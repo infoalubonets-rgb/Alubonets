@@ -1,0 +1,285 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Projects - Alubonets SHG</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Sora:wght@600;700&amp;display=swap" rel="stylesheet">
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#733500",
+                        "surface-dim": "#dadad8",
+                        "surface-tint": "#3b5ca3",
+                        "on-primary": "#ffffff",
+                        "primary-fixed-dim": "#b0c6ff",
+                        "surface-container-lowest": "#ffffff",
+                        "primary": "#001f50",
+                        "surface": "#f9f9f7",
+                        "on-primary-fixed": "#001945",
+                        "outline-variant": "#c4c6d2",
+                        "secondary-fixed-dim": "#ffb689",
+                        "on-tertiary-container": "#94a0b8",
+                        "tertiary-container": "#2b374b",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#fe8015",
+                        "on-surface": "#1a1c1b",
+                        "on-primary-fixed-variant": "#204489",
+                        "tertiary-fixed-dim": "#bbc7e0",
+                        "surface-variant": "#e2e3e1",
+                        "outline": "#747782",
+                        "on-background": "#1a1c1b",
+                        "inverse-surface": "#2f3130",
+                        "primary-container": "#063378",
+                        "tertiary-fixed": "#d7e3fd",
+                        "on-surface-variant": "#434651",
+                        "inverse-on-surface": "#f1f1ef",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed": "#101c2f",
+                        "on-secondary": "#ffffff",
+                        "surface-container-highest": "#e2e3e1",
+                        "on-tertiary-fixed-variant": "#3b475c",
+                        "surface-container-high": "#e8e8e6",
+                        "on-secondary-container": "#5f2b00",
+                        "inverse-primary": "#b0c6ff",
+                        "on-primary-container": "#7f9ee9",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#311300",
+                        "background": "#f9f9f7",
+                        "primary-fixed": "#d9e2ff",
+                        "surface-bright": "#f9f9f7",
+                        "secondary": "#974800",
+                        "surface-container": "#eeeeec",
+                        "secondary-fixed": "#ffdbc7",
+                        "tertiary": "#162235",
+                        "surface-container-low": "#f4f4f2"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "gutter": "24px",
+                        "unit": "8px",
+                        "xl": "40px",
+                        "md": "16px",
+                        "sm": "8px",
+                        "xxl": "64px",
+                        "xs": "4px",
+                        "container-max": "1200px"
+                    },
+                    "fontFamily": {
+                        "h1": ["Sora"],
+                        "h1-mobile": ["Sora"],
+                        "h3": ["Sora"],
+                        "h2-mobile": ["Sora"],
+                        "h2": ["Sora"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-bold": ["Inter"],
+                        "caption": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h1": ["40px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h1-mobile": ["32px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "h3": ["24px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "h2-mobile": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "h2": ["32px", { "lineHeight": "1.3", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "label-bold": ["14px", { "lineHeight": "1.4", "fontWeight": "600" }],
+                        "caption": ["12px", { "lineHeight": "1.4", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased flex flex-col min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface-dim sticky top-0 w-full border-b border-outline-variant z-50">
+<div class="flex justify-between items-center h-20 px-md md:px-lg max-w-container-max mx-auto">
+<div class="flex items-center gap-sm"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnSzS3JcCrGOIYnlA_odPQfW_EPHR1u48LU3KS766KoVD3igIme0EQq0vqNQG3PooaTM2bQqbTmk0RImwZPTDU2sdNN8x8Ewm1oKnJaxZir_KAlNdgRMYz9EyDkfErXWWvZg0JTfdI-WD5J0fK-SLORJPmc2el4H64y1qLg_W15yfg59vO479BZ_O3blOrXFo_F3Ht3cNs44g0jJDLYDrGYmavEdni6HS_DFgt8SvyLJk8W-BIPKiPF2oGxWdN9ncMpZo" alt="Alubonets SHG Logo" class="h-16 w-auto object-cover"><span class="font-h3 text-h3 text-primary">Alubonets</span></div>
+<nav class="hidden md:flex gap-lg h-full items-center">
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="index.html">Home</a>
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="about.html">About</a>
+<a class="text-secondary font-bold border-b-2 border-secondary pb-1 h-full flex items-center active:scale-95 transition-transform" href="projects.html">Projects</a>
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="gallery.html">Gallery</a>
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="contact.html">Contact</a>
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform text-xs" href="admin.html">Admin</a>
+</nav>
+<div class="flex items-center gap-md">
+<button class="bg-secondary-container text-on-primary font-label-bold text-label-bold px-md py-sm rounded-lg min-h-[48px] hover:opacity-90 transition-opacity flex items-center justify-center hidden md:flex" onclick="openAuthModal()">Login / Register</button>
+<button class="md:hidden text-primary flex items-center justify-center p-sm">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-grow w-full max-w-container-max mx-auto px-md md:px-lg py-lg md:py-xl">
+<!-- Tabs -->
+<div class="flex flex-wrap gap-sm justify-center mb-xl">
+<button class="px-md py-sm rounded-full bg-secondary-container text-on-primary font-label-bold text-label-bold min-h-[48px]">All</button>
+<button class="px-md py-sm rounded-full bg-surface-container text-on-surface-variant font-label-bold text-label-bold min-h-[48px] border border-outline-variant hover:bg-surface-variant transition-colors">Ongoing</button>
+<button class="px-md py-sm rounded-full bg-surface-container text-on-surface-variant font-label-bold text-label-bold min-h-[48px] border border-outline-variant hover:bg-surface-variant transition-colors">Completed</button>
+<button class="px-md py-sm rounded-full bg-surface-container text-on-surface-variant font-label-bold text-label-bold min-h-[48px] border border-outline-variant hover:bg-surface-variant transition-colors">Upcoming</button>
+</div>
+<!-- Project Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-lg mb-xxl">
+<!-- Card 1 -->
+<article class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden flex flex-col h-full hover:shadow-[0_4px_12px_rgba(20,32,51,0.05)] transition-shadow duration-300">
+<div class="w-full aspect-video bg-surface-variant relative">
+<img alt="" class="object-cover w-full h-full" data-alt="A detailed, realistic photograph of a modern, efficient agricultural setup in rural Kenya, showcasing a community-funded irrigation system. Bright sunlight illuminates the vibrant green crops, reflecting off the clean water channels. The scene feels hopeful, structured, and deeply connected to the local environment, fitting a professional yet warm community project aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfdYy4Sv_5gG6SgeBu4amwE1DDLStAGxcunb1Iu2qEbynVjfAuaAtqDB6wBv6xXYxqz2zB8x6OooTYexc99vYV6M6bD0X2GuWTU44qNsYuIUJEd0Ov6mgiEofahLG-ooCnqvBc-icI-ziTaJqfsfiJCAcK8B_AB-xkE1k0Uv_0IFxftkHTRJrxYhcrYN5c7e_rIvMt-YPsqdwigmHbYvp6q8g6seWlYfaooDgmw09rH0irYj_YOAV9Uw">
+<span class="absolute top-sm right-sm bg-green-100 text-green-800 font-caption text-caption px-sm py-xs rounded-full border border-green-200">Ongoing</span>
+</div>
+<div class="p-lg flex flex-col flex-grow"><h3 class="font-h3 text-h3 text-primary mb-sm">Welfare Fund Initiative</h3><p class="font-body-md text-body-md text-on-surface-variant mb-lg flex-grow">Providing support to members during emergencies and important family events.</p><a class="font-label-bold text-label-bold text-primary-container hover:text-primary inline-flex items-center gap-xs mt-auto" href="#">View Details<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a></div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden flex flex-col h-full hover:shadow-[0_4px_12px_rgba(20,32,51,0.05)] transition-shadow duration-300">
+<div class="w-full aspect-video bg-surface-variant relative">
+<img alt="" class="object-cover w-full h-full" data-alt="A professional photograph of a diverse group of Kenyan adults gathered around a large wooden table in a well-lit community hall. They are collaboratively reviewing documents and ledgers, conveying a sense of transparency, trust, and mutual financial support. The lighting is warm and inviting, emphasizing the 'family' aspect of the banking initiative." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZgdHyKmCGz_o5KBJdu72GMMYkqxSWbeacN93sW4OWqsVfN-VugIhVA-DOXqT5al9xv9Etd-ihdRePfHEVWqz5DIw2XCTMdJ2nKwMj5ICkYoFcuMSeKxVq3Zrq4c5Kd1tSXgEC_fOROvHDW5ZC-Ox6fRIi28TYA05fqO7RagIVRgfP52QFokujjOAaYh0rSP8NkX2qc1Hov4lu07GLI3ruEJnZEVlCcy1lblMrSu4hQg4zOgVKcbdzMg">
+<span class="absolute top-sm right-sm bg-blue-100 text-blue-800 font-caption text-caption px-sm py-xs rounded-full border border-blue-200">Completed</span>
+</div>
+<div class="p-lg flex flex-col flex-grow"><div class="border-b border-surface-container-highest pb-sm mb-sm"><h3 class="font-h3 text-h3 text-primary">Table Banking Initiative</h3></div><p class="font-body-md text-body-md text-on-surface-variant mb-lg flex-grow">Encouraging savings, investment and financial collaboration among members.</p><a class="font-label-bold text-label-bold text-primary-container hover:text-primary inline-flex items-center gap-xs mt-auto" href="#">View Details<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a></div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden flex flex-col h-full hover:shadow-[0_4px_12px_rgba(20,32,51,0.05)] transition-shadow duration-300">
+<div class="w-full aspect-video bg-surface-variant relative">
+<img alt="" class="object-cover w-full h-full" data-alt="A wide-angle, bright photograph showing a newly installed, modern community borehole in a rural Kenyan setting. Clean, clear water flows steadily into a structured collection area. The structure is built with neat brickwork and metal piping. The image conveys progress, health, and a vital community resource, captured in natural, optimistic daylight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtu48U4hW3OFz0P7OeCNee8BQVs0Fz7-5gBUl6sxuMnydUpZdl96iADgANjoSkGY7vVH5GqWjjTK8ORi9wDmMX9jbHJhsBkqDmdIVdlXnbdJlEjyPUbF9g0h8yWoUlis6PBI2_99aH1bkYptszfNbzN31c7sEdo3IqjrMHO36immmp8I4X3LcNGdZ5gPmFsqZKIzeaQE4PZE6ZA8DewT7IzyjN9E2fxftCaKkd_UoKjP42tRriy0RtWw">
+<span class="absolute top-sm right-sm bg-green-100 text-green-800 font-caption text-caption px-sm py-xs rounded-full border border-green-200">Ongoing</span>
+</div>
+<div class="p-lg flex flex-col flex-grow"><h3 class="font-h3 text-h3 text-primary mb-sm">Community Borehole Project</h3><p class="font-body-md text-body-md text-on-surface-variant mb-lg flex-grow">Improving access to clean and reliable water for the community.</p><a class="font-label-bold text-label-bold text-primary-container hover:text-primary inline-flex items-center gap-xs mt-auto" href="#">View Details<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a></div>
+</article>
+<!-- Card 4 -->
+<article class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden flex flex-col h-full hover:shadow-[0_4px_12px_rgba(20,32,51,0.05)] transition-shadow duration-300">
+<div class="w-full aspect-video bg-surface-variant relative">
+<img alt="" class="object-cover w-full h-full" data-alt="A vibrant, engaging photo of a young Kenyan entrepreneur proudly standing in front of a small, newly stocked modern retail shop. The lighting is bright and energetic. The shop looks organized and promising. The overall mood is optimistic and forward-looking, highlighting the success of youth empowerment programs." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCP2vv9U7rF3U2135dOaU7NfE63R21qtCWecXW1hdYdfmQOa8bv88igMnVGVaYCnHVg91GTIUuHdE8T7zeRedoz0VTRyr8_Ib5JgYUl50haQeY_-mPeh9XoE-MbRGfoP-Dtdh0xarETml_jegJBNzTW7oW9tGOfUTb0ar0sMUTNzznkKqsAW9aKuYKy56hM0u5H6Bhxl0v51Q7awrAE61208Youd1avi9PbESSa0DK4vpyAvpto7V17Tw">
+<span class="absolute top-sm right-sm bg-orange-100 text-orange-800 font-caption text-caption px-sm py-xs rounded-full border border-orange-200">Upcoming</span>
+</div>
+<div class="p-lg flex flex-col flex-grow"><h3 class="font-h3 text-h3 text-primary mb-sm">Youth Business Fund</h3><p class="font-body-md text-body-md text-on-surface-variant mb-lg flex-grow">Supporting young family members in starting and growing small businesses.</p><a class="font-label-bold text-label-bold text-primary-container hover:text-primary inline-flex items-center gap-xs mt-auto" href="#">View Details<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a></div>
+</article>
+<!-- Card 5 -->
+<article class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden flex flex-col h-full hover:shadow-[0_4px_12px_rgba(20,32,51,0.05)] transition-shadow duration-300">
+<div class="w-full aspect-video bg-surface-variant relative">
+<img alt="" class="object-cover w-full h-full" data-alt="A beautifully composed photograph of a lush, expansive piece of green land in Kenya under a clear blue sky. In the foreground, a neat pile of surveying markers or a formal document folder rests on a modest wooden post, symbolizing official ownership and acquisition. The scene is peaceful, secure, and visually represents long-term investment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfdYy4Sv_5gG6SgeBu4amwE1DDLStAGxcunb1Iu2qEbynVjfAuaAtqDB6wBv6xXYxqz2zB8x6OooTYexc99vYV6M6bD0X2GuWTU44qNsYuIUJEd0Ov6mgiEofahLG-ooCnqvBc-icI-ziTaJqfsfiJCAcK8B_AB-xkE1k0Uv_0IFxftkHTRJrxYhcrYN5c7e_rIvMt-YPsqdwigmHbYvp6q8g6seWlYfaooDgmw09rH0irYj_YOAV9Uw">
+<span class="absolute top-sm right-sm bg-green-100 text-green-800 font-caption text-caption px-sm py-xs rounded-full border border-green-200">Ongoing</span>
+</div>
+<div class="p-lg flex flex-col flex-grow"><div class="border-b border-surface-container-highest pb-sm mb-sm"><h3 class="font-h3 text-h3 text-primary">Family Land Title Acquisition</h3></div><p class="font-body-md text-body-md text-on-surface-variant mb-lg flex-grow">Coordinating documentation and ownership processes for family property.</p><a class="font-label-bold text-label-bold text-primary-container hover:text-primary inline-flex items-center gap-xs mt-auto" href="#">View Details<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a></div>
+</article>
+<!-- Card 6 -->
+<article class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden flex flex-col h-full hover:shadow-[0_4px_12px_rgba(20,32,51,0.05)] transition-shadow duration-300">
+<div class="w-full aspect-video bg-surface-variant relative">
+<img alt="" class="object-cover w-full h-full" data-alt="A heartwarming, high-quality image of Kenyan students in neat uniforms walking happily towards a modern, well-maintained school building. The morning sun casts long, gentle shadows, creating a bright and inspiring atmosphere. The image focuses on the students' focused expressions and the idea of a bright future enabled by community support." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZgdHyKmCGz_o5KBJdu72GMMYkqxSWbeacN93sW4OWqsVfN-VugIhVA-DOXqT5al9xv9Etd-ihdRePfHEVWqz5DIw2XCTMdJ2nKwMj5ICkYoFcuMSeKxVq3Zrq4c5Kd1tSXgEC_fOROvHDW5ZC-Ox6fRIi28TYA05fqO7RagIVRgfP52QFokujjOAaYh0rSP8NkX2qc1Hov4lu07GLI3ruEJnZEVlCcy1lblMrSu4hQg4zOgVKcbdzMg">
+<span class="absolute top-sm right-sm bg-blue-100 text-blue-800 font-caption text-caption px-sm py-xs rounded-full border border-blue-200">Completed</span>
+</div>
+<div class="p-lg flex flex-col flex-grow"><h3 class="font-h3 text-h3 text-primary mb-sm">Education Support Fund</h3><p class="font-body-md text-body-md text-on-surface-variant mb-lg flex-grow">Assisting deserving students with educational opportunities and support.</p><a class="font-label-bold text-label-bold text-primary-container hover:text-primary inline-flex items-center gap-xs mt-auto" href="#">View Details<span class="material-symbols-outlined text-[16px]">arrow_forward</span></a></div>
+</article>
+</div>
+</main>
+<!-- Member CTA Section -->
+<section class="bg-surface-container-low py-xl px-lg w-full border-t border-outline-variant mt-auto">
+<div class="max-w-container-max mx-auto flex flex-col md:flex-row items-center justify-between gap-lg bg-surface-container-lowest p-lg rounded-xl border border-outline-variant">
+<div class="flex items-center gap-md">
+<div class="bg-primary-fixed w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-primary text-[24px]">lock</span>
+</div>
+<div>
+<h4 class="font-h3 text-h3 text-primary mb-xs">Want the full financial breakdown?</h4>
+<p class="font-body-md text-body-md text-on-surface-variant">Log in as a member to view detailed reports, contributions, and progress tracking for all projects.</p>
+</div>
+</div>
+<button class="bg-secondary-container text-on-primary font-label-bold text-label-bold px-lg py-sm rounded-lg min-h-[48px] whitespace-nowrap hover:bg-secondary transition-colors duration-200 w-full md:w-auto">
+                Member Login
+            </button>
+</div>
+</section>
+<!-- Footer -->
+<footer class="bg-primary dark:bg-primary-container text-on-primary dark:text-on-primary-container font-body-md text-body-md w-full mt-auto">
+<div class="max-w-container-max mx-auto px-md md:px-lg py-lg md:py-xxl">
+<!-- Footer Grid: Responsive Layout -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-lg mb-xl">
+<!-- Column 1: Brand & Mission -->
+<div class="col-span-1">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAn57v5Ymo1x8sbwwTMwftgrNsv6q79gxLwVPWTgXlVoUihx2k3HxBBQYb5rBArH5kGwh3PXiU3mnEOnG1Vc4oQrMd-YAdEETRoAfemHCyXg4yrg1juvMejcPBAnak3k-ol6RBPVJAIORuxgkhvz6wpReOJqlnwyatoIJxleHG4VQJB3_I-I1H72Yb-tmG5HLwfSX-2vQPKOm6n0dgzjKu8-UrguwIMNYPhQBV05JAyCNpDoG_JP1OaX0pnfOvmETgnJwQ" alt="Alubonets SHG Logo" class="h-16 w-auto object-contain mb-md">
+<p class="text-on-primary/80 dark:text-on-primary-container/80 text-sm leading-relaxed">One Family, One Vision, Endless Possibilities.</p>
+</div>
+
+<!-- Column 2: Quick Links -->
+<div class="col-span-1">
+<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Quick Links</h4>
+<nav class="flex flex-col gap-sm">
+<a href="index.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Home</a>
+<a href="about.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">About</a>
+<a href="projects.html" class="text-secondary-fixed font-bold hover:text-secondary transition-colors duration-200">Projects</a>
+</nav>
+</div>
+
+<!-- Column 3: Explore -->
+<div class="col-span-1">
+<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Explore</h4>
+<nav class="flex flex-col gap-sm">
+<a href="gallery.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Gallery</a>
+<a href="contact.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Contact</a>
+<a href="#" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Admin</a>
+</nav>
+</div>
+
+<!-- Column 4: Contact Info -->
+<div class="col-span-1">
+<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Get in Touch</h4>
+<div class="flex flex-col gap-md">
+<div class="flex items-start gap-sm">
+<span class="material-symbols-outlined text-base flex-shrink-0 mt-xs">mail</span>
+<a href="mailto:info@alubonetsshg.org" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">info@alubonetsshg.org</a>
+</div>
+<div class="flex items-start gap-sm">
+<span class="material-symbols-outlined text-base flex-shrink-0 mt-xs">call</span>
+<a href="tel:+254700000000" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">+254 700 000 000</a>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Divider -->
+<div class="border-t border-on-primary/10 dark:border-on-primary-container/10 pt-lg">
+<!-- Footer Bottom: Copyright & Legal -->
+<div class="flex flex-col sm:flex-row items-center justify-between gap-md text-sm">
+<p class="text-on-primary/60 dark:text-on-primary-container/60">© 2026 Alubonets Self-Help Group. All rights reserved.</p>
+<div class="flex gap-lg text-on-primary/60 dark:text-on-primary-container/60">
+<a href="#" class="hover:text-on-primary dark:hover:text-on-primary-container transition-colors duration-200">Privacy Policy</a>
+<a href="#" class="hover:text-on-primary dark:hover:text-on-primary-container transition-colors duration-200">Terms of Service</a>
+</div>
+</div>
+</div>
+</div>
+</footer>
+
+
+
+
+
+
+
+
+</body></html>

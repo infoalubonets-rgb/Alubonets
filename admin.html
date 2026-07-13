@@ -1,0 +1,488 @@
+<!DOCTYPE html><html lang="en" style=""><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Sora:wght@600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet"><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">try{
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+                  "tertiary-fixed": "#d7e3fd",
+                  "on-secondary-container": "#5f2b00",
+                  "error-container": "#ffdad6",
+                  "on-error": "#ffffff",
+                  "on-surface": "#1a1c1b",
+                  "tertiary-container": "#2b374b",
+                  "secondary-fixed-dim": "#ffb689",
+                  "inverse-primary": "#b0c6ff",
+                  "tertiary": "#162235",
+                  "on-primary-fixed": "#001945",
+                  "secondary": "#974800",
+                  "on-primary-fixed-variant": "#204489",
+                  "on-tertiary-container": "#94a0b8",
+                  "error": "#ba1a1a",
+                  "tertiary-fixed-dim": "#bbc7e0",
+                  "primary-container": "#063378",
+                  "surface-dim": "#dadad8",
+                  "on-secondary": "#ffffff",
+                  "surface-container-high": "#e8e8e6",
+                  "surface-container": "#eeeeec",
+                  "on-primary": "#ffffff",
+                  "outline": "#747782",
+                  "surface-tint": "#3b5ca3",
+                  "on-secondary-fixed-variant": "#733500",
+                  "on-primary-container": "#7f9ee9",
+                  "surface-container-highest": "#e2e3e1",
+                  "surface-variant": "#e2e3e1",
+                  "secondary-fixed": "#ffdbc7",
+                  "outline-variant": "#c4c6d2",
+                  "inverse-on-surface": "#f1f1ef",
+                  "primary": "#001f50",
+                  "on-tertiary": "#ffffff",
+                  "on-secondary-fixed": "#311300",
+                  "on-tertiary-fixed-variant": "#3b475c",
+                  "on-background": "#1a1c1b",
+                  "inverse-surface": "#2f3130",
+                  "secondary-container": "#fe8015",
+                  "surface-container-low": "#f4f4f2",
+                  "surface": "#f9f9f7",
+                  "surface-bright": "#f9f9f7",
+                  "primary-fixed": "#d9e2ff",
+                  "on-tertiary-fixed": "#101c2f",
+                  "primary-fixed-dim": "#b0c6ff",
+                  "on-error-container": "#93000a",
+                  "background": "#f9f9f7",
+                  "on-surface-variant": "#434651",
+                  "surface-container-lowest": "#ffffff"
+          },
+          "borderRadius": {
+                  "DEFAULT": "0.25rem",
+                  "lg": "0.5rem",
+                  "xl": "0.75rem",
+                  "full": "9999px"
+          },
+          "spacing": {
+                  "lg": "24px",
+                  "xxl": "64px",
+                  "xs": "4px",
+                  "unit": "8px",
+                  "sm": "8px",
+                  "gutter": "24px",
+                  "container-max": "1200px",
+                  "xl": "40px",
+                  "md": "16px"
+          },
+          "fontFamily": {
+                  "h2-mobile": [
+                          "Sora"
+                  ],
+                  "body-lg": [
+                          "Inter"
+                  ],
+                  "caption": [
+                          "Inter"
+                  ],
+                  "body-md": [
+                          "Inter"
+                  ],
+                  "label-bold": [
+                          "Inter"
+                  ],
+                  "h2": [
+                          "Sora"
+                  ],
+                  "h1-mobile": [
+                          "Sora"
+                  ],
+                  "h1": [
+                          "Sora"
+                  ],
+                  "h3": [
+                          "Sora"
+                  ]
+          },
+          "fontSize": {
+                  "h2-mobile": [
+                          "24px",
+                          {
+                                  "lineHeight": "1.3",
+                                  "fontWeight": "600"
+                          }
+                  ],
+                  "body-lg": [
+                          "18px",
+                          {
+                                  "lineHeight": "1.6",
+                                  "fontWeight": "400"
+                          }
+                  ],
+                  "caption": [
+                          "12px",
+                          {
+                                  "lineHeight": "1.4",
+                                  "fontWeight": "500"
+                          }
+                  ],
+                  "body-md": [
+                          "16px",
+                          {
+                                  "lineHeight": "1.5",
+                                  "fontWeight": "400"
+                          }
+                  ],
+                  "label-bold": [
+                          "14px",
+                          {
+                                  "lineHeight": "1.4",
+                                  "fontWeight": "600"
+                          }
+                  ],
+                  "h2": [
+                          "32px",
+                          {
+                                  "lineHeight": "1.3",
+                                  "fontWeight": "600"
+                          }
+                  ],
+                  "h1-mobile": [
+                          "32px",
+                          {
+                                  "lineHeight": "1.2",
+                                  "fontWeight": "700"
+                          }
+                  ],
+                  "h1": [
+                          "40px",
+                          {
+                                  "lineHeight": "1.2",
+                                  "letterSpacing": "-0.02em",
+                                  "fontWeight": "700"
+                          }
+                  ],
+                  "h3": [
+                          "24px",
+                          {
+                                  "lineHeight": "1.4",
+                                  "fontWeight": "600"
+                          }
+                  ]
+          }
+        },
+      },
+    }
+  }catch(_e){}</script><meta charset="utf-8"></head><body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface-dim sticky top-0 w-full border-b border-outline-variant z-50">
+<div class="flex justify-between items-center h-20 px-md md:px-lg max-w-container-max mx-auto">
+<div class="flex items-center gap-sm"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnSzS3JcCrGOIYnlA_odPQfW_EPHR1u48LU3KS766KoVD3igIme0EQq0vqNQG3PooaTM2bQqbTmk0RImwZPTDU2sdNN8x8Ewm1oKnJaxZir_KAlNdgRMYz9EyDkfErXWWvZg0JTfdI-WD5J0fK-SLORJPmc2el4H64y1qLg_W15yfg59vO479BZ_O3blOrXFo_F3Ht3cNs44g0jJDLYDrGYmavEdni6HS_DFgt8SvyLJk8W-BIPKiPF2oGxWdN9ncMpZo" alt="Alubonets SHG Logo" class="h-16 w-auto object-cover"><span class="font-h3 text-h3 text-primary">Alubonets</span></div>
+<nav class="hidden md:flex gap-lg h-full items-center">
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="index.html">Home</a>
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="about.html">About</a>
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="projects.html">Projects</a>
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="gallery.html">Gallery</a>
+<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="contact.html">Contact</a>
+</nav>
+<div class="flex items-center gap-md">
+<button class="bg-secondary-container text-on-primary font-label-bold text-label-bold px-md py-sm rounded-lg min-h-[48px] hover:opacity-90 transition-opacity flex items-center justify-center hidden md:flex">Login / Register</button>
+<button class="md:hidden text-primary flex items-center justify-center p-sm">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="bg-primary dark:bg-tertiary-container text-on-primary dark:text-on-tertiary-container font-label-bold text-label-bold h-screen w-64 fixed left-0 top-20 shadow-md flex flex-col py-md z-40 overflow-y-auto">
+<div class="px-md mb-8 flex items-center space-x-3">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdftVT0b5kRl1qFFsclxaUAbXkDvijpgsYIZwtlv-i0BPSIPnLvPIu2ogx0ddz-HKa8BYpLouaIS-_zCjRCi89EtRrqBjGiAALHMFQ7l1vdNH8FqsYT0ZRKvPpcIimPglYSDOokQdCvH4KfZ06-A2jQpBWh81fRP1zJSZGv-m2Mjm5cOI2dgAYs-XDFFuAM4NhmYLnTkPoOEPLcqBx6yYLVH22UdYeHYZq9344zgQpfFoLSIwQB53hT0Ouy4cZkEhnYQE" alt="Alubonets Logo" class="h-10 w-10 rounded-full bg-white p-1">
+<div>
+<h1 class="font-h3 text-h3 font-bold text-on-primary">Alubonets</h1>
+<p class="font-caption text-caption text-primary-fixed-dim">Admin Dashboard</p>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto px-2 space-y-1">
+<a href="#" class="bg-secondary-container text-on-secondary-container rounded-lg mx-2 my-1 flex items-center px-3 py-2 duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3" data-original-icon="dashboard">dashboard</span>
+            Dashboard
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3" data-original-icon="person_add">person_add</span>
+            Pending Registrations
+            <span class="ml-auto bg-secondary text-white text-xs py-0.5 px-2 rounded-full">7</span>
+</a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3">group</span>
+            Members
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3" data-original-icon="admin_panel_settings">admin_panel_settings</span>
+            Roles &amp; Permissions
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3" data-original-icon="payments">payments</span>
+            Contributions
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3" data-original-icon="assignment">assignment</span>
+            Projects
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3">event</span>
+            Events
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3" data-original-icon="photo_library">photo_library</span>
+            Gallery
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3">folder</span>
+            Documents
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3">analytics</span>
+            Reports
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3">history</span>
+            Audit Logs
+        </a>
+<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
+<span class="material-symbols-outlined mr-3">settings</span>
+            Settings
+        </a>
+</nav>
+
+</aside>
+<!-- Main Content Wrapper -->
+<div class="ml-64 flex-1 flex flex-col min-w-0">
+<!-- TopNavBar -->
+<header class="bg-surface-container-lowest dark:bg-surface-container-low text-primary dark:text-primary-fixed-dim font-body-md text-body-md w-full h-16 border-b border-outline-variant dark:border-outline flat no shadows sticky top-0 z-40 flex items-center justify-between px-md w-full">
+<div class="flex-1 flex items-center max-w-md ml-4">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input type="text" placeholder="Search members, reports..." class="w-full pl-10 pr-4 py-2 bg-surface-container rounded-lg border-none focus:ring-2 focus:ring-primary text-sm">
+</div>
+</div>
+<div class="flex items-center space-x-6">
+<button class="relative text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute -top-1 -right-1 bg-secondary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>
+</button>
+<div class="flex items-center space-x-3 cursor-pointer active:opacity-80">
+<div class="text-right hidden sm:block">
+<p class="font-label-bold text-sm text-on-surface">Admin User</p>
+<p class="font-caption text-xs text-on-surface-variant">System Admin</p>
+</div>
+<img class="h-10 w-10 rounded-full border border-outline-variant object-cover" data-alt="A professional close up portrait photo of a corporate administrator in a modern office, softly lit with cool natural light, creating an approachable yet authoritative tone. Bright whites and deep navy tones dominate the palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwQiXo0nXYyCFnixY4wCRHhmplnTYwjdVUcJDeFaBnkXINyVS27aW2lBcOLc19A6siGXuuIDfUcYMIeVvB44QI4Fno2WTYTHBtXuzZm-EtuD11YyCR_VoDaVHwmOv9DlqGdzNdTvVL1NcXMb-MuXgq0hcXHei5EWXae-FBz_KIwd0oXALoijK4pwJSezigf5bKrt9Mhdk91DvC6PYuTN5VKJTjauFVbuDdszH5UhYZWLxALpDxj2bWlg">
+</div>
+</div>
+</header>
+<!-- Scrollable Main Content -->
+<main class="flex-1 overflow-y-auto space-y-xl px-lg pt-lg ml-64">
+<!-- Summary Cards -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-md">
+<div class="bg-white rounded-xl border border-outline-variant p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<p class="font-caption text-on-surface-variant uppercase tracking-wide">Total Members</p>
+<div class="bg-primary-fixed p-2 rounded-lg text-primary">
+<span class="material-symbols-outlined">group</span>
+</div>
+</div>
+<h3 class="font-h2 text-h2 text-on-surface">152</h3>
+</div>
+<div class="bg-white rounded-xl border border-outline-variant p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<p class="font-caption text-on-surface-variant uppercase tracking-wide">Active Members</p>
+<div class="bg-[#dcfce7] p-2 rounded-lg text-[#166534]">
+<span class="material-symbols-outlined">verified_user</span>
+</div>
+</div>
+<h3 class="font-h2 text-h2 text-on-surface">145</h3>
+</div>
+<div class="bg-white rounded-xl border-2 border-secondary-container p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-1 bg-secondary-container"></div>
+<div class="flex justify-between items-start mb-4">
+<p class="font-caption text-secondary-container font-bold uppercase tracking-wide">Pending Approvals</p>
+<div class="bg-secondary-fixed p-2 rounded-lg text-secondary">
+<span class="material-symbols-outlined">hourglass_empty</span>
+</div>
+</div>
+<h3 class="font-h2 text-h2 text-secondary-container">7</h3>
+</div>
+<div class="bg-white rounded-xl border border-outline-variant p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<p class="font-caption text-on-surface-variant uppercase tracking-wide">Contributions (Month)</p>
+<div class="bg-tertiary-fixed p-2 rounded-lg text-tertiary">
+<span class="material-symbols-outlined">payments</span>
+</div>
+</div>
+<h3 class="font-h3 text-h3 text-on-surface">KES 45k</h3>
+</div>
+<div class="bg-white rounded-xl border border-outline-variant p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow">
+<div class="flex justify-between items-start mb-4">
+<p class="font-caption text-on-surface-variant uppercase tracking-wide">Upcoming Events</p>
+<div class="bg-primary-fixed-dim p-2 rounded-lg text-primary">
+<span class="material-symbols-outlined">event</span>
+</div>
+</div>
+<h3 class="font-h2 text-h2 text-on-surface">2</h3>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+<!-- Main Content Area Left (Spans 2 cols) -->
+<div class="lg:col-span-2 space-y-xl">
+<!-- Pending Registrations Panel -->
+<div class="bg-white rounded-xl border border-outline-variant overflow-hidden">
+<div class="p-lg border-b border-surface-container-highest flex justify-between items-center">
+<h2 class="font-h3 text-h3 text-primary">Pending Registrations</h2>
+<button class="text-secondary font-label-bold hover:underline">View All</button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-surface-container-highest font-label-bold text-on-surface-variant">
+<th class="py-3 px-lg">Name</th>
+<th class="py-3 px-lg">Phone</th>
+<th class="py-3 px-lg">Date Applied</th>
+<th class="py-3 px-lg text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-surface-container-highest">
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="py-4 px-lg font-medium text-on-surface">Michael Ochieng</td>
+<td class="py-4 px-lg text-on-surface-variant">+254 712 345 678</td>
+<td class="py-4 px-lg text-on-surface-variant">Oct 24, 2023</td>
+<td class="py-4 px-lg text-right space-x-2">
+<button class="px-3 py-1.5 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-xs hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
+<button class="px-3 py-1.5 bg-error-container text-on-error-container rounded-lg font-label-bold text-xs hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors bg-surface">
+<td class="py-4 px-lg font-medium text-on-surface">Sarah Wangari</td>
+<td class="py-4 px-lg text-on-surface-variant">+254 722 987 654</td>
+<td class="py-4 px-lg text-on-surface-variant">Oct 23, 2023</td>
+<td class="py-4 px-lg text-right space-x-2">
+<button class="px-3 py-1.5 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-xs hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
+<button class="px-3 py-1.5 bg-error-container text-on-error-container rounded-lg font-label-bold text-xs hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="py-4 px-lg font-medium text-on-surface">David Kipkorir</td>
+<td class="py-4 px-lg text-on-surface-variant">+254 733 456 789</td>
+<td class="py-4 px-lg text-on-surface-variant">Oct 21, 2023</td>
+<td class="py-4 px-lg text-right space-x-2">
+<button class="px-3 py-1.5 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-xs hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
+<button class="px-3 py-1.5 bg-error-container text-on-error-container rounded-lg font-label-bold text-xs hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Member Management Table Snippet -->
+<div class="bg-white rounded-xl border border-outline-variant overflow-hidden">
+<div class="p-lg border-b border-surface-container-highest flex justify-between items-center">
+<h2 class="font-h3 text-h3 text-primary">Member Overview</h2>
+<button class="text-primary font-label-bold hover:underline flex items-center">
+                            View Directory <span class="material-symbols-outlined ml-1 text-sm">arrow_forward</span>
+</button>
+</div>
+<div class="p-lg">
+<div class="bg-surface-container-low rounded-lg p-4 flex items-center justify-center border border-dashed border-outline-variant text-on-surface-variant">
+<!-- Placeholder for more complex table/bento layout -->
+<p class="">Member Management Table Content goes here...</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Sidebar Content-->
+<div class="space-y-lg">
+<!-- Quick Actions Bento -->
+<div class="bg-primary rounded-xl p-lg text-on-primary">
+<h3 class="font-h3 text-h3 mb-4">Quick Actions</h3>
+<div class="grid grid-cols-2 gap-sm">
+<button class="bg-primary-container hover:bg-tertiary transition-colors p-3 rounded-lg flex flex-col items-center justify-center text-center group border border-outline/20">
+<span class="material-symbols-outlined mb-2 text-on-primary-container group-hover:text-white transition-colors">campaign</span>
+<span class="font-caption text-xs">Add Announcement</span>
+</button>
+<button class="bg-primary-container hover:bg-tertiary transition-colors p-3 rounded-lg flex flex-col items-center justify-center text-center group border border-outline/20">
+<span class="material-symbols-outlined mb-2 text-on-primary-container group-hover:text-white transition-colors">download</span>
+<span class="font-caption text-xs">Export Members</span>
+</button>
+<button class="bg-primary-container hover:bg-tertiary transition-colors p-3 rounded-lg flex flex-col items-center justify-center text-center group border border-outline/20">
+<span class="material-symbols-outlined mb-2 text-on-primary-container group-hover:text-white transition-colors">manage_accounts</span>
+<span class="font-caption text-xs">Manage Roles</span>
+</button>
+<button class="bg-secondary hover:bg-[#b85800] transition-colors p-3 rounded-lg flex flex-col items-center justify-center text-center group border border-secondary-container">
+<span class="material-symbols-outlined mb-2 text-white">how_to_reg</span>
+<span class="font-caption text-xs text-white">Approve Members</span>
+</button>
+</div>
+</div>
+<!-- Recent Activity Feed -->
+
+<!-- Upcoming Events Widget -->
+
+</div>
+</div>
+</main>
+</div>
+
+<!-- Footer -->
+<footer class="bg-primary dark:bg-primary-container text-on-primary dark:text-on-primary-container font-body-md text-body-md w-full mt-auto">
+<div class="max-w-container-max mx-auto px-md md:px-lg py-lg md:py-xxl">
+<!-- Footer Grid: Responsive Layout -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-lg mb-xl">
+<!-- Column 1: Brand & Mission -->
+<div class="col-span-1">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAn57v5Ymo1x8sbwwTMwftgrNsv6q79gxLwVPWTgXlVoUihx2k3HxBBQYb5rBArH5kGwh3PXiU3mnEOnG1Vc4oQrMd-YAdEETRoAfemHCyXg4yrg1juvMejcPBAnak3k-ol6RBPVJAIORuxgkhvz6wpReOJqlnwyatoIJxleHG4VQJB3_I-I1H72Yb-tmG5HLwfSX-2vQPKOm6n0dgzjKu8-UrguwIMNYPhQBV05JAyCNpDoG_JP1OaX0pnfOvmETgnJwQ" alt="Alubonets SHG Logo" class="h-16 w-auto object-contain mb-md">
+<p class="text-on-primary/80 dark:text-on-primary-container/80 text-sm leading-relaxed">Empowering our community through collective action, accountability, and sustainable projects.</p>
+</div>
+
+<!-- Column 2: Quick Links -->
+<div class="col-span-1">
+<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Quick Links</h4>
+<nav class="flex flex-col gap-sm">
+<a href="index.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Home</a>
+<a href="about.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">About</a>
+<a href="projects.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Projects</a>
+</nav>
+</div>
+
+<!-- Column 3: Explore -->
+<div class="col-span-1">
+<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Explore</h4>
+<nav class="flex flex-col gap-sm">
+<a href="gallery.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Gallery</a>
+<a href="contact.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Contact</a>
+<a href="admin.html" class="text-secondary-fixed font-bold hover:text-secondary transition-colors duration-200">Admin</a>
+</nav>
+</div>
+
+<!-- Column 4: Contact Info -->
+<div class="col-span-1">
+<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Get in Touch</h4>
+<div class="flex flex-col gap-md">
+<div class="flex items-start gap-sm">
+<span class="material-symbols-outlined text-base flex-shrink-0 mt-xs">mail</span>
+<a href="mailto:info@alubonetsshg.org" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">info@alubonetsshg.org</a>
+</div>
+<div class="flex items-start gap-sm">
+<span class="material-symbols-outlined text-base flex-shrink-0 mt-xs">call</span>
+<a href="tel:+254700000000" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">+254 700 000 000</a>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Divider -->
+<div class="border-t border-on-primary/10 dark:border-on-primary-container/10 pt-lg">
+<!-- Footer Bottom: Copyright & Legal -->
+<div class="flex flex-col sm:flex-row items-center justify-between gap-md text-sm">
+<p class="text-on-primary/60 dark:text-on-primary-container/60">© 2026 Alubonets Self-Help Group. All rights reserved.</p>
+<div class="flex gap-lg text-on-primary/60 dark:text-on-primary-container/60">
+<a href="#" class="hover:text-on-primary dark:hover:text-on-primary-container transition-colors duration-200">Privacy Policy</a>
+<a href="#" class="hover:text-on-primary dark:hover:text-on-primary-container transition-colors duration-200">Terms of Service</a>
+</div>
+</div>
+</div>
+</div>
+</footer>
+
+</body></html>
