@@ -238,37 +238,57 @@
 </div>
 </div>
 </footer>
+
 <!-- Auth Modal -->
 <div id="authModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-md" onclick="closeAuthModal(event)">
-<div class="bg-surface rounded-2xl shadow-2xl w-full max-w-[340px] relative" onclick="event.stopPropagation()">
-<button onclick="closeAuthModal()" class="absolute top-md right-md text-on-surface-variant hover:text-on-surface transition-colors p-xs rounded-lg hover:bg-surface-container-high z-10"><span class="material-symbols-outlined text-[20px]">close</span></button>
-<div class="p-lg pt-xl">
-<div id="signin-content" class="auth-tab-content flex flex-col gap-sm">
-<h2 class="font-h3 text-h3 text-on-surface text-center mb-xs">Sign In</h2>
-<input type="email" placeholder="Email" class="bg-surface-container-low border border-transparent rounded-lg px-md py-[10px] font-body-md text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface focus:border-primary focus:ring-1 focus:ring-primary w-full transition-colors">
-<input type="password" placeholder="Password" class="bg-surface-container-low border border-transparent rounded-lg px-md py-[10px] font-body-md text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface focus:border-primary focus:ring-1 focus:ring-primary w-full transition-colors">
-<button type="button" onclick="switchAuthTab('forgot')" class="text-[12px] text-on-surface-variant hover:text-secondary transition-colors text-right">Forgot your password?</button>
-<button type="button" class="bg-secondary text-on-secondary font-label-bold text-label-bold py-[10px] rounded-lg hover:opacity-90 active:scale-95 transition-all min-h-[42px] w-full">Sign In</button>
+<div class="bg-surface rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+<!-- â”€â”€ Primary branded header â”€â”€ -->
+<div class="bg-primary px-lg pt-lg pb-md flex-shrink-0">
+<div class="flex items-start justify-between mb-md">
+<div>
+<h2 class="font-h3 text-h3 text-on-primary">Alubonets Account</h2>
+<p class="font-caption text-caption mt-xs" style="color:rgba(176,198,255,0.65)">Self-Help Group Member Portal</p>
+</div>
+<button onclick="closeAuthModal()" class="p-xs rounded-lg hover:bg-white/10 transition-colors ml-md flex-shrink-0 mt-xs" style="color:rgba(176,198,255,0.7)"><span class="material-symbols-outlined text-[22px]">close</span></button>
+</div>
+<div class="flex gap-xs">
+<button onclick="switchAuthTab('signin')" id="tab-signin" class="tab-btn">Sign In</button>
+<button onclick="switchAuthTab('signup')" id="tab-signup" class="tab-btn">Sign Up</button>
+<button onclick="switchAuthTab('forgot')" id="tab-forgot" class="tab-btn">Forgot?</button>
+</div>
+</div>
+<!-- â”€â”€ Scrollable content â”€â”€ -->
+<div class="p-lg overflow-y-auto flex-1">
+<!-- Sign In -->
+<div id="signin-content" class="auth-tab-content flex flex-col gap-md">
+<button type="button" class="w-full flex items-center justify-center gap-sm py-[9px] rounded-lg border border-outline-variant bg-white hover:bg-surface-container-low transition-colors font-label-bold text-[13px] text-on-surface shadow-sm">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="18" height="18"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+Continue with Google
+</button>
+<div class="flex items-center gap-md"><div class="flex-1 h-px bg-outline-variant"></div><span class="text-[12px] text-on-surface-variant font-caption">or</span><div class="flex-1 h-px bg-outline-variant"></div></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Email</label><input type="email" placeholder="your@email.com" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Password</label><input type="password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<button type="button" class="bg-secondary text-on-secondary font-label-bold text-label-bold py-[10px] rounded-lg hover:opacity-90 active:scale-95 transition-all min-h-[42px] w-full mt-xs">Sign In</button>
 <p class="text-center text-[13px] text-on-surface-variant">No account? <button type="button" onclick="switchAuthTab('signup')" class="text-secondary hover:underline font-bold">Sign Up</button></p>
 </div>
+<!-- Sign Up -->
 <div id="signup-content" class="auth-tab-content hidden flex flex-col gap-sm">
-<h2 class="font-h3 text-h3 text-on-surface text-center mb-xs">Sign Up</h2>
-<input type="text" placeholder="Full Name" class="bg-surface-container-low border border-transparent rounded-lg px-md py-[10px] font-body-md text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface focus:border-primary focus:ring-1 focus:ring-primary w-full transition-colors">
-<div class="grid grid-cols-2 gap-sm">
-<input type="email" placeholder="Email" class="bg-surface-container-low border border-transparent rounded-lg px-md py-[10px] font-body-md text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface focus:border-primary focus:ring-1 focus:ring-primary w-full transition-colors">
-<input type="tel" placeholder="Phone" class="bg-surface-container-low border border-transparent rounded-lg px-md py-[10px] font-body-md text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface focus:border-primary focus:ring-1 focus:ring-primary w-full transition-colors">
-</div>
-<div class="grid grid-cols-2 gap-sm">
-<input type="password" placeholder="Password" class="bg-surface-container-low border border-transparent rounded-lg px-md py-[10px] font-body-md text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface focus:border-primary focus:ring-1 focus:ring-primary w-full transition-colors">
-<input type="password" placeholder="Confirm" class="bg-surface-container-low border border-transparent rounded-lg px-md py-[10px] font-body-md text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface focus:border-primary focus:ring-1 focus:ring-primary w-full transition-colors">
-</div>
-<button type="button" class="bg-secondary text-on-secondary font-label-bold text-label-bold py-[10px] rounded-lg hover:opacity-90 active:scale-95 transition-all min-h-[42px] w-full">Create Account</button>
+<button type="button" class="w-full flex items-center justify-center gap-sm py-[9px] rounded-lg border border-outline-variant bg-white hover:bg-surface-container-low transition-colors font-label-bold text-[13px] text-on-surface shadow-sm">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="18" height="18"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+Sign up with Google
+</button>
+<div class="flex items-center gap-md"><div class="flex-1 h-px bg-outline-variant"></div><span class="text-[12px] text-on-surface-variant font-caption">or</span><div class="flex-1 h-px bg-outline-variant"></div></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Full Name</label><input type="text" placeholder="Your Name" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Email</label><input type="email" placeholder="your@email.com" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Phone</label><input type="tel" placeholder="+254 7** *** ***" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Password</label><input type="password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Confirm Password</label><input type="password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<button type="button" class="bg-secondary text-on-secondary font-label-bold text-label-bold py-[10px] rounded-lg hover:opacity-90 active:scale-95 transition-all min-h-[42px] w-full mt-sm">Create Account</button>
 <p class="text-center text-[13px] text-on-surface-variant">Have account? <button type="button" onclick="switchAuthTab('signin')" class="text-secondary hover:underline font-bold">Sign In</button></p>
 </div>
-<div id="forgot-content" class="auth-tab-content hidden flex flex-col gap-sm">
-<h2 class="font-h3 text-h3 text-on-surface text-center mb-xs">Reset Password</h2>
-<p class="text-center text-[13px] text-on-surface-variant -mt-xs mb-xs">Enter your email to receive a reset link.</p>
-<input type="email" placeholder="Email" class="bg-surface-container-low border border-transparent rounded-lg px-md py-[10px] font-body-md text-[14px] text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:bg-surface focus:border-primary focus:ring-1 focus:ring-primary w-full transition-colors">
+<!-- Forgot -->
+<div id="forgot-content" class="auth-tab-content hidden flex flex-col gap-md">
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Email</label><input type="email" placeholder="your@email.com" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
 <button type="button" class="bg-secondary text-on-secondary font-label-bold text-label-bold py-[10px] rounded-lg hover:opacity-90 active:scale-95 transition-all min-h-[42px] w-full">Send Reset Link</button>
 <p class="text-center text-[13px] text-on-surface-variant">Remember? <button type="button" onclick="switchAuthTab('signin')" class="text-secondary hover:underline font-bold">Sign In</button></p>
 </div>
@@ -276,9 +296,10 @@
 </div>
 </div>
 <script>
+(function(){var s=document.createElement('style');s.textContent='.tab-btn{flex:1;padding:6px 0;text-align:center;font-weight:600;font-size:13px;border-radius:8px;transition:all .15s;color:rgba(176,198,255,0.65)}.tab-btn-active{background:#fe8015;color:#5f2b00;font-weight:700}';document.head.appendChild(s);})();
 function openAuthModal(){document.getElementById('authModal').classList.remove('hidden');document.body.style.overflow='hidden';}
 function closeAuthModal(e){if(e&&e.target.id!=='authModal')return;document.getElementById('authModal').classList.add('hidden');document.body.style.overflow='';}
-function switchAuthTab(t){document.querySelectorAll('.auth-tab-content').forEach(c=>c.classList.add('hidden'));const c=document.getElementById(t+'-content');if(c)c.classList.remove('hidden');}
+function switchAuthTab(t){document.querySelectorAll('.auth-tab-content').forEach(c=>c.classList.add('hidden'));document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('tab-btn-active'));const c=document.getElementById(t+'-content');if(c)c.classList.remove('hidden');const b=document.getElementById('tab-'+t);if(b)b.classList.add('tab-btn-active');}
 document.addEventListener('DOMContentLoaded',()=>switchAuthTab('signin'));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAuthModal();});
 </script>
