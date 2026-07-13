@@ -199,10 +199,38 @@ tailwind.config = {
       <div class="flex items-center justify-between">
         <div>
           <h1 class="font-h2 text-h2 text-primary dark:text-primary-fixed-dim">Dashboard</h1>
-          <p class="font-body-md text-body-md text-on-surface-variant dark:text-blue-200/60 mt-xs">Welcome back. Here's what's happening today.</p>
+          <p class="font-body-md text-body-md text-on-surface-variant dark:text-blue-200/60 mt-xs" id="welcomeMessage">Welcome back. Here's what's happening today.</p>
         </div>
         <span class="font-caption text-caption text-on-surface-variant dark:text-blue-200/60 bg-surface-container dark:bg-[#0d1729] px-md py-xs rounded-full border border-outline-variant dark:border-[#1a2d4f]">July 2026</span>
       </div>
+
+      <!-- Welcome Message Script -->
+      <script>
+        function updateWelcomeMessage() {
+          const hour = new Date().getHours();
+          let greeting;
+          
+          if (hour < 12) {
+            greeting = "Good morning";
+          } else if (hour < 18) {
+            greeting = "Good afternoon";
+          } else {
+            greeting = "Good evening";
+          }
+          
+          // Get admin name from localStorage or use default
+          const adminName = localStorage.getItem('adminName') || 'Collins';
+          
+          const message = `${greeting}, ${adminName}.`;
+          document.getElementById('welcomeMessage').textContent = message;
+        }
+        
+        // Update on page load
+        updateWelcomeMessage();
+        
+        // Update every minute
+        setInterval(updateWelcomeMessage, 60000);
+      </script>
 
       <!-- ── Stat Cards ── -->
       <section class="grid grid-cols-2 lg:grid-cols-5 gap-md">
