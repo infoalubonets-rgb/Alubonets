@@ -1,636 +1,388 @@
-<!DOCTYPE html><html lang="en" style=""><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Sora:wght@600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet"><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">try{
-    tailwind.config = {
-      darkMode: "class",
-      theme: {
-        extend: {
-          "colors": {
-                  "tertiary-fixed": "#d7e3fd",
-                  "on-secondary-container": "#5f2b00",
-                  "error-container": "#ffdad6",
-                  "on-error": "#ffffff",
-                  "on-surface": "#1a1c1b",
-                  "tertiary-container": "#2b374b",
-                  "secondary-fixed-dim": "#ffb689",
-                  "inverse-primary": "#b0c6ff",
-                  "tertiary": "#162235",
-                  "on-primary-fixed": "#001945",
-                  "secondary": "#974800",
-                  "on-primary-fixed-variant": "#204489",
-                  "on-tertiary-container": "#94a0b8",
-                  "error": "#ba1a1a",
-                  "tertiary-fixed-dim": "#bbc7e0",
-                  "primary-container": "#063378",
-                  "surface-dim": "#dadad8",
-                  "on-secondary": "#ffffff",
-                  "surface-container-high": "#e8e8e6",
-                  "surface-container": "#eeeeec",
-                  "on-primary": "#ffffff",
-                  "outline": "#747782",
-                  "surface-tint": "#3b5ca3",
-                  "on-secondary-fixed-variant": "#733500",
-                  "on-primary-container": "#7f9ee9",
-                  "surface-container-highest": "#e2e3e1",
-                  "surface-variant": "#e2e3e1",
-                  "secondary-fixed": "#ffdbc7",
-                  "outline-variant": "#c4c6d2",
-                  "inverse-on-surface": "#f1f1ef",
-                  "primary": "#001f50",
-                  "on-tertiary": "#ffffff",
-                  "on-secondary-fixed": "#311300",
-                  "on-tertiary-fixed-variant": "#3b475c",
-                  "on-background": "#1a1c1b",
-                  "inverse-surface": "#2f3130",
-                  "secondary-container": "#fe8015",
-                  "surface-container-low": "#f4f4f2",
-                  "surface": "#f9f9f7",
-                  "surface-bright": "#f9f9f7",
-                  "primary-fixed": "#d9e2ff",
-                  "on-tertiary-fixed": "#101c2f",
-                  "primary-fixed-dim": "#b0c6ff",
-                  "on-error-container": "#93000a",
-                  "background": "#f9f9f7",
-                  "on-surface-variant": "#434651",
-                  "surface-container-lowest": "#ffffff"
-          },
-          "borderRadius": {
-                  "DEFAULT": "0.25rem",
-                  "lg": "0.5rem",
-                  "xl": "0.75rem",
-                  "full": "9999px"
-          },
-          "spacing": {
-                  "lg": "24px",
-                  "xxl": "64px",
-                  "xs": "4px",
-                  "unit": "8px",
-                  "sm": "8px",
-                  "gutter": "24px",
-                  "container-max": "1200px",
-                  "xl": "40px",
-                  "md": "16px"
-          },
-          "fontFamily": {
-                  "h2-mobile": [
-                          "Sora"
-                  ],
-                  "body-lg": [
-                          "Inter"
-                  ],
-                  "caption": [
-                          "Inter"
-                  ],
-                  "body-md": [
-                          "Inter"
-                  ],
-                  "label-bold": [
-                          "Inter"
-                  ],
-                  "h2": [
-                          "Sora"
-                  ],
-                  "h1-mobile": [
-                          "Sora"
-                  ],
-                  "h1": [
-                          "Sora"
-                  ],
-                  "h3": [
-                          "Sora"
-                  ]
-          },
-          "fontSize": {
-                  "h2-mobile": [
-                          "24px",
-                          {
-                                  "lineHeight": "1.3",
-                                  "fontWeight": "600"
-                          }
-                  ],
-                  "body-lg": [
-                          "18px",
-                          {
-                                  "lineHeight": "1.6",
-                                  "fontWeight": "400"
-                          }
-                  ],
-                  "caption": [
-                          "12px",
-                          {
-                                  "lineHeight": "1.4",
-                                  "fontWeight": "500"
-                          }
-                  ],
-                  "body-md": [
-                          "16px",
-                          {
-                                  "lineHeight": "1.5",
-                                  "fontWeight": "400"
-                          }
-                  ],
-                  "label-bold": [
-                          "14px",
-                          {
-                                  "lineHeight": "1.4",
-                                  "fontWeight": "600"
-                          }
-                  ],
-                  "h2": [
-                          "32px",
-                          {
-                                  "lineHeight": "1.3",
-                                  "fontWeight": "600"
-                          }
-                  ],
-                  "h1-mobile": [
-                          "32px",
-                          {
-                                  "lineHeight": "1.2",
-                                  "fontWeight": "700"
-                          }
-                  ],
-                  "h1": [
-                          "40px",
-                          {
-                                  "lineHeight": "1.2",
-                                  "letterSpacing": "-0.02em",
-                                  "fontWeight": "700"
-                          }
-                  ],
-                  "h3": [
-                          "24px",
-                          {
-                                  "lineHeight": "1.4",
-                                  "fontWeight": "600"
-                          }
-                  ]
-          }
-        },
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — Alubonets SHG</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=block" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">try{
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#001f50", "primary-container": "#063378", "primary-fixed": "#d9e2ff",
+        "primary-fixed-dim": "#b0c6ff", "on-primary": "#ffffff", "on-primary-container": "#7f9ee9",
+        "secondary": "#974800", "secondary-container": "#fe8015", "secondary-fixed": "#ffdbc7",
+        "on-secondary": "#ffffff", "on-secondary-container": "#5f2b00",
+        "tertiary": "#162235", "tertiary-container": "#2b374b", "tertiary-fixed": "#d7e3fd",
+        "on-tertiary": "#ffffff", "on-tertiary-container": "#94a0b8",
+        "surface": "#f9f9f7", "surface-dim": "#dadad8", "surface-bright": "#f9f9f7",
+        "surface-container-lowest": "#ffffff", "surface-container-low": "#f4f4f2",
+        "surface-container": "#eeeeec", "surface-container-high": "#e8e8e6",
+        "surface-container-highest": "#e2e3e1",
+        "on-surface": "#1a1c1b", "on-surface-variant": "#434651",
+        "outline": "#747782", "outline-variant": "#c4c6d2",
+        "background": "#f9f9f7", "on-background": "#1a1c1b",
+        "error": "#ba1a1a", "error-container": "#ffdad6",
+        "on-error": "#ffffff", "on-error-container": "#93000a",
+        "inverse-surface": "#2f3130", "inverse-on-surface": "#f1f1ef", "inverse-primary": "#b0c6ff",
       },
-    }
-  }catch(_e){}</script><meta charset="utf-8"></head><body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
-<!-- TopNavBar -->
-<header class="bg-surface dark:bg-surface-dim sticky top-0 w-full border-b border-outline-variant z-50">
-<div class="flex justify-between items-center h-20 px-md md:px-lg max-w-container-max mx-auto">
-<div class="flex items-center gap-sm"><img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnSzS3JcCrGOIYnlA_odPQfW_EPHR1u48LU3KS766KoVD3igIme0EQq0vqNQG3PooaTM2bQqbTmk0RImwZPTDU2sdNN8x8Ewm1oKnJaxZir_KAlNdgRMYz9EyDkfErXWWvZg0JTfdI-WD5J0fK-SLORJPmc2el4H64y1qLg_W15yfg59vO479BZ_O3blOrXFo_F3Ht3cNs44g0jJDLYDrGYmavEdni6HS_DFgt8SvyLJk8W-BIPKiPF2oGxWdN9ncMpZo" alt="Alubonets SHG Logo" class="h-16 w-auto object-cover"><span class="font-h3 text-h3 text-primary">Alubonets</span></div>
-<nav class="hidden md:flex gap-lg h-full items-center">
-<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="index.html">Home</a>
-<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="about.html">About</a>
-<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="projects.html">Projects</a>
-<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="gallery.html">Gallery</a>
-<a class="text-primary dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200 h-full flex items-center active:scale-95 transition-transform" href="contact.html">Contact</a>
-<a class="text-secondary font-bold border-b-2 border-secondary pb-1 h-full flex items-center active:scale-95 transition-transform text-xs" href="admin.html">Admin</a>
-</nav>
-<div class="flex items-center gap-md">
-<button class="bg-secondary-container text-on-primary font-label-bold text-label-bold px-md py-sm rounded-lg min-h-[48px] hover:opacity-90 transition-opacity flex items-center justify-center hidden md:flex" onclick="openAuthModal()">Login / Register</button>
-<button class="md:hidden text-primary flex items-center justify-center p-sm">
-<span class="material-symbols-outlined" data-icon="menu">menu</span>
-</button>
-</div>
-</div>
-</header>
-<!-- SideNavBar -->
-<aside class="bg-primary dark:bg-tertiary-container text-on-primary dark:text-on-tertiary-container font-label-bold text-label-bold h-screen w-64 fixed left-0 top-20 shadow-md flex flex-col py-md z-40 overflow-y-auto">
-<div class="px-md mb-8 flex items-center space-x-3">
-<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdftVT0b5kRl1qFFsclxaUAbXkDvijpgsYIZwtlv-i0BPSIPnLvPIu2ogx0ddz-HKa8BYpLouaIS-_zCjRCi89EtRrqBjGiAALHMFQ7l1vdNH8FqsYT0ZRKvPpcIimPglYSDOokQdCvH4KfZ06-A2jQpBWh81fRP1zJSZGv-m2Mjm5cOI2dgAYs-XDFFuAM4NhmYLnTkPoOEPLcqBx6yYLVH22UdYeHYZq9344zgQpfFoLSIwQB53hT0Ouy4cZkEhnYQE" alt="Alubonets Logo" class="h-10 w-10 rounded-full bg-white p-1">
-<div>
-<h1 class="font-h3 text-h3 font-bold text-on-primary">Alubonets</h1>
-<p class="font-caption text-caption text-primary-fixed-dim">Admin Dashboard</p>
-</div>
-</div>
-<nav class="flex-1 overflow-y-auto px-2 space-y-1">
-<a href="#" class="bg-secondary-container text-on-secondary-container rounded-lg mx-2 my-1 flex items-center px-3 py-2 duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3" data-original-icon="dashboard">dashboard</span>
-            Dashboard
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3" data-original-icon="person_add">person_add</span>
-            Pending Registrations
-            <span class="ml-auto bg-secondary text-white text-xs py-0.5 px-2 rounded-full">7</span>
-</a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3">group</span>
-            Members
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3" data-original-icon="admin_panel_settings">admin_panel_settings</span>
-            Roles &amp; Permissions
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3" data-original-icon="payments">payments</span>
-            Contributions
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3" data-original-icon="assignment">assignment</span>
-            Projects
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3">event</span>
-            Events
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3" data-original-icon="photo_library">photo_library</span>
-            Gallery
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3">folder</span>
-            Documents
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3">analytics</span>
-            Reports
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3">history</span>
-            Audit Logs
-        </a>
-<a href="#" class="text-primary-fixed-dim hover:bg-primary-container dark:hover:bg-tertiary hover:text-on-primary-container mx-2 my-1 rounded-lg flex items-center px-3 py-2 transition-all duration-200 ease-in-out">
-<span class="material-symbols-outlined mr-3">settings</span>
-            Settings
-        </a>
-</nav>
+      fontFamily: {
+        "h1": ["Sora"], "h1-mobile": ["Sora"], "h2": ["Sora"], "h2-mobile": ["Sora"], "h3": ["Sora"],
+        "body-md": ["Inter"], "body-lg": ["Inter"], "label-bold": ["Inter"], "caption": ["Inter"],
+      },
+      fontSize: {
+        "h1": ["40px",{"lineHeight":"1.2","letterSpacing":"-0.02em","fontWeight":"700"}],
+        "h1-mobile": ["32px",{"lineHeight":"1.2","fontWeight":"700"}],
+        "h2": ["32px",{"lineHeight":"1.3","fontWeight":"600"}],
+        "h2-mobile": ["24px",{"lineHeight":"1.3","fontWeight":"600"}],
+        "h3": ["24px",{"lineHeight":"1.4","fontWeight":"600"}],
+        "body-md": ["16px",{"lineHeight":"1.5","fontWeight":"400"}],
+        "body-lg": ["18px",{"lineHeight":"1.6","fontWeight":"400"}],
+        "label-bold": ["14px",{"lineHeight":"1.4","fontWeight":"600"}],
+        "caption": ["12px",{"lineHeight":"1.4","fontWeight":"500"}],
+      },
+      spacing: {
+        "xs":"4px","sm":"8px","md":"16px","lg":"24px","xl":"40px","xxl":"64px",
+        "unit":"8px","gutter":"24px","container-max":"1200px",
+      },
+      borderRadius: {"DEFAULT":"0.25rem","lg":"0.5rem","xl":"0.75rem","full":"9999px"},
+    },
+  },
+}
+}catch(_e){}</script>
+<style>
+  .material-symbols-outlined { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; }
+  .sidebar-link { @apply flex items-center gap-sm px-sm py-[7px] rounded-lg text-primary-fixed-dim hover:bg-white/10 transition-colors font-body-md text-[13.5px] leading-tight; }
+  .sidebar-link .material-symbols-outlined { font-size:17px; flex-shrink:0; }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased">
 
-</aside>
-<!-- Main Content Wrapper -->
-<div class="ml-64 flex-1 flex flex-col min-w-0">
-<!-- TopNavBar -->
-<header class="bg-surface-container-lowest dark:bg-surface-container-low text-primary dark:text-primary-fixed-dim font-body-md text-body-md w-full h-16 border-b border-outline-variant dark:border-outline flat no shadows sticky top-0 z-40 flex items-center justify-between px-md w-full">
-<div class="flex-1 flex items-center max-w-md ml-4">
-<div class="relative w-full">
-<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
-<input type="text" placeholder="Search members, reports..." class="w-full pl-10 pr-4 py-2 bg-surface-container rounded-lg border-none focus:ring-2 focus:ring-primary text-sm">
+<!-- ═══════════════════════════════════════════════════
+     LOGIN GATE
+═══════════════════════════════════════════════════ -->
+<div id="loginGate" class="fixed inset-0 z-[200] bg-primary flex items-center justify-center min-h-screen px-md">
+  <div class="w-full max-w-[360px]">
+    <!-- Logo mounted above card -->
+    <div class="flex justify-center">
+      <div class="mb-[-30px] relative z-10 bg-surface rounded-2xl px-md py-sm shadow-xl border border-outline-variant/30">
+        <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfzzgw1iT_ZR6bjpmnVBu1xcYQITMpBnIaB5l2rRE7oL4gxxtovKMSTMNkC-Zu89sT2OyMUUgq1PMi5UoYMcVgcEclv0hqQ3O9ArvnGh5LMuvlEZP-8-xD5MGs9Cs5N_0OzTBoaVaNKg6zTHXhAzW29VvPjEVpqW2M6WPfYY-QmrFp4WCGIM5h7NSRT-aWWZ6LGvjnxGJHCR5SHv2TLNqytsiWuQLXD8L8833BClookPeihPT5XiY3yyqZjr8fMOY8BHA" alt="Alubonets SHG" class="h-12 w-auto object-contain">
+      </div>
+    </div>
+    <!-- Card: white/surface — clearly different from dark navy bg -->
+    <div class="bg-surface rounded-2xl pt-[52px] pb-lg px-lg shadow-2xl border border-white/10">
+      <div class="text-center mb-lg">
+        <h1 class="font-h3 text-h3 text-primary">Admin Access</h1>
+        <p class="font-caption text-caption text-on-surface-variant mt-xs">Secure administrative portal</p>
+      </div>
+      <form onsubmit="adminLogin(event)" class="flex flex-col gap-md">
+        <div>
+          <label class="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">Email Address</label>
+          <input type="email" id="loginEmail" placeholder="admin@alubonets.com" required
+            class="w-full px-md py-[10px] bg-surface border border-outline-variant rounded-lg text-on-surface placeholder-on-surface/30 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body-md text-[14px] transition-all">
+        </div>
+        <div>
+          <label class="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">Password</label>
+          <div class="relative">
+            <input type="password" id="loginPassword" placeholder="••••••••" required
+              class="w-full px-md py-[10px] pr-[44px] bg-surface border border-outline-variant rounded-lg text-on-surface placeholder-on-surface/30 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-body-md text-[14px] transition-all">
+            <button type="button" onclick="toggleAdminPw()" class="absolute right-sm top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors p-xs">
+              <span class="material-symbols-outlined text-[20px]" id="adminEyeIcon">visibility</span>
+            </button>
+          </div>
+        </div>
+        <p id="loginError" class="text-error text-center font-caption text-caption hidden text-[12px]">Invalid credentials. Please try again.</p>
+        <button type="submit"
+          class="bg-primary text-on-primary font-label-bold text-label-bold py-[11px] rounded-lg hover:opacity-90 active:scale-95 transition-all mt-xs flex items-center justify-center gap-sm min-h-[44px]">
+          <span class="material-symbols-outlined text-[17px]">lock_open</span>
+          Sign In to Dashboard
+        </button>
+      </form>
+    </div>
+    <p class="text-center mt-lg">
+      <a href="index.html" class="font-caption text-caption text-primary-fixed-dim/50 hover:text-primary-fixed-dim transition-colors">← Return to public site</a>
+    </p>
+  </div>
 </div>
-</div>
-<div class="flex items-center space-x-6">
-<button class="relative text-on-surface-variant hover:text-primary transition-colors">
-<span class="material-symbols-outlined">notifications</span>
-<span class="absolute -top-1 -right-1 bg-secondary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>
-</button>
-<div class="flex items-center space-x-3 cursor-pointer active:opacity-80">
-<div class="text-right hidden sm:block">
-<p class="font-label-bold text-sm text-on-surface">Admin User</p>
-<p class="font-caption text-xs text-on-surface-variant">System Admin</p>
-</div>
-<img class="h-10 w-10 rounded-full border border-outline-variant object-cover" data-alt="A professional close up portrait photo of a corporate administrator in a modern office, softly lit with cool natural light, creating an approachable yet authoritative tone. Bright whites and deep navy tones dominate the palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwQiXo0nXYyCFnixY4wCRHhmplnTYwjdVUcJDeFaBnkXINyVS27aW2lBcOLc19A6siGXuuIDfUcYMIeVvB44QI4Fno2WTYTHBtXuzZm-EtuD11YyCR_VoDaVHwmOv9DlqGdzNdTvVL1NcXMb-MuXgq0hcXHei5EWXae-FBz_KIwd0oXALoijK4pwJSezigf5bKrt9Mhdk91DvC6PYuTN5VKJTjauFVbuDdszH5UhYZWLxALpDxj2bWlg">
-</div>
-</div>
-</header>
-<!-- Scrollable Main Content -->
-<main class="flex-1 overflow-y-auto space-y-xl px-lg pt-lg ml-64">
-<!-- Summary Cards -->
-<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-md">
-<div class="bg-white rounded-xl border border-outline-variant p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow">
-<div class="flex justify-between items-start mb-4">
-<p class="font-caption text-on-surface-variant uppercase tracking-wide">Total Members</p>
-<div class="bg-primary-fixed p-2 rounded-lg text-primary">
-<span class="material-symbols-outlined">group</span>
-</div>
-</div>
-<h3 class="font-h2 text-h2 text-on-surface">152</h3>
-</div>
-<div class="bg-white rounded-xl border border-outline-variant p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow">
-<div class="flex justify-between items-start mb-4">
-<p class="font-caption text-on-surface-variant uppercase tracking-wide">Active Members</p>
-<div class="bg-[#dcfce7] p-2 rounded-lg text-[#166534]">
-<span class="material-symbols-outlined">verified_user</span>
-</div>
-</div>
-<h3 class="font-h2 text-h2 text-on-surface">145</h3>
-</div>
-<div class="bg-white rounded-xl border-2 border-secondary-container p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow relative overflow-hidden">
-<div class="absolute top-0 left-0 w-full h-1 bg-secondary-container"></div>
-<div class="flex justify-between items-start mb-4">
-<p class="font-caption text-secondary-container font-bold uppercase tracking-wide">Pending Approvals</p>
-<div class="bg-secondary-fixed p-2 rounded-lg text-secondary">
-<span class="material-symbols-outlined">hourglass_empty</span>
-</div>
-</div>
-<h3 class="font-h2 text-h2 text-secondary-container">7</h3>
-</div>
-<div class="bg-white rounded-xl border border-outline-variant p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow">
-<div class="flex justify-between items-start mb-4">
-<p class="font-caption text-on-surface-variant uppercase tracking-wide">Contributions (Month)</p>
-<div class="bg-tertiary-fixed p-2 rounded-lg text-tertiary">
-<span class="material-symbols-outlined">payments</span>
-</div>
-</div>
-<h3 class="font-h3 text-h3 text-on-surface">KES 45k</h3>
-</div>
-<div class="bg-white rounded-xl border border-outline-variant p-lg flex flex-col justify-between hover:shadow-[0px_4px_12px_rgba(20,32,51,0.05)] transition-shadow">
-<div class="flex justify-between items-start mb-4">
-<p class="font-caption text-on-surface-variant uppercase tracking-wide">Upcoming Events</p>
-<div class="bg-primary-fixed-dim p-2 rounded-lg text-primary">
-<span class="material-symbols-outlined">event</span>
-</div>
-</div>
-<h3 class="font-h2 text-h2 text-on-surface">2</h3>
-</div>
-</section>
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
-<!-- Main Content Area Left (Spans 2 cols) -->
-<div class="lg:col-span-2 space-y-xl">
-<!-- Pending Registrations Panel -->
-<div class="bg-white rounded-xl border border-outline-variant overflow-hidden">
-<div class="p-lg border-b border-surface-container-highest flex justify-between items-center">
-<h2 class="font-h3 text-h3 text-primary">Pending Registrations</h2>
-<button class="text-secondary font-label-bold hover:underline">View All</button>
-</div>
-<div class="overflow-x-auto">
-<table class="w-full text-left border-collapse">
-<thead>
-<tr class="bg-surface-container-low border-b border-surface-container-highest font-label-bold text-on-surface-variant">
-<th class="py-3 px-lg">Name</th>
-<th class="py-3 px-lg">Phone</th>
-<th class="py-3 px-lg">Date Applied</th>
-<th class="py-3 px-lg text-right">Actions</th>
-</tr>
-</thead>
-<tbody class="divide-y divide-surface-container-highest">
-<tr class="hover:bg-surface-container-lowest transition-colors">
-<td class="py-4 px-lg font-medium text-on-surface">Michael Ochieng</td>
-<td class="py-4 px-lg text-on-surface-variant">+254 712 345 678</td>
-<td class="py-4 px-lg text-on-surface-variant">Oct 24, 2023</td>
-<td class="py-4 px-lg text-right space-x-2">
-<button class="px-3 py-1.5 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-xs hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
-<button class="px-3 py-1.5 bg-error-container text-on-error-container rounded-lg font-label-bold text-xs hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
-</td>
-</tr>
-<tr class="hover:bg-surface-container-lowest transition-colors bg-surface">
-<td class="py-4 px-lg font-medium text-on-surface">Sarah Wangari</td>
-<td class="py-4 px-lg text-on-surface-variant">+254 722 987 654</td>
-<td class="py-4 px-lg text-on-surface-variant">Oct 23, 2023</td>
-<td class="py-4 px-lg text-right space-x-2">
-<button class="px-3 py-1.5 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-xs hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
-<button class="px-3 py-1.5 bg-error-container text-on-error-container rounded-lg font-label-bold text-xs hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
-</td>
-</tr>
-<tr class="hover:bg-surface-container-lowest transition-colors">
-<td class="py-4 px-lg font-medium text-on-surface">David Kipkorir</td>
-<td class="py-4 px-lg text-on-surface-variant">+254 733 456 789</td>
-<td class="py-4 px-lg text-on-surface-variant">Oct 21, 2023</td>
-<td class="py-4 px-lg text-right space-x-2">
-<button class="px-3 py-1.5 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-xs hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
-<button class="px-3 py-1.5 bg-error-container text-on-error-container rounded-lg font-label-bold text-xs hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
-</td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
-<!-- Member Management Table Snippet -->
-<div class="bg-white rounded-xl border border-outline-variant overflow-hidden">
-<div class="p-lg border-b border-surface-container-highest flex justify-between items-center">
-<h2 class="font-h3 text-h3 text-primary">Member Overview</h2>
-<button class="text-primary font-label-bold hover:underline flex items-center">
-                            View Directory <span class="material-symbols-outlined ml-1 text-sm">arrow_forward</span>
-</button>
-</div>
-<div class="p-lg">
-<div class="bg-surface-container-low rounded-lg p-4 flex items-center justify-center border border-dashed border-outline-variant text-on-surface-variant">
-<!-- Placeholder for more complex table/bento layout -->
-<p class="">Member Management Table Content goes here...</p>
-</div>
-</div>
-</div>
-</div>
-<!-- Sidebar Content-->
-<div class="space-y-lg">
-<!-- Quick Actions Bento -->
-<div class="bg-primary rounded-xl p-lg text-on-primary">
-<h3 class="font-h3 text-h3 mb-4">Quick Actions</h3>
-<div class="grid grid-cols-2 gap-sm">
-<button class="bg-primary-container hover:bg-tertiary transition-colors p-3 rounded-lg flex flex-col items-center justify-center text-center group border border-outline/20">
-<span class="material-symbols-outlined mb-2 text-on-primary-container group-hover:text-white transition-colors">campaign</span>
-<span class="font-caption text-xs">Add Announcement</span>
-</button>
-<button class="bg-primary-container hover:bg-tertiary transition-colors p-3 rounded-lg flex flex-col items-center justify-center text-center group border border-outline/20">
-<span class="material-symbols-outlined mb-2 text-on-primary-container group-hover:text-white transition-colors">download</span>
-<span class="font-caption text-xs">Export Members</span>
-</button>
-<button class="bg-primary-container hover:bg-tertiary transition-colors p-3 rounded-lg flex flex-col items-center justify-center text-center group border border-outline/20">
-<span class="material-symbols-outlined mb-2 text-on-primary-container group-hover:text-white transition-colors">manage_accounts</span>
-<span class="font-caption text-xs">Manage Roles</span>
-</button>
-<button class="bg-secondary hover:bg-[#b85800] transition-colors p-3 rounded-lg flex flex-col items-center justify-center text-center group border border-secondary-container">
-<span class="material-symbols-outlined mb-2 text-white">how_to_reg</span>
-<span class="font-caption text-xs text-white">Approve Members</span>
-</button>
-</div>
-</div>
-<!-- Recent Activity Feed -->
+<!-- ═══════════════════════════════════════════════════
+     ADMIN APP  (hidden until login)
+═══════════════════════════════════════════════════ -->
+<div id="adminApp" class="hidden min-h-screen flex">
 
-<!-- Upcoming Events Widget -->
+  <!-- ── Sidebar ── -->
+  <aside class="bg-primary text-on-primary w-56 fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.18)]">
 
-</div>
-</div>
-</main>
-</div>
+    <!-- Brand -->
+    <div class="px-md pt-lg pb-md flex items-center gap-sm border-b border-white/10">
+      <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdftVT0b5kRl1qFFsclxaUAbXkDvijpgsYIZwtlv-i0BPSIPnLvPIu2ogx0ddz-HKa8BYpLouaIS-_zCjRCi89EtRrqBjGiAALHMFQ7l1vdNH8FqsYT0ZRKvPpcIimPglYSDOokQdCvH4KfZ06-A2jQpBWh81fRP1zJSZGv-m2Mjm5cOI2dgAYs-XDFFuAM4NhmYLnTkPoOEPLcqBx6yYLVH22UdYeHYZq9344zgQpfFoLSIwQB53hT0Ouy4cZkEhnYQE"
+           alt="Alubonets" class="h-8 w-8 rounded-full bg-white/10 p-1 flex-shrink-0">
+      <div>
+        <p class="font-h3 text-[15px] font-bold text-on-primary leading-none">Alubonets</p>
+        <p class="text-[11px] text-primary-fixed-dim/60 mt-0.5 font-caption">Admin Panel</p>
+      </div>
+    </div>
 
-<!-- Footer -->
-<footer class="bg-primary dark:bg-primary-container text-on-primary dark:text-on-primary-container font-body-md text-body-md w-full mt-auto">
-<div class="max-w-container-max mx-auto px-md md:px-lg py-lg md:py-xxl">
-<!-- Footer Grid: Responsive Layout -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-lg mb-xl">
-<!-- Column 1: Brand & Mission -->
-<div class="col-span-1">
-<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAn57v5Ymo1x8sbwwTMwftgrNsv6q79gxLwVPWTgXlVoUihx2k3HxBBQYb5rBArH5kGwh3PXiU3mnEOnG1Vc4oQrMd-YAdEETRoAfemHCyXg4yrg1juvMejcPBAnak3k-ol6RBPVJAIORuxgkhvz6wpReOJqlnwyatoIJxleHG4VQJB3_I-I1H72Yb-tmG5HLwfSX-2vQPKOm6n0dgzjKu8-UrguwIMNYPhQBV05JAyCNpDoG_JP1OaX0pnfOvmETgnJwQ" alt="Alubonets SHG Logo" class="h-16 w-auto object-contain mb-md">
-<p class="text-on-primary/80 dark:text-on-primary-container/80 text-sm leading-relaxed">One Family, One Vision, Endless Possibilities.</p>
-</div>
+    <!-- Nav -->
+    <nav class="flex-1 overflow-y-auto py-sm px-sm space-y-0.5">
+      <a href="#" class="flex items-center gap-sm px-sm py-[7px] rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px]">
+        <span class="material-symbols-outlined text-[17px] text-secondary-container flex-shrink-0">dashboard</span>Dashboard
+      </a>
+      <a href="#" class="sidebar-link">
+        <span class="material-symbols-outlined">person_add</span>
+        <span class="flex-1">Pending</span>
+        <span class="bg-secondary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">7</span>
+      </a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">group</span>Members</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">admin_panel_settings</span>Roles &amp; Permissions</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">payments</span>Contributions</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">assignment</span>Projects</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">event</span>Events</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">photo_library</span>Gallery</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">folder</span>Documents</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">analytics</span>Reports</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">history</span>Audit Logs</a>
+      <a href="#" class="sidebar-link"><span class="material-symbols-outlined">settings</span>Settings</a>
+    </nav>
 
-<!-- Column 2: Quick Links -->
-<div class="col-span-1">
-<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Quick Links</h4>
-<nav class="flex flex-col gap-sm">
-<a href="index.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Home</a>
-<a href="about.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">About</a>
-<a href="projects.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Projects</a>
-</nav>
-</div>
+    <!-- Sidebar footer -->
+    <div class="px-md py-md border-t border-white/10">
+      <button onclick="adminLogout()"
+        class="flex items-center gap-sm text-primary-fixed-dim/60 hover:text-on-primary text-[13px] font-body-md transition-colors w-full group">
+        <span class="material-symbols-outlined text-[17px] group-hover:text-secondary-container transition-colors">logout</span>Sign Out
+      </button>
+    </div>
+  </aside>
 
-<!-- Column 3: Explore -->
-<div class="col-span-1">
-<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Explore</h4>
-<nav class="flex flex-col gap-sm">
-<a href="gallery.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Gallery</a>
-<a href="contact.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Contact</a>
-<a href="admin.html" class="text-secondary-fixed font-bold hover:text-secondary transition-colors duration-200">Admin</a>
-</nav>
-</div>
+  <!-- ── Main area ── -->
+  <div class="ml-56 flex-1 flex flex-col min-h-screen min-w-0">
 
-<!-- Column 4: Contact Info -->
-<div class="col-span-1">
-<h4 class="font-label-bold text-label-bold text-on-primary dark:text-on-primary-container mb-md uppercase tracking-wide">Get in Touch</h4>
-<div class="flex flex-col gap-md">
-<div class="flex items-start gap-sm">
-<span class="material-symbols-outlined text-base flex-shrink-0 mt-xs">mail</span>
-<a href="mailto:info@alubonetsshg.org" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">info@alubonetsshg.org</a>
-</div>
-<div class="flex items-start gap-sm">
-<span class="material-symbols-outlined text-base flex-shrink-0 mt-xs">call</span>
-<a href="tel:+254700000000" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">+254 700 000 000</a>
-</div>
-</div>
-</div>
-</div>
+    <!-- Top bar -->
+    <header class="bg-surface-container-lowest border-b border-outline-variant sticky top-0 z-40 h-13 flex items-center justify-between px-lg" style="height:52px;">
+      <div class="relative flex-1 max-w-xs">
+        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline" style="font-size:17px;">search</span>
+        <input type="text" placeholder="Search members, reports…"
+          class="w-full pl-9 pr-md py-1.5 bg-surface-container rounded-lg border border-outline-variant/60 focus:outline-none focus:ring-1 focus:ring-primary text-[13px] font-body-md">
+      </div>
+      <div class="flex items-center gap-md">
+        <button class="relative text-on-surface-variant hover:text-primary transition-colors">
+          <span class="material-symbols-outlined" style="font-size:20px;">notifications</span>
+          <span class="absolute -top-1 -right-1 bg-secondary text-white text-[9px] font-bold px-1 rounded-full leading-[14px]">3</span>
+        </button>
+        <div class="flex items-center gap-sm cursor-pointer group">
+          <div class="text-right hidden sm:block">
+            <p class="font-label-bold text-[12px] text-on-surface leading-tight">Admin User</p>
+            <p class="text-[11px] text-on-surface-variant font-caption">System Admin</p>
+          </div>
+          <img class="h-8 w-8 rounded-full border border-outline-variant object-cover"
+               src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwQiXo0nXYyCFnixY4wCRHhmplnTYwjdVUcJDeFaBnkXINyVS27aW2lBcOLc19A6siGXuuIDfUcYMIeVvB44QI4Fno2WTYTHBtXuzZm-EtuD11YyCR_VoDaVHwmOv9DlqGdzNdTvVL1NcXMb-MuXgq0hcXHei5EWXae-FBz_KIwd0oXALoijK4pwJSezigf5bKrt9Mhdk91DvC6PYuTN5VKJTjauFVbuDdszH5UhYZWLxALpDxj2bWlg"
+               alt="Admin">
+        </div>
+      </div>
+    </header>
 
-<!-- Divider -->
-<div class="border-t border-on-primary/10 dark:border-on-primary-container/10 pt-lg">
-<!-- Footer Bottom: Copyright & Legal -->
-<div class="flex flex-col sm:flex-row items-center justify-between gap-md text-sm">
-<p class="text-on-primary/60 dark:text-on-primary-container/60">© 2026 Alubonets Self-Help Group. All rights reserved.</p>
-<div class="flex gap-lg text-on-primary/60 dark:text-on-primary-container/60">
-<a href="#" class="hover:text-on-primary dark:hover:text-on-primary-container transition-colors duration-200">Privacy Policy</a>
-<a href="#" class="hover:text-on-primary dark:hover:text-on-primary-container transition-colors duration-200">Terms of Service</a>
-</div>
-</div>
-</div>
-</div>
-</footer>
+    <!-- Dashboard content -->
+    <main class="flex-1 p-lg space-y-lg overflow-y-auto">
 
-<!-- Auth Modal -->
-<div id="authModal" class="hidden fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center p-md" onclick="closeAuthModal(event)">
-<div class="bg-surface dark:bg-surface-dim rounded-lg shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-<!-- Modal Header with Logo -->
-<div class="bg-gradient-to-r from-primary to-primary-container p-lg flex flex-col items-center gap-md border-b border-outline-variant">
-<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfzzgw1iT_ZR6bjpmnVBu1xcYQITMpBnIaB5l2rRE7oL4gxxtovKMSTMNkC-Zu89sT2OyMUUgq1PMi5UoYMcVgcEclv0hqQ3O9ArvnGh5LMuvlEZP-8-xD5MGs9Cs5N_0OzTBoaVaNKg6zTHXhAzW29VvPjEVpqW2M6WPfYY-QmrFp4WCGIM5h7NSRT-aWWZ6LGvjnxGJHCR5SHv2TLNqytsiWuQLXD8L8833BClookPeihPT5XiY3yyqZjr8fMOY8BHA" alt="Alubonets SHG" class="h-16 w-auto object-contain">
-<h2 class="text-headline-md font-heading-md text-on-primary">Welcome to Alubonets</h2>
-<button onclick="closeAuthModal()" class="absolute top-md right-md text-on-primary hover:opacity-70 transition-opacity">
-<span class="material-symbols-outlined">close</span>
-</button>
-</div>
+      <!-- Page heading -->
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="font-h2 text-h2 text-primary">Dashboard</h1>
+          <p class="font-body-md text-body-md text-on-surface-variant mt-xs">Welcome back. Here's what's happening today.</p>
+        </div>
+        <span class="font-caption text-caption text-on-surface-variant bg-surface-container px-md py-xs rounded-full border border-outline-variant">July 2026</span>
+      </div>
 
-<!-- Tab Navigation -->
-<div class="flex border-b border-outline-variant bg-surface-container dark:bg-surface-container">
-<button onclick="switchAuthTab('signin')" class="flex-1 py-md px-sm text-center font-label-bold transition-all border-b-2 border-transparent hover:bg-surface-container-high dark:hover:bg-surface-container-high tab-btn" id="tab-signin" data-tab="signin">
-Sign In
-</button>
-<button onclick="switchAuthTab('signup')" class="flex-1 py-md px-sm text-center font-label-bold transition-all border-b-2 border-transparent hover:bg-surface-container-high dark:hover:bg-surface-container-high tab-btn" id="tab-signup" data-tab="signup">
-Sign Up
-</button>
-<button onclick="switchAuthTab('forgot')" class="flex-1 py-md px-sm text-center font-label-bold transition-all border-b-2 border-transparent hover:bg-surface-container-high dark:hover:bg-surface-container-high tab-btn" id="tab-forgot" data-tab="forgot">
-Forgot Password
-</button>
-</div>
+      <!-- ── Stat Cards ── -->
+      <section class="grid grid-cols-2 lg:grid-cols-5 gap-md">
 
-<!-- Tab Content -->
-<div class="p-lg">
-<!-- Sign In Tab -->
-<div id="signin-content" class="auth-tab-content">
-<form class="flex flex-col gap-md">
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Email Address</label>
-<input type="email" placeholder="your@email.com" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Password</label>
-<input type="password" placeholder="••••••••" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<button type="submit" class="bg-secondary text-on-secondary font-label-bold py-sm rounded-md hover:opacity-90 transition-opacity mt-md">Sign In</button>
-<div class="text-center text-body-sm text-on-surface/70">
-Don't have an account? <button type="button" onclick="switchAuthTab('signup')" class="text-secondary hover:underline font-bold">Sign Up</button>
-</div>
-</form>
-</div>
+        <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-md flex flex-col gap-sm hover:shadow-[0_2px_12px_rgba(0,31,80,0.07)] transition-all duration-200 group">
+          <div class="flex justify-between items-start">
+            <p class="font-caption text-[11px] text-on-surface-variant uppercase tracking-wider">Total Members</p>
+            <div class="bg-primary-fixed/50 p-1.5 rounded-lg text-primary group-hover:bg-primary-fixed transition-colors">
+              <span class="material-symbols-outlined" style="font-size:16px;">group</span>
+            </div>
+          </div>
+          <p class="font-h3 text-h3 text-on-surface mt-xs">152</p>
+        </div>
 
-<!-- Sign Up Tab -->
-<div id="signup-content" class="auth-tab-content hidden">
-<form class="flex flex-col gap-md">
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Full Name</label>
-<input type="text" placeholder="Your Name" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Email Address</label>
-<input type="email" placeholder="your@email.com" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Phone Number</label>
-<input type="tel" placeholder="+254 7** *** ***" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Password</label>
-<input type="password" placeholder="••••••••" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Confirm Password</label>
-<input type="password" placeholder="••••••••" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<button type="submit" class="bg-secondary text-on-secondary font-label-bold py-sm rounded-md hover:opacity-90 transition-opacity mt-md">Create Account</button>
-<div class="text-center text-body-sm text-on-surface/70">
-Already have an account? <button type="button" onclick="switchAuthTab('signin')" class="text-secondary hover:underline font-bold">Sign In</button>
-</div>
-</form>
-</div>
+        <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-md flex flex-col gap-sm hover:shadow-[0_2px_12px_rgba(0,31,80,0.07)] transition-all duration-200 group">
+          <div class="flex justify-between items-start">
+            <p class="font-caption text-[11px] text-on-surface-variant uppercase tracking-wider">Active</p>
+            <div class="bg-[#dcfce7] p-1.5 rounded-lg text-[#166534] group-hover:bg-[#bbf7d0] transition-colors">
+              <span class="material-symbols-outlined" style="font-size:16px;">verified_user</span>
+            </div>
+          </div>
+          <p class="font-h3 text-h3 text-on-surface mt-xs">145</p>
+        </div>
 
-<!-- Forgot Password Tab -->
-<div id="forgot-content" class="auth-tab-content hidden">
-<form class="flex flex-col gap-md">
-<p class="text-body-sm text-on-surface/80 mb-md">Enter your email address and we'll send you instructions to reset your password.</p>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Email Address</label>
-<input type="email" placeholder="your@email.com" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<button type="submit" class="bg-secondary text-on-secondary font-label-bold py-sm rounded-md hover:opacity-90 transition-opacity mt-md">Send Reset Link</button>
-<div class="text-center text-body-sm text-on-surface/70 mt-md">
-Remember your password? <button type="button" onclick="switchAuthTab('signin')" class="text-secondary hover:underline font-bold">Sign In</button>
-</div>
-</form>
-</div>
-</div>
-</div>
-</div>
+        <div class="bg-surface-container-lowest rounded-xl border-2 border-secondary-container/30 p-md flex flex-col gap-sm relative overflow-hidden hover:shadow-[0_2px_12px_rgba(254,128,21,0.12)] transition-all duration-200">
+          <div class="absolute top-0 left-0 w-full h-0.5 bg-secondary-container"></div>
+          <div class="flex justify-between items-start">
+            <p class="font-caption text-[11px] text-secondary font-bold uppercase tracking-wider">Pending</p>
+            <div class="bg-secondary-fixed/50 p-1.5 rounded-lg text-secondary">
+              <span class="material-symbols-outlined" style="font-size:16px;">hourglass_empty</span>
+            </div>
+          </div>
+          <p class="font-h3 text-h3 text-secondary mt-xs">7</p>
+        </div>
 
-<!-- Auth Modal Scripts -->
+        <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-md flex flex-col gap-sm hover:shadow-[0_2px_12px_rgba(0,31,80,0.07)] transition-all duration-200 group">
+          <div class="flex justify-between items-start">
+            <p class="font-caption text-[11px] text-on-surface-variant uppercase tracking-wider">Contributions</p>
+            <div class="bg-tertiary-fixed/50 p-1.5 rounded-lg text-tertiary group-hover:bg-tertiary-fixed transition-colors">
+              <span class="material-symbols-outlined" style="font-size:16px;">payments</span>
+            </div>
+          </div>
+          <p class="font-h3 text-h3 text-on-surface mt-xs">KES 45k</p>
+        </div>
+
+        <div class="bg-surface-container-lowest rounded-xl border border-outline-variant p-md flex flex-col gap-sm hover:shadow-[0_2px_12px_rgba(0,31,80,0.07)] transition-all duration-200 group">
+          <div class="flex justify-between items-start">
+            <p class="font-caption text-[11px] text-on-surface-variant uppercase tracking-wider">Events</p>
+            <div class="bg-primary-fixed/50 p-1.5 rounded-lg text-primary group-hover:bg-primary-fixed transition-colors">
+              <span class="material-symbols-outlined" style="font-size:16px;">event</span>
+            </div>
+          </div>
+          <p class="font-h3 text-h3 text-on-surface mt-xs">2</p>
+        </div>
+
+      </section>
+
+      <!-- ── Main grid ── -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+
+        <!-- Left: tables -->
+        <div class="lg:col-span-2 space-y-lg">
+
+          <!-- Pending Registrations -->
+          <div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden">
+            <div class="px-lg py-md border-b border-surface-container-highest flex justify-between items-center">
+              <h2 class="font-h3 text-h3 text-primary">Pending Registrations</h2>
+              <button class="text-secondary font-label-bold text-label-bold hover:underline text-[13px]">View All</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left">
+                <thead>
+                  <tr class="bg-surface-container-low border-b border-surface-container-highest">
+                    <th class="py-2.5 px-lg font-label-bold text-[12px] text-on-surface-variant uppercase tracking-wide">Name</th>
+                    <th class="py-2.5 px-lg font-label-bold text-[12px] text-on-surface-variant uppercase tracking-wide">Phone</th>
+                    <th class="py-2.5 px-lg font-label-bold text-[12px] text-on-surface-variant uppercase tracking-wide">Date Applied</th>
+                    <th class="py-2.5 px-lg font-label-bold text-[12px] text-on-surface-variant uppercase tracking-wide text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-surface-container-highest">
+                  <tr class="hover:bg-surface-container-low/50 transition-colors">
+                    <td class="py-3 px-lg font-label-bold text-[13.5px] text-on-surface">Michael Ochieng</td>
+                    <td class="py-3 px-lg text-on-surface-variant text-[13px]">+254 712 345 678</td>
+                    <td class="py-3 px-lg text-on-surface-variant text-[13px]">Oct 24, 2023</td>
+                    <td class="py-3 px-lg text-right space-x-2">
+                      <button class="px-3 py-1 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-[11px] hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
+                      <button class="px-3 py-1 bg-error-container text-on-error-container rounded-lg font-label-bold text-[11px] hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
+                    </td>
+                  </tr>
+                  <tr class="hover:bg-surface-container-low/50 transition-colors bg-surface/50">
+                    <td class="py-3 px-lg font-label-bold text-[13.5px] text-on-surface">Sarah Wangari</td>
+                    <td class="py-3 px-lg text-on-surface-variant text-[13px]">+254 722 987 654</td>
+                    <td class="py-3 px-lg text-on-surface-variant text-[13px]">Oct 23, 2023</td>
+                    <td class="py-3 px-lg text-right space-x-2">
+                      <button class="px-3 py-1 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-[11px] hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
+                      <button class="px-3 py-1 bg-error-container text-on-error-container rounded-lg font-label-bold text-[11px] hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
+                    </td>
+                  </tr>
+                  <tr class="hover:bg-surface-container-low/50 transition-colors">
+                    <td class="py-3 px-lg font-label-bold text-[13.5px] text-on-surface">David Kipkorir</td>
+                    <td class="py-3 px-lg text-on-surface-variant text-[13px]">+254 733 456 789</td>
+                    <td class="py-3 px-lg text-on-surface-variant text-[13px]">Oct 21, 2023</td>
+                    <td class="py-3 px-lg text-right space-x-2">
+                      <button class="px-3 py-1 bg-[#dcfce7] text-[#166534] rounded-lg font-label-bold text-[11px] hover:bg-[#bbf7d0] transition-colors border border-[#86efac]">Approve</button>
+                      <button class="px-3 py-1 bg-error-container text-on-error-container rounded-lg font-label-bold text-[11px] hover:bg-[#ffb4ab] transition-colors border border-[#ff897d]">Reject</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Member Overview -->
+          <div class="bg-surface-container-lowest rounded-xl border border-outline-variant overflow-hidden">
+            <div class="px-lg py-md border-b border-surface-container-highest flex justify-between items-center">
+              <h2 class="font-h3 text-h3 text-primary">Member Overview</h2>
+              <button class="text-primary font-label-bold text-label-bold hover:underline flex items-center gap-xs text-[13px]">
+                View Directory <span class="material-symbols-outlined" style="font-size:14px;">arrow_forward</span>
+              </button>
+            </div>
+            <div class="p-lg">
+              <div class="bg-surface-container-low rounded-lg p-lg flex items-center justify-center border border-dashed border-outline-variant text-on-surface-variant">
+                <p class="text-[13px]">Member Management Table Content goes here…</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right: Quick Actions -->
+        <div class="space-y-lg">
+          <div class="bg-primary rounded-xl p-lg text-on-primary shadow-[0_4px_20px_rgba(0,31,80,0.2)]">
+            <h3 class="font-h3 text-h3 mb-md">Quick Actions</h3>
+            <div class="grid grid-cols-2 gap-sm">
+              <button class="bg-primary-container/70 hover:bg-tertiary transition-colors p-md rounded-lg flex flex-col items-center justify-center gap-xs text-center group border border-white/10">
+                <span class="material-symbols-outlined text-on-primary-container group-hover:text-white transition-colors" style="font-size:20px;">campaign</span>
+                <span class="font-caption text-[11px] text-primary-fixed-dim group-hover:text-white transition-colors">Announcement</span>
+              </button>
+              <button class="bg-primary-container/70 hover:bg-tertiary transition-colors p-md rounded-lg flex flex-col items-center justify-center gap-xs text-center group border border-white/10">
+                <span class="material-symbols-outlined text-on-primary-container group-hover:text-white transition-colors" style="font-size:20px;">download</span>
+                <span class="font-caption text-[11px] text-primary-fixed-dim group-hover:text-white transition-colors">Export Members</span>
+              </button>
+              <button class="bg-primary-container/70 hover:bg-tertiary transition-colors p-md rounded-lg flex flex-col items-center justify-center gap-xs text-center group border border-white/10">
+                <span class="material-symbols-outlined text-on-primary-container group-hover:text-white transition-colors" style="font-size:20px;">manage_accounts</span>
+                <span class="font-caption text-[11px] text-primary-fixed-dim group-hover:text-white transition-colors">Manage Roles</span>
+              </button>
+              <button class="bg-secondary hover:bg-[#b85800] transition-colors p-md rounded-lg flex flex-col items-center justify-center gap-xs text-center group border border-secondary-container/30">
+                <span class="material-symbols-outlined text-white" style="font-size:20px;">how_to_reg</span>
+                <span class="font-caption text-[11px] text-white">Approve Members</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+</div><!-- /adminApp -->
+
 <script>
-function openAuthModal() {
-const modal = document.getElementById('authModal');
-modal.classList.remove('hidden');
-document.body.style.overflow = 'hidden';
+function adminLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw    = document.getElementById('loginPassword').value;
+  const err   = document.getElementById('loginError');
+  if (email && pw) {
+    err.classList.add('hidden');
+    document.getElementById('loginGate').classList.add('hidden');
+    document.getElementById('adminApp').classList.remove('hidden');
+    document.body.classList.add('overflow-hidden', 'h-full');
+  } else {
+    err.classList.remove('hidden');
+  }
 }
 
-function closeAuthModal(event) {
-if (event && event.target.id !== 'authModal') return;
-const modal = document.getElementById('authModal');
-modal.classList.add('hidden');
-document.body.style.overflow = 'auto';
+function adminLogout() {
+  document.getElementById('adminApp').classList.add('hidden');
+  document.getElementById('loginGate').classList.remove('hidden');
+  document.body.classList.remove('overflow-hidden', 'h-full');
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
 }
 
-function switchAuthTab(tabName) {
-// Hide all tab contents
-document.querySelectorAll('.auth-tab-content').forEach(content => {
-content.classList.add('hidden');
-});
-
-// Remove active state from all tabs
-document.querySelectorAll('.tab-btn').forEach(btn => {
-btn.classList.remove('border-secondary', 'text-secondary');
-btn.classList.add('border-transparent', 'text-on-surface');
-});
-
-// Show selected tab content
-const content = document.getElementById(tabName + '-content');
-if (content) {
-content.classList.remove('hidden');
+function toggleAdminPw() {
+  const pw = document.getElementById('loginPassword');
+  const icon = document.getElementById('adminEyeIcon');
+  pw.type = pw.type === 'password' ? 'text' : 'password';
+  icon.textContent = pw.type === 'password' ? 'visibility' : 'visibility_off';
 }
-
-// Highlight active tab
-const btn = document.getElementById('tab-' + tabName);
-if (btn) {
-btn.classList.remove('border-transparent', 'text-on-surface');
-btn.classList.add('border-secondary', 'text-secondary');
-}
-}
-
-// Initialize with Sign In tab active
-document.addEventListener('DOMContentLoaded', function() {
-switchAuthTab('signin');
-});
-
-// Close modal on Escape key
-document.addEventListener('keydown', function(e) {
-if (e.key === 'Escape') {
-closeAuthModal();
-}
-});
 </script>
 
 </body></html>

@@ -221,7 +221,7 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-lg mb-xl">
 <!-- Column 1: Brand & Mission -->
 <div class="col-span-1">
-<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAn57v5Ymo1x8sbwwTMwftgrNsv6q79gxLwVPWTgXlVoUihx2k3HxBBQYb5rBArH5kGwh3PXiU3mnEOnG1Vc4oQrMd-YAdEETRoAfemHCyXg4yrg1juvMejcPBAnak3k-ol6RBPVJAIORuxgkhvz6wpReOJqlnwyatoIJxleHG4VQJB3_I-I1H72Yb-tmG5HLwfSX-2vQPKOm6n0dgzjKu8-UrguwIMNYPhQBV05JAyCNpDoG_JP1OaX0pnfOvmETgnJwQ" alt="Alubonets SHG Logo" class="h-16 w-auto object-contain mb-md">
+<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR_dDwRkB1tcmCJtrBxxxDUmXedcs_rKyo1IuaQxVmKLH4dAZMkpW4aXqnUDLS-_7fOo0_9-T4a3zYfmaoR6hkpTSh5YcuRAB8MxFvl1g_nXBd0kzsBqo0Fs10akGGKGcbz8kev9JgCPeJpwHc91TB6CKQjiner8lyJj8RVeX-1SKHWzHu3GGOKfBTa8VgaLAPAlVAPa5ie0z_lmzPBQw5WXaDzj8GMqyWuTC9iVbmG0_iwYiA0_L2eMr8Q9REB0dzICo" alt="Alubonets SHG Logo" class="h-16 w-auto object-contain mb-md">
 <p class="text-on-primary/80 dark:text-on-primary-container/80 text-sm leading-relaxed">One Family, One Vision, Endless Possibilities.</p>
 </div>
 
@@ -241,7 +241,7 @@
 <nav class="flex flex-col gap-sm">
 <a href="gallery.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Gallery</a>
 <a href="contact.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Contact</a>
-<a href="#" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Admin</a>
+<a href="admin.html" class="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200">Admin</a>
 </nav>
 </div>
 
@@ -274,154 +274,48 @@
 </div>
 </div>
 </footer>
-
-
-
 <!-- Auth Modal -->
-<div id="authModal" class="hidden fixed inset-0 bg-black/50 dark:bg-black/70 z-50 flex items-center justify-center p-md" onclick="closeAuthModal(event)">
-<div class="bg-surface dark:bg-surface-dim rounded-lg shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-<!-- Modal Header with Logo -->
-<div class="bg-gradient-to-r from-primary to-primary-container p-lg flex flex-col items-center gap-md border-b border-outline-variant">
-<img src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfzzgw1iT_ZR6bjpmnVBu1xcYQITMpBnIaB5l2rRE7oL4gxxtovKMSTMNkC-Zu89sT2OyMUUgq1PMi5UoYMcVgcEclv0hqQ3O9ArvnGh5LMuvlEZP-8-xD5MGs9Cs5N_0OzTBoaVaNKg6zTHXhAzW29VvPjEVpqW2M6WPfYY-QmrFp4WCGIM5h7NSRT-aWWZ6LGvjnxGJHCR5SHv2TLNqytsiWuQLXD8L8833BClookPeihPT5XiY3yyqZjr8fMOY8BHA" alt="Alubonets SHG" class="h-16 w-auto object-contain">
-<h2 class="text-headline-md font-heading-md text-on-primary">Welcome to Alubonets</h2>
-<button onclick="closeAuthModal()" class="absolute top-md right-md text-on-primary hover:opacity-70 transition-opacity">
-<span class="material-symbols-outlined">close</span>
-</button>
+<div id="authModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-md" onclick="closeAuthModal(event)">
+<div class="bg-surface rounded-2xl shadow-2xl w-full max-w-sm" onclick="event.stopPropagation()">
+<div class="flex items-start justify-between px-lg pt-lg pb-md border-b border-outline-variant">
+<div><h2 class="font-h3 text-h3 text-on-surface">Alubonets Account</h2><p class="font-caption text-caption text-on-surface-variant mt-xs">Self-Help Group Member Portal</p></div>
+<button onclick="closeAuthModal()" class="text-on-surface-variant hover:text-on-surface transition-colors p-xs rounded-lg hover:bg-surface-container-high ml-md flex-shrink-0"><span class="material-symbols-outlined text-[22px]">close</span></button>
 </div>
-
-<!-- Tab Navigation -->
-<div class="flex border-b border-outline-variant bg-surface-container dark:bg-surface-container">
-<button onclick="switchAuthTab('signin')" class="flex-1 py-md px-sm text-center font-label-bold transition-all border-b-2 border-transparent hover:bg-surface-container-high dark:hover:bg-surface-container-high tab-btn" id="tab-signin" data-tab="signin">
-Sign In
-</button>
-<button onclick="switchAuthTab('signup')" class="flex-1 py-md px-sm text-center font-label-bold transition-all border-b-2 border-transparent hover:bg-surface-container-high dark:hover:bg-surface-container-high tab-btn" id="tab-signup" data-tab="signup">
-Sign Up
-</button>
-<button onclick="switchAuthTab('forgot')" class="flex-1 py-md px-sm text-center font-label-bold transition-all border-b-2 border-transparent hover:bg-surface-container-high dark:hover:bg-surface-container-high tab-btn" id="tab-forgot" data-tab="forgot">
-Forgot Password
-</button>
+<div class="flex border-b border-outline-variant bg-surface-container-low">
+<button onclick="switchAuthTab('signin')" id="tab-signin" class="tab-btn flex-1 py-sm text-center font-label-bold text-label-bold text-[13px] transition-all border-b-2 hover:bg-surface-container-high">Sign In</button>
+<button onclick="switchAuthTab('signup')" id="tab-signup" class="tab-btn flex-1 py-sm text-center font-label-bold text-label-bold text-[13px] transition-all border-b-2 hover:bg-surface-container-high">Sign Up</button>
+<button onclick="switchAuthTab('forgot')" id="tab-forgot" class="tab-btn flex-1 py-sm text-center font-label-bold text-label-bold text-[13px] transition-all border-b-2 hover:bg-surface-container-high">Forgot?</button>
 </div>
-
-<!-- Tab Content -->
 <div class="p-lg">
-<!-- Sign In Tab -->
-<div id="signin-content" class="auth-tab-content">
-<form class="flex flex-col gap-md">
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Email Address</label>
-<input type="email" placeholder="your@email.com" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
+<div id="signin-content" class="auth-tab-content flex flex-col gap-md">
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Email</label><input type="email" placeholder="your@email.com" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Password</label><input type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<button type="button" class="bg-secondary text-on-secondary font-label-bold text-label-bold py-[10px] rounded-lg hover:opacity-90 active:scale-95 transition-all min-h-[42px] w-full mt-xs">Sign In</button>
+<p class="text-center text-[13px] text-on-surface-variant">No account? <button type="button" onclick="switchAuthTab('signup')" class="text-secondary hover:underline font-bold">Sign Up</button></p>
 </div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Password</label>
-<input type="password" placeholder="••••••••" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
+<div id="signup-content" class="auth-tab-content hidden flex flex-col gap-md">
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Full Name</label><input type="text" placeholder="Your Name" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Email</label><input type="email" placeholder="your@email.com" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Phone</label><input type="tel" placeholder="+254 7** *** ***" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Password</label><input type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Confirm Password</label><input type="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<button type="button" class="bg-secondary text-on-secondary font-label-bold text-label-bold py-[10px] rounded-lg hover:opacity-90 active:scale-95 transition-all min-h-[42px] w-full mt-xs">Create Account</button>
+<p class="text-center text-[13px] text-on-surface-variant">Have account? <button type="button" onclick="switchAuthTab('signin')" class="text-secondary hover:underline font-bold">Sign In</button></p>
 </div>
-<button type="submit" class="bg-secondary text-on-secondary font-label-bold py-sm rounded-md hover:opacity-90 transition-opacity mt-md">Sign In</button>
-<div class="text-center text-body-sm text-on-surface/70">
-Don't have an account? <button type="button" onclick="switchAuthTab('signup')" class="text-secondary hover:underline font-bold">Sign Up</button>
-</div>
-</form>
-</div>
-
-<!-- Sign Up Tab -->
-<div id="signup-content" class="auth-tab-content hidden">
-<form class="flex flex-col gap-md">
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Full Name</label>
-<input type="text" placeholder="Your Name" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Email Address</label>
-<input type="email" placeholder="your@email.com" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Phone Number</label>
-<input type="tel" placeholder="+254 7** *** ***" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Password</label>
-<input type="password" placeholder="••••••••" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Confirm Password</label>
-<input type="password" placeholder="••••••••" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<button type="submit" class="bg-secondary text-on-secondary font-label-bold py-sm rounded-md hover:opacity-90 transition-opacity mt-md">Create Account</button>
-<div class="text-center text-body-sm text-on-surface/70">
-Already have an account? <button type="button" onclick="switchAuthTab('signin')" class="text-secondary hover:underline font-bold">Sign In</button>
-</div>
-</form>
-</div>
-
-<!-- Forgot Password Tab -->
-<div id="forgot-content" class="auth-tab-content hidden">
-<form class="flex flex-col gap-md">
-<p class="text-body-sm text-on-surface/80 mb-md">Enter your email address and we'll send you instructions to reset your password.</p>
-<div>
-<label class="block text-label-sm font-label-bold text-on-surface mb-xs">Email Address</label>
-<input type="email" placeholder="your@email.com" class="w-full px-md py-sm border border-outline rounded-md focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:bg-surface-container dark:border-outline-variant dark:text-on-surface">
-</div>
-<button type="submit" class="bg-secondary text-on-secondary font-label-bold py-sm rounded-md hover:opacity-90 transition-opacity mt-md">Send Reset Link</button>
-<div class="text-center text-body-sm text-on-surface/70 mt-md">
-Remember your password? <button type="button" onclick="switchAuthTab('signin')" class="text-secondary hover:underline font-bold">Sign In</button>
-</div>
-</form>
+<div id="forgot-content" class="auth-tab-content hidden flex flex-col gap-md">
+<p class="text-[13px] text-on-surface-variant">Enter your email and we'll send a password reset link.</p>
+<div class="flex flex-col gap-xs"><label class="font-label-bold text-label-bold text-on-surface text-[13px]">Email</label><input type="email" placeholder="your@email.com" class="border border-outline-variant rounded-lg px-md py-[9px] font-body-md text-[14px] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-surface w-full mt-xs"></div>
+<button type="button" class="bg-secondary text-on-secondary font-label-bold text-label-bold py-[10px] rounded-lg hover:opacity-90 active:scale-95 transition-all min-h-[42px] w-full mt-xs">Send Reset Link</button>
+<p class="text-center text-[13px] text-on-surface-variant">Remember? <button type="button" onclick="switchAuthTab('signin')" class="text-secondary hover:underline font-bold">Sign In</button></p>
 </div>
 </div>
 </div>
 </div>
-
-<!-- Auth Modal Scripts -->
 <script>
-function openAuthModal() {
-const modal = document.getElementById('authModal');
-modal.classList.remove('hidden');
-document.body.style.overflow = 'hidden';
-}
-
-function closeAuthModal(event) {
-if (event && event.target.id !== 'authModal') return;
-const modal = document.getElementById('authModal');
-modal.classList.add('hidden');
-document.body.style.overflow = 'auto';
-}
-
-function switchAuthTab(tabName) {
-// Hide all tab contents
-document.querySelectorAll('.auth-tab-content').forEach(content => {
-content.classList.add('hidden');
-});
-
-// Remove active state from all tabs
-document.querySelectorAll('.tab-btn').forEach(btn => {
-btn.classList.remove('border-secondary', 'text-secondary');
-btn.classList.add('border-transparent', 'text-on-surface');
-});
-
-// Show selected tab content
-const content = document.getElementById(tabName + '-content');
-if (content) {
-content.classList.remove('hidden');
-}
-
-// Highlight active tab
-const btn = document.getElementById('tab-' + tabName);
-if (btn) {
-btn.classList.remove('border-transparent', 'text-on-surface');
-btn.classList.add('border-secondary', 'text-secondary');
-}
-}
-
-// Initialize with Sign In tab active
-document.addEventListener('DOMContentLoaded', function() {
-switchAuthTab('signin');
-});
-
-// Close modal on Escape key
-document.addEventListener('keydown', function(e) {
-if (e.key === 'Escape') {
-closeAuthModal();
-}
-});
+function openAuthModal(){document.getElementById('authModal').classList.remove('hidden');document.body.style.overflow='hidden';}
+function closeAuthModal(e){if(e&&e.target.id!=='authModal')return;document.getElementById('authModal').classList.add('hidden');document.body.style.overflow='';}
+function switchAuthTab(t){document.querySelectorAll('.auth-tab-content').forEach(c=>c.classList.add('hidden'));document.querySelectorAll('.tab-btn').forEach(b=>{b.classList.remove('border-secondary','text-secondary');b.classList.add('border-transparent','text-on-surface-variant');});const c=document.getElementById(t+'-content');if(c)c.classList.remove('hidden');const b=document.getElementById('tab-'+t);if(b){b.classList.remove('border-transparent','text-on-surface-variant');b.classList.add('border-secondary','text-secondary');}}
+document.addEventListener('DOMContentLoaded',()=>switchAuthTab('signin'));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAuthModal();});
 </script>
-
 </body></html>
