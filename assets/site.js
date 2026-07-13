@@ -135,10 +135,31 @@
     });
   }
 
+  function setupPasswordToggles() {
+    document.addEventListener(
+      "click",
+      function (e) {
+        var btn = e.target.closest(".auth-password-toggle");
+        if (!btn) return;
+        var wrap = btn.closest(".auth-password-wrap");
+        if (!wrap) return;
+        var input = wrap.querySelector("input");
+        var icon = btn.querySelector(".material-symbols-outlined");
+        if (!input) return;
+        var show = input.type === "password";
+        input.type = show ? "text" : "password";
+        if (icon) icon.textContent = show ? "visibility_off" : "visibility";
+        btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      },
+      true
+    );
+  }
+
   function boot() {
     enhanceNavyCurve();
     markReveals();
     observeReveals();
+    setupPasswordToggles();
   }
 
   if (document.readyState === "loading") {
