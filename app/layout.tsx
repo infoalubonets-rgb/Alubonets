@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import { Sora, Inter } from 'next/font/google'
 import './globals.css'
-import AuthModal from '@/components/AuthModal'
-import SiteScripts from '@/components/SiteScripts'
 
 const sora = Sora({
   subsets: ['latin'],
@@ -40,8 +38,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${sora.variable} ${inter.variable} bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col`}
       >
         {children}
-        <AuthModal />
-        <SiteScripts />
       </body>
     </html>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type AuthTab = 'signin' | 'signup' | 'forgot'
 
@@ -49,7 +49,9 @@ export default function AuthModal() {
 
   useEffect(() => {
     _open = () => setOpen(true)
-    return () => { _open = null }
+    return () => {
+      _open = null
+    }
   }, [])
 
   useEffect(() => {
@@ -58,11 +60,15 @@ export default function AuthModal() {
     } else {
       document.body.style.overflow = ''
     }
-    return () => { document.body.style.overflow = '' }
+    return () => {
+      document.body.style.overflow = ''
+    }
   }, [open])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
@@ -89,84 +95,131 @@ export default function AuthModal() {
         </button>
 
         <div className="auth-modal-body">
-          {/* Sign In */}
           {tab === 'signin' && (
             <div className="auth-tab-content flex flex-col gap-md">
               <h2 className="font-h3 text-h3 text-primary">Sign In</h2>
               <button type="button" className="auth-google-btn">
-                <GoogleIcon />Sign in with Google
+                <GoogleIcon />
+                Sign in with Google
               </button>
-              <div className="auth-divider"><span>or</span></div>
+              <div className="auth-divider">
+                <span>or</span>
+              </div>
               <div className="flex flex-col gap-xs">
-                <label className="auth-label">Email <span className="req">*</span></label>
+                <label className="auth-label">
+                  Email <span className="req">*</span>
+                </label>
                 <input type="email" placeholder="your@email.com" className="auth-field" required />
               </div>
               <div className="flex flex-col gap-xs">
-                <label className="auth-label">Password <span className="req">*</span></label>
+                <label className="auth-label">
+                  Password <span className="req">*</span>
+                </label>
                 <PasswordInput placeholder="••••••••" />
               </div>
-              <button type="button" className="auth-primary-btn">Sign In</button>
+              <button type="button" className="auth-primary-btn">
+                Sign In
+              </button>
               <div className="flex items-center justify-between text-[12px] text-on-surface-variant">
-                <button type="button" onClick={() => setTab('forgot')} className="hover:text-primary transition-colors">Forgot password?</button>
-                <button type="button" onClick={() => setTab('signup')} className="hover:text-on-surface transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setTab('forgot')}
+                  className="hover:text-primary transition-colors"
+                >
+                  Forgot password?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('signup')}
+                  className="hover:text-on-surface transition-colors"
+                >
                   No account? <span className="auth-link-accent">Create account</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Sign Up */}
           {tab === 'signup' && (
             <div className="auth-tab-content flex flex-col gap-md">
               <h2 className="font-h3 text-h3 text-primary">Create Account</h2>
               <button type="button" className="auth-google-btn">
-                <GoogleIcon />Sign up with Google
+                <GoogleIcon />
+                Sign up with Google
               </button>
-              <div className="auth-divider"><span>or</span></div>
+              <div className="auth-divider">
+                <span>or</span>
+              </div>
               <div className="grid grid-cols-2 gap-sm">
                 <div className="flex flex-col gap-xs">
-                  <label className="auth-label">Full Name <span className="req">*</span></label>
+                  <label className="auth-label">
+                    Full Name <span className="req">*</span>
+                  </label>
                   <input type="text" placeholder="Jane Doe" className="auth-field" required />
                 </div>
                 <div className="flex flex-col gap-xs">
-                  <label className="auth-label">Phone <span className="req">*</span></label>
+                  <label className="auth-label">
+                    Phone <span className="req">*</span>
+                  </label>
                   <input type="tel" placeholder="07XX XXX XXX" className="auth-field" required />
                 </div>
               </div>
               <div className="flex flex-col gap-xs">
-                <label className="auth-label">Email <span className="req">*</span></label>
+                <label className="auth-label">
+                  Email <span className="req">*</span>
+                </label>
                 <input type="email" placeholder="your@email.com" className="auth-field" required />
               </div>
               <div className="grid grid-cols-2 gap-sm">
                 <div className="flex flex-col gap-xs">
-                  <label className="auth-label">Password <span className="req">*</span></label>
+                  <label className="auth-label">
+                    Password <span className="req">*</span>
+                  </label>
                   <PasswordInput placeholder="••••••" />
                 </div>
                 <div className="flex flex-col gap-xs">
-                  <label className="auth-label">Confirm <span className="req">*</span></label>
+                  <label className="auth-label">
+                    Confirm <span className="req">*</span>
+                  </label>
                   <PasswordInput placeholder="••••••" />
                 </div>
               </div>
-              <button type="button" className="auth-primary-btn">Create Account</button>
+              <button type="button" className="auth-primary-btn">
+                Create Account
+              </button>
               <p className="text-center text-[12px] text-on-surface-variant">
                 Already have an account?{' '}
-                <button type="button" onClick={() => setTab('signin')} className="auth-link-accent hover:underline">Sign in</button>
+                <button
+                  type="button"
+                  onClick={() => setTab('signin')}
+                  className="auth-link-accent hover:underline"
+                >
+                  Sign in
+                </button>
               </p>
             </div>
           )}
 
-          {/* Forgot Password */}
           {tab === 'forgot' && (
             <div className="auth-tab-content flex flex-col gap-md">
               <h2 className="font-h3 text-h3 text-primary">Reset Password</h2>
               <div className="flex flex-col gap-xs">
-                <label className="auth-label">Email <span className="req">*</span></label>
+                <label className="auth-label">
+                  Email <span className="req">*</span>
+                </label>
                 <input type="email" placeholder="your@email.com" className="auth-field" required />
               </div>
-              <button type="button" className="auth-primary-btn">Send Reset Link</button>
+              <button type="button" className="auth-primary-btn">
+                Send Reset Link
+              </button>
               <p className="text-center text-[12px] text-on-surface-variant">
                 Remember your password?{' '}
-                <button type="button" onClick={() => setTab('signin')} className="auth-link-accent hover:underline">Go to login</button>
+                <button
+                  type="button"
+                  onClick={() => setTab('signin')}
+                  className="auth-link-accent hover:underline"
+                >
+                  Go to login
+                </button>
               </p>
             </div>
           )}

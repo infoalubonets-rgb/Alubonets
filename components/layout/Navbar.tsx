@@ -3,19 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { openAuthModal } from './AuthModal'
-
-const LOGO_URL =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuCnSzS3JcCrGOIYnlA_odPQfW_EPHR1u48LU3KS766KoVD3igIme0EQq0vqNQG3PooaTM2bQqbTmk0RImwZPTDU2sdNN8x8Ewm1oKnJaxZir_KAlNdgRMYz9EyDkfErXWWvZg0JTfdI-WD5J0fK-SLORJPmc2el4H64y1qLg_W15yfg59vO479BZ_O3blOrXFo_F3Ht3cNs44g0jJDLYDrGYmavEdni6HS_DFgt8SvyLJk8W-BIPKiPF2oGxWdN9ncMpZo'
-
-const links = [
-  { href: '/', label: 'Home' },
-  { href: '/about', label: 'About' },
-  { href: '/projects', label: 'Projects' },
-  { href: '/gallery', label: 'Gallery' },
-  { href: '/contact', label: 'Contact' },
-  { href: '/admin', label: 'Admin', small: true },
-]
+import { openAuthModal } from '@/components/auth/AuthModal'
+import { NAV_LINKS, SITE_LOGO } from '@/lib/constants'
 
 export default function Navbar() {
   const pathname = usePathname()
@@ -31,12 +20,12 @@ export default function Navbar() {
       <header className="bg-surface dark:bg-surface-dim sticky top-0 w-full border-b border-outline-variant z-50">
         <div className="flex justify-between items-center h-20 px-md md:px-lg max-w-container-max mx-auto">
           <Link href="/" className="flex items-center gap-sm">
-            <img src={LOGO_URL} alt="Alubonets SHG Logo" className="h-16 w-auto object-cover" />
+            <img src={SITE_LOGO} alt="Alubonets SHG Logo" className="h-16 w-auto object-cover" />
             <span className="font-h3 text-h3 text-primary">Alubonets</span>
           </Link>
 
           <nav className="hidden md:flex gap-lg h-full items-center">
-            {links.map(({ href, label, small }) => (
+            {NAV_LINKS.map(({ href, label, small }) => (
               <Link
                 key={href}
                 href={href}
@@ -69,10 +58,9 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div className="md:hidden bg-surface-container-lowest border-t border-outline-variant px-md py-lg flex flex-col gap-md z-40">
-          {links.map(({ href, label }) => (
+          {NAV_LINKS.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
@@ -88,7 +76,10 @@ export default function Navbar() {
           ))}
           <button
             className="bg-secondary-container text-on-primary font-label-bold text-label-bold px-lg py-md rounded-lg text-center mt-md min-h-[48px] flex items-center justify-center"
-            onClick={() => { setMenuOpen(false); openAuthModal() }}
+            onClick={() => {
+              setMenuOpen(false)
+              openAuthModal()
+            }}
           >
             Login / Register
           </button>

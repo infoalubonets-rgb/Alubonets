@@ -1,13 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { FormEvent, useEffect, useState } from 'react'
-
-const ADMIN_LOGO =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuCfzzgw1iT_ZR6bjpmnVBu1xcYQITMpBnIaB5l2rRE7oL4gxxtovKMSTMNkC-Zu89sT2OyMUUgq1PMi5UoYMcVgcEclv0hqQ3O9ArvnGh5LMuvlEZP-8-xD5MGs9Cs5N_0OzTBoaVaNKg6zTHXhAzW29VvPjEVpqW2M6WPfYY-QmrFp4WCGIM5h7NSRT-aWWZ6LGvjnxGJHCR5SHv2TLNqytsiWuQLXD8L8833BClookPeihPT5XiY3yyqZjr8fMOY8BHA'
-
-const SIDEBAR_LOGO =
-  'https://lh3.googleusercontent.com/aida-public/AB6AXuAdftVT0b5kRl1qFFsclxaUAbXkDvijpgsYIZwtlv-i0BPSIPnLvPIu2ogx0ddz-HKa8BYpLouaIS-_zCjRCi89EtRrqBjGiAALHMFQ7l1vdNH8FqsYT0ZRKvPpcIimPglYSDOokQdCvH4KfZ06-A2jQpBWh81fRP1zJSZGv-m2Mjm5cOI2dgAYs-XDFFuAM4NhmYLnTkPoOEPLcqBx6yYLVH22UdYeHYZq9344zgQpfFoLSIwQB53hT0Ouy4cZkEhnYQE'
+import { type FormEvent, useEffect, useState } from 'react'
+import { ADMIN_LOGIN_LOGO, ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
 
 const PENDING = [
   { name: 'Michael Ochieng', phone: '+254 712 345 678', date: 'Oct 24, 2023', alt: false },
@@ -104,7 +99,7 @@ export default function AdminPage() {
         <div className="w-full max-w-[360px]">
           <div className="flex justify-center">
             <div className="mb-[-30px] relative z-10 bg-surface rounded-2xl px-md py-sm shadow-xl border border-outline-variant/30">
-              <img src={ADMIN_LOGO} alt="Alubonets SHG" className="h-12 w-auto object-contain" />
+              <img src={ADMIN_LOGIN_LOGO} alt="Alubonets SHG" className="h-12 w-auto object-contain" />
             </div>
           </div>
           <div className="bg-surface rounded-2xl pt-[52px] pb-lg px-lg shadow-2xl border border-white/10">
@@ -183,7 +178,7 @@ export default function AdminPage() {
       <aside className="bg-primary dark:bg-[#0c1e42] text-on-primary w-56 fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] dark:border-white/[0.06] shadow-[2px_0_16px_rgba(0,0,0,0.28)] transition-colors">
         <div className="px-md pt-lg pb-md flex items-center gap-sm border-b border-white/10">
           <img
-            src={SIDEBAR_LOGO}
+            src={ADMIN_SIDEBAR_LOGO}
             alt="Alubonets"
             className="h-11 w-11 rounded-full bg-white/10 p-1 flex-shrink-0"
           />
