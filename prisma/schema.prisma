@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  TREASURER
+  SECRETARY
+  MEMBER
+}
+
+enum MemberStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ProjectStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+}
+
+enum WelfareStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  fullName      String
+  phone         String?
+  role          Role         @default(MEMBER)
+  status        MemberStatus @default(PENDING)
+  avatarUrl     String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  contributions Contribution[]
+  welfareRequests WelfareRequest[]
+  auditLogs     AuditLog[]
+
+  @@map("users")
+}
+
+model Contribution {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  amount      Float
+  description String?
+  paidAt      DateTime @default(now())
+  mpesaRef    String?
+  createdAt   DateTime @default(now())
+
+  @@map("contributions")
+}
+
+model WelfareRequest {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  description String
+  amount      Float?
+  status      WelfareStatus @default(PENDING)
+  reviewNote  String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("welfare_requests")
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  status      ProjectStatus @default(UPCOMING)
+  imageUrl    String?
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("projects")
+}
+
+model GalleryPhoto {
+  id          String   @id @default(cuid())
+  url         String
+  caption     String?
+  category    String?
+  uploadedAt  DateTime @default(now())
+
+  @@map("gallery_photos")
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  authorId    String
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@map("announcements")
+}
+
+model Event {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  location    String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@map("events")
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  title       String
+  fileUrl     String
+  category    String?
+  uploadedBy  String
+  uploadedAt  DateTime @default(now())
+
+  @@map("documents")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String?
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
