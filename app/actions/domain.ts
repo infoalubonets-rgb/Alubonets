@@ -120,8 +120,6 @@ export async function actionCreateEvent(formData: FormData) {
   revalidatePath('/dashboard/member')
 }
 
-export { actionCreateMeeting } from '@/app/actions/meetings'
-
 export async function actionCreateDocument(formData: FormData) {
   const actor = await requireActiveRole(['SECRETARY', 'ADMIN'])
   const title = String(formData.get('title') || '')
