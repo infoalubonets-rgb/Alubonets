@@ -87,13 +87,7 @@ npm run db:bootstrap-auth
 npm run db:test
 ```
 
-| Account | Password | Notes |
-|---------|----------|--------|
-| `superadmin@alubonets.com` | `SuperAdmin@2026!` | Super Admin → `/admin/login` |
-| All other seeded emails | `ChangeMe123!` | Or `SEED_AUTH_PASSWORD` |
-
-Full table (every role + login URL): [README — Seeded test logins](../README.md#seeded-test-logins-local-only).  
-Schema details: [DATA_MODEL.md](./DATA_MODEL.md).
+Seed emails/passwords (dev only): **[DATA_MODEL.md — Seeded dev accounts](./DATA_MODEL.md#seeded-dev-accounts)**.
 
 ---
 
@@ -180,8 +174,8 @@ npm run lint
 
 | Doc | Contents |
 |-----|----------|
-| [README.md](../README.md) | Product overview, how auth/payments/receipts work, **seed logins** |
-| [DATA_MODEL.md](./DATA_MODEL.md) | Tables, columns, relationships, ERD |
+| [README.md](../README.md) | Product overview, how auth/payments/receipts work |
+| [DATA_MODEL.md](./DATA_MODEL.md) | Tables, columns, ERD, **seeded dev accounts** |
 | [DESIGN.md](./DESIGN.md) | UI / design tokens |
 | `.env.local.example` | Env placeholders only |
 | `prisma/schema.prisma` | Source of truth for the data model |

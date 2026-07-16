@@ -12,7 +12,7 @@ Public website and member platform for **Alubonets Self-Help Group**.
 |-----|---------|
 | **This README** | What the product is and **how it works** |
 | [docs/BACKEND_SETUP.md](docs/BACKEND_SETUP.md) | **How to set up** env, Supabase, seed, RLS, Resend, Daraja, deploy |
-| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Tables, columns, relationships, ERD |
+| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Tables, relationships, ERD, **local seed accounts** |
 | [docs/DESIGN.md](docs/DESIGN.md) | UI / design tokens |
 
 ---
@@ -28,31 +28,8 @@ npm run db:bootstrap-auth
 npm run dev
 ```
 
-Full setup steps: **[docs/BACKEND_SETUP.md](docs/BACKEND_SETUP.md)**.
-
----
-
-## Seeded test logins (local only)
-
-After `npm run db:seed` and `npm run db:bootstrap-auth`:
-
-| Email | Password | Role | Status | Where to sign in | Lands on |
-|-------|----------|------|--------|------------------|----------|
-| `superadmin@alubonets.com` | `SuperAdmin@2026!` | ADMIN (Super Admin) | ACTIVE | [/admin/login](http://localhost:3001/admin/login) | `/admin` |
-| `admin@alubonets.com` | `ChangeMe123!` | ADMIN | ACTIVE | [/admin/login](http://localhost:3001/admin/login) | `/admin` |
-| `executive@alubonets.com` | `ChangeMe123!` | EXECUTIVE | ACTIVE | [/login](http://localhost:3001/login) | `/dashboard/executive` |
-| `treasurer@alubonets.com` | `ChangeMe123!` | TREASURER | ACTIVE | [/login](http://localhost:3001/login) | `/dashboard/treasurer` |
-| `secretary@alubonets.com` | `ChangeMe123!` | SECRETARY | ACTIVE | [/login](http://localhost:3001/login) | `/dashboard/secretary` |
-| `organizer@alubonets.com` | `ChangeMe123!` | ORGANIZER | ACTIVE | [/login](http://localhost:3001/login) | `/dashboard/organizer` |
-| `member@alubonets.com` | `ChangeMe123!` | MEMBER | ACTIVE | [/login](http://localhost:3001/login) | `/dashboard/member` |
-| `pending@alubonets.com` | `ChangeMe123!` | MEMBER | PENDING | [/login](http://localhost:3001/login) | `/pending` |
-
-Notes:
-
-- Override the non-super password with env `SEED_AUTH_PASSWORD` before bootstrap if you want.
-- Every signed-in user also has **[/profile](http://localhost:3001/profile)**.
-- Super Admin can open all workspaces via the header **Workspace** switcher.
-- Change these passwords before any shared or production use.
+Full setup: **[docs/BACKEND_SETUP.md](docs/BACKEND_SETUP.md)**.  
+Local seed emails/passwords (dev only): **[docs/DATA_MODEL.md](docs/DATA_MODEL.md#seeded-dev-accounts)**.
 
 ---
 

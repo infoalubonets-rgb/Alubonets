@@ -317,13 +317,26 @@ Linking: register / OAuth / bootstrap sets `users.authUserId = auth.users.id`.
 
 ---
 
-## Seed snapshot (dev)
+## Seeded dev accounts
 
-After `npm run db:seed` + `npm run db:bootstrap-auth`, Prisma has sample users, contributions, projects, etc.
+> **Dev / local only.** Do not use these passwords in production. Change them before any shared environment.  
+> Created by: `npm run db:seed` + `npm run db:bootstrap-auth`.  
+> Override non-super password with env `SEED_AUTH_PASSWORD` before bootstrap if needed.
 
-**Full login table (emails + passwords + dashboards):** see the root [README — Seeded test logins](../README.md#seeded-test-logins-local-only).
+| Email | Password | Role | Status | Sign in | Lands on |
+|-------|----------|------|--------|---------|----------|
+| `superadmin@alubonets.com` | `SuperAdmin@2026!` | ADMIN (Super Admin) | ACTIVE | `/admin/login` | `/admin` |
+| `admin@alubonets.com` | `ChangeMe123!` | ADMIN | ACTIVE | `/admin/login` | `/admin` |
+| `executive@alubonets.com` | `ChangeMe123!` | EXECUTIVE | ACTIVE | `/login` | `/dashboard/executive` |
+| `treasurer@alubonets.com` | `ChangeMe123!` | TREASURER | ACTIVE | `/login` | `/dashboard/treasurer` |
+| `secretary@alubonets.com` | `ChangeMe123!` | SECRETARY | ACTIVE | `/login` | `/dashboard/secretary` |
+| `organizer@alubonets.com` | `ChangeMe123!` | ORGANIZER | ACTIVE | `/login` | `/dashboard/organizer` |
+| `member@alubonets.com` | `ChangeMe123!` | MEMBER | ACTIVE | `/login` | `/dashboard/member` |
+| `pending@alubonets.com` | `ChangeMe123!` | MEMBER | PENDING | `/login` | `/pending` |
 
-Change those passwords before any shared or production use.
+Also after login: shared profile at `/profile`. Super Admin can switch workspaces from the dashboard header.
+
+Seed also creates sample contributions, projects, announcements, etc. (see `prisma/seed.ts`).
 
 ---
 
