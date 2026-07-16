@@ -1,610 +1,216 @@
-'use client'
-
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { type FormEvent, useEffect, useState } from 'react'
-import { ADMIN_LOGIN_LOGO, ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
+import DashboardShell, { type NavItem } from '@/components/dashboard/DashboardShell'
+import { setMemberApproval, setMemberRole } from '@/app/actions/members'
+import { actionApproveGallery } from '@/app/actions/domain'
+import { getAdminDashboardData, getContributionChartSeries } from '@/lib/data/queries'
 import {
-  homeForRole,
-  loginRequest,
-  logoutRequest,
-  meRequest,
-  type AuthUser,
-} from '@/lib/auth/client'
-import AdminExtras from '@/components/dashboard/AdminExtras'
-import { TEST_ACCOUNTS } from '@/lib/auth/users'
+  ApprovalStatusChart,
+  ContributionTrendChart,
+  MemberGrowthChart,
+} from '@/components/dashboard/Charts'
+import { prisma } from '@/lib/prisma'
 
-const PENDING = [
-  { name: 'Michael Ochieng', phone: '+254 712 345 678', date: 'Oct 24, 2023', alt: false },
-  { name: 'Sarah Wangari', phone: '+254 722 987 654', date: 'Oct 23, 2023', alt: true },
-  { name: 'David Kipkorir', phone: '+254 733 456 789', date: 'Oct 21, 2023', alt: false },
-]
-
-const SIDEBAR_LINKS: { icon: string; label: string; badge?: string; active?: boolean }[] = [
-  { icon: 'dashboard', label: 'Dashboard', active: true },
-  { icon: 'person_add', label: 'Pending', badge: '18' },
+const NAV: NavItem[] = [
+  { icon: 'dashboard', label: 'Overview', active: true },
   { icon: 'group', label: 'Members' },
-  { icon: 'admin_panel_settings', label: 'Roles & Permissions' },
-  { icon: 'payments', label: 'Contributions' },
-  { icon: 'assignment', label: 'Projects' },
-  { icon: 'event', label: 'Events' },
-  { icon: 'photo_library', label: 'Gallery' },
-  { icon: 'folder', label: 'Documents' },
-  { icon: 'analytics', label: 'Reports' },
-  { icon: 'history', label: 'Audit Logs' },
-  { icon: 'settings', label: 'Settings' },
+  { icon: 'pending_actions', label: 'Approvals' },
+  { icon: 'photo_library', label: 'Gallery queue' },
+  { icon: 'admin_panel_settings', label: 'Roles' },
 ]
 
-function greetingForHour(hour: number) {
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
-}
-
-export default function AdminPage() {
-  const router = useRouter()
-  const [loggedIn, setLoggedIn] = useState(false)
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [email, setEmail] = useState('admin@alubonets.com')
-  const [password, setPassword] = useState('admin123')
-  const [showPw, setShowPw] = useState(false)
-  const [loginError, setLoginError] = useState('')
-  const [loginLoading, setLoginLoading] = useState(false)
-  const [isDark, setIsDark] = useState(false)
-  const [welcome, setWelcome] = useState("Welcome back. Here's what's happening today.")
-
-  useEffect(() => {
-    const saved = localStorage.getItem('adminTheme')
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const dark = saved === 'dark' || (!saved && prefersDark)
-    setIsDark(dark)
-    document.documentElement.classList.toggle('dark', dark)
-  }, [])
-
-  useEffect(() => {
-    meRequest().then(u => {
-      if (u?.role === 'ADMIN') {
-        setUser(u)
-        setLoggedIn(true)
-        localStorage.setItem('adminName', u.fullName.split(' ')[0])
-      } else if (u) {
-        router.replace(homeForRole(u.role))
-      }
-    })
-  }, [router])
-
-  useEffect(() => {
-    if (!loggedIn) return
-    const update = () => {
-      const name = user?.fullName.split(' ')[0] || localStorage.getItem('adminName') || 'Gina'
-      setWelcome(`${greetingForHour(new Date().getHours())}, ${name}.`)
-    }
-    update()
-    const id = setInterval(update, 60000)
-    return () => clearInterval(id)
-  }, [loggedIn, user])
-
-  useEffect(() => {
-    if (loggedIn) {
-      document.body.classList.add('overflow-hidden', 'h-full')
-    } else {
-      document.body.classList.remove('overflow-hidden', 'h-full')
-    }
-    return () => {
-      document.body.classList.remove('overflow-hidden', 'h-full')
-    }
-  }, [loggedIn])
-
-  const toggleTheme = () => {
-    const next = !document.documentElement.classList.contains('dark')
-    document.documentElement.classList.toggle('dark', next)
-    localStorage.setItem('adminTheme', next ? 'dark' : 'light')
-    setIsDark(next)
-  }
-
-  const onLogin = async (e: FormEvent) => {
-    e.preventDefault()
-    setLoginError('')
-    setLoginLoading(true)
-    try {
-      const { user: u, redirectTo } = await loginRequest(email, password)
-      if (u.role !== 'ADMIN') {
-        router.push(redirectTo)
-        return
-      }
-      setUser(u)
-      setLoggedIn(true)
-      localStorage.setItem('adminName', u.fullName.split(' ')[0])
-    } catch (err) {
-      setLoginError(err instanceof Error ? err.message : 'Invalid credentials. Please try again.')
-    } finally {
-      setLoginLoading(false)
-    }
-  }
-
-  const onLogout = async () => {
-    await logoutRequest()
-    setLoggedIn(false)
-    setUser(null)
-    setEmail('admin@alubonets.com')
-    setPassword('admin123')
-  }
-
-  if (!loggedIn) {
-    return (
-      <div className="fixed inset-0 z-[200] bg-primary flex items-center justify-center min-h-screen px-md">
-        <div className="w-full max-w-[360px]">
-          <div className="flex justify-center">
-            <div className="mb-[-30px] relative z-10 bg-surface rounded-2xl px-md py-sm shadow-xl border border-outline-variant/30">
-              <img src={ADMIN_LOGIN_LOGO} alt="Alubonets SHG" className="h-12 w-auto object-contain" />
-            </div>
-          </div>
-          <div className="bg-surface rounded-2xl pt-[52px] pb-lg px-lg shadow-2xl border border-white/10">
-            <div className="text-center mb-lg">
-              <h1 className="font-h3 text-h3 text-secondary-container">Admin Login</h1>
-              <p className="font-caption text-caption text-on-surface-variant mt-xs">
-                JWT role session — other roles redirect to their dashboard
-              </p>
-            </div>
-            <form onSubmit={onLogin} className="flex flex-col gap-md">
-              <div>
-                <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="admin@alubonets.com"
-                  required
-                  className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface placeholder-on-surface/30 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary-container/40 font-body-md text-[14px] transition-all"
-                />
-              </div>
-              <div>
-                <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPw ? 'text' : 'password'}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    className="w-full px-md py-[10px] pr-[44px] bg-surface border border-secondary-container rounded-lg text-on-surface placeholder-on-surface/30 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary-container/40 font-body-md text-[14px] transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPw(!showPw)}
-                    className="absolute right-sm top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors p-xs"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">
-                      {showPw ? 'visibility_off' : 'visibility'}
-                    </span>
-                  </button>
-                </div>
-              </div>
-              {loginError && (
-                <p className="text-error text-center font-caption text-caption text-[12px]">
-                  {loginError}
-                </p>
-              )}
-              <div className="flex justify-center mt-xs">
-                <button
-                  type="submit"
-                  disabled={loginLoading}
-                  className="bg-secondary-container text-on-secondary font-label-bold text-label-bold py-[11px] px-xl rounded-full hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-sm min-h-[44px] shadow-md disabled:opacity-60"
-                >
-                  <span className="material-symbols-outlined text-[17px]">lock_open</span>
-                  {loginLoading ? 'Signing in…' : 'Sign In'}
-                </button>
-              </div>
-            </form>
-            <div className="mt-lg pt-md border-t border-outline-variant/40">
-              <p className="font-label-bold text-[11px] text-on-surface-variant uppercase tracking-wider mb-sm text-center">
-                Role test emails
-              </p>
-              <div className="flex flex-col gap-xs max-h-40 overflow-y-auto">
-                {TEST_ACCOUNTS.map(a => (
-                  <button
-                    key={a.email}
-                    type="button"
-                    onClick={() => {
-                      setEmail(a.email)
-                      setPassword(a.password)
-                      setLoginError('')
-                    }}
-                    className="text-left px-sm py-xs rounded-lg hover:bg-surface-container text-[12px]"
-                  >
-                    <span className="font-semibold text-primary">{a.role}</span>
-                    <span className="text-on-surface-variant">
-                      {' '}
-                      — {a.email} / {a.password}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <p className="text-center mt-lg">
-            <Link
-              href="/"
-              className="font-caption text-caption text-primary-fixed-dim/50 hover:text-primary-fixed-dim transition-colors"
-            >
-              ← Return to public site
-            </Link>
-          </p>
-        </div>
-      </div>
-    )
-  }
+export default async function AdminPage() {
+  const data = await getAdminDashboardData()
+  const chart = await getContributionChartSeries()
+  const statusCounts = await prisma.user.groupBy({
+    by: ['status'],
+    _count: true,
+  })
+  const statusMap = Object.fromEntries(statusCounts.map((s) => [s.status, s._count]))
 
   return (
-    <div className="min-h-screen flex bg-background text-on-background dark:bg-[#060c1a] dark:text-blue-50">
-      <aside className="bg-primary dark:bg-[#0c1e42] text-on-primary w-56 fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] dark:border-white/[0.06] shadow-[2px_0_16px_rgba(0,0,0,0.28)] transition-colors">
-        <div className="px-md pt-lg pb-md flex items-center gap-sm border-b border-white/10">
-          <img
-            src={ADMIN_SIDEBAR_LOGO}
-            alt="Alubonets"
-            className="h-11 w-11 rounded-full bg-white/10 p-1 flex-shrink-0"
-          />
-          <div>
-            <p className="font-h3 text-[19px] font-bold text-on-primary leading-none">Alubonets</p>
-            <p className="text-[11px] text-primary-fixed-dim/60 mt-0.5 font-caption">Admin Panel</p>
-          </div>
+    <DashboardShell role="ADMIN" title="Administrator" nav={NAV}>
+      <div className="space-y-6 p-4 md:p-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: 'Total members', value: data.totalMembers },
+            { label: 'Active', value: data.activeMembers },
+            { label: 'Pending', value: data.pendingMembers },
+            {
+              label: 'Contributions (KES)',
+              value: Math.round(data.totalContributions).toLocaleString(),
+            },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border border-outline-variant/40 bg-surface p-4">
+              <p className="text-xs text-on-surface-variant uppercase tracking-wide">{s.label}</p>
+              <p className="text-2xl font-semibold mt-1">{s.value}</p>
+            </div>
+          ))}
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-sm px-sm space-y-0.5">
-          {SIDEBAR_LINKS.map(link =>
-            link.active ? (
-              <a
-                key={link.label}
-                href="#"
-                className="flex items-center gap-sm px-sm py-[7px] rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px]"
-              >
-                <span className="material-symbols-outlined text-[17px] text-secondary-container flex-shrink-0">
-                  {link.icon}
-                </span>
-                {link.label}
-              </a>
-            ) : (
-              <a key={link.label} href="#" className="sidebar-link">
-                <span className="material-symbols-outlined">{link.icon}</span>
-                {link.badge ? (
-                  <>
-                    <span className="flex-1">{link.label}</span>
-                    <span className="bg-secondary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                      {link.badge}
-                    </span>
-                  </>
-                ) : (
-                  link.label
-                )}
-              </a>
-            )
-          )}
-        </nav>
-
-        <div className="px-md py-md border-t border-white/10">
-          <button
-            type="button"
-            onClick={onLogout}
-            className="flex items-center gap-sm text-primary-fixed-dim/60 hover:text-on-primary text-[13px] font-body-md transition-colors w-full group"
-          >
-            <span className="material-symbols-outlined text-[17px] group-hover:text-secondary-container transition-colors">
-              logout
-            </span>
-            Sign Out
-          </button>
-        </div>
-      </aside>
-
-      <div className="ml-56 flex-1 flex flex-col min-h-screen min-w-0">
-        <header
-          className="bg-surface-container-lowest dark:bg-[#0d1729] border-b border-outline-variant dark:border-[#1a2d4f] sticky top-0 z-40 flex items-center justify-between px-lg transition-colors"
-          style={{ height: 52 }}
-        >
-          <div className="relative flex-1 max-w-xs">
-            <span
-              className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline"
-              style={{ fontSize: 17 }}
-            >
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Search members, reports…"
-              className="w-full pl-9 pr-md py-1.5 bg-surface-container dark:bg-[#111f36] dark:text-blue-50 rounded-lg border border-outline-variant/60 dark:border-[#1e3461] focus:outline-none focus:ring-1 focus:ring-primary text-[13px] font-body-md"
+        <div className="grid lg:grid-cols-2 gap-4">
+          <div className="rounded-xl border border-outline-variant/40 bg-surface p-4">
+            <h2 className="font-semibold mb-3">Contribution trend</h2>
+            <ContributionTrendChart
+              labels={chart.labels.length ? chart.labels : ['—']}
+              values={chart.values.length ? chart.values : [0]}
             />
           </div>
-          <div className="flex items-center gap-md">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="text-on-surface-variant dark:text-blue-200/60 hover:text-primary dark:hover:text-primary-fixed-dim transition-colors"
-              title="Toggle theme"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                {isDark ? 'light_mode' : 'dark_mode'}
-              </span>
-            </button>
-            <button
-              type="button"
-              className="relative text-on-surface-variant dark:text-blue-200/60 hover:text-primary dark:hover:text-primary-fixed-dim transition-colors"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
-                notifications
-              </span>
-              <span className="absolute -top-1 -right-1 bg-secondary text-white text-[9px] font-bold px-1 rounded-full leading-[14px]">
-                3
-              </span>
-            </button>
-            <div className="flex items-center gap-sm cursor-pointer group">
-              <div className="text-right hidden sm:block">
-                <p className="font-label-bold text-[12px] text-on-surface dark:text-blue-50 leading-tight">
-                  {user?.fullName || 'Admin'}
-                </p>
-              </div>
-              <div className="h-8 w-8 rounded-full border border-outline-variant dark:border-[#1e3461] bg-primary text-on-primary flex items-center justify-center font-label-bold text-[12px] flex-shrink-0">
-                {user?.initials || 'G'}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-secondary-container/40 bg-secondary-container text-on-primary px-md py-1.5 font-label-bold text-[12px] hover:opacity-90 active:scale-95 transition-all shadow-sm"
-              title="Sign out"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                logout
-              </span>
-              <span className="hidden sm:inline">Sign out</span>
-            </button>
+          <div className="rounded-xl border border-outline-variant/40 bg-surface p-4">
+            <h2 className="font-semibold mb-3">Membership status</h2>
+            <ApprovalStatusChart
+              labels={['ACTIVE', 'PENDING', 'INACTIVE', 'SUSPENDED']}
+              values={[
+                statusMap.ACTIVE ?? 0,
+                statusMap.PENDING ?? 0,
+                statusMap.INACTIVE ?? 0,
+                statusMap.SUSPENDED ?? 0,
+              ]}
+            />
           </div>
-        </header>
+        </div>
 
-        <main className="flex-1 p-lg space-y-lg overflow-y-auto">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="font-h2 text-h2 text-primary dark:text-primary-fixed-dim">Dashboard</h1>
-              <p className="font-body-md text-body-md text-on-surface-variant dark:text-blue-200/60 mt-xs">
-                {welcome}
-              </p>
-            </div>
-            <span className="font-caption text-caption text-on-surface-variant dark:text-blue-200/60 bg-surface-container dark:bg-[#0d1729] px-md py-xs rounded-full border border-outline-variant dark:border-[#1a2d4f]">
-              July 2026
-            </span>
+        <section className="rounded-xl border border-outline-variant/40 bg-surface p-4">
+          <h2 className="font-semibold mb-3">Pending registrations ({data.pendingList.length})</h2>
+          <div className="space-y-2">
+            {data.pendingList.length === 0 && (
+              <p className="text-sm text-on-surface-variant">No pending members.</p>
+            )}
+            {data.pendingList.map((u) => (
+              <div
+                key={u.id}
+                className="flex flex-wrap items-center justify-between gap-2 border border-outline-variant/30 rounded-lg p-3"
+              >
+                <div>
+                  <p className="font-medium">{u.fullName}</p>
+                  <p className="text-sm text-on-surface-variant">{u.email}</p>
+                </div>
+                <div className="flex gap-2">
+                  <form
+                    action={async () => {
+                      'use server'
+                      await setMemberApproval({ userId: u.id, approve: true })
+                    }}
+                  >
+                    <button className="px-3 py-1.5 rounded-lg bg-primary text-on-primary text-sm">
+                      Approve
+                    </button>
+                  </form>
+                  <form
+                    action={async () => {
+                      'use server'
+                      await setMemberApproval({ userId: u.id, approve: false })
+                    }}
+                  >
+                    <button className="px-3 py-1.5 rounded-lg border text-sm">Reject</button>
+                  </form>
+                </div>
+              </div>
+            ))}
           </div>
+        </section>
 
-          <section className="grid grid-cols-2 lg:grid-cols-5 gap-md">
-            <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-md flex flex-col gap-sm hover:shadow-[0_2px_12px_rgba(0,31,80,0.07)] transition-all duration-200 group">
-              <div className="flex justify-between items-start">
-                <p className="font-caption text-[11px] text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wider">
-                  Total Members
-                </p>
-                <div className="bg-primary-fixed/50 dark:bg-primary/30 p-1.5 rounded-lg text-primary dark:text-primary-fixed-dim group-hover:bg-primary-fixed transition-colors">
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                    group
-                  </span>
+        <section className="rounded-xl border border-outline-variant/40 bg-surface p-4">
+          <h2 className="font-semibold mb-3">Gallery approval queue</h2>
+          <div className="space-y-2">
+            {data.galleryQueue.length === 0 && (
+              <p className="text-sm text-on-surface-variant">No pending photos.</p>
+            )}
+            {data.galleryQueue.map((g) => (
+              <div key={g.id} className="flex items-center justify-between gap-3 border rounded-lg p-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{g.caption || g.url}</p>
                 </div>
-              </div>
-              <p className="font-h3 text-h3 text-on-surface dark:text-blue-50 mt-xs">152</p>
-            </div>
-
-            <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-md flex flex-col gap-sm hover:shadow-[0_2px_12px_rgba(0,31,80,0.07)] transition-all duration-200 group">
-              <div className="flex justify-between items-start">
-                <p className="font-caption text-[11px] text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wider">
-                  Active
-                </p>
-                <div className="bg-[#dcfce7] dark:bg-[#14532d]/40 p-1.5 rounded-lg text-[#166534] dark:text-[#4ade80] group-hover:bg-[#bbf7d0] transition-colors">
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                    verified_user
-                  </span>
-                </div>
-              </div>
-              <p className="font-h3 text-h3 text-on-surface dark:text-blue-50 mt-xs">145</p>
-            </div>
-
-            <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border-2 border-secondary-container/30 p-md flex flex-col gap-sm relative overflow-hidden hover:shadow-[0_2px_12px_rgba(254,128,21,0.12)] transition-all duration-200">
-              <div className="absolute top-0 left-0 w-full h-0.5 bg-secondary-container" />
-              <div className="flex justify-between items-start">
-                <p className="font-caption text-[11px] text-secondary dark:text-secondary-container font-bold uppercase tracking-wider">
-                  Pending
-                </p>
-                <div className="bg-secondary-fixed/50 dark:bg-secondary/30 p-1.5 rounded-lg text-secondary dark:text-secondary-container">
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                    hourglass_empty
-                  </span>
-                </div>
-              </div>
-              <p className="font-h3 text-h3 text-secondary dark:text-secondary-container mt-xs">7</p>
-            </div>
-
-            <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-md flex flex-col gap-sm hover:shadow-[0_2px_12px_rgba(0,31,80,0.07)] transition-all duration-200 group">
-              <div className="flex justify-between items-start">
-                <p className="font-caption text-[11px] text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wider">
-                  Contributions
-                </p>
-                <div className="bg-tertiary-fixed/50 dark:bg-tertiary/50 p-1.5 rounded-lg text-tertiary dark:text-tertiary-fixed group-hover:bg-tertiary-fixed transition-colors">
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                    payments
-                  </span>
-                </div>
-              </div>
-              <p className="font-h3 text-h3 text-on-surface dark:text-blue-50 mt-xs">KES 45k</p>
-            </div>
-
-            <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-md flex flex-col gap-sm hover:shadow-[0_2px_12px_rgba(0,31,80,0.07)] transition-all duration-200 group">
-              <div className="flex justify-between items-start">
-                <p className="font-caption text-[11px] text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wider">
-                  Events
-                </p>
-                <div className="bg-primary-fixed/50 dark:bg-primary/30 p-1.5 rounded-lg text-primary dark:text-primary-fixed-dim group-hover:bg-primary-fixed transition-colors">
-                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                    event
-                  </span>
-                </div>
-              </div>
-              <p className="font-h3 text-h3 text-on-surface dark:text-blue-50 mt-xs">2</p>
-            </div>
-          </section>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
-            <div className="lg:col-span-2 space-y-lg">
-              <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] overflow-hidden">
-                <div className="px-lg py-md border-b border-surface-container-highest dark:border-[#1a2d4f] flex justify-between items-center">
-                  <h2 className="font-h3 text-h3 text-primary dark:text-primary-fixed-dim">
-                    Pending Registrations
-                  </h2>
-                  <button
-                    type="button"
-                    className="text-secondary dark:text-secondary-container font-label-bold text-label-bold hover:underline text-[13px]"
-                  >
-                    View All
+                <form action={actionApproveGallery}>
+                  <input type="hidden" name="id" value={g.id} />
+                  <input type="hidden" name="approve" value="true" />
+                  <button className="px-3 py-1.5 rounded-lg bg-secondary-container text-sm">
+                    Publish
                   </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-surface-container-low dark:bg-[#111f36]/40 border-b border-surface-container-highest dark:border-[#1a2d4f]">
-                        <th className="py-2.5 px-lg font-label-bold text-[12px] text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wide">
-                          Name
-                        </th>
-                        <th className="py-2.5 px-lg font-label-bold text-[12px] text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wide">
-                          Phone
-                        </th>
-                        <th className="py-2.5 px-lg font-label-bold text-[12px] text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wide">
-                          Date Applied
-                        </th>
-                        <th className="py-2.5 px-lg font-label-bold text-[12px] text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wide text-right">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-surface-container-highest dark:divide-slate-700">
-                      {PENDING.map(row => (
-                        <tr
-                          key={row.name}
-                          className={`hover:bg-surface-container-low/50 dark:hover:bg-slate-700/30 transition-colors${
-                            row.alt ? ' bg-surface/50 dark:bg-[#0d1729]/40' : ''
-                          }`}
-                        >
-                          <td className="py-3 px-lg font-label-bold text-[13.5px] text-on-surface dark:text-blue-50">
-                            {row.name}
-                          </td>
-                          <td className="py-3 px-lg text-on-surface-variant dark:text-blue-200/60 text-[13px]">
-                            {row.phone}
-                          </td>
-                          <td className="py-3 px-lg text-on-surface-variant dark:text-blue-200/60 text-[13px]">
-                            {row.date}
-                          </td>
-                          <td className="py-3 px-lg text-right space-x-2">
-                            <button
-                              type="button"
-                              className="px-3 py-1 bg-[#dcfce7] dark:bg-[#14532d]/40 text-[#166534] dark:text-[#4ade80] rounded-lg font-label-bold text-[11px] hover:bg-[#bbf7d0] transition-colors border border-[#86efac] dark:border-[#166534]"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              type="button"
-                              className="px-3 py-1 bg-error-container dark:bg-error/20 text-on-error-container dark:text-[#ff897d] rounded-lg font-label-bold text-[11px] hover:bg-[#ffb4ab] transition-colors border border-[#ff897d] dark:border-error"
-                            >
-                              Reject
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                </form>
               </div>
-
-              <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] overflow-hidden">
-                <div className="px-lg py-md border-b border-surface-container-highest dark:border-[#1a2d4f] flex justify-between items-center">
-                  <h2 className="font-h3 text-h3 text-primary dark:text-primary-fixed-dim">
-                    Member Overview
-                  </h2>
-                  <button
-                    type="button"
-                    className="text-primary dark:text-primary-fixed-dim font-label-bold text-label-bold hover:underline flex items-center gap-xs text-[13px]"
-                  >
-                    View Directory{' '}
-                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-                      arrow_forward
-                    </span>
-                  </button>
-                </div>
-                <div className="p-lg">
-                  <div className="bg-surface-container-low dark:bg-[#111f36]/30 rounded-lg p-lg flex items-center justify-center border border-dashed border-outline-variant dark:border-[#1e3461] text-on-surface-variant dark:text-blue-200/60">
-                    <p className="text-[13px]">Member Management Table Content goes here…</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-lg">
-              <div className="bg-primary rounded-xl p-lg text-on-primary shadow-[0_4px_20px_rgba(0,31,80,0.2)]">
-                <h3 className="font-h3 text-h3 mb-md">Quick Actions</h3>
-                <div className="grid grid-cols-2 gap-sm">
-                  <button
-                    type="button"
-                    className="bg-primary-container/70 hover:bg-tertiary transition-colors p-md rounded-lg flex flex-col items-center justify-center gap-xs text-center group border border-white/10"
-                  >
-                    <span
-                      className="material-symbols-outlined text-on-primary-container group-hover:text-white transition-colors"
-                      style={{ fontSize: 20 }}
-                    >
-                      campaign
-                    </span>
-                    <span className="font-caption text-[11px] text-primary-fixed-dim group-hover:text-white transition-colors">
-                      Announcement
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="bg-primary-container/70 hover:bg-tertiary transition-colors p-md rounded-lg flex flex-col items-center justify-center gap-xs text-center group border border-white/10"
-                  >
-                    <span
-                      className="material-symbols-outlined text-on-primary-container group-hover:text-white transition-colors"
-                      style={{ fontSize: 20 }}
-                    >
-                      download
-                    </span>
-                    <span className="font-caption text-[11px] text-primary-fixed-dim group-hover:text-white transition-colors">
-                      Export Members
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="bg-primary-container/70 hover:bg-tertiary transition-colors p-md rounded-lg flex flex-col items-center justify-center gap-xs text-center group border border-white/10"
-                  >
-                    <span
-                      className="material-symbols-outlined text-on-primary-container group-hover:text-white transition-colors"
-                      style={{ fontSize: 20 }}
-                    >
-                      manage_accounts
-                    </span>
-                    <span className="font-caption text-[11px] text-primary-fixed-dim group-hover:text-white transition-colors">
-                      Manage Roles
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="bg-secondary hover:bg-[#b85800] transition-colors p-md rounded-lg flex flex-col items-center justify-center gap-xs text-center group border border-secondary-container/30"
-                  >
-                    <span className="material-symbols-outlined text-white" style={{ fontSize: 20 }}>
-                      how_to_reg
-                    </span>
-                    <span className="font-caption text-[11px] text-white">Approve Members</span>
-                  </button>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
+        </section>
 
-          <AdminExtras />
-        </main>
+        <section className="rounded-xl border border-outline-variant/40 bg-surface p-4 overflow-x-auto">
+          <h2 className="font-semibold mb-3">Roles</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-on-surface-variant">
+                <th className="py-2">Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.allUsers.map((u) => (
+                <tr key={u.id} className="border-t border-outline-variant/30">
+                  <td className="py-2">{u.fullName}</td>
+                  <td>{u.email}</td>
+                  <td>{u.status}</td>
+                  <td>
+                    <form
+                      action={async (fd) => {
+                        'use server'
+                        await setMemberRole({
+                          userId: u.id,
+                          role: String(fd.get('role')) as
+                            | 'ADMIN'
+                            | 'EXECUTIVE'
+                            | 'TREASURER'
+                            | 'SECRETARY'
+                            | 'ORGANIZER'
+                            | 'MEMBER',
+                        })
+                      }}
+                      className="flex gap-2 items-center"
+                    >
+                      <select
+                        name="role"
+                        defaultValue={u.role}
+                        className="border rounded px-2 py-1 bg-surface"
+                      >
+                        {['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'].map(
+                          (r) => (
+                            <option key={r} value={r}>
+                              {r}
+                            </option>
+                          )
+                        )}
+                      </select>
+                      <button className="text-primary text-xs font-semibold">Save</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="rounded-xl border border-outline-variant/40 bg-surface p-4">
+          <h2 className="font-semibold mb-3">Recent activity</h2>
+          <ul className="space-y-2 text-sm">
+            {data.recentAudit.map((a) => (
+              <li key={a.id} className="border-b border-outline-variant/20 pb-2">
+                <span className="font-medium">{a.action}</span>
+                <span className="text-on-surface-variant">
+                  {' '}
+                  by {a.user.fullName} · {a.createdAt.toLocaleString()}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div className="rounded-xl border border-outline-variant/40 bg-surface p-4">
+          <h2 className="font-semibold mb-3">Open welfare requests</h2>
+          <p className="text-2xl font-semibold">{data.openWelfare}</p>
+          <MemberGrowthChart
+            labels={['Active', 'Pending']}
+            values={[data.activeMembers, data.pendingMembers]}
+          />
+        </div>
       </div>
-    </div>
+    </DashboardShell>
   )
 }

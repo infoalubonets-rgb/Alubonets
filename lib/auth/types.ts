@@ -21,8 +21,6 @@ export type JwtPayload = {
   role: Role
 }
 
-export const AUTH_COOKIE = 'alubonets_token'
-
 export const ROLE_HOME: Record<Role, string> = {
   ADMIN: '/admin',
   EXECUTIVE: '/dashboard/executive',

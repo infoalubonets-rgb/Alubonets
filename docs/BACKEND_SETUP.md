@@ -14,17 +14,17 @@ This guide walks through setting up the full stack from the Solution Design Docu
 | Layer / package | Installed in `package.json`? | Wired & used end-to-end? |
 |-----------------|-----------------------------|---------------------------|
 | Next.js 15 + Tailwind + TypeScript | Yes | Yes — public site + role dashboards |
-| `@supabase/supabase-js` + `@supabase/ssr` | Yes | Partial — clients + session middleware exist; Auth not replacing JWT test users yet |
-| Prisma + schema | Yes | Partial — schema exists; not connected to live Supabase DB / pages yet |
-| Zod | Yes | Partial — login API only |
-| React Hook Form | Yes | No — forms not migrated yet |
-| Chart.js / `react-chartjs-2` | Yes | Yes — used in dashboard chart components |
-| Resend | Yes | No — no email senders yet |
-| PapaParse | Yes | No — no CSV import routes yet |
-| pdf-lib | Yes | No — no receipt/PDF generators yet |
-| docx | Yes | No — no Word export yet |
-| M-Pesa Daraja | No code yet | No |
-| JWT (`jose`) test auth | Yes | Yes — middleware protects `/admin` + `/dashboard/*` |
+| `@supabase/supabase-js` + `@supabase/ssr` | Yes | Yes — Auth login/register, middleware session, service role admin |
+| Prisma + schema | Yes | Yes — live DB queries on all dashboards; seed + RLS SQL |
+| Zod | Yes | Yes — auth + server actions |
+| React Hook Form | Yes | Partial — forms use native + Zod server actions (RHF available) |
+| Chart.js / `react-chartjs-2` | Yes | Yes — fed by Prisma aggregates |
+| Resend | Yes | Yes — approval/receipt/welfare emails (skipped if key missing) |
+| PapaParse | Yes | Yes — treasurer CSV import |
+| pdf-lib | Yes | Yes — receipt + statement PDF routes |
+| docx | Yes | Yes — meetings export |
+| M-Pesa Daraja | Yes | Yes — STK + callback routes (needs Daraja env) |
+| JWT (`jose`) test auth | Removed | Replaced by Supabase Auth + app_metadata roles |
 
 **Goal of this doc:** finish connecting Supabase + Prisma + Resend + validation + charts + PDFs/Word + CSV + Daraja so the platform matches the SDD.
 
@@ -174,6 +174,22 @@ After tables exist in Supabase:
 3. Never use the service role key in the browser.
 
 Test policies in the Supabase SQL editor before shipping.
+
+---
+
+Apply RLS after schema push:
+
+1. Open Supabase → SQL Editor
+2. Paste and run [`supabase/policies.sql`](../supabase/policies.sql)
+
+Seed + Auth bootstrap:
+
+```bash
+npm run db:seed
+npm run db:bootstrap-auth
+```
+
+Default seeded Auth password: `ChangeMe123!` (override with `SEED_AUTH_PASSWORD`).
 
 ---
 

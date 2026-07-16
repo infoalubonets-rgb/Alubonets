@@ -4,19 +4,22 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { ADMIN_LOGIN_LOGO } from '@/lib/constants'
-import { homeForRole, loginRequest, meRequest, type AuthUser } from '@/lib/auth/client'
-import { TEST_ACCOUNTS } from '@/lib/auth/users'
+import { homeForRole, loginRequest, meRequest, registerRequest, type AuthUser } from '@/lib/auth/client'
 
 type Props = {
   title?: string
-  showTestAccounts?: boolean
+  allowRegister?: boolean
 }
 
-export default function LoginForm({ title = 'Member Login', showTestAccounts = true }: Props) {
+export default function LoginForm({ title = 'Member Login', allowRegister = true }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState('admin@alubonets.com')
-  const [password, setPassword] = useState('admin123')
+  const [mode, setMode] = useState<'signin' | 'register'>('signin')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,12 +33,32 @@ export default function LoginForm({ title = 'Member Login', showTestAccounts = t
     })
   }, [router, searchParams])
 
-  const onLogin = async (e: FormEvent) => {
+  useEffect(() => {
+    if (searchParams.get('error') === 'inactive') {
+      setError('Your account is not active. Contact an administrator.')
+    }
+  }, [searchParams])
+
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
     setLoading(true)
     try {
-      const { user, redirectTo } = await loginRequest(email, password)
+      if (mode === 'register') {
+        const { redirectTo } = await registerRequest({ email, password, fullName, phone })
+        router.push(redirectTo || '/pending')
+        router.refresh()
+        return
+      }
+      const { user, redirectTo, status } = await loginRequest(email, password)
+      if (status === 'PENDING') {
+        router.push('/pending')
+        return
+      }
       const next = searchParams.get('next')
       if (next && next.startsWith('/')) {
         router.push(next)
@@ -44,16 +67,10 @@ export default function LoginForm({ title = 'Member Login', showTestAccounts = t
       }
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid credentials. Please try again.')
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
-  }
-
-  const fill = (e: string, p: string) => {
-    setEmail(e)
-    setPassword(p)
-    setError('')
   }
 
   return (
@@ -68,10 +85,37 @@ export default function LoginForm({ title = 'Member Login', showTestAccounts = t
           <div className="text-center mb-lg">
             <h1 className="font-h3 text-h3 text-secondary-container">{title}</h1>
             <p className="font-caption text-caption text-on-surface-variant mt-xs">
-              Sign in with your role account — JWT session redirect
+              Secure sign-in with Supabase Auth
             </p>
           </div>
-          <form onSubmit={onLogin} className="flex flex-col gap-md">
+          <form onSubmit={onSubmit} className="flex flex-col gap-md">
+            {mode === 'register' && (
+              <>
+                <div>
+                  <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
+                    Full name
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
+                    Phone (optional)
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
                 Email Address
@@ -79,10 +123,9 @@ export default function LoginForm({ title = 'Member Login', showTestAccounts = t
               <input
                 type="email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="admin@alubonets.com"
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface placeholder-on-surface/30 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary-container/40 font-body-md text-[14px] transition-all"
+                className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
               />
             </div>
             <div>
@@ -93,10 +136,10 @@ export default function LoginForm({ title = 'Member Login', showTestAccounts = t
                 <input
                   type={showPw ? 'text' : 'password'}
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-md py-[10px] pr-[44px] bg-surface border border-secondary-container rounded-lg text-on-surface placeholder-on-surface/30 focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary-container/40 font-body-md text-[14px] transition-all"
+                  minLength={mode === 'register' ? 8 : 1}
+                  className="w-full px-md py-[10px] pr-[44px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
                 />
                 <button
                   type="button"
@@ -109,6 +152,21 @@ export default function LoginForm({ title = 'Member Login', showTestAccounts = t
                 </button>
               </div>
             </div>
+            {mode === 'register' && (
+              <div>
+                <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
+                  Confirm password
+                </label>
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
+                />
+              </div>
+            )}
             {error && (
               <p className="text-error text-center font-caption text-caption text-[12px]">{error}</p>
             )}
@@ -119,30 +177,51 @@ export default function LoginForm({ title = 'Member Login', showTestAccounts = t
                 className="bg-secondary-container text-on-secondary font-label-bold text-label-bold py-[11px] px-xl rounded-full hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-sm min-h-[44px] shadow-md disabled:opacity-60"
               >
                 <span className="material-symbols-outlined text-[17px]">lock_open</span>
-                {loading ? 'Signing in…' : 'Sign In'}
+                {loading
+                  ? mode === 'register'
+                    ? 'Creating…'
+                    : 'Signing in…'
+                  : mode === 'register'
+                    ? 'Register'
+                    : 'Sign In'}
               </button>
             </div>
           </form>
 
-          {showTestAccounts && (
-            <div className="mt-lg pt-md border-t border-outline-variant/40">
-              <p className="font-label-bold text-[11px] text-on-surface-variant uppercase tracking-wider mb-sm text-center">
-                Test emails (no email service required)
-              </p>
-              <div className="flex flex-col gap-xs max-h-48 overflow-y-auto">
-                {TEST_ACCOUNTS.map(a => (
+          {allowRegister && (
+            <p className="text-center mt-md text-[13px] text-on-surface-variant">
+              {mode === 'signin' ? (
+                <>
+                  New member?{' '}
                   <button
-                    key={a.email}
                     type="button"
-                    onClick={() => fill(a.email, a.password)}
-                    className="text-left px-sm py-xs rounded-lg hover:bg-surface-container text-[12px] font-body-md text-on-surface border border-transparent hover:border-outline-variant/50 transition-colors"
+                    className="text-primary font-semibold"
+                    onClick={() => {
+                      setMode('register')
+                      setConfirmPassword('')
+                      setError('')
+                    }}
                   >
-                    <span className="font-semibold text-primary">{a.role}</span>
-                    <span className="text-on-surface-variant"> — {a.email} / {a.password}</span>
+                    Register
                   </button>
-                ))}
-              </div>
-            </div>
+                </>
+              ) : (
+                <>
+                  Already registered?{' '}
+                  <button
+                    type="button"
+                    className="text-primary font-semibold"
+                    onClick={() => {
+                      setMode('signin')
+                      setConfirmPassword('')
+                      setError('')
+                    }}
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+            </p>
           )}
         </div>
         <p className="text-center mt-lg">

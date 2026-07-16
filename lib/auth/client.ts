@@ -1,6 +1,6 @@
-import { AUTH_COOKIE, ROLE_HOME, type AuthUser, type Role } from './types'
+import { ROLE_HOME, type AuthUser, type Role } from './types'
 
-export { AUTH_COOKIE, ROLE_HOME }
+export { ROLE_HOME }
 export type { AuthUser, Role }
 
 export async function loginRequest(email: string, password: string) {
@@ -13,7 +13,25 @@ export async function loginRequest(email: string, password: string) {
   if (!res.ok) {
     throw new Error(data.error || 'Invalid credentials')
   }
-  return data as { user: AuthUser; redirectTo: string }
+  return data as { user: AuthUser; redirectTo: string; status?: string }
+}
+
+export async function registerRequest(input: {
+  email: string
+  password: string
+  fullName: string
+  phone?: string
+}) {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Registration failed')
+  }
+  return data as { user: AuthUser; redirectTo: string; status?: string }
 }
 
 export async function logoutRequest() {

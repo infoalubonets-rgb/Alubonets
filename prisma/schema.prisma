@@ -37,41 +37,60 @@ enum WelfareStatus {
   PAID
 }
 
-model User {
-  id            String       @id @default(cuid())
-  email         String       @unique
-  fullName      String
-  phone         String?
-  role          Role         @default(MEMBER)
-  status        MemberStatus @default(PENDING)
-  avatarUrl     String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+enum PaymentMethod {
+  CASH
+  MPESA
+  BANK
+  OTHER
+}
 
-  contributions Contribution[]
+model User {
+  id              String       @id @default(cuid())
+  authUserId      String?      @unique
+  email           String       @unique
+  fullName        String
+  phone           String?
+  role            Role         @default(MEMBER)
+  status          MemberStatus @default(PENDING)
+  avatarUrl       String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  contributions   Contribution[]
   welfareRequests WelfareRequest[]
-  auditLogs     AuditLog[]
+  auditLogs       AuditLog[]
+  announcements   Announcement[]
+  documents       Document[]
+  meetings        Meeting[]      @relation("MeetingRecorder")
+  galleryPhotos   GalleryPhoto[]
+  emailLogs       EmailLog[]
 
   @@map("users")
 }
 
 model Contribution {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  amount      Float
-  description String?
-  paidAt      DateTime @default(now())
-  mpesaRef    String?
-  createdAt   DateTime @default(now())
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount        Float
+  description   String?
+  category      String?
+  paymentMethod PaymentMethod @default(CASH)
+  receivedBy    String?
+  statementRef  String?
+  paidAt        DateTime      @default(now())
+  mpesaRef      String?
+  createdAt     DateTime      @default(now())
 
+  @@index([userId])
+  @@index([paidAt])
   @@map("contributions")
 }
 
 model WelfareRequest {
   id          String        @id @default(cuid())
   userId      String
-  user        User          @relation(fields: [userId], references: [id])
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   description String
   amount      Float?
   status      WelfareStatus @default(PENDING)
@@ -79,6 +98,8 @@ model WelfareRequest {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  @@index([userId])
+  @@index([status])
   @@map("welfare_requests")
 }
 
@@ -97,11 +118,15 @@ model Project {
 }
 
 model GalleryPhoto {
-  id          String   @id @default(cuid())
-  url         String
-  caption     String?
-  category    String?
-  uploadedAt  DateTime @default(now())
+  id         String    @id @default(cuid())
+  url        String
+  caption    String?
+  category   String?
+  isPublic   Boolean   @default(false)
+  approvedAt DateTime?
+  uploadedBy String?
+  uploader   User?     @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  uploadedAt DateTime  @default(now())
 
   @@map("gallery_photos")
 }
@@ -111,6 +136,7 @@ model Announcement {
   title       String
   content     String
   authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   publishedAt DateTime @default(now())
   createdAt   DateTime @default(now())
 
@@ -118,37 +144,68 @@ model Announcement {
 }
 
 model Event {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   description String?
   location    String?
   startsAt    DateTime
   endsAt      DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@map("events")
 }
 
 model Document {
-  id          String   @id @default(cuid())
-  title       String
-  fileUrl     String
-  category    String?
-  uploadedBy  String
-  uploadedAt  DateTime @default(now())
+  id         String   @id @default(cuid())
+  title      String
+  fileUrl    String
+  category   String?
+  uploadedBy String
+  uploader   User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  uploadedAt DateTime @default(now())
 
   @@map("documents")
+}
+
+model Meeting {
+  id         String   @id @default(cuid())
+  title      String
+  agenda     String?
+  minutes    String?
+  heldAt     DateTime
+  attendance Int      @default(0)
+  recordedBy String
+  recorder   User     @relation("MeetingRecorder", fields: [recordedBy], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("meetings")
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  toEmail   String
+  subject   String
+  template  String?
+  status    String   @default("sent")
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@map("email_logs")
 }
 
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   action    String
   entity    String?
   entityId  String?
   meta      Json?
   createdAt DateTime @default(now())
 
+  @@index([userId])
   @@map("audit_logs")
 }

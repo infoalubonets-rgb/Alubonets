@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
-import { loginRequest } from '@/lib/auth/client'
+import { homeForRole, loginRequest, registerRequest } from '@/lib/auth/client'
 
 type AuthTab = 'signin' | 'signup' | 'forgot'
 
@@ -11,15 +11,6 @@ let _open: (() => void) | null = null
 export function openAuthModal() {
   _open?.()
 }
-
-const GoogleIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="16" height="16" style={{ flexShrink: 0 }}>
-    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-  </svg>
-)
 
 function PasswordInput({
   placeholder,
@@ -38,8 +29,9 @@ function PasswordInput({
         placeholder={placeholder}
         className="auth-field auth-field-password"
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         required
+        minLength={8}
       />
       <button
         type="button"
@@ -61,6 +53,9 @@ export default function AuthModal() {
   const [tab, setTab] = useState<AuthTab>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -72,35 +67,43 @@ export default function AuthModal() {
   }, [])
 
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
+    document.body.style.overflow = open ? 'hidden' : ''
     return () => {
       document.body.style.overflow = ''
     }
   }, [open])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [])
 
   const onSignIn = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const { redirectTo } = await loginRequest(email, password)
+      const { user, redirectTo, status } = await loginRequest(email, password)
       setOpen(false)
-      router.push(redirectTo)
+      router.push(status === 'PENDING' ? '/pending' : redirectTo || homeForRole(user.role))
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid credentials')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const onSignUp = async (e: FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (password !== confirm) {
+      setError('Passwords do not match')
+      return
+    }
+    setLoading(true)
+    try {
+      const { redirectTo } = await registerRequest({ email, password, fullName, phone })
+      setOpen(false)
+      router.push(redirectTo || '/pending')
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
       setLoading(false)
     }
@@ -116,7 +119,7 @@ export default function AuthModal() {
     >
       <div
         className={`auth-modal-panel bg-white rounded-2xl w-full relative ${tab === 'signup' ? 'auth-modal-wide' : ''}`}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
@@ -131,13 +134,6 @@ export default function AuthModal() {
           {tab === 'signin' && (
             <form className="auth-tab-content flex flex-col gap-md" onSubmit={onSignIn}>
               <h2 className="font-h3 text-h3 text-primary">Sign In</h2>
-              <button type="button" className="auth-google-btn">
-                <GoogleIcon />
-                Sign in with Google
-              </button>
-              <div className="auth-divider">
-                <span>or</span>
-              </div>
               <div className="flex flex-col gap-xs">
                 <label className="auth-label">
                   Email <span className="req">*</span>
@@ -147,7 +143,7 @@ export default function AuthModal() {
                   placeholder="your@email.com"
                   className="auth-field"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
@@ -162,112 +158,91 @@ export default function AuthModal() {
                 {loading ? 'Signing in…' : 'Sign In'}
               </button>
               <div className="flex items-center justify-between text-[12px] text-on-surface-variant">
-                <button
-                  type="button"
-                  onClick={() => setTab('forgot')}
-                  className="hover:text-primary transition-colors"
-                >
+                <button type="button" onClick={() => setTab('forgot')} className="hover:text-primary">
                   Forgot password?
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setTab('signup')}
-                  className="hover:text-on-surface transition-colors"
-                >
+                <button type="button" onClick={() => setTab('signup')} className="hover:text-on-surface">
                   No account? <span className="auth-link-accent">Create account</span>
                 </button>
               </div>
-              <p className="text-[11px] text-center text-on-surface-variant">
-                Test: admin@alubonets.com / admin123 — or{' '}
-                <a href="/login" className="auth-link-accent">
-                  all role emails
-                </a>
-              </p>
             </form>
           )}
 
           {tab === 'signup' && (
-            <div className="auth-tab-content flex flex-col gap-md">
+            <form className="auth-tab-content flex flex-col gap-md" onSubmit={onSignUp}>
               <h2 className="font-h3 text-h3 text-primary">Create Account</h2>
-              <button type="button" className="auth-google-btn">
-                <GoogleIcon />
-                Sign up with Google
-              </button>
-              <div className="auth-divider">
-                <span>or</span>
-              </div>
               <div className="grid grid-cols-2 gap-sm">
                 <div className="flex flex-col gap-xs">
                   <label className="auth-label">
                     Full Name <span className="req">*</span>
                   </label>
-                  <input type="text" placeholder="Jane Doe" className="auth-field" required />
+                  <input
+                    type="text"
+                    className="auth-field"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="flex flex-col gap-xs">
-                  <label className="auth-label">
-                    Phone <span className="req">*</span>
-                  </label>
-                  <input type="tel" placeholder="07XX XXX XXX" className="auth-field" required />
+                  <label className="auth-label">Phone</label>
+                  <input
+                    type="tel"
+                    className="auth-field"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="flex flex-col gap-xs">
                 <label className="auth-label">
                   Email <span className="req">*</span>
                 </label>
-                <input type="email" placeholder="your@email.com" className="auth-field" required />
+                <input
+                  type="email"
+                  className="auth-field"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
               <div className="grid grid-cols-2 gap-sm">
                 <div className="flex flex-col gap-xs">
                   <label className="auth-label">
                     Password <span className="req">*</span>
                   </label>
-                  <PasswordInput placeholder="••••••" value="" onChange={() => {}} />
+                  <PasswordInput placeholder="••••••" value={password} onChange={setPassword} />
                 </div>
                 <div className="flex flex-col gap-xs">
                   <label className="auth-label">
                     Confirm <span className="req">*</span>
                   </label>
-                  <PasswordInput placeholder="••••••" value="" onChange={() => {}} />
+                  <PasswordInput placeholder="••••••" value={confirm} onChange={setConfirm} />
                 </div>
               </div>
-              <button type="button" className="auth-primary-btn">
-                Create Account
+              {error && <p className="text-error text-[12px] text-center">{error}</p>}
+              <button type="submit" className="auth-primary-btn" disabled={loading}>
+                {loading ? 'Creating…' : 'Create Account'}
               </button>
               <p className="text-center text-[12px] text-on-surface-variant">
                 Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => setTab('signin')}
-                  className="auth-link-accent hover:underline"
-                >
+                <button type="button" onClick={() => setTab('signin')} className="auth-link-accent">
                   Sign in
                 </button>
               </p>
-            </div>
+            </form>
           )}
 
           {tab === 'forgot' && (
             <div className="auth-tab-content flex flex-col gap-md">
               <h2 className="font-h3 text-h3 text-primary">Reset Password</h2>
-              <div className="flex flex-col gap-xs">
-                <label className="auth-label">
-                  Email <span className="req">*</span>
-                </label>
-                <input type="email" placeholder="your@email.com" className="auth-field" required />
-              </div>
-              <button type="button" className="auth-primary-btn">
-                Send Reset Link
-              </button>
-              <p className="text-center text-[12px] text-on-surface-variant">
-                Remember your password?{' '}
-                <button
-                  type="button"
-                  onClick={() => setTab('signin')}
-                  className="auth-link-accent hover:underline"
-                >
-                  Go to login
-                </button>
+              <p className="text-sm text-on-surface-variant">
+                Password reset via email can be enabled in the Supabase Auth dashboard. For now,
+                contact an administrator.
               </p>
+              <button type="button" onClick={() => setTab('signin')} className="auth-primary-btn">
+                Back to sign in
+              </button>
             </div>
           )}
         </div>

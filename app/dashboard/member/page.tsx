@@ -1,127 +1,120 @@
-'use client'
+import DashboardShell, { type NavItem } from '@/components/dashboard/DashboardShell'
+import { actionCreateWelfare } from '@/app/actions/domain'
+import { getMemberDashboardData } from '@/lib/data/queries'
+import { getSessionProfile } from '@/lib/auth/session'
+import { redirect } from 'next/navigation'
 
-import DashboardShell from '@/components/dashboard/DashboardShell'
-import StatCard from '@/components/dashboard/StatCard'
-
-const NAV = [
-  { icon: 'dashboard', label: 'My portal', active: true },
-  { icon: 'payments', label: 'My contributions' },
-  { icon: 'campaign', label: 'Announcements' },
-  { icon: 'event', label: 'Events' },
-  { icon: 'assignment', label: 'Projects' },
-  { icon: 'folder', label: 'Documents' },
+const NAV: NavItem[] = [
+  { icon: 'home', label: 'Home', active: true },
+  { icon: 'payments', label: 'Contributions' },
   { icon: 'volunteer_activism', label: 'Welfare' },
-  { icon: 'person', label: 'Profile' },
 ]
 
-export default function MemberDashboardPage() {
-  return (
-    <DashboardShell role="MEMBER" title="Member Portal" nav={NAV}>
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-md">
-        <StatCard label="My Contributions" value="KES 12,500" icon="payments" accent="green" />
-        <StatCard label="Pending Balance" value="KES 1,500" icon="account_balance_wallet" accent="orange" />
-        <StatCard label="Upcoming Events" value="3" icon="event" />
-        <StatCard label="New Announcements" value="5" icon="campaign" />
-      </section>
+export default async function MemberPage() {
+  const profile = await getSessionProfile()
+  if (!profile) redirect('/login')
+  const data = await getMemberDashboardData(profile.id)
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] overflow-hidden">
-          <div className="px-lg py-md border-b border-outline-variant/40 flex justify-between items-center">
-            <h3 className="font-h3 text-[18px] text-primary">Contribution history</h3>
-            <button type="button" className="text-secondary font-label-bold text-[13px] hover:underline">
-              Download statement
-            </button>
+  return (
+    <DashboardShell role="MEMBER" title="Member" nav={NAV}>
+      <div className="space-y-6 p-4 md:p-6">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border bg-surface p-4">
+            <p className="text-xs text-on-surface-variant uppercase">My contributions</p>
+            <p className="text-2xl font-semibold mt-1">
+              KES {Math.round(data.total).toLocaleString()}
+            </p>
           </div>
-          <table className="w-full text-[13px] text-left">
+          <div className="rounded-xl border bg-surface p-4">
+            <p className="text-xs text-on-surface-variant uppercase">Welfare requests</p>
+            <p className="text-2xl font-semibold mt-1">{data.welfare.length}</p>
+          </div>
+        </div>
+
+        <section className="rounded-xl border bg-surface p-4 overflow-x-auto">
+          <div className="flex justify-between mb-3">
+            <h2 className="font-semibold">Contribution history</h2>
+            <a href={`/api/pdf/statement/${profile.id}`} className="text-sm text-primary underline">
+              Statement PDF
+            </a>
+          </div>
+          <table className="w-full text-sm">
             <thead>
-              <tr className="bg-surface-container-low text-[11px] uppercase text-on-surface-variant">
-                <th className="px-lg py-sm">Date</th>
-                <th className="px-lg py-sm">Amount</th>
-                <th className="px-lg py-sm">Receipt</th>
+              <tr className="text-left text-on-surface-variant">
+                <th className="py-2">Date</th>
+                <th>Amount</th>
+                <th>Category</th>
+                <th>Receipt</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-outline-variant/40">
-              {[
-                ['Jul 01, 2026', '2,000'],
-                ['Jun 01, 2026', '2,000'],
-                ['May 01, 2026', '2,000'],
-              ].map(([d, a]) => (
-                <tr key={d}>
-                  <td className="px-lg py-sm">{d}</td>
-                  <td className="px-lg py-sm font-label-bold">KES {a}</td>
-                  <td className="px-lg py-sm">
-                    <button type="button" className="text-primary font-bold text-[12px] hover:underline">
-                      Download receipt
-                    </button>
+            <tbody>
+              {data.contributions.map((c) => (
+                <tr key={c.id} className="border-t">
+                  <td className="py-2">{c.paidAt.toLocaleDateString()}</td>
+                  <td>{c.amount.toLocaleString()}</td>
+                  <td>{c.category || '—'}</td>
+                  <td>
+                    <a href={`/api/pdf/receipt/${c.id}`} className="text-primary underline">
+                      PDF
+                    </a>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </section>
 
-        <div className="space-y-lg">
-          <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-            <h3 className="font-h3 text-[18px] text-primary mb-md">Recent announcements</h3>
-            <ul className="text-[13px] space-y-sm text-on-surface-variant">
-              <li>• Family Day registration opens July 15</li>
-              <li>• Contribution reminder for July dues</li>
-              <li>• AGM minutes published in Documents</li>
-            </ul>
-          </div>
-          <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-            <h3 className="font-h3 text-[18px] text-primary mb-md">Upcoming events</h3>
-            <ul className="text-[13px] space-y-sm">
-              {['Family Day — Jul 26', 'Youth Clinic — Aug 2', 'Monthly meeting — Aug 9'].map(e => (
-                <li key={e} className="flex justify-between items-center border-b border-outline-variant/40 py-sm last:border-0">
-                  <span>{e}</span>
-                  <button type="button" className="text-[12px] font-bold text-secondary-container">
-                    RSVP
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-          <h3 className="font-h3 text-[18px] text-primary mb-md">Projects & comments</h3>
-          <p className="text-[13px] text-on-surface-variant mb-sm">Youth Skills Hub — Ongoing</p>
-          <textarea className="auth-field !rounded-lg !h-20 mb-sm" placeholder="Comment on project…" />
-          <button type="button" className="bg-primary text-on-primary font-label-bold text-[13px] px-lg py-sm rounded-lg">
-            Comment on project
-          </button>
-        </div>
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-          <h3 className="font-h3 text-[18px] text-primary mb-md">Document downloads</h3>
-          <ul className="text-[13px] space-y-sm">
-            <li>
-              <button type="button" className="text-primary hover:underline">
-                Constitution.pdf
-              </button>
-            </li>
-            <li>
-              <button type="button" className="text-primary hover:underline">
-                Member handbook.pdf
-              </button>
-            </li>
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">Request welfare support</h2>
+          <form action={actionCreateWelfare} className="grid gap-3">
+            <textarea name="description" required placeholder="Describe your need" className="border rounded-lg px-3 py-2" />
+            <input name="amount" type="number" placeholder="Amount (optional)" className="border rounded-lg px-3 py-2" />
+            <button className="bg-primary text-on-primary rounded-lg px-4 py-2">Submit request</button>
+          </form>
+          <ul className="mt-4 space-y-2 text-sm">
+            {data.welfare.map((w) => (
+              <li key={w.id} className="border-b pb-2">
+                {w.status}: {w.description}
+              </li>
+            ))}
           </ul>
-        </div>
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-          <h3 className="font-h3 text-[18px] text-primary mb-md">Welfare request</h3>
-          <textarea className="auth-field !rounded-lg !h-24 mb-sm" placeholder="Describe your request…" />
-          <button type="button" className="w-full bg-secondary-container text-on-primary font-label-bold text-[13px] py-sm rounded-lg">
-            Submit welfare request
-          </button>
-          <button type="button" className="w-full mt-sm border border-primary text-primary font-label-bold text-[13px] py-sm rounded-lg">
-            Update profile
-          </button>
-          <p className="text-[11px] text-on-surface-variant mt-md">
-            You can only view your own financial records.
-          </p>
-        </div>
+        </section>
+
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">Announcements</h2>
+          <ul className="space-y-2">
+            {data.announcements.map((a) => (
+              <li key={a.id} className="border-b pb-2">
+                <p className="font-medium">{a.title}</p>
+                <p className="text-sm text-on-surface-variant">{a.content}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">Upcoming events</h2>
+          <ul className="space-y-2 text-sm">
+            {data.events.map((e) => (
+              <li key={e.id}>
+                {e.title} — {e.startsAt.toLocaleString()}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">Documents</h2>
+          <ul className="space-y-2 text-sm">
+            {data.documents.map((d) => (
+              <li key={d.id}>
+                <a href={d.fileUrl} className="text-primary underline" target="_blank" rel="noreferrer">
+                  {d.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </DashboardShell>
   )

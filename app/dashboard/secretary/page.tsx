@@ -1,95 +1,115 @@
-'use client'
+import DashboardShell, { type NavItem } from '@/components/dashboard/DashboardShell'
+import {
+  actionCreateAnnouncement,
+  actionCreateDocument,
+  actionCreateMeeting,
+} from '@/app/actions/domain'
+import { getSecretaryDashboardData } from '@/lib/data/queries'
 
-import DashboardShell from '@/components/dashboard/DashboardShell'
-import StatCard from '@/components/dashboard/StatCard'
-
-const NAV = [
-  { icon: 'dashboard', label: 'Meetings Home', active: true },
-  { icon: 'event_note', label: 'Agendas' },
-  { icon: 'edit_note', label: 'Minutes' },
-  { icon: 'group', label: 'Attendance' },
-  { icon: 'task_alt', label: 'Action points' },
-  { icon: 'folder', label: 'Documents' },
-  { icon: 'history', label: 'Versions' },
+const NAV: NavItem[] = [
+  { icon: 'description', label: 'Records', active: true },
+  { icon: 'campaign', label: 'Announcements' },
+  { icon: 'groups', label: 'Meetings' },
 ]
 
-export default function SecretaryDashboardPage() {
+export default async function SecretaryPage() {
+  const data = await getSecretaryDashboardData()
+
   return (
-    <DashboardShell role="SECRETARY" title="Secretary — Meetings & Documents" nav={NAV}>
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-md">
-        <StatCard label="Meetings This Month" value="6" icon="event" />
-        <StatCard label="Draft Reports" value="3" icon="draft" accent="orange" />
-        <StatCard label="Published Minutes" value="24" icon="verified" accent="green" />
-        <StatCard label="Documents Uploaded" value="58" icon="folder" />
-      </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-          <h3 className="font-h3 text-[18px] text-primary mb-md">Meeting agenda creator</h3>
-          <input className="auth-field !rounded-lg mb-sm" placeholder="Meeting title" />
-          <input className="auth-field !rounded-lg mb-sm" type="datetime-local" />
-          <textarea
-            className="auth-field !rounded-lg !h-28 mb-sm"
-            placeholder="Agenda items…"
-          />
-          <button type="button" className="bg-primary text-on-primary font-label-bold text-[13px] px-lg py-sm rounded-lg">
-            Create meeting notice
-          </button>
+    <DashboardShell role="SECRETARY" title="Secretary" nav={NAV}>
+      <div className="space-y-6 p-4 md:p-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          {[
+            { label: 'Documents', value: data.documents.length },
+            { label: 'Meetings', value: data.meetings.length },
+            { label: 'Avg attendance', value: data.attendanceAvg },
+          ].map((s) => (
+            <div key={s.label} className="rounded-xl border bg-surface p-4">
+              <p className="text-xs text-on-surface-variant uppercase">{s.label}</p>
+              <p className="text-2xl font-semibold mt-1">{s.value}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-          <h3 className="font-h3 text-[18px] text-primary mb-md">Minutes editor</h3>
-          <textarea
-            className="auth-field !rounded-lg !h-40 mb-sm"
-            defaultValue="Rich text minutes draft — discussion notes, resolutions, attendance…"
-          />
-          <div className="flex flex-wrap gap-sm">
-            {['Save draft', 'Publish minutes', 'Export Word', 'Export PDF'].map(a => (
-              <button
-                key={a}
-                type="button"
-                className="bg-primary-fixed text-primary font-label-bold text-[12px] px-md py-sm rounded-lg"
-              >
-                {a}
-              </button>
-            ))}
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">New announcement</h2>
+          <form action={actionCreateAnnouncement} className="grid gap-3">
+            <input name="title" placeholder="Title" required className="border rounded-lg px-3 py-2" />
+            <textarea name="content" placeholder="Content" required rows={3} className="border rounded-lg px-3 py-2" />
+            <button className="bg-primary text-on-primary rounded-lg px-4 py-2">Publish</button>
+          </form>
+        </section>
+
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">Record meeting</h2>
+          <form action={actionCreateMeeting} className="grid gap-3 md:grid-cols-2">
+            <input name="title" placeholder="Title" required className="border rounded-lg px-3 py-2" />
+            <input name="heldAt" type="datetime-local" required className="border rounded-lg px-3 py-2" />
+            <input name="attendance" type="number" placeholder="Attendance" className="border rounded-lg px-3 py-2" />
+            <textarea name="agenda" placeholder="Agenda" className="border rounded-lg px-3 py-2 md:col-span-2" />
+            <textarea name="minutes" placeholder="Minutes" className="border rounded-lg px-3 py-2 md:col-span-2" />
+            <button className="bg-primary text-on-primary rounded-lg px-4 py-2 md:col-span-2">Save meeting</button>
+          </form>
+        </section>
+
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">Add document (URL)</h2>
+          <form action={actionCreateDocument} className="grid gap-3 md:grid-cols-2">
+            <input name="title" placeholder="Title" required className="border rounded-lg px-3 py-2" />
+            <input name="category" placeholder="Category" className="border rounded-lg px-3 py-2" />
+            <input name="fileUrl" placeholder="https://..." required className="border rounded-lg px-3 py-2 md:col-span-2" />
+            <button className="bg-primary text-on-primary rounded-lg px-4 py-2 md:col-span-2">Save document</button>
+          </form>
+        </section>
+
+        <section className="rounded-xl border bg-surface p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">Meetings</h2>
+            <a href="/api/export/meetings" className="text-sm text-primary underline">
+              Export DOCX
+            </a>
           </div>
-        </div>
-      </div>
+          <ul className="space-y-2 text-sm">
+            {data.meetings.map((m) => (
+              <li key={m.id} className="border-b pb-2">
+                <p className="font-medium">
+                  {m.title} · {m.heldAt.toLocaleDateString()} · {m.attendance} present
+                </p>
+                {m.minutes && <p className="text-on-surface-variant">{m.minutes}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-          <h3 className="font-h3 text-[18px] text-primary mb-md">Attendance</h3>
-          <ul className="text-[13px] space-y-sm">
-            <li className="flex justify-between"><span>Present</span><strong>42</strong></li>
-            <li className="flex justify-between"><span>Apologies</span><strong>6</strong></li>
-            <li className="flex justify-between"><span>Absent</span><strong>8</strong></li>
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">Documents</h2>
+          <ul className="space-y-2 text-sm">
+            {data.documents.map((d) => (
+              <li key={d.id} className="flex justify-between gap-2 border-b pb-2">
+                <span>
+                  {d.title} <span className="text-on-surface-variant">({d.category || 'General'})</span>
+                </span>
+                <a href={d.fileUrl} className="text-primary underline" target="_blank" rel="noreferrer">
+                  Open
+                </a>
+              </li>
+            ))}
           </ul>
-        </div>
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-          <h3 className="font-h3 text-[18px] text-primary mb-md">Action points</h3>
-          <ul className="text-[13px] space-y-sm text-on-surface-variant">
-            <li>• Secretary to circulate draft minutes by Friday</li>
-            <li>• Treasurer to share Q2 statement</li>
-            <li>• Organizer to confirm Family Day venue</li>
+        </section>
+
+        <section className="rounded-xl border bg-surface p-4">
+          <h2 className="font-semibold mb-3">Announcements</h2>
+          <ul className="space-y-2">
+            {data.announcements.map((a) => (
+              <li key={a.id} className="border-b pb-2">
+                <p className="font-medium">{a.title}</p>
+                <p className="text-sm text-on-surface-variant">
+                  {a.content} — {a.author.fullName}
+                </p>
+              </li>
+            ))}
           </ul>
-        </div>
-        <div className="bg-surface-container-lowest dark:bg-[#0d1729] rounded-xl border border-outline-variant dark:border-[#1a2d4f] p-lg">
-          <h3 className="font-h3 text-[18px] text-primary mb-md">Document repository</h3>
-          <ul className="text-[13px] space-y-sm">
-            <li className="flex justify-between border-b border-outline-variant/40 py-sm">
-              <span>Constitution_v3.pdf</span>
-              <span className="text-on-surface-variant">v3</span>
-            </li>
-            <li className="flex justify-between py-sm">
-              <span>AGM_Minutes_2025.docx</span>
-              <span className="text-on-surface-variant">v1</span>
-            </li>
-          </ul>
-          <button type="button" className="mt-md w-full border border-primary text-primary font-label-bold text-[13px] py-sm rounded-lg">
-            Upload official document
-          </button>
-        </div>
+        </section>
       </div>
     </DashboardShell>
   )
