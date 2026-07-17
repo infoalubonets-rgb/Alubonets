@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { ADMIN_LOGIN_LOGO } from '@/lib/constants'
+import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
 import { homeForRole, loginRequest, logoutRequest, meRequest, registerRequest, type AuthUser } from '@/lib/auth/client'
 
 type Props = {
@@ -24,6 +25,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [devOpen, setDevOpen] = useState(false)
 
   useEffect(() => {
     meRequest().then((user: AuthUser | null) => {
@@ -130,13 +132,27 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
               <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
                 Email Address
               </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
-              />
+              <div className="relative">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onFocus={() => setDevOpen(true)}
+                  onBlur={() => setDevOpen(false)}
+                  required
+                  className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
+                />
+                {mode === 'signin' && (
+                  <DevAccountsDropdown
+                    open={devOpen}
+                    onPick={(devEmail, devPassword) => {
+                      setEmail(devEmail)
+                      setPassword(devPassword)
+                      setDevOpen(false)
+                    }}
+                  />
+                )}
+              </div>
             </div>
             <div>
               <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">

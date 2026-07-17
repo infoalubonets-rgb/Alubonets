@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { homeForRole, loginRequest, registerRequest } from '@/lib/auth/client'
 import { createClient } from '@/utils/supabase/client'
+import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
 
 type AuthTab = 'signin' | 'signup' | 'forgot'
 
@@ -61,6 +62,7 @@ export default function AuthModal() {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [devOpen, setDevOpen] = useState(false)
 
   useEffect(() => {
     _open = (t: AuthTab = 'signin') => {
@@ -163,14 +165,26 @@ export default function AuthModal() {
                 <label className="auth-label">
                   Email <span className="req">*</span>
                 </label>
-                <input
-                  type="email"
-                  placeholder="your@email.com"
-                  className="auth-field"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="email"
+                    placeholder="your@email.com"
+                    className="auth-field w-full"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onFocus={() => setDevOpen(true)}
+                    onBlur={() => setDevOpen(false)}
+                    required
+                  />
+                  <DevAccountsDropdown
+                    open={devOpen}
+                    onPick={(devEmail, devPassword) => {
+                      setEmail(devEmail)
+                      setPassword(devPassword)
+                      setDevOpen(false)
+                    }}
+                  />
+                </div>
               </div>
               <div className="flex flex-col gap-xs">
                 <label className="auth-label">
