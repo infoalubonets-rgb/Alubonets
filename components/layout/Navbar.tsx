@@ -25,11 +25,11 @@ export default function Navbar() {
           </Link>
 
           <nav className="hidden md:flex gap-lg h-full items-center">
-            {NAV_LINKS.map(({ href, label, small }) => (
+            {NAV_LINKS.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
-                className={`h-full flex items-center active:scale-95 transition-transform ${small ? 'text-xs' : ''} ${
+                className={`h-full flex items-center active:scale-95 transition-transform ${
                   isActive(href)
                     ? 'text-secondary-container font-semibold border-b-2 border-secondary-container pb-1'
                     : 'text-primary font-medium dark:text-on-surface-variant hover:text-secondary-container transition-colors duration-200'
@@ -43,7 +43,7 @@ export default function Navbar() {
           <div className="flex items-center gap-md">
             <button
               className="bg-secondary-container text-on-primary font-label-bold text-label-bold px-md py-sm rounded-lg min-h-[48px] hover:opacity-90 transition-opacity flex items-center justify-center hidden md:flex"
-              onClick={openAuthModal}
+              onClick={() => openAuthModal()}
             >
               Login / Register
             </button>

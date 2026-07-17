@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import HeroActions from '@/components/home/HeroActions'
 import { HERO_IMAGE } from '@/lib/constants'
 
 export const metadata: Metadata = {
@@ -29,20 +30,7 @@ export default function HomePage() {
             <p className="font-body-lg text-body-lg text-on-primary/90 max-w-lg">
               Alubonets Self-Help Group brings together the descendants of the Alubokho family to strengthen unity, provide welfare support and create opportunities for social and economic development.
             </p>
-            <div className="flex flex-col sm:flex-row gap-md mt-sm">
-              <Link
-                href="/contact"
-                className="bg-secondary-container text-on-primary font-label-bold text-label-bold px-lg py-sm rounded-lg min-h-[48px] hover:bg-secondary transition-colors w-full sm:w-auto text-center flex items-center justify-center"
-              >
-                Join the Group
-              </Link>
-              <Link
-                href="/about"
-                className="border-2 border-on-primary text-on-primary font-label-bold text-label-bold px-lg py-sm rounded-lg min-h-[48px] hover:bg-on-primary/10 transition-colors w-full sm:w-auto text-center flex items-center justify-center"
-              >
-                Learn More
-              </Link>
-            </div>
+            <HeroActions />
           </div>
           <div className="w-full md:w-1/2 rounded-xl overflow-hidden shadow-sm">
             <img

@@ -15,12 +15,10 @@ export const ADMIN_SIDEBAR_LOGO =
 
 export const CONTACT_EMAIL = 'info@alubonets.com'
 
-export const NAV_LINKS: { href: string; label: string; small?: boolean }[] = [
+export const NAV_LINKS: { href: string; label: string }[] = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
   { href: '/projects', label: 'Projects' },
   { href: '/gallery', label: 'Gallery' },
   { href: '/contact', label: 'Contact' },
-  { href: '/login', label: 'Portal', small: true },
-  { href: '/admin/login', label: 'Admin', small: true },
 ]

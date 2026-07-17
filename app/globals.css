@@ -92,6 +92,56 @@
   width: 3rem;
 }
 
+/* —— Hero CTA buttons —— */
+.hero-cta {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 0.3s cubic-bezier(0.33, 1, 0.68, 1),
+    box-shadow 0.3s ease,
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease;
+}
+.hero-cta .hero-cta-icon {
+  transition: transform 0.3s cubic-bezier(0.33, 1, 0.68, 1);
+}
+.hero-cta:hover .hero-cta-icon {
+  transform: translateX(5px);
+}
+.hero-cta:active {
+  transform: translateY(-1px) scale(0.97);
+}
+.hero-cta::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -80%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.55s ease;
+  pointer-events: none;
+}
+.hero-cta:hover::after {
+  left: 130%;
+}
+
+.hero-cta-primary:hover {
+  background-color: #e5720f;
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(254, 128, 21, 0.45);
+}
+
+.hero-cta-outline:hover {
+  background-color: #fff;
+  border-color: #fff;
+  color: #001f50;
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25);
+}
+
 /* —— Creative curved navy band (Olipop-style) —— */
 .site-motto-band,
 .site-footer {

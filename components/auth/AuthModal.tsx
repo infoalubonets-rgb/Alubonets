@@ -7,10 +7,10 @@ import { createClient } from '@/utils/supabase/client'
 
 type AuthTab = 'signin' | 'signup' | 'forgot'
 
-let _open: (() => void) | null = null
+let _open: ((tab?: AuthTab) => void) | null = null
 
-export function openAuthModal() {
-  _open?.()
+export function openAuthModal(tab: AuthTab = 'signin') {
+  _open?.(tab)
 }
 
 function PasswordInput({
@@ -63,7 +63,10 @@ export default function AuthModal() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    _open = () => setOpen(true)
+    _open = (t: AuthTab = 'signin') => {
+      setTab(t)
+      setOpen(true)
+    }
     return () => {
       _open = null
     }
