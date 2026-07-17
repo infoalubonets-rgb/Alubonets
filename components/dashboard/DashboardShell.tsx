@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
-import { logoutRequest, meRequest, type AuthUser, type Role } from '@/lib/auth/client'
+import { meRequest, type AuthUser, type Role } from '@/lib/auth/client'
 import { ROLE_HOME, ROLE_LABEL } from '@/lib/auth/types'
 import ThemeLoader from '@/components/ui/ThemeLoader'
 import DashboardNav from './DashboardNav'
@@ -56,6 +56,7 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
   const [isDark, setIsDark] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [signingOut, setSigningOut] = useState(false)
   const [welcome, setWelcome] = useState('')
   const showWelcome = pathname === ROLE_HOME[role]
 
@@ -129,10 +130,14 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
     setIsDark(next)
   }
 
-  const onLogout = async () => {
-    await logoutRequest()
-    // Hard navigation so all client state (badge counts, cached pages) is reset.
-    window.location.href = role === 'ADMIN' ? '/admin/login' : '/login'
+  const onLogout = () => {
+    setSigningOut(true)
+    // Single navigation: the route clears cookies and redirects to login.
+    window.location.assign(role === 'ADMIN' ? '/api/auth/logout?to=admin' : '/api/auth/logout')
+  }
+
+  if (signingOut) {
+    return <ThemeLoader label="Signing out…" />
   }
 
   if (!user) {

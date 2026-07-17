@@ -1,15 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { logoutRequest } from '@/lib/auth/client'
 
 export default function PendingPage() {
   const [loading, setLoading] = useState(false)
 
-  const onLogout = async () => {
+  const onLogout = () => {
     setLoading(true)
-    await logoutRequest()
-    window.location.href = '/login'
+    window.location.assign('/api/auth/logout')
   }
 
   return (
