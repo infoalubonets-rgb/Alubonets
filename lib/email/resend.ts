@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
-import type { User } from '@prisma/client'
+import type { Contribution, User } from '@prisma/client'
+import { buildReceiptPdf } from '@/lib/pdf/receipt'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -62,13 +63,12 @@ export async function sendMemberApprovedEmail(user: User) {
 }
 
 export async function sendContributionReceiptEmail(
-  user: User,
-  amount: number,
-  ref?: string | null
+  contribution: Contribution & { user: User }
 ) {
   const resend = getResend()
+  const { user, amount, mpesaRef: ref } = contribution
   const subject = `Contribution receipt — KES ${amount.toLocaleString()}`
-  const html = `<p>Hello ${user.fullName},</p><p>We received your contribution of <strong>KES ${amount.toLocaleString()}</strong>${ref ? ` (ref: ${ref})` : ''}.</p>`
+  const html = `<p>Hello ${user.fullName},</p><p>We received your contribution of <strong>KES ${amount.toLocaleString()}</strong>${ref ? ` (ref: ${ref})` : ''}.</p><p>Your receipt is attached as a PDF.</p>`
 
   if (!resend) {
     await prisma.emailLog.create({
@@ -78,13 +78,27 @@ export async function sendContributionReceiptEmail(
         subject,
         template: 'contribution_receipt',
         status: 'skipped',
+        meta: { reason: 'RESEND_API_KEY not configured' },
       },
     })
-    return
+    return { skipped: true }
   }
 
   try {
-    await resend.emails.send({ from: from(), to: user.email, subject, html })
+    const pdfBytes = await buildReceiptPdf(contribution)
+    const { error } = await resend.emails.send({
+      from: from(),
+      to: user.email,
+      subject,
+      html,
+      attachments: [
+        {
+          filename: `receipt-${contribution.id}.pdf`,
+          content: Buffer.from(pdfBytes),
+        },
+      ],
+    })
+    if (error) throw new Error(error.message)
     await prisma.emailLog.create({
       data: {
         userId: user.id,
@@ -94,7 +108,8 @@ export async function sendContributionReceiptEmail(
         status: 'sent',
       },
     })
-  } catch {
+    return { skipped: false }
+  } catch (err) {
     await prisma.emailLog.create({
       data: {
         userId: user.id,
@@ -102,8 +117,10 @@ export async function sendContributionReceiptEmail(
         subject,
         template: 'contribution_receipt',
         status: 'failed',
+        meta: { error: err instanceof Error ? err.message : 'unknown' },
       },
     })
+    return { skipped: false, error: true }
   }
 }
 

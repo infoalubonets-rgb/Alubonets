@@ -1,6 +1,6 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { TREASURER_NAV } from '@/lib/dashboard/nav'
-import { actionCreateContribution } from '@/app/actions/domain'
+import { actionCreateContribution, actionEmailReceipt } from '@/app/actions/domain'
 import {
   getTreasurerDashboardData,
   getContributionChartSeries,
@@ -154,9 +154,17 @@ export default async function TreasurerContributionsPage() {
                   <td>{c.mpesaRef || '—'}</td>
                   <td>{c.paidAt.toLocaleDateString()}</td>
                   <td>
-                    <a className="text-primary underline" href={`/api/pdf/receipt/${c.id}`}>
-                      PDF
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <a className="text-primary underline" href={`/api/pdf/receipt/${c.id}`}>
+                        PDF
+                      </a>
+                      <form action={actionEmailReceipt}>
+                        <input type="hidden" name="id" value={c.id} />
+                        <button className="text-primary underline" title="Email receipt PDF to member">
+                          Email
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               ))}

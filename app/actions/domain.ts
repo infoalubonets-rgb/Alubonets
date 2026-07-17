@@ -43,8 +43,11 @@ export async function actionCreateContribution(formData: FormData) {
     receivedBy: actor.fullName,
   })
 
-  const member = await prisma.user.findUnique({ where: { id: parsed.userId } })
-  if (member) await sendContributionReceiptEmail(member, parsed.amount, parsed.mpesaRef)
+  const created = await prisma.contribution.findUnique({
+    where: { id: row.id },
+    include: { user: true },
+  })
+  if (created) await sendContributionReceiptEmail(created)
 
   await writeAudit({
     userId: actor.id,
@@ -56,6 +59,29 @@ export async function actionCreateContribution(formData: FormData) {
   revalidatePath('/dashboard/treasurer')
   revalidatePath('/dashboard/member')
   revalidatePath('/admin')
+}
+
+export async function actionEmailReceipt(formData: FormData) {
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const id = String(formData.get('id') || '')
+  if (!id) throw new Error('Contribution id required')
+
+  const contribution = await prisma.contribution.findUnique({
+    where: { id },
+    include: { user: true },
+  })
+  if (!contribution) throw new Error('Contribution not found')
+
+  await sendContributionReceiptEmail(contribution)
+
+  await writeAudit({
+    userId: actor.id,
+    action: 'CONTRIBUTION_RECEIPT_EMAIL',
+    entity: 'Contribution',
+    entityId: id,
+  })
+
+  revalidatePath('/dashboard/treasurer/contributions')
 }
 
 export async function actionCreateWelfare(formData: FormData) {
