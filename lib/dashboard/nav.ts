@@ -31,7 +31,7 @@ export const EXECUTIVE_NAV: NavItem[] = [
 ]
 
 export const TREASURER_NAV: NavItem[] = [
-  { icon: 'account_balance', label: 'Finance', href: '/dashboard/treasurer' },
+  { icon: 'dashboard', label: 'Overview', href: '/dashboard/treasurer' },
   { icon: 'payments', label: 'Member contributions', href: '/dashboard/treasurer/contributions' },
   { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/treasurer/welfare' },
   { icon: 'savings', label: 'My contributions', href: '/contributions' },
@@ -39,14 +39,15 @@ export const TREASURER_NAV: NavItem[] = [
 ]
 
 export const SECRETARY_NAV: NavItem[] = [
-  { icon: 'description', label: 'Records', href: '/dashboard/secretary' },
+  { icon: 'dashboard', label: 'Overview', href: '/dashboard/secretary' },
   ANNOUNCEMENTS_NAV,
   { icon: 'groups', label: 'Meetings', href: '/dashboard/secretary/meetings' },
   CONTRIBUTIONS_NAV,
 ]
 
 export const ORGANIZER_NAV: NavItem[] = [
-  { icon: 'event', label: 'Events', href: '/dashboard/organizer' },
+  { icon: 'dashboard', label: 'Overview', href: '/dashboard/organizer' },
+  { icon: 'event', label: 'Events', href: '/dashboard/organizer/events' },
   { icon: 'photo_library', label: 'Gallery', href: '/dashboard/organizer/gallery' },
   { icon: 'work', label: 'Projects', href: '/dashboard/organizer/projects' },
   ANNOUNCEMENTS_NAV,
