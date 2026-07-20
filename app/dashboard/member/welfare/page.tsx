@@ -1,14 +1,23 @@
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { MEMBER_NAV } from '@/lib/dashboard/nav'
 import { actionCreateWelfare } from '@/app/actions/domain'
-import { getMemberDashboardData } from '@/lib/data/queries'
 import { getSessionProfile } from '@/lib/auth/session'
-import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
 
 export default async function MemberWelfarePage() {
   const profile = await getSessionProfile()
   if (!profile) redirect('/login')
-  const data = await getMemberDashboardData(profile.id)
+
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+
+  const { data: welfare } = await supabase
+    .from('welfare_requests')
+    .select('id, status, description')
+    .eq('userId', profile.id)
+    .order('createdAt', { ascending: false })
 
   return (
     <DashboardShell role="MEMBER" title="Welfare" nav={MEMBER_NAV}>
@@ -35,14 +44,15 @@ export default async function MemberWelfarePage() {
         <section className="rounded-xl border bg-surface p-4">
           <h2 className="font-semibold mb-3">Your requests</h2>
           <ul className="space-y-2 text-sm">
-            {data.welfare.length === 0 && (
+            {(welfare ?? []).length === 0 ? (
               <li className="text-on-surface-variant">No welfare requests yet.</li>
+            ) : (
+              (welfare ?? []).map((w) => (
+                <li key={w.id} className="border-b pb-2">
+                  {w.status}: {w.description}
+                </li>
+              ))
             )}
-            {data.welfare.map((w) => (
-              <li key={w.id} className="border-b pb-2">
-                {w.status}: {w.description}
-              </li>
-            ))}
           </ul>
         </section>
       </div>

@@ -1,8 +1,9 @@
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
-import { getMemberDashboardData } from '@/lib/data/queries'
 import { getSessionProfile } from '@/lib/auth/session'
+import { createClient } from '@/utils/supabase/server'
 import type { Role } from '@/lib/auth/types'
 
 export const metadata = {
@@ -15,7 +16,16 @@ export default async function ContributionsPage() {
   if (profile.status === 'SUSPENDED') redirect('/login?error=suspended')
 
   const role = profile.role as Role
-  const data = await getMemberDashboardData(profile.id)
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+
+  const { data: contributions } = await supabase
+    .from('contributions')
+    .select('id, amount, paidAt, category')
+    .eq('userId', profile.id)
+    .order('paidAt', { ascending: false })
+
+  const total = (contributions ?? []).reduce((s, c) => s + (c.amount ?? 0), 0)
 
   return (
     <DashboardShell role={role} title="My contributions" nav={navForRole(role)}>
@@ -26,7 +36,7 @@ export default async function ContributionsPage() {
               Your total
             </p>
             <p className="mt-1 text-3xl font-h3 font-bold text-primary">
-              KES {Math.round(data.total).toLocaleString()}
+              KES {Math.round(total).toLocaleString()}
             </p>
             <p className="mt-1 text-sm text-on-surface-variant">
               Every role contributes — you are part of the team.
@@ -45,7 +55,7 @@ export default async function ContributionsPage() {
           <div className="px-4 py-3 border-b border-outline-variant bg-surface-container-low">
             <h2 className="font-label-bold text-sm text-on-surface">Contribution history</h2>
           </div>
-          {data.contributions.length === 0 ? (
+          {(contributions ?? []).length === 0 ? (
             <p className="px-4 py-8 text-sm text-on-surface-variant text-center">
               No contributions recorded yet.
             </p>
@@ -61,14 +71,14 @@ export default async function ContributionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.contributions.map((c, i) => (
+                  {(contributions ?? []).map((c, i) => (
                     <tr
                       key={c.id}
                       className={`border-t border-outline-variant/40 ${
                         i % 2 === 1 ? 'bg-surface-container-low/60' : ''
                       }`}
                     >
-                      <td className="py-3 px-4">{c.paidAt.toLocaleDateString()}</td>
+                      <td className="py-3 px-4">{new Date(c.paidAt).toLocaleDateString()}</td>
                       <td className="py-3 px-4 font-label-bold text-secondary">
                         KES {c.amount.toLocaleString()}
                       </td>
