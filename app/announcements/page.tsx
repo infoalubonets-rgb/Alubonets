@@ -18,7 +18,7 @@ export default async function AnnouncementsPage() {
 
   const role = profile.role as Role
   const canSend = role === 'ADMIN' || profile.isSuperAdmin
-  const canDelete = role === 'ADMIN' || role === 'SECRETARY'
+  const canDelete = ['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER'].includes(role)
 
   const [announcements, members] = await Promise.all([
     getAnnouncementsForUser(profile.id),

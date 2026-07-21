@@ -26,10 +26,8 @@ export default function AnnouncementsClient({
 
   function handleDelete(id: string) {
     setDeleting(null)
-    startTransition(async () => {
-      await actionDeleteAnnouncement(id)
-      setItems((prev) => prev.filter((a) => a.id !== id))
-    })
+    setItems((prev) => prev.filter((a) => a.id !== id))
+    startTransition(() => { actionDeleteAnnouncement(id) })
   }
 
   if (items.length === 0) {

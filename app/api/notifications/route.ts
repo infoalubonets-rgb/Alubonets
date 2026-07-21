@@ -1,14 +1,20 @@
 import { NextResponse } from 'next/server'
 import { getSessionProfile } from '@/lib/auth/session'
-import { getRecentItems } from '@/lib/data/queries'
+import { getRecentItems, getOldAnnouncementsCount } from '@/lib/data/queries'
 
 export const dynamic = 'force-dynamic'
+
+const CLEANUP_ROLES = ['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER']
 
 export async function GET() {
   const profile = await getSessionProfile()
   if (!profile) return NextResponse.json({ items: [] }, { status: 401 })
 
-  const { events, projects, photos } = await getRecentItems()
+  const canCleanup = CLEANUP_ROLES.includes(profile.role)
+  const [{ events, projects, photos }, cleanupCount] = await Promise.all([
+    getRecentItems(),
+    canCleanup ? getOldAnnouncementsCount() : Promise.resolve(0),
+  ])
 
   const items = [
     ...events.map((e) => ({
@@ -40,5 +46,5 @@ export async function GET() {
     })),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
-  return NextResponse.json({ items })
+  return NextResponse.json({ items, cleanupCount })
 }

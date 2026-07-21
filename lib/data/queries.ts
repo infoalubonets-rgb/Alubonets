@@ -381,6 +381,11 @@ export async function getRecentItems() {
   return { events, projects, photos }
 }
 
+export async function getOldAnnouncementsCount() {
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000)
+  return prisma.announcement.count({ where: { publishedAt: { lt: cutoff } } })
+}
+
 export async function deleteEvent(id: string) {
   return prisma.event.delete({ where: { id } })
 }

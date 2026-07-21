@@ -43,6 +43,12 @@
   transform: translate3d(0, 0, 0) scale(1);
 }
 
+/* —— Dashboard notification slide-in —— */
+@keyframes notif-slide {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 /* —— CSS-driven page reveals via html[data-pr] (zero React DOM mutation) —— */
 @keyframes pr-up {
   from { opacity: 0; transform: translate3d(0, 18px, 0); }

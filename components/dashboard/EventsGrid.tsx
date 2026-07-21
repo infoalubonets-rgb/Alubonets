@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 
 export type EventRow = {
   id: string
@@ -21,6 +20,7 @@ type Props = {
   selected?: Set<string>
   onToggleSelect?: (id: string) => void
   onDelete?: (id: string) => void
+  onViewDetails?: (event: EventRow) => void
 }
 
 export default function EventsGrid({
@@ -31,6 +31,7 @@ export default function EventsGrid({
   selected,
   onToggleSelect,
   onDelete,
+  onViewDetails,
 }: Props) {
   if (events.length === 0) {
     return <p className="text-[13px] text-on-surface-variant dark:text-blue-200/50 py-2">{emptyMessage}</p>
@@ -47,6 +48,7 @@ export default function EventsGrid({
           isSelected={selected?.has(e.id) ?? false}
           onToggleSelect={onToggleSelect ? () => onToggleSelect(e.id) : undefined}
           onDelete={onDelete ? () => onDelete(e.id) : undefined}
+          onViewDetails={onViewDetails ? () => onViewDetails(e) : undefined}
         />
       ))}
     </div>
@@ -60,6 +62,7 @@ function EventCard({
   isSelected,
   onToggleSelect,
   onDelete,
+  onViewDetails,
 }: {
   event: EventRow
   dimPast: boolean
@@ -67,9 +70,9 @@ function EventCard({
   isSelected: boolean
   onToggleSelect?: () => void
   onDelete?: () => void
+  onViewDetails?: () => void
 }) {
   const [showPopover, setShowPopover] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
   const date = new Date(event.startsAt)
   const month = date.toLocaleDateString('en-KE', { month: 'short' }).toUpperCase()
   const day = date.getDate()
@@ -84,7 +87,6 @@ function EventCard({
 
   function confirmAndDelete() {
     setShowPopover(false)
-    setIsDeleting(true)
     onDelete?.()
   }
 
@@ -97,35 +99,31 @@ function EventCard({
         : 'border-outline-variant dark:border-[#1a2d4f] hover:border-primary/40'
     }`}>
 
-      {/* Loading overlay while deletion is in progress */}
-      {isDeleting && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-surface/80 dark:bg-[#0a1628]/85 backdrop-blur-sm rounded-2xl">
-          <span className="material-symbols-outlined text-red-400 animate-spin" style={{ fontSize: 28 }}>progress_activity</span>
-          <p className="text-[12px] font-semibold text-on-surface-variant">Deleting…</p>
-        </div>
-      )}
-
       {/* ── Header ── */}
       {event.imageUrl ? (
-        <Link href={`/events/${event.id}`} className="relative overflow-hidden block">
+        <div
+          className="relative overflow-hidden cursor-pointer"
+          onClick={onViewDetails}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && onViewDetails?.()}
+        >
           <img
             src={event.imageUrl}
             alt={event.title}
             className="w-full h-40 object-cover transition-transform duration-500 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-          {/* "More details" on hover */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             <span className="bg-black/40 backdrop-blur-sm text-white text-[12px] font-semibold px-4 py-2 rounded-full border border-white/20 flex items-center gap-1.5">
-              More details
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+              View details
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>open_in_new</span>
             </span>
           </div>
-          {/* Checkbox */}
           {selectable && (
             <label
               className="absolute top-2.5 left-2.5 flex items-center justify-center w-6 h-6 rounded-lg bg-white/90 dark:bg-[#0a1628]/90 backdrop-blur-sm shadow cursor-pointer"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+              onClick={(e) => e.stopPropagation()}
             >
               <input
                 type="checkbox"
@@ -146,7 +144,7 @@ function EventCard({
               Members only
             </span>
           )}
-        </Link>
+        </div>
       ) : (
         /* No-image gradient header */
         <div className="h-28 bg-gradient-to-br from-primary dark:from-[#1a3a6b] to-[#001f50] dark:to-[#080f20] overflow-hidden relative">
@@ -211,21 +209,23 @@ function EventCard({
           </p>
         )}
 
-        {/* More details link */}
-        <Link
-          href={`/events/${event.id}`}
-          className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:gap-2 transition-all"
-        >
-          More details
-          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
-        </Link>
+        {/* View details */}
+        {onViewDetails && (
+          <button
+            type="button"
+            onClick={onViewDetails}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:gap-2 transition-all"
+          >
+            View details
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+          </button>
+        )}
 
         {/* Delete — single button, popover on click */}
         {onDelete && (
           <div className="mt-auto pt-2.5 border-t border-outline-variant/20 flex items-center justify-end relative">
             <button
               type="button"
-              disabled={isDeleting}
               onClick={() => setShowPopover((v) => !v)}
               className="flex items-center gap-1 text-[11px] text-outline hover:text-red-500 transition-colors disabled:opacity-40"
             >

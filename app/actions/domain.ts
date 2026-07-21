@@ -156,7 +156,7 @@ export async function actionMarkAnnouncementsRead() {
 }
 
 export async function actionDeleteAnnouncement(id: string) {
-  await requireActiveRole(['ADMIN', 'SECRETARY'])
+  await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER'])
   await deleteAnnouncement(id)
   revalidatePath('/announcements')
   revalidatePath('/dashboard/member')
