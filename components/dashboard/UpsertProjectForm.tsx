@@ -225,18 +225,12 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
           onChange={(e) => setProgress(Number(e.target.value))}
           className="w-full accent-primary"
         />
-        <div className="w-full h-2 rounded-full bg-outline-variant/30 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${progress === 100 ? 'bg-emerald-500' : 'bg-primary'}`}
-            style={{ width: `${progress}%` }}
-          />
-        </div>
       </div>
 
       {/* Cover image upload */}
       <div className="space-y-2">
         <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">
-          Cover image
+          Cover image <span className="normal-case font-normal text-on-surface-variant/60">(optional)</span>
         </label>
 
         {uploadedUrl && (

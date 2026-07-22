@@ -246,6 +246,7 @@ export async function actionCreateEvent(formData: FormData) {
     title: `New event: ${title}`,
     content: lines.join('\n'),
     broadcast: true,
+    includeSelf: true,
   }).catch(console.error))
 
   if (sendEmail) {
@@ -349,6 +350,7 @@ export async function actionCreateGallery(formData: FormData) {
     title: 'New photo added to gallery',
     content: lines.join('\n'),
     broadcast: true,
+    includeSelf: true,
   }).catch(console.error))
   revalidatePath('/dashboard/organizer')
   revalidatePath('/dashboard/organizer/gallery')
@@ -414,29 +416,46 @@ export async function actionUpsertProject(formData: FormData) {
     const sendEmail = formData.get('sendEmail') !== 'off'
     const emailAudience = String(formData.get('emailAudience') || 'ALL')
     const emailMemberIds = formData.getAll('emailMemberId').map(String).filter(Boolean)
+    const memberIds = emailAudience === 'SELECTED' && emailMemberIds.length ? emailMemberIds : undefined
+    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
+    const projectImageUrl = String(formData.get('imageUrl') || '') || undefined
+    const projectId = project.id
 
-    // Always create in-app announcement for new projects
-    after(() => sendAnnouncement({
-      authorId: actorId,
-      title: `New project: ${title}`,
-      content: description,
-      broadcast: true,
-    }).catch(console.error))
+    // Single after() — create announcement, then optionally send email and mark emailSentAt
+    after(async () => {
+      try {
+        const ann = await sendAnnouncement({
+          authorId: actorId,
+          title: `New project: ${title}`,
+          content: description,
+          broadcast: true,
+          includeSelf: true,
+        })
 
-    if (sendEmail) {
-      const memberIds = emailAudience === 'SELECTED' && emailMemberIds.length ? emailMemberIds : undefined
-      const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
-      after(() => sendBroadcastEmail({
-        subject: `New project: ${title}`,
-        title: `New project — ${title}`,
-        body: `<p style="margin:0 0 8px;">${description}</p>`,
-        ctaLabel: 'View Projects',
-        ctaUrl: `${appBaseUrl}/projects/${project.id}`,
-        template: 'project_notification',
-        actorId,
-        memberIds,
-      }).catch(console.error))
-    }
+        if (sendEmail) {
+          const result = await sendBroadcastEmail({
+            subject: `New project: ${title}`,
+            title: `New project — ${title}`,
+            body: `<p style="margin:0 0 8px;">${description}</p>`,
+            imageUrl: projectImageUrl,
+            ctaLabel: 'View Projects',
+            ctaUrl: `${appBaseUrl}/projects/${projectId}`,
+            template: 'project_notification',
+            actorId,
+            memberIds,
+          })
+          if ('sent' in result && result.sent > 0) {
+            await prisma.announcement.update({
+              where: { id: ann.id },
+              data: { emailSentAt: new Date() },
+            })
+          }
+        }
+
+        revalidatePath('/announcements')
+        revalidateTag(TAGS.announcements)
+      } catch (e) { console.error(e) }
+    })
   }
 
   revalidatePath('/dashboard/executive')

@@ -82,10 +82,12 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
     fetchUnread()
     const id = window.setInterval(fetchUnread, 60_000)
     window.addEventListener('announcements-read', fetchUnread)
+    window.addEventListener('new-announcement', fetchUnread)
     return () => {
       cancelled = true
       window.clearInterval(id)
       window.removeEventListener('announcements-read', fetchUnread)
+      window.removeEventListener('new-announcement', fetchUnread)
     }
   }, [pathname])
 

@@ -65,11 +65,10 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
 
-  // getSession() decodes the JWT from the cookie — zero network calls
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return null
+  // getUser() validates the JWT with Supabase Auth servers — recommended for server-side auth
+  const { data: { user: authUser }, error } = await supabase.auth.getUser()
+  if (!authUser || error) return null
 
-  const authUser = session.user
   const meta = authUser.app_metadata ?? {}
 
   // Fast path: JWT already carries everything we need — skip the DB entirely

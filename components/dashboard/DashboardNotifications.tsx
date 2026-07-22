@@ -69,16 +69,23 @@ export default function DashboardNotifications() {
   const [cleanupCounts, setCleanupCounts] = useState<CleanupCounts>({ announcements: 0, pastEvents: 0, oldGallery: 0 })
   const [showCleanup, setShowCleanup] = useState(false)
 
-  useEffect(() => {
+  const fetchNotifications = useCallback(() => {
     fetch('/api/notifications')
-      .then((r) => r.json())
-      .then(({ items: fetched, announcementCount = 0, pastEventsCount = 0, oldGalleryCount = 0 }: {
-        items: NotifItem[]
-        announcementCount: number
-        pastEventsCount: number
-        oldGalleryCount: number
-      }) => {
-        setItems(fetched.filter((i) => !isRecentlySeen(i.id)))
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return
+        const { items: fetched = [], announcementCount = 0, pastEventsCount = 0, oldGalleryCount = 0 } = data as {
+          items: NotifItem[]
+          announcementCount: number
+          pastEventsCount: number
+          oldGalleryCount: number
+        }
+        const unseen = fetched.filter((i) => !isRecentlySeen(i.id))
+        setItems((prev) => {
+          const existingIds = new Set(prev.map((i) => i.id))
+          const newItems = unseen.filter((i) => !existingIds.has(i.id))
+          return newItems.length > 0 ? [...newItems, ...prev] : prev
+        })
         const hasCleanup = (announcementCount > 0 || pastEventsCount > 0 || oldGalleryCount > 0) && shouldShowCleanupReminder()
         if (hasCleanup) {
           setCleanupCounts({ announcements: announcementCount, pastEvents: pastEventsCount, oldGallery: oldGalleryCount })
@@ -87,6 +94,18 @@ export default function DashboardNotifications() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    fetchNotifications()
+    // Poll every 30 s to pick up items added while the user is already on the dashboard
+    const interval = window.setInterval(fetchNotifications, 30_000)
+    // Event dispatched by dashboard components after creating a project/event
+    window.addEventListener('check-notifications', fetchNotifications)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('check-notifications', fetchNotifications)
+    }
+  }, [fetchNotifications])
 
   const dismiss = useCallback((id: string) => {
     markSeen(id)

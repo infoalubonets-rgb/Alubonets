@@ -497,11 +497,15 @@ export async function sendAnnouncement(input: {
   content: string
   broadcast: boolean
   memberIds?: string[]
+  includeSelf?: boolean  // when true, author is included in broadcast receipts
 }) {
   const recipientIds = input.broadcast
     ? (
         await prisma.user.findMany({
-          where: { status: 'ACTIVE', id: { not: input.authorId } },
+          where: {
+            status: 'ACTIVE',
+            ...(input.includeSelf ? {} : { id: { not: input.authorId } }),
+          },
           select: { id: true },
         })
       ).map((u) => u.id)
