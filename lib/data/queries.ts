@@ -353,7 +353,13 @@ export const getAnnouncementsForUser = unstable_cache(
       where: { OR: [{ broadcast: true }, { receipts: { some: { userId } } }] },
       orderBy: { publishedAt: 'desc' },
       take: 50,
-      include: {
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        publishedAt: true,
+        broadcast: true,
+        emailSentAt: true,
         author: { select: { fullName: true } },
         receipts: { where: { userId }, select: { readAt: true } },
       },
@@ -411,7 +417,7 @@ export const getActiveMembers = unstable_cache(
   async () => {
     return prisma.user.findMany({
       where: { status: 'ACTIVE' },
-      select: { id: true, fullName: true },
+      select: { id: true, fullName: true, email: true },
       orderBy: { fullName: 'asc' },
     })
   },
@@ -498,7 +504,7 @@ export async function sendAnnouncement(input: {
           select: { id: true },
         })
       ).map((u) => u.id)
-    : (input.memberIds ?? []).filter((id) => id !== input.authorId)
+    : (input.memberIds ?? []) // targeted: send to exactly who's specified
 
   return prisma.announcement.create({
     data: {

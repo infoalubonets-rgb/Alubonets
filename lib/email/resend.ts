@@ -11,6 +11,8 @@ function getResend() {
 
 const from = () => process.env.FROM_EMAIL || 'noreply@alubonets.com'
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
+// When set, ALL outgoing emails are redirected here (use until domain is verified)
+const testEmailOverride = () => process.env.RESEND_TEST_EMAIL || null
 
 function baseHtml(body: string) {
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f7fa;font-family:sans-serif;">
@@ -32,6 +34,7 @@ export async function sendBroadcastEmail({
   body,
   ctaLabel,
   ctaUrl,
+  imageUrl,
   template,
   actorId,
   memberIds,
@@ -41,6 +44,7 @@ export async function sendBroadcastEmail({
   body: string
   ctaLabel?: string
   ctaUrl?: string
+  imageUrl?: string
   template: string
   actorId?: string
   memberIds?: string[] // if provided, only these members receive the email
@@ -58,8 +62,12 @@ export async function sendBroadcastEmail({
     ? `<p style="margin-top:24px;"><a href="${ctaUrl}" style="display:inline-block;background:#003d82;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">${ctaLabel}</a></p>`
     : ''
 
+  const imageBlock = imageUrl
+    ? `<img src="${imageUrl}" alt="" style="width:100%;max-height:280px;object-fit:cover;border-radius:8px;margin-bottom:20px;display:block;" />`
+    : ''
+
   const html = (name: string) =>
-    baseHtml(`<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">${title}</h2>
+    baseHtml(`${imageBlock}<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">${title}</h2>
 <p style="margin:0 0 8px;color:#374151;">Hello ${name},</p>
 <div style="color:#374151;line-height:1.7;">${body}</div>
 ${ctaBlock}`)
@@ -78,18 +86,30 @@ ${ctaBlock}`)
     return { sent: 0, skipped: members.length }
   }
 
+  const override = testEmailOverride()
   // Send in chunks of 100 (Resend batch limit)
   let sent = 0
   for (let i = 0; i < members.length; i += 100) {
     const chunk = members.slice(i, i + 100)
-    await resend.batch.send(
-      chunk.map((m) => ({
+    if (override) {
+      // No domain yet — send one combined email to the override address
+      const names = chunk.map((m) => m.fullName).join(', ')
+      await resend.emails.send({
         from: from(),
-        to: m.email,
-        subject,
-        html: html(m.fullName),
-      })),
-    )
+        to: override,
+        subject: `[TEST — would go to ${chunk.length} member(s): ${names}] ${subject}`,
+        html: html('members'),
+      })
+    } else {
+      await resend.batch.send(
+        chunk.map((m) => ({
+          from: from(),
+          to: m.email,
+          subject,
+          html: html(m.fullName),
+        })),
+      )
+    }
     sent += chunk.length
   }
 

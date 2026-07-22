@@ -6,7 +6,7 @@ import { actionDeleteEvent, actionDeleteEvents } from '@/app/actions/domain'
 import CreateEventForm from './CreateEventForm'
 import EventsGrid, { EventRow } from './EventsGrid'
 
-type MemberOption = { id: string; fullName: string }
+type MemberOption = { id: string; fullName: string; email: string }
 
 type Props = {
   upcoming: EventRow[]
@@ -52,7 +52,7 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
     setLocalUpcoming((prev) => prev.filter((e) => e.id !== id))
     setLocalPast((prev) => prev.filter((e) => e.id !== id))
     setSelected((prev) => { const n = new Set(prev); n.delete(id); return n })
-    startTransition(() => { actionDeleteEvent(id) })
+    if (!id.startsWith('opt-')) startTransition(() => { actionDeleteEvent(id) })
   }
 
   function handleOptimisticUpdate(updated: EventRow) {
@@ -66,7 +66,8 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
     setLocalUpcoming((prev) => prev.filter((e) => !ids.includes(e.id)))
     setLocalPast((prev) => prev.filter((e) => !ids.includes(e.id)))
     clearSelection()
-    startTransition(() => { actionDeleteEvents(ids) })
+    const realIds = ids.filter((id) => !id.startsWith('opt-'))
+    if (realIds.length > 0) startTransition(() => { actionDeleteEvents(realIds) })
   }
 
   function handleDeleteAllPast() {

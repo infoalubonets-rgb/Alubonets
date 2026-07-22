@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react'
 import { actionCreateEvent, actionUpdateEvent } from '@/app/actions/domain'
 import { createClient } from '@/utils/supabase/client'
 
-type MemberOption = { id: string; fullName: string }
+type MemberOption = { id: string; fullName: string; email: string }
 
 function toDateTimeLocal(isoStr: string): string {
   const d = new Date(isoStr)
@@ -77,7 +77,7 @@ async function uploadWithProgress(
 type Draft = {
   title: string; startsAt: string; location: string
   description: string; uploadedUrl: string; isPublic: boolean
-  sendNotif: boolean; sendEmail: boolean; emailAudience: 'ALL' | 'SELECTED'
+  sendEmail: boolean; emailAudience: 'ALL' | 'SELECTED'
 }
 
 function loadDraft(): Draft | null {
@@ -114,12 +114,10 @@ export default function CreateEventForm({
   const [location, setLocation]       = useState(initial?.location ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [isPublic, setIsPublic]       = useState(initial?.isPublic !== false)
-  const [sendNotif, setSendNotif]     = useState(true)
   const [sendEmail, setSendEmail]     = useState(true)
   const [emailAudience, setEmailAudience] = useState<'ALL' | 'SELECTED'>('ALL')
   const [selectedEmailMembers, setSelectedEmailMembers] = useState<Set<string>>(new Set())
-  const [emailPickerOpen, setEmailPickerOpen] = useState(false)
-  const emailPickerRef = useRef<HTMLDivElement>(null)
+  const [memberModalOpen, setMemberModalOpen] = useState(false)
 
   // upload track separately from paste URL; in edit mode seed with existing image
   const [uploadedUrl, setUploadedUrl] = useState('')
@@ -137,18 +135,6 @@ export default function CreateEventForm({
   // effective image URL: uploaded takes precedence over pasted
   const effectiveUrl = uploadedUrl || pastedUrl
 
-  // close email picker on outside click
-  useEffect(() => {
-    if (!emailPickerOpen) return
-    const onOutside = (e: MouseEvent) => {
-      if (emailPickerRef.current && !emailPickerRef.current.contains(e.target as Node)) {
-        setEmailPickerOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onOutside)
-    return () => document.removeEventListener('mousedown', onOutside)
-  }, [emailPickerOpen])
-
   // load draft on mount
   useEffect(() => {
     const d = loadDraft()
@@ -164,7 +150,6 @@ export default function CreateEventForm({
     setDescription(d.description)
     setUploadedUrl(d.uploadedUrl)
     setIsPublic(d.isPublic)
-    setSendNotif(d.sendNotif)
     if (d.sendEmail !== undefined) setSendEmail(d.sendEmail)
     if (d.emailAudience) setEmailAudience(d.emailAudience)
     setHasDraft(false)
@@ -175,7 +160,7 @@ export default function CreateEventForm({
     draftTimer.current = setTimeout(() => {
       saveDraft({
         title, startsAt, location, description,
-        uploadedUrl, isPublic, sendNotif, sendEmail, emailAudience,
+        uploadedUrl, isPublic, sendEmail, emailAudience,
         ...patch,
       })
     }, 1200)
@@ -189,12 +174,6 @@ export default function CreateEventForm({
     })
   }
 
-  const emailPickerLabel =
-    selectedEmailMembers.size === 0
-      ? 'Select members…'
-      : selectedEmailMembers.size === 1
-        ? members.find((m) => selectedEmailMembers.has(m.id))?.fullName || '1 member'
-        : `${selectedEmailMembers.size} members selected`
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -272,7 +251,6 @@ export default function CreateEventForm({
     })
     clearDraft()
 
-    fd.set('sendNotification', sendNotif ? 'on' : 'off')
     fd.set('sendEmail', sendEmail ? 'on' : 'off')
     fd.set('emailAudience', emailAudience)
     if (emailAudience === 'SELECTED') {
@@ -471,36 +449,18 @@ export default function CreateEventForm({
           </div>
           <div>
             <p className="text-[12px] font-semibold text-on-surface dark:text-blue-50 flex items-center gap-1.5">
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>public</span>
-              Show on public page
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{isPublic ? 'public' : 'lock'}</span>
+              {isPublic ? 'Public event' : 'Members only'}
             </p>
             <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">
-              {isPublic ? 'Visible to everyone on the website' : 'Hidden from public — members only'}
+              {isPublic ? 'On public site · notifies all members' : 'In-app only · not on public site'}
             </p>
           </div>
         </button>
 
         {!isEditing && (
-          <button type="button" onClick={() => { setSendNotif((v) => !v); scheduleSave({ sendNotif: !sendNotif }) }}
-            className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${sendNotif ? 'border-secondary-container/60 bg-secondary-container/5 dark:bg-secondary-container/10' : 'border-outline-variant dark:border-[#1e3461] bg-surface-container dark:bg-[#111f36]'}`}>
-            <div className={`relative flex-shrink-0 w-9 h-5 rounded-full transition-colors ${sendNotif ? 'bg-secondary-container' : 'bg-outline/40 dark:bg-[#2a3f66]'}`}>
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${sendNotif ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
-            </div>
-            <div>
-              <p className="text-[12px] font-semibold text-on-surface dark:text-blue-50 flex items-center gap-1.5">
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>notifications</span>
-                In-app notification
-              </p>
-              <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">
-                {sendNotif ? 'Send bell notification to all members' : 'No in-app notification'}
-              </p>
-            </div>
-          </button>
-        )}
-
-        {!isEditing && (
           <button type="button" onClick={() => { setSendEmail((v) => !v); scheduleSave({ sendEmail: !sendEmail }) }}
-            className={`sm:col-span-2 flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${sendEmail ? 'border-blue-300/60 dark:border-blue-700/40 bg-blue-50/50 dark:bg-blue-950/20' : 'border-outline-variant dark:border-[#1e3461] bg-surface-container dark:bg-[#111f36]'}`}>
+            className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${sendEmail ? 'border-blue-300/60 dark:border-blue-700/40 bg-blue-50/50 dark:bg-blue-950/20' : 'border-outline-variant dark:border-[#1e3461] bg-surface-container dark:bg-[#111f36]'}`}>
             <div className={`relative flex-shrink-0 w-9 h-5 rounded-full transition-colors ${sendEmail ? 'bg-blue-500' : 'bg-outline/40 dark:bg-[#2a3f66]'}`}>
               <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${sendEmail ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
             </div>
@@ -523,57 +483,87 @@ export default function CreateEventForm({
           <p className="text-[11px] font-semibold text-on-surface-variant dark:text-blue-200/60 uppercase tracking-wider">Email recipients</p>
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2 text-[12px] cursor-pointer">
-              <input
-                type="radio"
-                checked={emailAudience === 'ALL'}
-                onChange={() => { setEmailAudience('ALL'); scheduleSave({ emailAudience: 'ALL' }) }}
-              />
+              <input type="radio" checked={emailAudience === 'ALL'} onChange={() => { setEmailAudience('ALL'); scheduleSave({ emailAudience: 'ALL' }) }} />
               All members
             </label>
             <label className="flex items-center gap-2 text-[12px] cursor-pointer">
-              <input
-                type="radio"
-                checked={emailAudience === 'SELECTED'}
-                onChange={() => { setEmailAudience('SELECTED'); scheduleSave({ emailAudience: 'SELECTED' }) }}
-              />
+              <input type="radio" checked={emailAudience === 'SELECTED'} onChange={() => { setEmailAudience('SELECTED'); scheduleSave({ emailAudience: 'SELECTED' }) }} />
               Specific members
             </label>
           </div>
 
-          {emailAudience === 'SELECTED' && members.length > 0 && (
-            <div className="relative" ref={emailPickerRef}>
-              <button
-                type="button"
-                onClick={() => setEmailPickerOpen((o) => !o)}
-                className="flex items-center justify-between gap-2 w-full rounded-lg border border-outline-variant dark:border-[#1e3461] bg-surface dark:bg-[#0d1729] px-3 py-2 text-[12px] text-left hover:border-primary/40 transition-colors"
-              >
-                <span className={selectedEmailMembers.size === 0 ? 'text-on-surface-variant' : 'text-on-surface dark:text-blue-50'}>
-                  {emailPickerLabel}
-                </span>
-                <span className="material-symbols-outlined text-outline" style={{ fontSize: 16 }}>
-                  {emailPickerOpen ? 'expand_less' : 'expand_more'}
-                </span>
-              </button>
-
-              {emailPickerOpen && (
-                <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-outline-variant dark:border-[#1e3461] bg-surface dark:bg-[#0d1729] shadow-lg">
-                  {members.map((m) => (
-                    <label
-                      key={m.id}
-                      className="flex items-center gap-3 px-3 py-2 text-[12px] cursor-pointer hover:bg-surface-container dark:hover:bg-[#111f36] border-b border-outline-variant/30 last:border-b-0"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedEmailMembers.has(m.id)}
-                        onChange={() => toggleEmailMember(m.id)}
-                      />
-                      <span className="text-on-surface dark:text-blue-50">{m.fullName}</span>
-                    </label>
-                  ))}
+          {emailAudience === 'SELECTED' && (
+            <div>
+              {/* Selected member chips */}
+              {selectedEmailMembers.size > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {[...selectedEmailMembers].map((id) => {
+                    const m = members.find((x) => x.id === id)
+                    if (!m) return null
+                    return (
+                      <span key={id} className="inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 rounded-full px-2.5 py-1 text-[11px] font-medium">
+                        {m.fullName}
+                        <button type="button" onClick={() => toggleEmailMember(id)} className="hover:text-blue-600 dark:hover:text-blue-100 leading-none">
+                          <span className="material-symbols-outlined" style={{ fontSize: 12 }}>close</span>
+                        </button>
+                      </span>
+                    )
+                  })}
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => setMemberModalOpen(true)}
+                className="flex items-center gap-2 rounded-lg border border-outline-variant dark:border-[#1e3461] bg-surface dark:bg-[#0d1729] px-3 py-2 text-[12px] text-on-surface-variant hover:border-primary/40 hover:text-on-surface transition-colors"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>group</span>
+                {selectedEmailMembers.size === 0 ? 'Choose members…' : `${selectedEmailMembers.size} selected — edit`}
+              </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Member selection modal */}
+      {memberModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setMemberModalOpen(false)}>
+          <div className="w-full max-w-md bg-surface dark:bg-[#0d1729] rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant dark:border-[#1e3461]">
+              <p className="text-[13px] font-bold text-on-surface dark:text-blue-50">Select members</p>
+              <button type="button" onClick={() => setMemberModalOpen(false)} className="text-outline hover:text-on-surface transition-colors">
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+              </button>
+            </div>
+            <div className="overflow-y-auto max-h-80 divide-y divide-outline-variant/30 dark:divide-[#1e3461]/60">
+              {members.length === 0 ? (
+                <p className="px-4 py-6 text-[13px] text-on-surface-variant text-center">No active members.</p>
+              ) : members.map((m) => {
+                const checked = selectedEmailMembers.has(m.id)
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => toggleEmailMember(m.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${checked ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-surface-container dark:hover:bg-[#111f36]'}`}
+                  >
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${checked ? 'bg-blue-500 border-blue-500' : 'border-outline dark:border-[#2a3f66]'}`}>
+                      {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 13 }}>check</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium text-on-surface dark:text-blue-50 truncate">{m.fullName || '—'}</p>
+                      <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 truncate">{m.email}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="px-4 py-3 border-t border-outline-variant dark:border-[#1e3461] flex items-center justify-between">
+              <p className="text-[12px] text-on-surface-variant">{selectedEmailMembers.size} selected</p>
+              <button type="button" onClick={() => setMemberModalOpen(false)} className="bg-primary text-on-primary rounded-lg px-4 py-1.5 text-[12px] font-semibold hover:opacity-90 transition-opacity">
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

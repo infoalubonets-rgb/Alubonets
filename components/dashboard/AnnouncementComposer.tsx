@@ -103,46 +103,65 @@ export default function AnnouncementComposer({ members }: { members: MemberOptio
       )}
 
       {audience === 'SELECTED' && (
-        <div className="relative" ref={pickerRef}>
-          <button
-            type="button"
-            onClick={() => setPickerOpen((o) => !o)}
-            className="w-full md:w-80 flex items-center justify-between border rounded-lg px-3 py-2 text-sm text-left bg-surface hover:bg-surface-container transition-colors"
-          >
-            <span className={selected.size === 0 ? 'text-on-surface-variant' : ''}>
-              {selectedLabel}
-            </span>
-            <span className="material-symbols-outlined text-[18px]">
-              {pickerOpen ? 'expand_less' : 'expand_more'}
-            </span>
-          </button>
-
-          {pickerOpen && (
-            <div className="absolute z-30 mt-1 w-full md:w-80 max-h-64 overflow-y-auto rounded-lg border border-outline-variant bg-surface shadow-lg">
-              {members.length === 0 ? (
-                <p className="px-3 py-3 text-sm text-on-surface-variant">No active members.</p>
-              ) : (
-                members.map((m) => (
-                  <label
-                    key={m.id}
-                    className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-surface-container border-b border-outline-variant/40 last:border-b-0"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(m.id)}
-                      onChange={() => toggleMember(m.id)}
-                    />
-                    <span className="flex-1 min-w-0">
-                      <span className="block font-medium truncate">{m.fullName}</span>
-                      <span className="block text-[12px] text-on-surface-variant truncate">
-                        {m.email}
-                      </span>
-                    </span>
-                  </label>
-                ))
-              )}
+        <div className="space-y-2" ref={pickerRef}>
+          {/* Selected member chips */}
+          {selected.size > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {[...selected].map((id) => {
+                const m = members.find((x) => x.id === id)
+                if (!m) return null
+                return (
+                  <span key={id} className="inline-flex items-center gap-1 bg-primary/10 text-primary dark:text-blue-300 rounded-full px-2.5 py-1 text-[12px] font-medium">
+                    {m.fullName}
+                    <button type="button" onClick={() => toggleMember(id)} className="hover:text-primary/60 leading-none">
+                      <span className="material-symbols-outlined" style={{ fontSize: 13 }}>close</span>
+                    </button>
+                  </span>
+                )
+              })}
             </div>
           )}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setPickerOpen((o) => !o)}
+              className="w-full md:w-80 flex items-center justify-between border rounded-lg px-3 py-2 text-sm text-left bg-surface hover:bg-surface-container transition-colors"
+            >
+              <span className="text-on-surface-variant">
+                {selected.size === 0 ? 'Select members…' : 'Add more members…'}
+              </span>
+              <span className="material-symbols-outlined text-[18px]">
+                {pickerOpen ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
+
+            {pickerOpen && (
+              <div className="absolute z-30 mt-1 w-full md:w-80 max-h-64 overflow-y-auto rounded-lg border border-outline-variant bg-surface shadow-lg">
+                {members.length === 0 ? (
+                  <p className="px-3 py-3 text-sm text-on-surface-variant">No active members.</p>
+                ) : (
+                  members.map((m) => (
+                    <label
+                      key={m.id}
+                      className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover:bg-surface-container border-b border-outline-variant/40 last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(m.id)}
+                        onChange={() => toggleMember(m.id)}
+                      />
+                      <span className="flex-1 min-w-0">
+                        <span className="block font-medium truncate">{m.fullName}</span>
+                        <span className="block text-[12px] text-on-surface-variant truncate">
+                          {m.email}
+                        </span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

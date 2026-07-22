@@ -141,14 +141,15 @@ model GalleryPhoto {
 }
 
 model Announcement {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   content     String
   authorId    String
-  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  broadcast   Boolean  @default(true)
-  publishedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  broadcast   Boolean   @default(true)
+  publishedAt DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  emailSentAt DateTime?
 
   receipts AnnouncementReceipt[]
 

@@ -9,6 +9,7 @@ type Announcement = {
   content: string
   publishedAt: Date
   broadcast: boolean
+  emailSentAt: Date | null
   author: { fullName: string }
   receipts: { readAt: Date | null }[]
 }
@@ -68,10 +69,16 @@ export default function AnnouncementsClient({
                         New
                       </span>
                     )}
+                    {a.emailSentAt && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-widest bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                        <span className="material-symbols-outlined" style={{ fontSize: 10 }}>mark_email_read</span>
+                        Emailed
+                      </span>
+                    )}
                     <p className="text-[14px] font-bold text-on-surface leading-snug">{a.title}</p>
                   </div>
                   <p className="text-[11px] text-on-surface-variant mt-0.5">
-                    {a.author.fullName} · {a.publishedAt.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    {a.author.fullName} · {new Date(a.publishedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
                     {!a.broadcast && ' · sent to you'}
                   </p>
                 </div>

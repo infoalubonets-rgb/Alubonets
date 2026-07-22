@@ -160,19 +160,31 @@ export async function actionSendAnnouncement(formData: FormData) {
   // Send email to all members in the background (doesn't block response)
   if (broadcast && sendEmail) {
     const actorId = actor.id
+    const announcementId = announcement.id
     const paragraphs = content.split('\n').filter(Boolean)
       .map((p) => `<p style="margin:0 0 8px;">${p}</p>`).join('')
-    after(() =>
-      sendBroadcastEmail({
-        subject: title,
-        title,
-        body: paragraphs,
-        ctaLabel: 'View Announcements',
-        ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/announcements`,
-        template: 'announcement_broadcast',
-        actorId,
-      }).catch(console.error)
-    )
+    after(async () => {
+      try {
+        const result = await sendBroadcastEmail({
+          subject: title,
+          title,
+          body: paragraphs,
+          ctaLabel: 'View Announcements',
+          ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/announcements`,
+          template: 'announcement_broadcast',
+          actorId,
+        })
+        if ('sent' in result && result.sent > 0) {
+          await prisma.announcement.update({
+            where: { id: announcementId },
+            data: { emailSentAt: new Date() },
+          })
+          revalidateTag(TAGS.announcements)
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    })
   }
   revalidatePath('/announcements')
   revalidatePath('/dashboard/member')
@@ -203,7 +215,6 @@ export async function actionCreateEvent(formData: FormData) {
   if (!title || !startsAt) throw new Error('Title and start date required')
 
   const isPublic = formData.get('isPublic') !== 'off'
-  const sendNotif = formData.get('sendNotification') !== 'off'
   const sendEmail = formData.get('sendEmail') !== 'off'
   const emailAudience = String(formData.get('emailAudience') || 'ALL')
   const emailMemberIds = formData.getAll('emailMemberId').map(String).filter(Boolean)
@@ -230,29 +241,44 @@ export async function actionCreateEvent(formData: FormData) {
   if (description) lines.push(description)
   if (!isPublic) lines.push('(Members only — not listed on the public website)')
 
-  if (sendNotif) {
-    after(() => sendAnnouncement({
-      authorId: actorId,
-      title: `New event: ${title}`,
-      content: lines.join('\n'),
-      broadcast: true,
-    }).catch(console.error))
-  }
+  after(() => sendAnnouncement({
+    authorId: actorId,
+    title: `New event: ${title}`,
+    content: lines.join('\n'),
+    broadcast: true,
+  }).catch(console.error))
 
   if (sendEmail) {
     const memberIds = emailAudience === 'SELECTED' && emailMemberIds.length ? emailMemberIds : undefined
     const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
     const paragraphs = lines.map((l) => `<p style="margin:0 0 6px;">${l}</p>`).join('')
-    after(() => sendBroadcastEmail({
-      subject: `New event: ${title}`,
-      title: `Upcoming event — ${title}`,
-      body: paragraphs,
-      ctaLabel: 'View Event',
-      ctaUrl: `${appBaseUrl}/events/${event.id}`,
-      template: 'event_notification',
-      actorId,
-      memberIds,
-    }).catch(console.error))
+    after(async () => {
+      try {
+        const result = await sendBroadcastEmail({
+          subject: `New event: ${title}`,
+          title: `Upcoming event — ${title}`,
+          body: paragraphs,
+          imageUrl: imageUrl || undefined,
+          ctaLabel: 'View Event',
+          ctaUrl: `${appBaseUrl}/events/${event.id}`,
+          template: 'event_notification',
+          actorId,
+          memberIds,
+        })
+        if ('sent' in result && result.sent > 0) {
+          await sendAnnouncement({
+            authorId: actorId,
+            title: `Email sent: ${title}`,
+            content: `Your email notification for "${title}" was successfully sent to ${result.sent} member${result.sent !== 1 ? 's' : ''}.`,
+            broadcast: false,
+            memberIds: [actorId],
+          })
+          revalidateTag(TAGS.announcements)
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    })
   }
 
   revalidatePath('/dashboard/organizer')

@@ -17,14 +17,6 @@ export default async function ProjectsPage() {
     <main className="flex-grow">
       <div className="max-w-container-max mx-auto px-md md:px-lg py-xl space-y-xl">
 
-        {/* Header */}
-        <div>
-          <h1 className="font-h2 text-h2-mobile md:text-h2 text-primary">Projects</h1>
-          <p className="text-on-surface-variant mt-xs text-[15px]">
-            Community initiatives, welfare programmes and development projects by Alubonets.
-          </p>
-        </div>
-
         {/* Filter pills */}
         <div className="flex flex-wrap gap-sm">
           {['All', 'Ongoing', 'Completed', 'Upcoming'].map((label, i) => (
