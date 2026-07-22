@@ -527,16 +527,19 @@ export default function CreateEventForm({
       {/* Member selection modal */}
       {memberModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setMemberModalOpen(false)}>
-          <div className="w-full max-w-md bg-surface dark:bg-[#0d1729] rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant dark:border-[#1e3461]">
-              <p className="text-[13px] font-bold text-on-surface dark:text-blue-50">Select members</p>
-              <button type="button" onClick={() => setMemberModalOpen(false)} className="text-outline hover:text-on-surface transition-colors">
-                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+          <div className="w-full max-w-lg bg-surface dark:bg-[#0d1729] rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant dark:border-[#1e3461]">
+              <div>
+                <p className="text-[14px] font-bold text-on-surface dark:text-blue-50">Select members</p>
+                <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">{members.length} active members</p>
+              </div>
+              <button type="button" onClick={() => setMemberModalOpen(false)} className="text-outline hover:text-on-surface transition-colors p-1">
+                <span className="material-symbols-outlined" style={{ fontSize: 22 }}>close</span>
               </button>
             </div>
-            <div className="overflow-y-auto max-h-80 divide-y divide-outline-variant/30 dark:divide-[#1e3461]/60">
+            <div className="overflow-y-auto max-h-[420px] divide-y divide-outline-variant/30 dark:divide-[#1e3461]/60">
               {members.length === 0 ? (
-                <p className="px-4 py-6 text-[13px] text-on-surface-variant text-center">No active members.</p>
+                <p className="px-5 py-8 text-[13px] text-on-surface-variant text-center">No active members.</p>
               ) : members.map((m) => {
                 const checked = selectedEmailMembers.has(m.id)
                 return (
@@ -544,22 +547,22 @@ export default function CreateEventForm({
                     key={m.id}
                     type="button"
                     onClick={() => toggleEmailMember(m.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${checked ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-surface-container dark:hover:bg-[#111f36]'}`}
+                    className={`w-full flex items-center gap-4 px-5 py-4 text-left transition-colors ${checked ? 'bg-blue-50/60 dark:bg-blue-950/30' : 'hover:bg-surface-container dark:hover:bg-[#111f36]'}`}
                   >
-                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${checked ? 'bg-blue-500 border-blue-500' : 'border-outline dark:border-[#2a3f66]'}`}>
-                      {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 13 }}>check</span>}
+                    <div className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${checked ? 'bg-blue-500 border-blue-500' : 'border-outline dark:border-[#2a3f66]'}`}>
+                      {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 15 }}>check</span>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-on-surface dark:text-blue-50 truncate">{m.fullName || '—'}</p>
-                      <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 truncate">{m.email}</p>
+                      <p className="text-[14px] font-semibold text-on-surface dark:text-blue-50">{m.fullName || '—'}</p>
+                      <p className="text-[12px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">{m.email}</p>
                     </div>
                   </button>
                 )
               })}
             </div>
-            <div className="px-4 py-3 border-t border-outline-variant dark:border-[#1e3461] flex items-center justify-between">
-              <p className="text-[12px] text-on-surface-variant">{selectedEmailMembers.size} selected</p>
-              <button type="button" onClick={() => setMemberModalOpen(false)} className="bg-primary text-on-primary rounded-lg px-4 py-1.5 text-[12px] font-semibold hover:opacity-90 transition-opacity">
+            <div className="px-5 py-4 border-t border-outline-variant dark:border-[#1e3461] flex items-center justify-between">
+              <p className="text-[13px] text-on-surface-variant">{selectedEmailMembers.size} of {members.length} selected</p>
+              <button type="button" onClick={() => setMemberModalOpen(false)} className="bg-primary text-on-primary rounded-lg px-5 py-2 text-[13px] font-semibold hover:opacity-90 transition-opacity">
                 Done
               </button>
             </div>

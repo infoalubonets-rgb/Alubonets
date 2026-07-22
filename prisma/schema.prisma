@@ -118,6 +118,7 @@ model Project {
   description String
   status      ProjectStatus @default(UPCOMING)
   imageUrl    String?
+  progress    Int           @default(0)
   startDate   DateTime?
   endDate     DateTime?
   createdAt   DateTime      @default(now())

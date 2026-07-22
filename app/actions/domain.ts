@@ -397,12 +397,15 @@ export async function actionUpsertProject(formData: FormData) {
     | 'COMPLETED'
   if (!title || !description) throw new Error('Title and description required')
   const existingId = String(formData.get('id') || '') || undefined
+  const rawProgress = Number(formData.get('progress') ?? 0)
+  const progress = Math.min(100, Math.max(0, isNaN(rawProgress) ? 0 : rawProgress))
   const project = await upsertProject({
     id: existingId,
     title,
     description,
     status,
     imageUrl: String(formData.get('imageUrl') || '') || undefined,
+    progress,
   })
 
   // Only notify on creation (not updates)

@@ -451,6 +451,7 @@ export const getOrganizerProjects = unstable_cache(
       description: p.description,
       status: p.status as 'UPCOMING' | 'ONGOING' | 'COMPLETED',
       imageUrl: p.imageUrl ?? null,
+      progress: p.progress,
       updatedAt: p.updatedAt.toISOString(),
     }))
   },
@@ -649,6 +650,7 @@ export async function upsertProject(data: {
   description: string
   status: ProjectStatus
   imageUrl?: string
+  progress?: number
   startDate?: Date
   endDate?: Date
 }) {
@@ -657,14 +659,16 @@ export async function upsertProject(data: {
       where: { id: data.id },
       data: {
         title: data.title, description: data.description, status: data.status,
-        imageUrl: data.imageUrl, startDate: data.startDate, endDate: data.endDate,
+        imageUrl: data.imageUrl, progress: data.progress ?? 0,
+        startDate: data.startDate, endDate: data.endDate,
       },
     })
   }
   return prisma.project.create({
     data: {
       title: data.title, description: data.description, status: data.status,
-      imageUrl: data.imageUrl, startDate: data.startDate, endDate: data.endDate,
+      imageUrl: data.imageUrl, progress: data.progress ?? 0,
+      startDate: data.startDate, endDate: data.endDate,
     },
   })
 }
