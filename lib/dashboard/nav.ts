@@ -33,6 +33,7 @@ export const EXECUTIVE_NAV: NavItem[] = [
 export const TREASURER_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/treasurer' },
   { icon: 'payments', label: 'Member contributions', href: '/dashboard/treasurer/contributions' },
+  { icon: 'receipt_long', label: 'Payments', href: '/dashboard/treasurer/payments' },
   { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/treasurer/welfare' },
   { icon: 'savings', label: 'My contributions', href: '/contributions' },
   ANNOUNCEMENTS_NAV,

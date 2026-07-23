@@ -9,9 +9,7 @@ export async function POST(req: NextRequest) {
   if (!profile || profile.status !== 'ACTIVE') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!['ADMIN', 'TREASURER', 'MEMBER'].includes(profile.role)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  // All active roles can initiate their own contribution
 
   if (!mpesaConfigured()) {
     return NextResponse.json(
@@ -64,6 +62,7 @@ export async function POST(req: NextRequest) {
       checkoutRequestId: result.CheckoutRequestID,
       merchantRequestId: result.MerchantRequestID,
       targetUserId: userId,
+      phone,
       amount,
     },
   })
