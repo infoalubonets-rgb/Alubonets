@@ -15,7 +15,6 @@ export type MeetingEditorValues = {
   title: string
   heldAt: string
   attendance: number
-  location: string
   opening: string
   attendees: string       // members present
   membersAbsent: string
@@ -23,7 +22,6 @@ export type MeetingEditorValues = {
   aob: string
   agenda: string
   minutes: string
-  resolutions: string
   nextMeetingAt: string
   status?: 'DRAFT' | 'FINAL'
   publishedDocumentId?: string | null
@@ -96,7 +94,6 @@ export default function MeetingMinutesEditor({
     fd.set('title', values.title)
     fd.set('heldAt', values.heldAt)
     fd.set('attendance', String(values.attendance || 0))
-    fd.set('location', values.location)
     fd.set('opening', values.opening)
     fd.set('attendees', values.attendees)
     fd.set('membersAbsent', values.membersAbsent)
@@ -104,7 +101,6 @@ export default function MeetingMinutesEditor({
     fd.set('aob', values.aob)
     fd.set('agenda', values.agenda)
     fd.set('minutes', values.minutes)
-    fd.set('resolutions', values.resolutions)
     fd.set('nextMeetingAt', values.nextMeetingAt)
     return fd
   }
@@ -152,7 +148,6 @@ export default function MeetingMinutesEditor({
     { label: 'Absent', body: values.membersAbsent },
     { label: 'Agenda', body: values.agenda },
     { label: 'Discussion', body: values.minutes },
-    { label: 'Resolutions', body: values.resolutions },
     { label: 'Any Other Business', body: values.aob },
   ]
 
@@ -216,15 +211,6 @@ export default function MeetingMinutesEditor({
             </Field>
           </div>
 
-          <Field label="Venue">
-            <input
-              value={values.location}
-              onChange={(e) => set('location', e.target.value)}
-              placeholder="e.g. Alubonets Hall, Nairobi"
-              className={INPUT}
-            />
-          </Field>
-
           <Field label="Opening">
             <textarea
               value={values.opening}
@@ -286,16 +272,6 @@ export default function MeetingMinutesEditor({
               onChange={(e) => set('minutes', e.target.value)}
               rows={6}
               placeholder="Record of discussions…"
-              className={INPUT}
-            />
-          </Field>
-
-          <Field label="Resolutions">
-            <textarea
-              value={values.resolutions}
-              onChange={(e) => set('resolutions', e.target.value)}
-              rows={3}
-              placeholder="Agreed actions and decisions…"
               className={INPUT}
             />
           </Field>
@@ -390,7 +366,6 @@ export default function MeetingMinutesEditor({
                 {values.title || <span className="text-gray-300 font-normal italic">Untitled meeting</span>}
               </h2>
               <p className="text-[12px] text-gray-500">{previewDate}</p>
-              {values.location && <p className="text-[12px] text-gray-500">{values.location}</p>}
               <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded bg-[#001f50]/8 text-[11px] font-semibold text-[#001f50]">
                 <span className="material-symbols-outlined text-[12px]">person</span>
                 {values.attendance || 0} present

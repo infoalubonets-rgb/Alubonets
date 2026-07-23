@@ -152,10 +152,6 @@ export async function buildMeetingMinutesPdf(meeting: MeetingForPdf): Promise<Ui
   ctx.page.drawText(`${dateLine}, ${timeLine}`, { x: MX + 52, y: ctx.y, size: 9, font, color: MUTED })
   ctx.y -= 16
 
-  if (meeting.location) {
-    ctx.page.drawText(`Venue: ${meeting.location}`, { x: MX, y: ctx.y, size: 9, font, color: MUTED })
-    ctx.y -= 14
-  }
   if (meeting.recorder) {
     ctx.page.drawText(`Recorded by: ${meeting.recorder.fullName}`, { x: MX, y: ctx.y, size: 9, font, color: MUTED })
     ctx.y -= 14
@@ -194,7 +190,6 @@ export async function buildMeetingMinutesPdf(meeting: MeetingForPdf): Promise<Ui
   drawSection(ctx, 'Opening', meeting.opening)
   drawSection(ctx, 'Agenda', meeting.agenda)
   drawSection(ctx, 'Discussion / Minutes', meeting.minutes)
-  drawSection(ctx, 'Resolutions', meeting.resolutions)
   drawSection(ctx, 'Any Other Business (AOB)', meeting.aob)
 
   if (meeting.nextMeetingAt) {

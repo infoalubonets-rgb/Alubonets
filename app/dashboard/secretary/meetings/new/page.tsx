@@ -12,7 +12,6 @@ export default function NewMeetingPage() {
             title: '',
             heldAt: new Date().toISOString(),
             attendance: 0,
-            location: '',
             opening: '',
             attendees: '',
             membersAbsent: '',
@@ -20,7 +19,6 @@ export default function NewMeetingPage() {
             aob: '',
             agenda: '',
             minutes: '',
-            resolutions: '',
             nextMeetingAt: '',
             status: 'DRAFT',
           }}

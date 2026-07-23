@@ -205,12 +205,10 @@ model Meeting {
   agenda              String?
   minutes             String?
   opening             String?
-  location            String?
   attendees           String?   // members present
   membersAbsent       String?   // absent without apology
   membersApology      String?   // absent with apology
   aob                 String?   // any other business
-  resolutions         String?
   nextMeetingAt       DateTime?
   status              MeetingStatus @default(DRAFT)
   heldAt              DateTime

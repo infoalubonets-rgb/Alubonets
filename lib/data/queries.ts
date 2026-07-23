@@ -592,9 +592,10 @@ export async function createMeeting(data: {
   agenda?: string
   minutes?: string
   opening?: string
-  location?: string
   attendees?: string
-  resolutions?: string
+  membersAbsent?: string
+  membersApology?: string
+  aob?: string
   nextMeetingAt?: Date
   heldAt: Date
   attendance: number
@@ -611,9 +612,10 @@ export async function updateMeeting(
     agenda?: string | null
     minutes?: string | null
     opening?: string | null
-    location?: string | null
     attendees?: string | null
-    resolutions?: string | null
+    membersAbsent?: string | null
+    membersApology?: string | null
+    aob?: string | null
     nextMeetingAt?: Date | null
     heldAt?: Date
     attendance?: number

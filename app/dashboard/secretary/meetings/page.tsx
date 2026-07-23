@@ -106,7 +106,6 @@ function MeetingRow({
     id: string
     title: string
     heldAt: Date
-    location: string | null
     attendance: number
     status: 'DRAFT' | 'FINAL'
     publishedDocument: { id: string; fileUrl: string } | null
@@ -147,12 +146,6 @@ function MeetingRow({
               <span className="material-symbols-outlined text-[13px]">schedule</span>
               {fmtTime(m.heldAt)}
             </span>
-            {m.location && (
-              <span className="text-[12px] text-on-surface-variant flex items-center gap-1">
-                <span className="material-symbols-outlined text-[13px]">location_on</span>
-                {m.location}
-              </span>
-            )}
             <span className="text-[12px] text-on-surface-variant flex items-center gap-1">
               <span className="material-symbols-outlined text-[13px]">group</span>
               {m.attendance} present

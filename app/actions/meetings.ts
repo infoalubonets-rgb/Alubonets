@@ -20,7 +20,6 @@ const meetingFields = z.object({
   title: z.string().min(1),
   heldAt: z.string().min(1),
   attendance: z.coerce.number().int().min(0).default(0),
-  location: z.string().optional().nullable(),
   opening: z.string().optional().nullable(),
   attendees: z.string().optional().nullable(),
   membersAbsent: z.string().optional().nullable(),
@@ -28,7 +27,6 @@ const meetingFields = z.object({
   aob: z.string().optional().nullable(),
   agenda: z.string().optional().nullable(),
   minutes: z.string().optional().nullable(),
-  resolutions: z.string().optional().nullable(),
   nextMeetingAt: z.string().optional().nullable(),
 })
 
@@ -50,7 +48,6 @@ export async function actionCreateMeeting(formData: FormData) {
     title: formData.get('title'),
     heldAt: formData.get('heldAt'),
     attendance: formData.get('attendance') || 0,
-    location: formData.get('location'),
     opening: formData.get('opening'),
     attendees: formData.get('attendees'),
     membersAbsent: formData.get('membersAbsent'),
@@ -58,7 +55,6 @@ export async function actionCreateMeeting(formData: FormData) {
     aob: formData.get('aob'),
     agenda: formData.get('agenda'),
     minutes: formData.get('minutes'),
-    resolutions: formData.get('resolutions'),
     nextMeetingAt: formData.get('nextMeetingAt'),
   })
 
@@ -66,7 +62,6 @@ export async function actionCreateMeeting(formData: FormData) {
     title: parsed.title.trim(),
     heldAt: new Date(parsed.heldAt),
     attendance: parsed.attendance,
-    location: emptyToNull(parsed.location) ?? undefined,
     opening: emptyToNull(parsed.opening) ?? undefined,
     attendees: emptyToNull(parsed.attendees) ?? undefined,
     membersAbsent: emptyToNull(parsed.membersAbsent) ?? undefined,
@@ -74,7 +69,6 @@ export async function actionCreateMeeting(formData: FormData) {
     aob: emptyToNull(parsed.aob) ?? undefined,
     agenda: emptyToNull(parsed.agenda) ?? undefined,
     minutes: emptyToNull(parsed.minutes) ?? undefined,
-    resolutions: emptyToNull(parsed.resolutions) ?? undefined,
     nextMeetingAt: parseNextMeeting(parsed.nextMeetingAt) ?? undefined,
     recordedBy: actor.id,
     status: 'DRAFT',
@@ -103,7 +97,6 @@ export async function actionUpdateMeeting(formData: FormData) {
     title: formData.get('title'),
     heldAt: formData.get('heldAt'),
     attendance: formData.get('attendance') || 0,
-    location: formData.get('location'),
     opening: formData.get('opening'),
     attendees: formData.get('attendees'),
     membersAbsent: formData.get('membersAbsent'),
@@ -111,7 +104,6 @@ export async function actionUpdateMeeting(formData: FormData) {
     aob: formData.get('aob'),
     agenda: formData.get('agenda'),
     minutes: formData.get('minutes'),
-    resolutions: formData.get('resolutions'),
     nextMeetingAt: formData.get('nextMeetingAt'),
   })
 
@@ -119,7 +111,6 @@ export async function actionUpdateMeeting(formData: FormData) {
     title: parsed.title.trim(),
     heldAt: new Date(parsed.heldAt),
     attendance: parsed.attendance,
-    location: emptyToNull(parsed.location),
     opening: emptyToNull(parsed.opening),
     attendees: emptyToNull(parsed.attendees),
     membersAbsent: emptyToNull(parsed.membersAbsent),
@@ -127,7 +118,6 @@ export async function actionUpdateMeeting(formData: FormData) {
     aob: emptyToNull(parsed.aob),
     agenda: emptyToNull(parsed.agenda),
     minutes: emptyToNull(parsed.minutes),
-    resolutions: emptyToNull(parsed.resolutions),
     nextMeetingAt: parseNextMeeting(parsed.nextMeetingAt),
   })
 
@@ -154,10 +144,9 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
   const hasContent =
     Boolean(meeting.minutes?.trim()) ||
     Boolean(meeting.agenda?.trim()) ||
-    Boolean(meeting.resolutions?.trim()) ||
     Boolean(meeting.opening?.trim())
   if (!hasContent) {
-    throw new Error('Add agenda, minutes, or resolutions before publishing')
+    throw new Error('Add agenda or minutes before publishing')
   }
 
   const bytes = await buildMeetingMinutesPdf(meeting)
