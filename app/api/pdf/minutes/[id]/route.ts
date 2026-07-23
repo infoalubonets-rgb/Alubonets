@@ -34,10 +34,11 @@ export async function GET(
   const bytes = await buildMeetingMinutesPdf(meeting)
   const filename = minutesFilename(meeting)
 
+  const download = _req.nextUrl.searchParams.get('download') === '1'
   return new NextResponse(Buffer.from(bytes), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
     },
   })
 }

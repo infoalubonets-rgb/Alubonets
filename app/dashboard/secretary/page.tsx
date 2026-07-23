@@ -10,63 +10,72 @@ export default async function SecretaryPage() {
   const nextMeeting = [...data.meetings]
     .filter((m) => new Date(m.heldAt) >= now)
     .sort((a, b) => new Date(a.heldAt).getTime() - new Date(b.heldAt).getTime())[0] ?? null
-  const recentMeetings = data.meetings.slice(0, 3)
+  const recentMeetings = data.meetings.slice(0, 4)
 
   const stats = [
-    { label: 'Documents',      value: data.documents.length,     icon: 'description', color: 'bg-primary dark:bg-[#0c1e42]',           text: 'text-white', iconBg: 'bg-white/15' },
-    { label: 'Meetings',       value: data.meetings.length,      icon: 'groups',      color: 'bg-secondary-container dark:bg-[#c45e00]', text: 'text-white', iconBg: 'bg-white/15' },
-    { label: 'Avg attendance', value: data.attendanceAvg,        icon: 'how_to_reg',  color: 'bg-primary-container dark:bg-[#153060]',  text: 'text-white', iconBg: 'bg-white/15' },
-    { label: 'Announcements',  value: data.announcements.length, icon: 'campaign',    color: 'bg-secondary dark:bg-[#7a3a00]',          text: 'text-white', iconBg: 'bg-white/15' },
+    { label: 'Documents',     value: data.documents.length,     icon: 'description',   from: 'from-[#001f50]', to: 'to-[#0a3070]' },
+    { label: 'Meetings',      value: data.meetings.length,      icon: 'groups',         from: 'from-[#fe8015]', to: 'to-[#ff9c40]' },
+    { label: 'Avg attendance',value: data.attendanceAvg,        icon: 'how_to_reg',     from: 'from-[#001f50]', to: 'to-[#153060]' },
+    { label: 'Announcements', value: data.announcements.length, icon: 'campaign',       from: 'from-[#fe8015]', to: 'to-[#c45e00]' },
   ]
 
   const quickLinks = [
-    { label: 'Announcements', description: 'Publish and review notices', icon: 'campaign', href: '/announcements' },
-    { label: 'Meetings', description: 'Minutes, attendance, DOCX export', icon: 'groups', href: '/dashboard/secretary/meetings' },
-    { label: 'Contributions', description: 'View contribution records', icon: 'payments', href: '/contributions' },
+    { label: 'Announcements',  description: 'Publish and review notices',     icon: 'campaign',  href: '/announcements',                    orange: false },
+    { label: 'Meetings',       description: 'Minutes, attendance, exports',   icon: 'groups',    href: '/dashboard/secretary/meetings',      orange: true  },
+    { label: 'Contributions',  description: 'View contribution records',      icon: 'payments',  href: '/contributions',                    orange: false },
   ]
 
   return (
     <DashboardShell role="SECRETARY" title="Secretary" nav={SECRETARY_NAV}>
-      <div className="space-y-5 p-4 md:p-6 max-w-4xl mx-auto">
+      <div className="space-y-5 max-w-5xl mx-auto">
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {stats.map((s) => (
-            <div key={s.label} className={`relative overflow-hidden rounded-2xl ${s.color} p-4 shadow-sm`}>
-              <div className="absolute -right-3 -top-3 h-16 w-16 rounded-full bg-black/[0.04] dark:bg-white/[0.05]" />
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${s.iconBg}`}>
-                <span className={`material-symbols-outlined icon-fill ${s.text}`} style={{ fontSize: 18 }}>
+            <div
+              key={s.label}
+              className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${s.from} ${s.to} p-4 shadow-sm`}
+            >
+              <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/[0.06]" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                <span className="material-symbols-outlined icon-fill text-white" style={{ fontSize: 18 }}>
                   {s.icon}
                 </span>
               </div>
-              <p className={`mt-3 text-[22px] font-bold leading-none tracking-tight ${s.text}`}>{s.value}</p>
-              <p className={`mt-1 text-[11px] font-medium uppercase tracking-wider ${s.text} opacity-60`}>{s.label}</p>
+              <p className="mt-3 text-[24px] font-bold leading-none tracking-tight text-white">{s.value}</p>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-white/60">{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* Next meeting spotlight */}
         {nextMeeting && (
-          <div className="flex items-center gap-4 rounded-2xl border border-primary/20 dark:border-[#1a2d4f] bg-primary/5 dark:bg-[#0c1e42]/60 px-5 py-4">
-            <div className="flex w-12 shrink-0 flex-col items-center rounded-xl border border-primary/20 dark:border-[#1e3461] bg-surface dark:bg-[#0d1729] py-1.5 text-center">
-              <span className="text-[10px] font-semibold text-secondary dark:text-orange-300 uppercase leading-none">
-                {new Date(nextMeeting.heldAt).toLocaleDateString(undefined, { month: 'short' })}
+          <div className="flex items-center gap-4 rounded-2xl border border-[#fe8015]/25 bg-gradient-to-r from-[#fe8015]/8 to-transparent px-5 py-4">
+            <div className="flex w-14 shrink-0 flex-col items-center rounded-xl border border-[#fe8015]/30 bg-white/80 dark:bg-[#0d1729] py-2 text-center">
+              <span className="text-[10px] font-bold text-[#fe8015] uppercase leading-none tracking-wide">
+                {new Date(nextMeeting.heldAt).toLocaleDateString('en-KE', { month: 'short' })}
               </span>
-              <span className="text-[18px] font-bold text-primary dark:text-blue-50 leading-tight">
+              <span className="text-[22px] font-bold text-[#001f50] dark:text-blue-100 leading-tight">
                 {new Date(nextMeeting.heldAt).getDate()}
+              </span>
+              <span className="text-[10px] text-[#fe8015]/60 leading-none">
+                {new Date(nextMeeting.heldAt).getFullYear()}
               </span>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold text-primary/60 dark:text-blue-200/50 uppercase tracking-wider mb-0.5">Next meeting</p>
-              <p className="font-semibold text-[14px] text-primary dark:text-blue-50 truncate">{nextMeeting.title}</p>
+              <p className="text-[10px] font-bold text-[#fe8015] uppercase tracking-widest mb-0.5">Next meeting</p>
+              <p className="font-bold text-[14px] text-[#001f50] dark:text-blue-50 truncate">{nextMeeting.title}</p>
               <p className="text-[12px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">
-                {new Date(nextMeeting.heldAt).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {new Date(nextMeeting.heldAt).toLocaleString('en-KE', {
+                  weekday: 'short', month: 'short', day: 'numeric',
+                  hour: '2-digit', minute: '2-digit',
+                })}
                 {' · '}{nextMeeting.attendance} attending
               </p>
             </div>
             <Link
               href="/dashboard/secretary/meetings"
-              className="shrink-0 flex items-center gap-1 rounded-lg bg-primary text-on-primary px-3 py-1.5 text-[12px] font-semibold hover:opacity-90 transition-opacity"
+              className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-[#fe8015] text-white px-3.5 py-2 text-[12px] font-semibold hover:opacity-90 transition-opacity shadow-sm"
             >
               View all
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chevron_right</span>
@@ -80,10 +89,18 @@ export default async function SecretaryPage() {
             <Link
               key={l.label}
               href={l.href}
-              className="group flex items-center gap-3 rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4 hover:border-primary/40 hover:shadow-md transition-all"
+              className={`group flex items-center gap-3 rounded-2xl border p-4 hover:shadow-md transition-all ${
+                l.orange
+                  ? 'border-[#fe8015]/25 bg-gradient-to-br from-[#fe8015]/5 to-transparent hover:border-[#fe8015]/40'
+                  : 'border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] hover:border-primary/30'
+              }`}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 dark:bg-primary/20 group-hover:bg-primary/20 transition-colors">
-                <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 20 }}>
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                l.orange
+                  ? 'bg-[#fe8015]/15 group-hover:bg-[#fe8015]/25'
+                  : 'bg-primary/10 dark:bg-primary/20 group-hover:bg-primary/20'
+              }`}>
+                <span className={`material-symbols-outlined icon-fill ${l.orange ? 'text-[#fe8015]' : 'text-primary'}`} style={{ fontSize: 20 }}>
                   {l.icon}
                 </span>
               </div>
@@ -91,70 +108,130 @@ export default async function SecretaryPage() {
                 <p className="font-semibold text-[13px] text-on-surface dark:text-blue-50">{l.label}</p>
                 <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">{l.description}</p>
               </div>
-              <span className="material-symbols-outlined text-outline dark:text-blue-200/30 group-hover:text-primary group-hover:translate-x-0.5 ml-auto shrink-0 transition-all" style={{ fontSize: 16 }}>
+              <span className={`material-symbols-outlined ml-auto shrink-0 group-hover:translate-x-0.5 transition-all ${
+                l.orange ? 'text-[#fe8015]/40 group-hover:text-[#fe8015]' : 'text-outline dark:text-blue-200/30 group-hover:text-primary'
+              }`} style={{ fontSize: 16 }}>
                 chevron_right
               </span>
             </Link>
           ))}
         </div>
 
-        {/* Two-column: recent meetings + recent documents */}
+        {/* Recent meetings + Documents */}
         <div className="grid md:grid-cols-2 gap-4">
 
           {/* Recent meetings */}
-          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4">
-            <div className="flex items-center justify-between mb-3">
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/60 dark:border-[#1a2d4f] bg-[#001f50]/4 dark:bg-[#001f50]/20">
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>groups</span>
-                <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Meetings</h2>
+                <span className="material-symbols-outlined icon-fill text-[#001f50] dark:text-blue-300" style={{ fontSize: 17 }}>groups</span>
+                <h2 className="font-bold text-[12px] text-[#001f50] dark:text-blue-200 uppercase tracking-widest">Recent Meetings</h2>
               </div>
-              <Link href="/dashboard/secretary/meetings" className="text-[12px] text-primary dark:text-blue-300 hover:underline font-medium">
+              <Link href="/dashboard/secretary/meetings" className="text-[11px] text-[#fe8015] font-semibold hover:opacity-80 transition-opacity">
                 View all →
               </Link>
             </div>
             {recentMeetings.length === 0 ? (
-              <p className="text-[13px] text-on-surface-variant dark:text-blue-200/50">No meetings recorded.</p>
+              <div className="px-4 py-8 text-center">
+                <span className="material-symbols-outlined text-[32px] text-outline/40">groups</span>
+                <p className="text-[13px] text-on-surface-variant mt-2">No meetings recorded yet.</p>
+              </div>
             ) : (
-              <ul className="divide-y divide-outline-variant dark:divide-[#1a2d4f]">
-                {recentMeetings.map((m) => (
-                  <li key={m.id} className="py-2.5 first:pt-0 last:pb-0">
-                    <p className="text-[13px] font-medium text-on-surface dark:text-blue-50 truncate">{m.title}</p>
-                    <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">
-                      {new Date(m.heldAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                      {' · '}{m.attendance} attending
-                    </p>
-                  </li>
-                ))}
+              <ul className="divide-y divide-outline-variant/40 dark:divide-[#1a2d4f]">
+                {recentMeetings.map((m) => {
+                  const isFinal = m.status === 'FINAL'
+                  return (
+                    <li key={m.id}>
+                      <Link
+                        href={`/dashboard/secretary/meetings/${m.id}`}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-surface-container/50 dark:hover:bg-[#111f36]/60 transition-colors group"
+                      >
+                        {/* Date badge */}
+                        <div className={`flex-shrink-0 w-10 rounded-lg text-center py-1.5 border ${
+                          isFinal
+                            ? 'bg-[#001f50]/8 dark:bg-[#001f50]/30 border-blue-200 dark:border-[#1a2d4f]'
+                            : 'bg-orange-50 dark:bg-orange-950/30 border-orange-200/70 dark:border-orange-900/40'
+                        }`}>
+                          <p className={`text-[9px] font-bold leading-none uppercase ${isFinal ? 'text-[#001f50] dark:text-blue-300' : 'text-[#fe8015]'}`}>
+                            {new Date(m.heldAt).toLocaleDateString('en-KE', { month: 'short' })}
+                          </p>
+                          <p className={`text-[15px] font-bold leading-tight ${isFinal ? 'text-[#001f50] dark:text-blue-200' : 'text-[#fe8015]'}`}>
+                            {new Date(m.heldAt).getDate()}
+                          </p>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-semibold text-on-surface dark:text-blue-50 truncate group-hover:text-primary transition-colors">
+                            {m.title}
+                          </p>
+                          <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">
+                            {m.attendance} present
+                          </p>
+                        </div>
+                        {isFinal ? (
+                          <span className="flex-shrink-0 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest bg-[#001f50]/10 dark:bg-[#001f50]/40 text-[#001f50] dark:text-blue-300">
+                            <span className="material-symbols-outlined icon-fill" style={{ fontSize: 10 }}>verified</span>
+                            Final
+                          </span>
+                        ) : (
+                          <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest bg-orange-100 dark:bg-orange-950/50 text-[#fe8015]">
+                            Draft
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </section>
 
-          {/* Recent documents */}
-          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>folder_open</span>
-              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Documents</h2>
+          {/* Documents */}
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/60 dark:border-[#1a2d4f] bg-[#fe8015]/6 dark:bg-[#fe8015]/10">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined icon-fill text-[#fe8015]" style={{ fontSize: 17 }}>folder_open</span>
+                <h2 className="font-bold text-[12px] text-[#fe8015] uppercase tracking-widest">Documents</h2>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-[#fe8015]/15 text-[#fe8015] text-[10px] font-bold">
+                {data.documents.length}
+              </span>
             </div>
             {data.documents.length === 0 ? (
-              <p className="text-[13px] text-on-surface-variant dark:text-blue-200/50">No documents yet.</p>
+              <div className="px-4 py-8 text-center">
+                <span className="material-symbols-outlined text-[32px] text-outline/40">description</span>
+                <p className="text-[13px] text-on-surface-variant mt-2">No documents yet. Publish a meeting to create one.</p>
+              </div>
             ) : (
-              <ul className="space-y-1">
+              <ul className="divide-y divide-outline-variant/40 dark:divide-[#1a2d4f]">
                 {data.documents.slice(0, 5).map((d) => (
                   <li key={d.id}>
                     <a
                       href={d.fileUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="group flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-surface-container dark:hover:bg-[#111f36] transition-colors"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-surface-container/50 dark:hover:bg-[#111f36]/60 transition-colors group"
                     >
-                      <span className="material-symbols-outlined text-outline dark:text-blue-200/40 group-hover:text-primary transition-colors" style={{ fontSize: 15 }}>
-                        description
-                      </span>
-                      <span className="text-[12px] text-on-surface dark:text-blue-200 group-hover:underline truncate flex-1">
-                        {d.title}
-                      </span>
-                      <span className="text-[10px] text-outline dark:text-blue-200/30 shrink-0">
-                        {d.category || 'General'}
+                      {/* Icon badge */}
+                      <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-[#fe8015]/10 border border-[#fe8015]/20 dark:border-[#fe8015]/30 flex items-center justify-center">
+                        <span className="material-symbols-outlined icon-fill text-[#fe8015]" style={{ fontSize: 17 }}>description</span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-semibold text-on-surface dark:text-blue-50 truncate group-hover:text-[#fe8015] transition-colors">
+                          {d.title}
+                        </p>
+                        <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">
+                          {d.uploader?.fullName ?? 'Unknown'}
+                          {' · '}
+                          {new Date(d.uploadedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                      {d.category && (
+                        <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide bg-[#001f50]/8 dark:bg-[#001f50]/30 text-[#001f50] dark:text-blue-300">
+                          {d.category}
+                        </span>
+                      )}
+                      <span className="material-symbols-outlined text-outline/40 dark:text-blue-200/20 group-hover:text-[#fe8015] transition-colors flex-shrink-0" style={{ fontSize: 15 }}>
+                        open_in_new
                       </span>
                     </a>
                   </li>
@@ -162,6 +239,7 @@ export default async function SecretaryPage() {
               </ul>
             )}
           </section>
+
         </div>
       </div>
     </DashboardShell>

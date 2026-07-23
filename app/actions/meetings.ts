@@ -211,3 +211,16 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
   revalidatePath(`/dashboard/secretary/meetings/${meetingId}`)
   return { documentId, fileUrl }
 }
+
+export async function actionDeleteMeeting(id: string) {
+  await requireActiveRole(['SECRETARY', 'ADMIN'])
+  await prisma.meeting.delete({ where: { id } })
+  revalidateMeetings()
+}
+
+export async function actionDeleteMeetings(ids: string[]) {
+  if (!ids.length) return
+  await requireActiveRole(['SECRETARY', 'ADMIN'])
+  await prisma.meeting.deleteMany({ where: { id: { in: ids } } })
+  revalidateMeetings()
+}
