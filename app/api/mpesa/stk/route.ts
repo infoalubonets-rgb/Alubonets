@@ -47,12 +47,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'phone and amount required' }, { status: 400 })
   }
 
-  const result = await stkPush({
-    phone,
-    amount,
-    accountReference: userId.slice(0, 12),
-    description: 'Alubonets',
-  })
+  let result
+  try {
+    result = await stkPush({
+      phone,
+      amount,
+      accountReference: userId.slice(0, 12),
+      description: 'Alubonets',
+    })
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'STK push failed' },
+      { status: 500 },
+    )
+  }
 
   await writeAudit({
     userId: profile.id,
