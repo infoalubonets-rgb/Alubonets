@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-import { sendContributionNotificationToTreasurers } from '@/lib/email/resend'
 
 type CallbackBody = {
   Body?: {
@@ -128,19 +127,6 @@ export async function POST(req: NextRequest) {
     } catch { /* non-fatal */ }
     revalidateTag('contributions')
 
-    // Notify treasurers by email (best-effort, non-blocking)
-    try {
-      const member = await prisma.user.findUnique({
-        where: { id: targetUserId },
-        select: { fullName: true },
-      })
-      await sendContributionNotificationToTreasurers({
-        memberName: member?.fullName ?? 'A member',
-        amount,
-        receipt,
-        phone,
-      })
-    } catch { /* non-fatal */ }
   } else if (amount > 0) {
     console.error('M-Pesa callback: paid but no matching STK init audit', {
       checkoutRequestId,
