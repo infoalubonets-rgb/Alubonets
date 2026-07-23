@@ -283,6 +283,54 @@ export async function sendContributionReceiptEmail(
   }
 }
 
+export async function sendContributionNotificationToTreasurers({
+  memberName,
+  amount,
+  receipt,
+  phone,
+}: {
+  memberName: string
+  amount: number
+  receipt: string
+  phone: string
+}) {
+  const resend = getResend()
+  const subject = `New contribution — KES ${Math.round(amount).toLocaleString()} from ${memberName}`
+  const rows = [
+    ['Member',     memberName],
+    ['Amount',     `KES ${Math.round(amount).toLocaleString()}`],
+    ['M-Pesa Ref', receipt || '—'],
+    ['Phone',      phone   || '—'],
+  ]
+  const html = baseHtml(`
+    <h2 style="margin:0 0 14px;font-size:20px;color:#111827;">New contribution received</h2>
+    <p style="margin:0 0 18px;color:#374151;">A new M-Pesa payment has been successfully recorded.</p>
+    <table cellpadding="0" cellspacing="0" style="width:100%;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+      ${rows.map(([label, value], i) => `
+        <tr style="background:${i % 2 === 0 ? '#f9fafb' : '#fff'};">
+          <td style="padding:10px 14px;color:#6b7280;font-size:13px;font-weight:600;white-space:nowrap;">${label}</td>
+          <td style="padding:10px 14px;color:#111827;font-size:13px;font-weight:${label === 'Amount' ? '700;color:#974800' : '400'};">${value}</td>
+        </tr>`).join('')}
+    </table>
+    <p style="margin-top:20px;">
+      <a href="${appUrl()}/dashboard/treasurer/payments" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">View Payments Dashboard</a>
+    </p>
+  `)
+
+  const recipients = await prisma.user.findMany({
+    where: { role: { in: ['TREASURER', 'ADMIN'] }, status: 'ACTIVE' },
+    select: { email: true },
+  })
+  if (!resend || recipients.length === 0) return
+
+  const override = testEmailOverride()
+  if (override) {
+    await resend.emails.send({ from: from(), to: override, subject: `[TEST] ${subject}`, html })
+    return
+  }
+  await resend.batch.send(recipients.map((r) => ({ from: from(), to: r.email, subject, html })))
+}
+
 export async function sendWelfareStatusEmail(
   user: User,
   status: string,

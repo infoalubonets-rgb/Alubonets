@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import TreasurerPaymentsClient from '@/components/dashboard/TreasurerPaymentsClient'
 
+export const dynamic = 'force-dynamic'
 export const metadata = { title: 'M-Pesa Payments' }
 
 export default async function TreasurerPaymentsPage() {

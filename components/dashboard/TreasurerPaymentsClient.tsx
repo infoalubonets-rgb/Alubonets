@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ContributionTrendChart } from './Charts'
 import {
@@ -56,6 +56,27 @@ function daysAgo(n: number) {
 export default function TreasurerPaymentsClient({ successPayments, failedPayments, chartLabels, chartValues }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
+
+  // Auto-poll every 30 s so the treasurer sees new payments without refreshing
+  useEffect(() => {
+    const tid = setInterval(() => {
+      if (document.visibilityState === 'visible') router.refresh()
+    }, 30_000)
+    return () => clearInterval(tid)
+  }, [router])
+
+  // Toast: show when successPayments count increases after a background refresh
+  const prevCountRef = useRef(successPayments.length)
+  const [toast, setToast] = useState<{ amount: number; member: string } | null>(null)
+  useEffect(() => {
+    if (successPayments.length > prevCountRef.current) {
+      const newest = successPayments[0]
+      setToast({ amount: newest.amount, member: newest.user.fullName })
+      prevCountRef.current = successPayments.length
+      const tid = setTimeout(() => setToast(null), 6_000)
+      return () => clearTimeout(tid)
+    }
+  }, [successPayments])
 
   // Filters for success table
   const [dateFilter, setDateFilter] = useState<DateFilter>('all')
@@ -130,6 +151,24 @@ export default function TreasurerPaymentsClient({ successPayments, failedPayment
 
   return (
     <div className="space-y-6 p-4 md:p-6">
+
+      {/* New-payment toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-[300] flex items-center gap-3 rounded-2xl bg-white dark:bg-[#0d1729] border border-green-200 dark:border-green-900/60 shadow-xl px-4 py-3 animate-in slide-in-from-top-2 duration-300">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
+            <span className="material-symbols-outlined icon-fill text-green-600 dark:text-green-400" style={{ fontSize: 18 }}>payments</span>
+          </div>
+          <div>
+            <p className="text-[13px] font-semibold text-on-surface dark:text-blue-50">New contribution received</p>
+            <p className="text-[12px] text-on-surface-variant dark:text-blue-200/60">
+              KES {Math.round(toast.amount).toLocaleString()} from {toast.member}
+            </p>
+          </div>
+          <button onClick={() => setToast(null)} className="ml-2 text-on-surface-variant hover:text-on-surface transition-colors">
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
