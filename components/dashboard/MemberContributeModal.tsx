@@ -22,14 +22,49 @@ function friendlyError(code: number | undefined, desc: string | undefined) {
   return 'The payment could not be completed — please try again'
 }
 
+// Returns { formatted: '2547XXXXXXXX' } on success or { error: '...' } on failure
+function parsePhone(raw: string): { formatted: string } | { error: string } {
+  const d = raw.replace(/\D/g, '')
+  if (!d) return { error: 'Phone number is required' }
+
+  // 254 prefix (12 digits: 254 + 9)
+  if (d.startsWith('254')) {
+    if (d.length !== 12) return { error: 'International format must be 12 digits — e.g. 254712345678' }
+    const after = d.slice(3)
+    if (!after.startsWith('7') && !after.startsWith('1'))
+      return { error: 'Number must start with 07 or 01 after the country code' }
+    return { formatted: d }
+  }
+
+  // Local 07 / 01 (10 digits)
+  if (d.startsWith('07') || d.startsWith('01')) {
+    if (d.length !== 10) return { error: '10 digits required — e.g. 0712345678' }
+    return { formatted: `254${d.slice(1)}` }
+  }
+
+  return { error: 'Start with 07, 01, or 254' }
+}
+
+function parseAmount(raw: string): { value: number } | { error: string } {
+  const n = Number(raw)
+  if (!raw || isNaN(n) || n < 1) return { error: 'Enter an amount of at least KES 1' }
+  if (n > 150_000) return { error: 'Maximum single contribution is KES 150,000' }
+  return { value: n }
+}
+
 export default function MemberContributeModal() {
   const router = useRouter()
-  const [open, setOpen]           = useState(false)
-  const [state, setState]         = useState<State>('idle')
-  const [message, setMessage]     = useState('')
-  const [checkoutId, setCheckoutId] = useState('')
+  const [open, setOpen]               = useState(false)
+  const [state, setState]             = useState<State>('idle')
+  const [message, setMessage]         = useState('')
+  const [checkoutId, setCheckoutId]   = useState('')
+  const [phoneError, setPhoneError]   = useState('')
+  const [amountError, setAmountError] = useState('')
   const phoneRef  = useRef<HTMLInputElement>(null)
   const amountRef = useRef<HTMLInputElement>(null)
+
+  // Ref-based stop flag — always current, safe to read inside any async callback
+  const pollStoppedRef = useRef(true)
 
   useEffect(() => {
     if (!open) return
@@ -38,59 +73,109 @@ export default function MemberContributeModal() {
     return () => document.removeEventListener('keydown', h)
   }, [open])
 
-  // Poll every 2 s while waiting (up to 65 s)
+  // Poll every 2 s while waiting (up to 65 s).
+  // Keyed only on checkoutId: starts when an ID arrives, stops when it's cleared.
   useEffect(() => {
-    if (state !== 'waiting' || !checkoutId) return
+    if (!checkoutId) return
+    pollStoppedRef.current = false
     const start = Date.now()
-    let stopped = false
 
     async function poll() {
-      if (stopped) return
+      if (pollStoppedRef.current) return
       if (Date.now() - start > 65_000) {
-        setState('error')
-        setMessage(MPESA_ERRORS[1019])
+        if (!pollStoppedRef.current) {
+          pollStoppedRef.current = true
+          setState('error')
+          setMessage(MPESA_ERRORS[1019])
+        }
         return
       }
       try {
         const res  = await fetch(`/api/mpesa/status/${checkoutId}`)
+        if (pollStoppedRef.current) return          // discard response if already cancelled
         const data = await res.json() as { status: string; resultCode?: number; resultDesc?: string; amount?: number }
+        if (pollStoppedRef.current) return          // double-check after JSON parse
         if (data.status === 'success') {
+          pollStoppedRef.current = true
           setState('success')
           setMessage(data.amount ? `KES ${Math.round(data.amount).toLocaleString()} received and recorded.` : 'Your payment has been received and recorded.')
           router.refresh()
+          return
         } else if (data.status === 'failed') {
+          pollStoppedRef.current = true
           setState('error')
           setMessage(friendlyError(data.resultCode, data.resultDesc))
+          return
         }
-      } catch { /* keep polling */ }
+      } catch { /* keep polling on network error */ }
+      // Schedule next poll only if still active
+      if (!pollStoppedRef.current) setTimeout(poll, 2_000)
     }
 
     poll()
-    const tid = setInterval(poll, 2_000)
-    return () => { stopped = true; clearInterval(tid) }
-  }, [state, checkoutId, router])
+    return () => { pollStoppedRef.current = true }
+  }, [checkoutId, router])
+
+  function stopPolling() { pollStoppedRef.current = true }
 
   function handleClose() {
+    stopPolling()
     setOpen(false); setState('idle'); setMessage(''); setCheckoutId('')
+    setPhoneError(''); setAmountError('')
   }
   function handleRetry() {
+    stopPolling()
     setState('idle'); setMessage(''); setCheckoutId('')
   }
 
+  // ── Input handlers ────────────────────────────────────────────────────────
+  function onPhoneInput(e: React.FormEvent<HTMLInputElement>) {
+    const el = e.currentTarget
+    // Strip non-digits, cap at 13 chars
+    el.value = el.value.replace(/\D/g, '').slice(0, 13)
+    setPhoneError('')
+  }
+
+  function onPhoneBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const result = parsePhone(e.currentTarget.value)
+    if ('error' in result) setPhoneError(result.error)
+  }
+
+  function onAmountInput(e: React.FormEvent<HTMLInputElement>) {
+    const el = e.currentTarget
+    // Digits only, max 6 chars (150000 = 6 digits)
+    el.value = el.value.replace(/\D/g, '').slice(0, 6)
+    const n = Number(el.value)
+    if (el.value && n > 150_000) {
+      el.value = '150000'
+      setAmountError('Maximum single contribution is KES 150,000')
+    } else {
+      setAmountError('')
+    }
+  }
+
+  function onAmountBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const result = parseAmount(e.currentTarget.value)
+    if ('error' in result) setAmountError(result.error)
+  }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const raw    = phoneRef.current?.value.trim() ?? ''
-    const amount = Number(amountRef.current?.value)
+    const rawPhone  = phoneRef.current?.value.trim()  ?? ''
+    const rawAmount = amountRef.current?.value.trim()  ?? ''
 
-    const digits = raw.replace(/\D/g, '')
-    if (digits.length !== 10 || (!digits.startsWith('07') && !digits.startsWith('01'))) {
-      setState('error')
-      setMessage('Enter a valid Safaricom number starting with 07 or 01 — 10 digits, e.g. 0712345678')
-      return
-    }
-    if (!amount || amount < 1) return
+    const phoneResult  = parsePhone(rawPhone)
+    const amountResult = parseAmount(rawAmount)
 
-    const phone = `254${digits.slice(1)}`
+    let hasError = false
+    if ('error' in phoneResult)  { setPhoneError(phoneResult.error);   hasError = true }
+    if ('error' in amountResult) { setAmountError(amountResult.error); hasError = true }
+    if (hasError) return
+
+    const phone  = (phoneResult  as { formatted: string }).formatted
+    const amount = (amountResult as { value: number }).value
+
     setState('loading')
     setMessage('')
     try {
@@ -198,37 +283,70 @@ export default function MemberContributeModal() {
               {/* FORM (idle / loading) */}
               {(state === 'idle' || state === 'loading') && (
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-[12px] font-semibold text-on-surface dark:text-blue-200 uppercase tracking-wide">Phone number</label>
-                    <div className="flex items-center gap-2 rounded-xl border border-outline-variant dark:border-[#1e3461] bg-surface-container dark:bg-[#111f36] px-3 py-2.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+
+                  {/* Phone */}
+                  <div className="space-y-1">
+                    <label className="block text-[12px] font-semibold text-on-surface dark:text-blue-200 uppercase tracking-wide">
+                      Phone number
+                    </label>
+                    <div className={`flex items-center gap-2 rounded-xl border bg-surface-container dark:bg-[#111f36] px-3 py-2.5 focus-within:ring-1 transition-all ${
+                      phoneError
+                        ? 'border-red-400 focus-within:border-red-400 focus-within:ring-red-300'
+                        : 'border-outline-variant dark:border-[#1e3461] focus-within:border-primary focus-within:ring-primary'
+                    }`}>
                       <span className="material-symbols-outlined text-outline dark:text-blue-200/40" style={{ fontSize: 16 }}>phone</span>
                       <input
                         ref={phoneRef}
                         type="tel"
-                        name="phone"
+                        inputMode="numeric"
                         placeholder="0712345678"
+                        onInput={onPhoneInput}
+                        onBlur={onPhoneBlur}
                         required
                         className="flex-1 bg-transparent outline-none text-[13px] text-on-surface dark:text-blue-50 placeholder:text-outline dark:placeholder:text-blue-200/30"
                       />
                     </div>
-                    <p className="text-[11px] text-on-surface-variant dark:text-blue-200/40">Safaricom number starting with 07 or 01 — 10 digits</p>
+                    {phoneError && (
+                      <p className="text-[11px] text-red-500 flex items-center gap-1">
+                        <span className="material-symbols-outlined icon-fill" style={{ fontSize: 12 }}>error</span>
+                        {phoneError}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="block text-[12px] font-semibold text-on-surface dark:text-blue-200 uppercase tracking-wide">Amount (KES)</label>
-                    <div className="flex items-center gap-2 rounded-xl border border-outline-variant dark:border-[#1e3461] bg-surface-container dark:bg-[#111f36] px-3 py-2.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all">
+                  {/* Amount */}
+                  <div className="space-y-1">
+                    <label className="block text-[12px] font-semibold text-on-surface dark:text-blue-200 uppercase tracking-wide">
+                      Amount (KES)
+                    </label>
+                    <div className={`flex items-center gap-2 rounded-xl border bg-surface-container dark:bg-[#111f36] px-3 py-2.5 focus-within:ring-1 transition-all ${
+                      amountError
+                        ? 'border-red-400 focus-within:border-red-400 focus-within:ring-red-300'
+                        : 'border-outline-variant dark:border-[#1e3461] focus-within:border-primary focus-within:ring-primary'
+                    }`}>
                       <span className="material-symbols-outlined text-outline dark:text-blue-200/40" style={{ fontSize: 16 }}>payments</span>
                       <input
                         ref={amountRef}
-                        type="number"
-                        name="amount"
+                        type="text"
+                        inputMode="numeric"
                         placeholder="e.g. 500"
-                        min={1}
+                        onInput={onAmountInput}
+                        onBlur={onAmountBlur}
                         required
                         className="flex-1 bg-transparent outline-none text-[13px] text-on-surface dark:text-blue-50 placeholder:text-outline dark:placeholder:text-blue-200/30"
                       />
                       <span className="text-[12px] font-semibold text-on-surface-variant dark:text-blue-200/50">KES</span>
                     </div>
+                    {amountError ? (
+                      <p className="text-[11px] text-red-500 flex items-center gap-1">
+                        <span className="material-symbols-outlined icon-fill" style={{ fontSize: 12 }}>error</span>
+                        {amountError}
+                      </p>
+                    ) : (
+                      <p className="text-[11px] text-on-surface-variant dark:text-blue-200/40">
+                        Max KES 150,000 per transaction
+                      </p>
+                    )}
                   </div>
 
                   <button
@@ -255,7 +373,7 @@ export default function MemberContributeModal() {
         </div>
       )}
 
-      {/* Error overlay — small floating card on top, blurs everything behind */}
+      {/* Error overlay — blurred card on top */}
       {open && state === 'error' && (
         <div
           className="fixed inset-0 z-[200] flex items-center justify-center p-6"

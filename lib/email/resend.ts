@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 import type { Contribution, User } from '@prisma/client'
 import { buildReceiptPdf } from '@/lib/pdf/receipt'
+import { SITE_LOGO } from '@/lib/constants'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -20,9 +21,8 @@ function baseHtml(body: string) {
   <div style="background:#001f50;padding:20px 28px;">
     <table cellpadding="0" cellspacing="0" border="0"><tr>
       <td style="vertical-align:middle;padding-right:12px;">
-        <div style="width:36px;height:36px;background:#fe8015;border-radius:50%;text-align:center;line-height:36px;">
-          <span style="color:#fff;font-weight:700;font-size:18px;font-family:sans-serif;">A</span>
-        </div>
+        <img src="${SITE_LOGO}" alt="Alubonets" width="40" height="40"
+          style="width:40px;height:40px;border-radius:50%;display:block;object-fit:cover;background:#fe8015;" />
       </td>
       <td style="vertical-align:middle;">
         <span style="color:#fff;font-size:17px;font-weight:700;letter-spacing:-.3px;font-family:sans-serif;">Alubonets SHG</span>

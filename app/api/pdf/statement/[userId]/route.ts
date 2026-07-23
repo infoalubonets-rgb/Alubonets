@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, StandardFonts, rgb, type PDFImage } from 'pdf-lib'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
+import { SITE_LOGO } from '@/lib/constants'
+
+// Module-level logo cache so warm lambda instances skip the network entirely
+let _logoCache: { buf: ArrayBuffer; ct: string } | null = null
 
 const BLUE   = rgb(0,     0.122, 0.314)   // #001f50
 const BRIGHT = rgb(0.996, 0.502, 0.082)   // #fe8015
@@ -57,16 +61,39 @@ export async function GET(
   const font = await pdf.embedFont(StandardFonts.Helvetica)
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold)
 
+  // Fetch and embed logo once — shared across all pages
+  let logo: PDFImage | null = null
+  try {
+    if (!_logoCache) {
+      const res = await fetch(SITE_LOGO, { next: { revalidate: 86400 } } as RequestInit)
+      if (res.ok) {
+        _logoCache = { buf: await res.arrayBuffer(), ct: res.headers.get('content-type') ?? '' }
+      }
+    }
+    if (_logoCache) {
+      const { buf, ct } = _logoCache
+      // Slice to pass a copy — pdf-lib takes ownership of the bytes it receives
+      logo = ct.includes('png') ? await pdf.embedPng(buf.slice(0)) : await pdf.embedJpg(buf.slice(0))
+    }
+  } catch { /* fall back to text badge */ }
+
   function addPage() {
     const pg = pdf.addPage([PAGE_W, PAGE_H])
 
     // Header bar
     pg.drawRectangle({ x: 0, y: PAGE_H - 70, width: PAGE_W, height: 70, color: BLUE })
-    // Logo badge — orange circle with "A"
-    pg.drawEllipse({ x: 66, y: PAGE_H - 35, xScale: 15, yScale: 15, color: BRIGHT })
-    pg.drawText('A', { x: 61, y: PAGE_H - 41, size: 15, font: bold, color: WHITE })
-    pg.drawText('Alubonets SHG', { x: 88, y: PAGE_H - 30, size: 14, font: bold, color: WHITE })
-    pg.drawText('Member Contribution Statement', { x: 88, y: PAGE_H - 48, size: 9, font, color: rgb(0.7, 0.8, 1) })
+
+    // Logo image or text badge fallback
+    if (logo) {
+      const dims = logo.scaleToFit(34, 34)
+      pg.drawImage(logo, { x: 50, y: PAGE_H - 52, width: dims.width, height: dims.height })
+    } else {
+      pg.drawEllipse({ x: 66, y: PAGE_H - 35, xScale: 15, yScale: 15, color: BRIGHT })
+      pg.drawText('A', { x: 61, y: PAGE_H - 41, size: 15, font: bold, color: WHITE })
+    }
+
+    pg.drawText('Alubonets SHG', { x: 92, y: PAGE_H - 30, size: 14, font: bold, color: WHITE })
+    pg.drawText('Member Contribution Statement', { x: 92, y: PAGE_H - 48, size: 9, font, color: rgb(0.7, 0.8, 1) })
     // Orange accent stripe
     pg.drawRectangle({ x: 0, y: PAGE_H - 73, width: PAGE_W, height: 3, color: BRIGHT })
 

@@ -38,7 +38,7 @@ export default async function ContributionsPage() {
         contributions={contributions.map((c) => ({
           id: c.id,
           amount: c.amount,
-          paidAt: c.paidAt.toISOString(),
+          paidAt: new Date(c.paidAt).toISOString(),
           category: c.category,
         }))}
         userId={profile.id}
