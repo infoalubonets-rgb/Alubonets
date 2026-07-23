@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { actionSendAnnouncement } from '@/app/actions/domain'
 
 type MemberOption = {
@@ -12,9 +12,28 @@ type MemberOption = {
 export default function AnnouncementComposer({ members }: { members: MemberOption[] }) {
   const [audience, setAudience] = useState<'ALL' | 'SELECTED'>('ALL')
   const [sendEmail, setSendEmail] = useState(true)
+
+  const defaultExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10)
+  const [expiresAt, setExpiresAt] = useState(defaultExpiry)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [isPending, startTransition] = useTransition()
+  const formRef = useRef<HTMLFormElement>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
+
+  function handleAction(formData: FormData) {
+    startTransition(async () => {
+      await actionSendAnnouncement(formData)
+      window.dispatchEvent(new Event('new-announcement'))
+      formRef.current?.reset()
+      setAudience('ALL')
+      setSendEmail(true)
+      setExpiresAt(defaultExpiry)
+      setSelected(new Set())
+    })
+  }
 
   useEffect(() => {
     if (!pickerOpen) return
@@ -47,7 +66,7 @@ export default function AnnouncementComposer({ members }: { members: MemberOptio
         : `${selected.size} members selected`
 
   return (
-    <form action={actionSendAnnouncement} className="grid gap-3">
+    <form ref={formRef} action={handleAction} className="grid gap-3">
       <input name="title" placeholder="Title" required className="border rounded-lg px-3 py-2" />
       <textarea
         name="content"
@@ -59,6 +78,7 @@ export default function AnnouncementComposer({ members }: { members: MemberOptio
 
       <input type="hidden" name="audience" value={audience} />
       <input type="hidden" name="sendEmail" value={sendEmail ? 'on' : 'off'} />
+      <input type="hidden" name="expiresAt" value={expiresAt} />
       {audience === 'SELECTED' &&
         [...selected].map((id) => <input key={id} type="hidden" name="memberIds" value={id} />)}
 
@@ -165,8 +185,26 @@ export default function AnnouncementComposer({ members }: { members: MemberOptio
         </div>
       )}
 
-      <button className="bg-primary text-on-primary rounded-lg px-4 py-2 justify-self-start">
-        Send announcement
+      {/* Delete reminder date */}
+      <div className="flex items-center gap-3 text-[12px] text-on-surface-variant">
+        <span className="material-symbols-outlined text-[15px] text-outline">alarm</span>
+        <label className="flex items-center gap-2">
+          Remind me to remove this after:
+          <input
+            type="date"
+            value={expiresAt}
+            min={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setExpiresAt(e.target.value)}
+            className="border border-outline-variant rounded-lg px-2 py-1 text-[12px] bg-surface text-on-surface"
+          />
+        </label>
+      </div>
+
+      <button
+        disabled={isPending}
+        className="bg-primary text-on-primary rounded-lg px-4 py-2 justify-self-start disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {isPending ? 'Sending…' : 'Send announcement'}
       </button>
     </form>
   )

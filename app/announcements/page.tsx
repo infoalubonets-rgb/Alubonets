@@ -17,8 +17,7 @@ export default async function AnnouncementsPage() {
   if (profile.status === 'SUSPENDED') redirect('/login?error=suspended')
 
   const role = profile.role as Role
-  const canSend = role === 'ADMIN' || profile.isSuperAdmin
-  const canDelete = ['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER'].includes(role)
+  const canSend = ['ADMIN', 'EXECUTIVE', 'ORGANIZER', 'SECRETARY', 'TREASURER'].includes(role) || profile.isSuperAdmin
 
   const [announcements, members] = await Promise.all([
     getAnnouncementsForUser(profile.id),
@@ -41,7 +40,11 @@ export default async function AnnouncementsPage() {
             <AnnouncementComposer members={members} />
           </section>
         )}
-        <AnnouncementsClient announcements={announcements} canDelete={canDelete} />
+        <AnnouncementsClient
+          announcements={announcements}
+          currentUserId={profile.id}
+          isSuperAdmin={profile.isSuperAdmin ?? false}
+        />
       </div>
     </DashboardShell>
   )

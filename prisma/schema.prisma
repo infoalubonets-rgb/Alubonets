@@ -151,6 +151,7 @@ model Announcement {
   publishedAt DateTime  @default(now())
   createdAt   DateTime  @default(now())
   emailSentAt DateTime?
+  expiresAt   DateTime?   // author-set reminder date: show "please delete" badge after this
 
   receipts AnnouncementReceipt[]
 
@@ -205,7 +206,10 @@ model Meeting {
   minutes             String?
   opening             String?
   location            String?
-  attendees           String?
+  attendees           String?   // members present
+  membersAbsent       String?   // absent without apology
+  membersApology      String?   // absent with apology
+  aob                 String?   // any other business
   resolutions         String?
   nextMeetingAt       DateTime?
   status              MeetingStatus @default(DRAFT)

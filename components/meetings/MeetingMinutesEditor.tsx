@@ -8,6 +8,7 @@ import {
   actionPublishMeetingMinutes,
   actionUpdateMeeting,
 } from '@/app/actions/meetings'
+import { SITE_LOGO } from '@/lib/constants'
 
 export type MeetingEditorValues = {
   id?: string
@@ -16,7 +17,10 @@ export type MeetingEditorValues = {
   attendance: number
   location: string
   opening: string
-  attendees: string
+  attendees: string       // members present
+  membersAbsent: string
+  membersApology: string
+  aob: string
   agenda: string
   minutes: string
   resolutions: string
@@ -32,6 +36,29 @@ function toLocalInput(isoOrLocal: string) {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="block text-[12px] font-semibold text-on-surface-variant uppercase tracking-wide">
+        {label}
+        {hint && <span className="ml-1.5 normal-case font-normal text-outline">{hint}</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+const INPUT =
+  'w-full border border-outline-variant dark:border-[#1e3461] rounded-xl px-3 py-2 text-[13px] bg-surface dark:bg-[#111f36] text-on-surface dark:text-blue-50 focus:outline-none focus:ring-1 focus:ring-primary transition-colors'
 
 export default function MeetingMinutesEditor({
   initial,
@@ -51,43 +78,47 @@ export default function MeetingMinutesEditor({
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
-  const set = (key: keyof MeetingEditorValues, value: string | number) => {
+  const set = (key: keyof MeetingEditorValues, value: string | number) =>
     setValues((v) => ({ ...v, [key]: value }))
-  }
 
   const previewDate = useMemo(() => {
     try {
-      return values.heldAt ? new Date(values.heldAt).toLocaleString() : '—'
-    } catch {
-      return '—'
-    }
+      if (!values.heldAt) return '—'
+      const d = new Date(values.heldAt)
+      return d.toLocaleDateString('en-KE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) +
+        ', ' + d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
+    } catch { return '—' }
   }, [values.heldAt])
 
-  const onSave = async () => {
-    setError('')
-    setMessage('')
-    setSaving(true)
-    try {
-      const fd = new FormData()
-      if (values.id) fd.set('id', values.id)
-      fd.set('title', values.title)
-      fd.set('heldAt', values.heldAt)
-      fd.set('attendance', String(values.attendance || 0))
-      fd.set('location', values.location)
-      fd.set('opening', values.opening)
-      fd.set('attendees', values.attendees)
-      fd.set('agenda', values.agenda)
-      fd.set('minutes', values.minutes)
-      fd.set('resolutions', values.resolutions)
-      fd.set('nextMeetingAt', values.nextMeetingAt)
+  const buildFormData = () => {
+    const fd = new FormData()
+    if (values.id) fd.set('id', values.id)
+    fd.set('title', values.title)
+    fd.set('heldAt', values.heldAt)
+    fd.set('attendance', String(values.attendance || 0))
+    fd.set('location', values.location)
+    fd.set('opening', values.opening)
+    fd.set('attendees', values.attendees)
+    fd.set('membersAbsent', values.membersAbsent)
+    fd.set('membersApology', values.membersApology)
+    fd.set('aob', values.aob)
+    fd.set('agenda', values.agenda)
+    fd.set('minutes', values.minutes)
+    fd.set('resolutions', values.resolutions)
+    fd.set('nextMeetingAt', values.nextMeetingAt)
+    return fd
+  }
 
+  const onSave = async () => {
+    setError(''); setMessage(''); setSaving(true)
+    try {
       if (mode === 'create') {
-        const meeting = await actionCreateMeeting(fd)
+        const meeting = await actionCreateMeeting(buildFormData())
         setMessage('Draft saved.')
         router.push(`/dashboard/secretary/meetings/${meeting.id}`)
         router.refresh()
       } else {
-        await actionUpdateMeeting(fd)
+        await actionUpdateMeeting(buildFormData())
         setMessage('Draft saved.')
         router.refresh()
       }
@@ -99,28 +130,10 @@ export default function MeetingMinutesEditor({
   }
 
   const onPublish = async () => {
-    if (!values.id) {
-      setError('Save the draft before publishing.')
-      return
-    }
-    setError('')
-    setMessage('')
-    setPublishing(true)
+    if (!values.id) { setError('Save the draft before publishing.'); return }
+    setError(''); setMessage(''); setPublishing(true)
     try {
-      // Persist latest edits first
-      const fd = new FormData()
-      fd.set('id', values.id)
-      fd.set('title', values.title)
-      fd.set('heldAt', values.heldAt)
-      fd.set('attendance', String(values.attendance || 0))
-      fd.set('location', values.location)
-      fd.set('opening', values.opening)
-      fd.set('attendees', values.attendees)
-      fd.set('agenda', values.agenda)
-      fd.set('minutes', values.minutes)
-      fd.set('resolutions', values.resolutions)
-      fd.set('nextMeetingAt', values.nextMeetingAt)
-      await actionUpdateMeeting(fd)
+      await actionUpdateMeeting(buildFormData())
       await actionPublishMeetingMinutes(values.id)
       setValues((v) => ({ ...v, status: 'FINAL' }))
       setMessage('Published as Final — PDF stored in documents library.')
@@ -132,20 +145,34 @@ export default function MeetingMinutesEditor({
     }
   }
 
+  const previewSections = [
+    { label: 'Opening', body: values.opening },
+    { label: 'Members Present', body: values.attendees },
+    { label: 'Absent with Apology', body: values.membersApology },
+    { label: 'Absent', body: values.membersAbsent },
+    { label: 'Agenda', body: values.agenda },
+    { label: 'Discussion', body: values.minutes },
+    { label: 'Resolutions', body: values.resolutions },
+    { label: 'Any Other Business', body: values.aob },
+  ]
+
+  const anyContent = previewSections.some((s) => s.body.trim())
+
   return (
     <div className="grid lg:grid-cols-2 gap-6">
+      {/* ── Form ── */}
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2 items-center justify-between">
           <Link
             href="/dashboard/secretary/meetings"
-            className="text-sm text-primary font-label-bold inline-flex items-center gap-1"
+            className="text-sm text-primary font-semibold inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             All meetings
           </Link>
           {values.status && (
             <span
-              className={`text-[11px] uppercase tracking-wide font-label-bold px-2.5 py-1 rounded-full ${
+              className={`text-[11px] uppercase tracking-wide font-semibold px-2.5 py-1 rounded-full ${
                 values.status === 'FINAL'
                   ? 'bg-primary text-on-primary'
                   : 'bg-surface-container text-on-surface-variant'
@@ -156,202 +183,243 @@ export default function MeetingMinutesEditor({
           )}
         </div>
 
-        <div className="rounded-2xl border border-outline-variant/50 bg-surface p-4 space-y-3">
-          <div>
-            <label className="text-[12px] font-label-bold text-on-surface-variant">Title</label>
+        <div className="rounded-2xl border border-outline-variant/50 dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4 space-y-4 shadow-sm">
+          {/* Title */}
+          <Field label="Title">
             <input
               value={values.title}
               onChange={(e) => set('title', e.target.value)}
-              className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+              placeholder="e.g. January General Meeting"
+              className={INPUT}
               required
             />
-          </div>
+          </Field>
+
           <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-[12px] font-label-bold text-on-surface-variant">Held at</label>
+            <Field label="Date & Time">
               <input
                 type="datetime-local"
                 value={values.heldAt}
                 onChange={(e) => set('heldAt', e.target.value)}
-                className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+                className={INPUT}
                 required
               />
-            </div>
-            <div>
-              <label className="text-[12px] font-label-bold text-on-surface-variant">
-                Attendance count
-              </label>
+            </Field>
+            <Field label="Attendance" hint="(total present)">
               <input
                 type="number"
                 min={0}
                 value={values.attendance}
                 onChange={(e) => set('attendance', Number(e.target.value))}
-                className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+                className={INPUT}
               />
-            </div>
+            </Field>
           </div>
-          <div>
-            <label className="text-[12px] font-label-bold text-on-surface-variant">Venue</label>
+
+          <Field label="Venue">
             <input
               value={values.location}
               onChange={(e) => set('location', e.target.value)}
               placeholder="e.g. Alubonets Hall, Nairobi"
-              className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+              className={INPUT}
             />
-          </div>
-          <div>
-            <label className="text-[12px] font-label-bold text-on-surface-variant">Opening</label>
+          </Field>
+
+          <Field label="Opening">
             <textarea
               value={values.opening}
               onChange={(e) => set('opening', e.target.value)}
               rows={2}
-              className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+              placeholder="Opening remarks or prayers…"
+              className={INPUT}
             />
+          </Field>
+
+          {/* Attendance block */}
+          <div className="rounded-xl border border-outline-variant/40 dark:border-[#1e3461] bg-surface-container/40 dark:bg-[#0a1628] p-3 space-y-3">
+            <p className="text-[11px] uppercase tracking-wide font-semibold text-primary flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">group</span>
+              Attendance
+            </p>
+            <Field label="Members Present" hint="(one per line)">
+              <textarea
+                value={values.attendees}
+                onChange={(e) => set('attendees', e.target.value)}
+                rows={3}
+                placeholder="Jane Doe&#10;John Smith&#10;…"
+                className={INPUT}
+              />
+            </Field>
+            <Field label="Absent with Apology" hint="(one per line)">
+              <textarea
+                value={values.membersApology}
+                onChange={(e) => set('membersApology', e.target.value)}
+                rows={2}
+                placeholder="Mary Wanjiku&#10;…"
+                className={INPUT}
+              />
+            </Field>
+            <Field label="Absent" hint="(no apology — one per line)">
+              <textarea
+                value={values.membersAbsent}
+                onChange={(e) => set('membersAbsent', e.target.value)}
+                rows={2}
+                placeholder="Peter Otieno&#10;…"
+                className={INPUT}
+              />
+            </Field>
           </div>
-          <div>
-            <label className="text-[12px] font-label-bold text-on-surface-variant">
-              Attendee list
-            </label>
-            <textarea
-              value={values.attendees}
-              onChange={(e) => set('attendees', e.target.value)}
-              rows={2}
-              className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-[12px] font-label-bold text-on-surface-variant">Agenda</label>
+
+          <Field label="Agenda">
             <textarea
               value={values.agenda}
               onChange={(e) => set('agenda', e.target.value)}
               rows={3}
-              className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+              placeholder="1. Opening prayer&#10;2. Confirmation of previous minutes&#10;3. …"
+              className={INPUT}
             />
-          </div>
-          <div>
-            <label className="text-[12px] font-label-bold text-on-surface-variant">
-              Discussion / minutes
-            </label>
+          </Field>
+
+          <Field label="Discussion / Minutes">
             <textarea
               value={values.minutes}
               onChange={(e) => set('minutes', e.target.value)}
-              rows={5}
-              className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+              rows={6}
+              placeholder="Record of discussions…"
+              className={INPUT}
             />
-          </div>
-          <div>
-            <label className="text-[12px] font-label-bold text-on-surface-variant">
-              Resolutions
-            </label>
+          </Field>
+
+          <Field label="Resolutions">
             <textarea
               value={values.resolutions}
               onChange={(e) => set('resolutions', e.target.value)}
               rows={3}
-              className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+              placeholder="Agreed actions and decisions…"
+              className={INPUT}
             />
-          </div>
-          <div>
-            <label className="text-[12px] font-label-bold text-on-surface-variant">
-              Next meeting
-            </label>
+          </Field>
+
+          <Field label="Any Other Business (AOB)">
+            <textarea
+              value={values.aob}
+              onChange={(e) => set('aob', e.target.value)}
+              rows={2}
+              placeholder="Additional matters raised…"
+              className={INPUT}
+            />
+          </Field>
+
+          <Field label="Next Meeting">
             <input
               type="datetime-local"
               value={values.nextMeetingAt}
               onChange={(e) => set('nextMeetingAt', e.target.value)}
-              className="mt-1 w-full border border-outline-variant rounded-xl px-3 py-2 text-sm"
+              className={INPUT}
             />
-          </div>
+          </Field>
 
-          {error && <p className="text-error text-[12px]">{error}</p>}
-          {message && <p className="text-primary text-[12px]">{message}</p>}
+          {error   && <p className="text-error text-[12px] flex items-center gap-1"><span className="material-symbols-outlined icon-fill text-[14px]">error</span>{error}</p>}
+          {message && <p className="text-green-600 dark:text-green-400 text-[12px] flex items-center gap-1"><span className="material-symbols-outlined icon-fill text-[14px]">check_circle</span>{message}</p>}
 
           <div className="flex flex-wrap gap-2 pt-1">
             <button
               type="button"
               onClick={onSave}
               disabled={saving}
-              className="px-4 py-2 rounded-full bg-primary text-on-primary text-sm font-label-bold disabled:opacity-60"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-on-primary text-[13px] font-semibold disabled:opacity-60 hover:opacity-90 active:scale-95 transition-all"
             >
+              <span className="material-symbols-outlined text-[16px]">{saving ? 'hourglass_empty' : 'save'}</span>
               {saving ? 'Saving…' : 'Save draft'}
             </button>
             {values.id && (
               <>
                 <a
                   href={`/api/pdf/minutes/${values.id}`}
-                  className="px-4 py-2 rounded-full border border-outline-variant text-sm font-label-bold"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-outline-variant dark:border-[#1e3461] text-[13px] font-semibold hover:bg-surface-container dark:hover:bg-[#111f36] transition-colors"
                 >
+                  <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
                   Download PDF
                 </a>
-                <button
-                  type="button"
-                  onClick={onPublish}
-                  disabled={publishing}
-                  className="px-4 py-2 rounded-full bg-secondary-container text-on-primary text-sm font-label-bold disabled:opacity-60"
-                >
-                  {publishing ? 'Publishing…' : 'Mark final & publish'}
-                </button>
+                {values.status !== 'FINAL' && (
+                  <button
+                    type="button"
+                    onClick={onPublish}
+                    disabled={publishing}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-secondary-container text-on-primary text-[13px] font-semibold disabled:opacity-60 hover:opacity-90 active:scale-95 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{publishing ? 'hourglass_empty' : 'publish'}</span>
+                    {publishing ? 'Publishing…' : 'Mark final & publish'}
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Letterhead preview */}
+      {/* ── Live preview ── */}
       <div className="lg:sticky lg:top-4 self-start">
-        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant font-label-bold mb-2 px-1">
-          Preview
+        <p className="text-[11px] uppercase tracking-wide text-on-surface-variant font-semibold mb-2 px-1 flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[14px]">preview</span>
+          Letterhead preview
         </p>
         <article className="rounded-2xl overflow-hidden shadow-[0_16px_40px_rgba(0,31,80,0.14)] bg-white border border-outline-variant/30">
-          <div className="bg-primary text-on-primary px-6 py-3">
-            <p className="text-[11px] font-label-bold tracking-[0.12em] uppercase opacity-90">
-              Alubonets Self-Help Group
-            </p>
-          </div>
-          <div className="px-6 py-5 space-y-4 min-h-[420px]">
+          {/* Header */}
+          <div className="bg-[#001f50] px-5 py-3.5 flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={SITE_LOGO}
+              alt="Alubonets"
+              width={36}
+              height={36}
+              className="h-9 w-9 rounded-full object-cover flex-shrink-0 bg-[#fe8015]/20"
+            />
             <div>
-              <p className="text-[12px] uppercase tracking-wide text-on-surface-variant font-label-bold">
-                Meeting Minutes
-              </p>
-              <h2 className="font-h3 text-[22px] text-primary mt-1 leading-tight">
-                {values.title || 'Untitled meeting'}
-              </h2>
-              <p className="text-[13px] text-on-surface-variant mt-2">{previewDate}</p>
-              {values.location && (
-                <p className="text-[13px] text-on-surface-variant">{values.location}</p>
-              )}
-              <p className="text-[13px] text-on-surface-variant">
-                Attendance: {values.attendance || 0}
-              </p>
+              <p className="text-[13px] font-bold text-white leading-tight">Alubonets SHG</p>
+              <p className="text-[10px] text-blue-200/70 leading-none mt-0.5">Meeting Minutes</p>
             </div>
-            <div className="h-px bg-outline-variant/60" />
-            {[
-              { label: 'Opening', body: values.opening },
-              { label: 'Attendees', body: values.attendees },
-              { label: 'Agenda', body: values.agenda },
-              { label: 'Discussion', body: values.minutes },
-              { label: 'Resolutions', body: values.resolutions },
-            ].map(
-              (s) =>
-                s.body.trim() && (
-                  <section key={s.label}>
-                    <h3 className="text-[11px] uppercase tracking-wide font-label-bold text-primary mb-1">
-                      {s.label}
-                    </h3>
-                    <p className="text-[13px] text-on-surface whitespace-pre-wrap leading-relaxed">
-                      {s.body}
-                    </p>
-                  </section>
-                )
+          </div>
+          {/* Orange stripe */}
+          <div className="h-[3px] bg-[#fe8015]" />
+
+          <div className="px-5 py-4 space-y-3 min-h-[420px] text-[13px]">
+            {/* Title block */}
+            <div className="space-y-1">
+              <h2 className="text-[18px] font-bold text-[#001f50] leading-snug">
+                {values.title || <span className="text-gray-300 font-normal italic">Untitled meeting</span>}
+              </h2>
+              <p className="text-[12px] text-gray-500">{previewDate}</p>
+              {values.location && <p className="text-[12px] text-gray-500">{values.location}</p>}
+              <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded bg-[#001f50]/8 text-[11px] font-semibold text-[#001f50]">
+                <span className="material-symbols-outlined text-[12px]">person</span>
+                {values.attendance || 0} present
+              </div>
+            </div>
+
+            <div className="h-[2px] bg-[#fe8015]/60 rounded-full" />
+
+            {/* Sections */}
+            {anyContent ? (
+              previewSections.map(
+                (s) =>
+                  s.body.trim() && (
+                    <section key={s.label} className="space-y-0.5">
+                      <h3 className="text-[10px] uppercase tracking-wider font-bold text-[#001f50] flex items-center gap-1.5">
+                        <span className="inline-block w-[3px] h-[10px] rounded-sm bg-[#fe8015]" />
+                        {s.label}
+                      </h3>
+                      <p className="text-[12px] text-gray-700 whitespace-pre-wrap leading-relaxed pl-[9px]">
+                        {s.body}
+                      </p>
+                    </section>
+                  )
+              )
+            ) : (
+              <p className="text-[12px] text-gray-400 italic">
+                Start writing on the left — the preview updates live.
+              </p>
             )}
-            {!values.opening &&
-              !values.attendees &&
-              !values.agenda &&
-              !values.minutes &&
-              !values.resolutions && (
-                <p className="text-sm text-on-surface-variant italic">
-                  Start writing on the left — the letterhead preview updates live.
-                </p>
-              )}
           </div>
         </article>
       </div>

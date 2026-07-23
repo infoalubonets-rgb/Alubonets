@@ -20,9 +20,14 @@ function baseHtml(body: string) {
 <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);">
   <div style="background:#001f50;padding:20px 28px;">
     <table cellpadding="0" cellspacing="0" border="0"><tr>
-      <td style="vertical-align:middle;padding-right:12px;">
-        <img src="${SITE_LOGO}" alt="Alubonets" width="40" height="40"
-          style="width:40px;height:40px;border-radius:50%;display:block;object-fit:cover;background:#fe8015;" />
+      <td style="vertical-align:middle;padding-right:14px;">
+        <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:44px;width:44px;v-text-anchor:middle;" arcsize="50%" fillcolor="#fe8015" strokecolor="#fe8015"><v:fill type="frame" src="${SITE_LOGO}" /></v:roundrect><![endif]-->
+        <!--[if !mso]><!-->
+        <div style="width:44px;height:44px;border-radius:22px;overflow:hidden;display:inline-block;line-height:0;background:#fe8015;">
+          <img src="${SITE_LOGO}" alt="Alubonets" width="44" height="44"
+            style="width:44px;height:44px;display:block;" />
+        </div>
+        <!--<![endif]-->
       </td>
       <td style="vertical-align:middle;">
         <span style="color:#fff;font-size:17px;font-weight:700;letter-spacing:-.3px;font-family:sans-serif;">Alubonets SHG</span>

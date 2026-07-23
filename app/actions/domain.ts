@@ -132,12 +132,14 @@ export async function actionReviewWelfare(formData: FormData) {
 }
 
 export async function actionSendAnnouncement(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN', 'ORGANIZER', 'SECRETARY', 'EXECUTIVE'])
+  const actor = await requireActiveRole(['ADMIN', 'ORGANIZER', 'SECRETARY', 'EXECUTIVE', 'TREASURER'])
   const title = String(formData.get('title') || '').trim()
   const content = String(formData.get('content') || '').trim()
   const audience = String(formData.get('audience') || 'ALL')
   const memberIds = formData.getAll('memberIds').map(String).filter(Boolean)
   const sendEmail = formData.get('sendEmail') !== 'off'
+  const expiresAtRaw = String(formData.get('expiresAt') || '').trim()
+  const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null
   if (!title || !content) throw new Error('Title and content required')
   const broadcast = audience !== 'SELECTED'
   if (!broadcast && memberIds.length === 0) {
@@ -149,6 +151,7 @@ export async function actionSendAnnouncement(formData: FormData) {
     content,
     broadcast,
     memberIds,
+    expiresAt: expiresAt ?? undefined,
   })
   await writeAudit({
     userId: actor.id,
@@ -197,9 +200,21 @@ export async function actionMarkAnnouncementsRead() {
 }
 
 export async function actionDeleteAnnouncement(id: string) {
-  await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER'])
+  const actor = await requireSessionProfile()
+  if (!actor || actor.status !== 'ACTIVE') throw new Error('Unauthorized')
+
+  const announcement = await prisma.announcement.findUnique({
+    where: { id },
+    select: { authorId: true },
+  })
+  if (!announcement) throw new Error('Announcement not found')
+
+  // Only the author or a super-admin may delete
+  if (actor.id !== announcement.authorId && !actor.isSuperAdmin) {
+    throw new Error('Only the person who sent this announcement can delete it')
+  }
+
   await deleteAnnouncement(id)
-  // Revalidate every path that shows announcements so it disappears for all users
   revalidatePath('/announcements')
   revalidatePath('/dashboard/member')
   revalidatePath('/dashboard/organizer')

@@ -360,6 +360,8 @@ export const getAnnouncementsForUser = unstable_cache(
         publishedAt: true,
         broadcast: true,
         emailSentAt: true,
+        expiresAt: true,
+        authorId: true,
         author: { select: { fullName: true } },
         receipts: { where: { userId }, select: { readAt: true } },
       },
@@ -497,7 +499,8 @@ export async function sendAnnouncement(input: {
   content: string
   broadcast: boolean
   memberIds?: string[]
-  includeSelf?: boolean  // when true, author is included in broadcast receipts
+  includeSelf?: boolean
+  expiresAt?: Date
 }) {
   const recipientIds = input.broadcast
     ? (
@@ -509,7 +512,7 @@ export async function sendAnnouncement(input: {
           select: { id: true },
         })
       ).map((u) => u.id)
-    : (input.memberIds ?? []) // targeted: send to exactly who's specified
+    : (input.memberIds ?? [])
 
   return prisma.announcement.create({
     data: {
@@ -517,6 +520,7 @@ export async function sendAnnouncement(input: {
       title: input.title,
       content: input.content,
       broadcast: input.broadcast,
+      expiresAt: input.expiresAt ?? null,
       receipts: { create: recipientIds.map((userId) => ({ userId })) },
     },
   })
