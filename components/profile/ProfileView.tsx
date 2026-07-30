@@ -30,7 +30,6 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
   const [fullName, setFullName] = useState(data.fullName)
   const [phone, setPhone] = useState(data.phone ?? '')
   const [location, setLocation] = useState(data.location ?? '')
-  const [avatarUrl, setAvatarUrl] = useState(data.avatarUrl ?? '')
 
   const locationLine = data.location?.trim() || 'Alubonets SHG · Kenya'
 
@@ -43,7 +42,6 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
         fullName,
         phone: phone || null,
         location: location || null,
-        avatarUrl: avatarUrl || null,
       })
       setEditing(false)
       router.refresh()
@@ -93,7 +91,6 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
                 setFullName(data.fullName)
                 setPhone(data.phone ?? '')
                 setLocation(data.location ?? '')
-                setAvatarUrl(data.avatarUrl ?? '')
               }}
               className="inline-flex items-center gap-1.5 rounded-full bg-secondary-container text-on-primary px-3.5 py-2 font-label-bold text-[11px] tracking-[0.08em] uppercase shadow-[0_4px_14px_rgba(254,128,21,0.35)] hover:opacity-95 active:scale-[0.98] transition-all"
             >
@@ -123,7 +120,6 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
                   ['Full name', fullName, setFullName, true],
                   ['Phone', phone, setPhone, false],
                   ['Location', location, setLocation, false],
-                  ['Avatar URL', avatarUrl, setAvatarUrl, false],
                 ] as const
               ).map(([label, value, setter, required]) => (
                 <div key={label}>

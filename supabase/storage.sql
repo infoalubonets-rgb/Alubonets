@@ -27,6 +27,13 @@ values
       'image/jpeg',
       'image/png'
     ]
+  ),
+  (
+    'member-avatars',
+    'member-avatars',
+    false,
+    2097152,
+    array['image/jpeg', 'image/png', 'image/webp']
   )
 on conflict (id) do update set
   public = excluded.public,
@@ -86,3 +93,32 @@ drop policy if exists documents_storage_delete on storage.objects;
 create policy documents_storage_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'documents' and public.is_admin());
+
+-- Member avatars: each member owns a folder named with their Supabase auth user ID.
+-- Admins may read all avatars; members can read and manage only their own.
+drop policy if exists member_avatars_read on storage.objects;
+create policy member_avatars_read on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'member-avatars'
+    and (public.is_admin() or (storage.foldername(name))[1] = auth.uid()::text)
+  );
+
+drop policy if exists member_avatars_insert on storage.objects;
+create policy member_avatars_insert on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'member-avatars'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists member_avatars_update on storage.objects;
+create policy member_avatars_update on storage.objects
+  for update to authenticated
+  using (bucket_id = 'member-avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'member-avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists member_avatars_delete on storage.objects;
+create policy member_avatars_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'member-avatars' and (storage.foldername(name))[1] = auth.uid()::text);

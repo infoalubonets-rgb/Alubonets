@@ -138,6 +138,11 @@ alter table public.meetings enable row level security;
 alter table public.email_logs enable row level security;
 alter table public.audit_logs enable row level security;
 alter table public.contact_submissions enable row level security;
+alter table public.member_profiles enable row level security;
+alter table public.consent_records enable row level security;
+alter table public.login_events enable row level security;
+alter table public.rate_limits enable row level security;
+alter table public.membership_sequences enable row level security;
 
 -- ── users ────────────────────────────────────────────────────────────────────
 
@@ -148,7 +153,6 @@ create policy users_select on public.users
   using (
     "authUserId" = auth.uid()::text
     or public.is_admin()
-    or public.current_app_role() in ('EXECUTIVE', 'TREASURER', 'SECRETARY')
   );
 
 drop policy if exists users_update_admin on public.users;
@@ -167,6 +171,28 @@ drop policy if exists users_delete on public.users;
 create policy users_delete on public.users
   for delete to authenticated
   using (public.is_super_admin());
+
+-- Sensitive member profiles are visible only to the member and administrators.
+drop policy if exists member_profiles_select on public.member_profiles;
+create policy member_profiles_select on public.member_profiles
+  for select to authenticated
+  using ("userId" = public.current_app_user_id() or public.is_admin());
+
+drop policy if exists member_profiles_update on public.member_profiles;
+create policy member_profiles_update on public.member_profiles
+  for update to authenticated
+  using ("userId" = public.current_app_user_id() or public.is_admin())
+  with check ("userId" = public.current_app_user_id() or public.is_admin());
+
+drop policy if exists consent_records_select on public.consent_records;
+create policy consent_records_select on public.consent_records
+  for select to authenticated
+  using ("userId" = public.current_app_user_id() or public.is_admin());
+
+drop policy if exists login_events_select on public.login_events;
+create policy login_events_select on public.login_events
+  for select to authenticated
+  using ("userId" = public.current_app_user_id() or public.is_admin());
 
 -- ── contributions ────────────────────────────────────────────────────────────
 

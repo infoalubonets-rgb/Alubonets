@@ -8,6 +8,7 @@ import {
 } from '@/lib/auth/types'
 import { isAppRole, isMemberStatus } from '@/lib/auth/helpers'
 import { normalizeSupabaseUrl } from '@/lib/supabase-url'
+import { jwtVerify } from 'jose'
 
 function isProtectedPath(pathname: string) {
   if (pathname === '/admin/login' || pathname.startsWith('/admin/login/')) {
@@ -23,6 +24,12 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith('/contributions/') ||
     pathname === '/announcements' ||
     pathname.startsWith('/announcements/')
+    || pathname === '/financial-reports'
+    || pathname.startsWith('/financial-reports/')
+    || pathname === '/documents'
+    || pathname.startsWith('/documents/')
+    || pathname === '/governance'
+    || pathname.startsWith('/governance/')
   )
 }
 
@@ -127,6 +134,27 @@ export async function middleware(req: NextRequest) {
     : null
   const isSuperAdmin = Boolean(user.app_metadata?.isSuperAdmin)
   const dashboardAccess = parseDashboardAccess(user.app_metadata?.dashboardAccess)
+
+  if (
+    process.env.BYPASS_LOGIN_VERIFICATION !== 'true' &&
+    status === 'ACTIVE' &&
+    isProtectedPath(pathname)
+  ) {
+    const verificationToken = req.cookies.get('alubonets-verified')?.value
+    const verificationHours = role && ['ADMIN', 'EXECUTIVE'].includes(role) ? 6 : 24
+    let recentlyVerified = false
+    if (verificationToken && process.env.JWT_SECRET) {
+      try {
+        const { payload } = await jwtVerify(verificationToken, new TextEncoder().encode(process.env.JWT_SECRET))
+        recentlyVerified = payload.sub === user.app_metadata?.dbUserId && typeof payload.verifiedAt === 'number' && Date.now() - payload.verifiedAt < verificationHours * 3600000
+      } catch { recentlyVerified = false }
+    }
+    if (!recentlyVerified) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/verify-login'
+      return redirectWithCookies(url)
+    }
+  }
 
   if (!role || !status) {
     const url = req.nextUrl.clone()

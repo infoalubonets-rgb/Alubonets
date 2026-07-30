@@ -9,6 +9,10 @@ import { requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { CONTACT_EMAIL } from '@/lib/constants'
 import { logError } from '@/lib/logger'
+import { headers } from 'next/headers'
+import { enforceRateLimit } from '@/lib/rate-limit'
+import { verifyTurnstile } from '@/lib/turnstile'
+import { requireActiveRole } from '@/lib/auth/session'
 
 function escapeHtml(value: string) {
   return value
@@ -28,6 +32,16 @@ const contactSchema = z.object({
 })
 
 export async function sendContactMessage(formData: FormData) {
+  if (String(formData.get('website') || '')) redirect('/contact?sent=1')
+  const requestHeaders = await headers()
+  const ip = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() || requestHeaders.get('x-real-ip')
+  try {
+    await enforceRateLimit(`contact:${ip || 'unknown'}`, 5, 60)
+  } catch {
+    redirect('/contact?error=rate')
+  }
+  const captchaOk = await verifyTurnstile(String(formData.get('cf-turnstile-response') || ''), ip)
+  if (!captchaOk) redirect('/contact?error=captcha')
   const parsed = contactSchema.safeParse({
     name: String(formData.get('name') || ''),
     email: String(formData.get('email') || ''),
@@ -47,6 +61,7 @@ export async function sendContactMessage(formData: FormData) {
       message,
     },
   })
+  const destination = (await prisma.appSetting.findUnique({ where: { key: 'contact_destination_email' } }))?.value || CONTACT_EMAIL
 
   const key = process.env.RESEND_API_KEY
   if (key && !key.startsWith('re_your-')) {
@@ -56,7 +71,7 @@ export async function sendContactMessage(formData: FormData) {
         process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
       const { error } = await resend.emails.send({
         from,
-        to: CONTACT_EMAIL,
+        to: destination,
         replyTo: email,
         subject: `Contact: ${category || 'General'} — ${name}`,
         html: `
@@ -120,4 +135,44 @@ export async function deleteContactMessage(formData: FormData) {
     entityId: id,
   })
   revalidatePath('/admin/contact-messages')
+}
+
+export async function updateContactWorkflow(formData: FormData) {
+  const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE'])
+  const id = z.string().min(1).parse(formData.get('id'))
+  const status = z.enum(['UNREAD', 'IN_PROGRESS', 'RESOLVED', 'SPAM']).parse(formData.get('status'))
+  const assignedToId = String(formData.get('assignedToId') || '') || null
+  const now = new Date()
+  const retainUntil = status === 'RESOLVED' ? new Date(now.getTime() + 730 * 86400000) : status === 'SPAM' ? new Date(now.getTime() + 90 * 86400000) : null
+  await prisma.contactSubmission.update({ where: { id }, data: { status, assignedToId, readAt: now, resolvedAt: status === 'RESOLVED' ? now : null, spamAt: status === 'SPAM' ? now : null, retainUntil } })
+  await writeAudit({ userId: actor.id, action: 'CONTACT_WORKFLOW_UPDATE', entity: 'ContactSubmission', entityId: id, meta: { status, assignedToId, retainUntil } })
+  revalidatePath('/admin/contact-messages')
+}
+
+export async function replyToContact(formData: FormData) {
+  const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE'])
+  const id = z.string().min(1).parse(formData.get('id'))
+  const subject = z.string().trim().min(1).max(200).parse(formData.get('subject'))
+  const body = z.string().trim().min(1).max(5000).parse(formData.get('body'))
+  const submission = await prisma.contactSubmission.findUniqueOrThrow({ where: { id } })
+  let deliveryStatus = 'not_configured'
+  const key = process.env.RESEND_API_KEY
+  if (key && !key.startsWith('re_your-')) {
+    const recipient = process.env.RESEND_TEST_EMAIL || submission.email
+    const { error } = await new Resend(key).emails.send({ from: process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>', to: recipient, replyTo: CONTACT_EMAIL, subject, html: `<p style="white-space:pre-line">${escapeHtml(body)}</p>` })
+    deliveryStatus = error ? 'failed' : 'sent'
+  }
+  await prisma.contactReply.create({ data: { submissionId: id, sentById: actor.id, subject, body, method: 'in_site', deliveryStatus } })
+  await prisma.contactSubmission.update({ where: { id }, data: { status: 'IN_PROGRESS', readAt: new Date() } })
+  await writeAudit({ userId: actor.id, action: 'CONTACT_REPLY', entity: 'ContactSubmission', entityId: id, meta: { deliveryStatus } })
+  revalidatePath('/admin/contact-messages')
+}
+
+export async function updateContactDestination(formData: FormData) {
+  const actor = await requireAdmin()
+  const value = z.string().email().parse(formData.get('email'))
+  await prisma.appSetting.upsert({ where: { key: 'contact_destination_email' }, create: { key: 'contact_destination_email', value, updatedBy: actor.id }, update: { value, updatedBy: actor.id } })
+  await writeAudit({ userId: actor.id, action: 'CONTACT_DESTINATION_UPDATE', entity: 'AppSetting', entityId: 'contact_destination_email' })
+  revalidatePath('/admin/contact-messages')
+  revalidatePath('/contact')
 }

@@ -24,6 +24,62 @@ enum MemberStatus {
   SUSPENDED
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum MemberCategory {
+  ORDINARY
+  COMMITTEE_MEMBER
+  ADMIN
+  EXECUTIVE
+  TREASURER
+  SECRETARY
+  ORGANIZER
+  MEMBER
+}
+
+enum EducationLevel {
+  PRIMARY
+  SECONDARY
+  CERTIFICATE
+  DIPLOMA
+  BACHELORS
+  MASTERS
+  DOCTORATE
+  OTHER
+}
+
+enum IdentityVerificationStatus {
+  NOT_REVIEWED
+  VERIFIED
+  REJECTED
+}
+
+enum ContactStatus {
+  UNREAD
+  IN_PROGRESS
+  RESOLVED
+  SPAM
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ContentGroup {
+  HOME
+  ABOUT
+  CONTACT
+  FOOTER
+  ACTIVITIES
+  SOCIAL_LINKS
+}
+
 enum ProjectStatus {
   UPCOMING
   ONGOING
@@ -44,9 +100,90 @@ enum PaymentMethod {
   OTHER
 }
 
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  RECONCILED
+  REVERSED
+}
+enum ReconciliationStatus {
+  UNRECONCILED
+  MATCHED
+  RECONCILED
+  DISPUTED
+}
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+enum TransactionType {
+  CONTRIBUTION
+  EXPENSE
+  DISBURSEMENT
+  ADJUSTMENT
+  REVERSAL
+  TRANSFER
+  OPENING_BALANCE
+}
+enum CategoryType {
+  INCOME
+  EXPENSE
+  BOTH
+}
+enum PeriodStatus {
+  OPEN
+  CLOSED
+}
+enum ObligationStatus {
+  OUTSTANDING
+  PARTIALLY_PAID
+  PAID
+  WAIVED
+}
+enum PaymentEventStatus {
+  UNMATCHED
+  MATCHED
+  DUPLICATE
+  IGNORED
+}
+
 enum MeetingStatus {
   DRAFT
+  NOTICE
+  PENDING_APPROVAL
   FINAL
+}
+
+enum DocumentAccessLevel {
+  PUBLIC
+  MEMBERS
+  SELECTED_ROLES
+  ADMIN_SECRETARY
+}
+
+enum DocumentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  EXPIRED
+}
+
+enum MeetingAudienceType {
+  ALL_MEMBERS
+  SELECTED_ROLES
+  SELECTED_MEMBERS
+  MIXED
+}
+
+enum ActionPointStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+  CANCELLED
 }
 
 model User {
@@ -61,6 +198,12 @@ model User {
   isSuperAdmin    Boolean      @default(false)
   dashboardAccess Role[]       @default([])
   avatarUrl       String?
+  membershipNumber String?     @unique
+  approvalNotes     String?
+  rejectionReason  String?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  identityVerificationStatus IdentityVerificationStatus @default(NOT_REVIEWED)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -73,8 +216,103 @@ model User {
   meetings             Meeting[]      @relation("MeetingRecorder")
   galleryPhotos        GalleryPhoto[]
   emailLogs            EmailLog[]
+  memberProfile        MemberProfile?
+  consentRecords       ConsentRecord[]
+  loginEvents          LoginEvent[]
+  assignedContacts     ContactSubmission[] @relation("ContactAssignee")
+  contactReplies       ContactReply[]
+  editedContent        PublicContentVersion[]
+  committeeProfilesEdited CommitteeProfile[] @relation("CommitteeEditor")
+  createdFinancialTransactions FinancialTransaction[] @relation("TransactionCreator")
+  approvedFinancialTransactions FinancialTransaction[] @relation("TransactionApprover")
+  contributionObligations MemberContributionObligation[]
+  reconciliationsPerformed Reconciliation[] @relation("ReconciledBy")
+  financialDocuments SupportingDocument[] @relation("DocumentUploader")
+  documentDownloads DocumentDownload[]
+  meetingInvitations MeetingInvitation[]
+  ownedActionPoints MeetingActionPoint[] @relation("ActionPointOwner")
+  createdActionPoints MeetingActionPoint[] @relation("ActionPointCreator")
+  createdDecisions MeetingDecision[]
+  approvedMeetings Meeting[] @relation("MeetingApprover")
 
   @@map("users")
+}
+
+model MemberProfile {
+  id                    String          @id @default(cuid())
+  userId                String          @unique
+  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gender                Gender?
+  dateOfBirth           DateTime?
+  address               String?
+  familyBranch          String?
+  nextOfKinName         String?
+  nextOfKinPhone        String?
+  nextOfKinRelationship String?
+  profession            String?
+  skills                String?
+  educationLevel        EducationLevel?
+  achievements          String?
+  mentorshipArea        String?
+  interests             String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  memberCategory        MemberCategory?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([familyBranch])
+  @@index([memberCategory])
+  @@map("member_profiles")
+}
+
+model ConsentRecord {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  termsVersion    String
+  privacyVersion  String
+  acceptedAt      DateTime @default(now())
+  ipAddress       String?
+  userAgent       String?
+
+  @@index([userId, acceptedAt])
+  @@map("consent_records")
+}
+
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String
+  success   Boolean
+  reason    String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+  @@map("login_events")
+}
+
+model RateLimit {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  attempts     Int      @default(0)
+  windowStart  DateTime @default(now())
+  blockedUntil DateTime?
+  updatedAt    DateTime @updatedAt
+
+  @@map("rate_limits")
+}
+
+model MembershipSequence {
+  year      Int      @id
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@map("membership_sequences")
 }
 
 model Contribution {
@@ -90,10 +328,247 @@ model Contribution {
   paidAt        DateTime      @default(now())
   mpesaRef      String?
   createdAt     DateTime      @default(now())
+  status        TransactionStatus @default(CONFIRMED)
+  reconciliationStatus ReconciliationStatus @default(UNRECONCILED)
+  reconciledAt  DateTime?
+  correctionReason String?
+  sourceAccountId String?
+  sourceAccount FinancialAccount? @relation(fields: [sourceAccountId], references: [id], onDelete: SetNull)
+  categoryId    String?
+  transactionCategory TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  campaignId    String?
+  campaign      ContributionCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  financialTransactionId String? @unique
+  financialTransaction FinancialTransaction? @relation(fields: [financialTransactionId], references: [id], onDelete: Restrict)
+  contributionPeriod String?
+  reversedById String?
+  reversedBy   Contribution? @relation("ContributionReversal", fields: [reversedById], references: [id], onDelete: SetNull)
+  reverses     Contribution[] @relation("ContributionReversal")
+  supportingDocuments SupportingDocument[]
 
   @@index([userId])
   @@index([paidAt])
+  @@index([status, reconciliationStatus])
+  @@index([campaignId, userId])
   @@map("contributions")
+}
+
+model FinancialAccount {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  type AccountType
+  description String?
+  restricted Boolean @default(false)
+  active Boolean @default(true)
+  entries LedgerEntry[]
+  sourceContributions Contribution[]
+  paymentEvents PaymentEvent[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("financial_accounts")
+}
+
+model TransactionCategory {
+  id String @id @default(cuid())
+  code String @unique
+  name String
+  type CategoryType
+  description String?
+  requiresEvidence Boolean @default(false)
+  active Boolean @default(true)
+  contributions Contribution[]
+  campaigns ContributionCampaign[]
+  transactions FinancialTransaction[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("transaction_categories")
+}
+
+model AccountingPeriod {
+  id String @id @default(cuid())
+  year Int
+  month Int
+  startsAt DateTime
+  endsAt DateTime
+  status PeriodStatus @default(OPEN)
+  closedAt DateTime?
+  closedBy String?
+  transactions FinancialTransaction[]
+  reconciliations Reconciliation[]
+  @@unique([year, month])
+  @@index([status, startsAt])
+  @@map("accounting_periods")
+}
+
+model FinancialTransaction {
+  id String @id @default(cuid())
+  transactionNumber String @unique
+  type TransactionType
+  status TransactionStatus @default(PENDING)
+  amount Decimal @db.Decimal(14, 2)
+  description String
+  occurredAt DateTime
+  providerReference String? @unique
+  correctionReason String?
+  categoryId String?
+  category TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  periodId String
+  period AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  createdById String
+  createdBy User @relation("TransactionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedById String?
+  approvedBy User? @relation("TransactionApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  confirmedAt DateTime?
+  reconciledAt DateTime?
+  reversedAt DateTime?
+  originalTransactionId String?
+  originalTransaction FinancialTransaction? @relation("TransactionReversal", fields: [originalTransactionId], references: [id], onDelete: Restrict)
+  reversingTransactions FinancialTransaction[] @relation("TransactionReversal")
+  entries LedgerEntry[]
+  contribution Contribution?
+  expense Expense?
+  disbursement Disbursement?
+  adjustment Adjustment?
+  reconciliation Reconciliation?
+  supportingDocuments SupportingDocument[]
+  createdAt DateTime @default(now())
+  @@index([occurredAt, status])
+  @@index([categoryId, occurredAt])
+  @@map("financial_transactions")
+}
+
+model LedgerEntry {
+  id String @id @default(cuid())
+  transactionId String
+  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  accountId String
+  account FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  debit Decimal @default(0) @db.Decimal(14, 2)
+  credit Decimal @default(0) @db.Decimal(14, 2)
+  memo String?
+  createdAt DateTime @default(now())
+  @@index([accountId, createdAt])
+  @@index([transactionId])
+  @@map("ledger_entries")
+}
+
+model ContributionCampaign {
+  id String @id @default(cuid())
+  title String
+  description String?
+  targetAmount Decimal @db.Decimal(14, 2)
+  categoryId String
+  category TransactionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  startsAt DateTime
+  dueAt DateTime?
+  active Boolean @default(true)
+  createdById String
+  contributions Contribution[]
+  obligations MemberContributionObligation[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([active, startsAt])
+  @@map("contribution_campaigns")
+}
+
+model MemberContributionObligation {
+  id String @id @default(cuid())
+  campaignId String
+  campaign ContributionCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetAmount Decimal @db.Decimal(14, 2)
+  status ObligationStatus @default(OUTSTANDING)
+  waivedReason String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([campaignId, userId])
+  @@index([userId, status])
+  @@map("member_contribution_obligations")
+}
+
+model PaymentEvent {
+  id String @id @default(cuid())
+  provider String
+  providerReference String @unique
+  amount Decimal @db.Decimal(14, 2)
+  phone String?
+  payerName String?
+  receivedAt DateTime
+  rawPayload Json?
+  status PaymentEventStatus @default(UNMATCHED)
+  matchedUserId String?
+  matchedContributionId String?
+  sourceAccountId String?
+  sourceAccount FinancialAccount? @relation(fields: [sourceAccountId], references: [id], onDelete: SetNull)
+  reconciliation Reconciliation?
+  createdAt DateTime @default(now())
+  @@index([status, receivedAt])
+  @@index([phone, receivedAt])
+  @@map("payment_events")
+}
+
+model Reconciliation {
+  id String @id @default(cuid())
+  transactionId String @unique
+  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  paymentEventId String? @unique
+  paymentEvent PaymentEvent? @relation(fields: [paymentEventId], references: [id], onDelete: Restrict)
+  periodId String
+  period AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  notes String
+  reconciledById String
+  reconciledBy User @relation("ReconciledBy", fields: [reconciledById], references: [id], onDelete: Restrict)
+  reconciledAt DateTime @default(now())
+  @@index([reconciledAt])
+  @@map("reconciliations")
+}
+
+model Expense {
+  id String @id @default(cuid())
+  transactionId String @unique
+  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  payee String
+  purpose String
+  approvalRequired Boolean @default(false)
+  @@map("expenses")
+}
+
+model Disbursement {
+  id String @id @default(cuid())
+  transactionId String @unique
+  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  beneficiary String
+  purpose String
+  welfareRequestId String?
+  @@map("disbursements")
+}
+
+model Adjustment {
+  id String @id @default(cuid())
+  transactionId String @unique
+  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  reason String
+  oldValue Json?
+  newValue Json?
+  @@map("adjustments")
+}
+
+model SupportingDocument {
+  id String @id @default(cuid())
+  transactionId String?
+  transaction FinancialTransaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  contributionId String?
+  contribution Contribution? @relation(fields: [contributionId], references: [id], onDelete: Restrict)
+  title String
+  fileUrl String
+  mimeType String
+  uploadedById String
+  uploadedBy User @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@index([transactionId])
+  @@map("supporting_documents")
 }
 
 model WelfareRequest {
@@ -187,17 +662,59 @@ model Event {
 }
 
 model Document {
-  id         String   @id @default(cuid())
-  title      String
-  fileUrl    String
-  category   String?
-  uploadedBy String
-  uploader   User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
-  uploadedAt DateTime @default(now())
+  id                String              @id @default(cuid())
+  title             String
+  description       String?
+  fileUrl           String
+  storagePath       String?
+  mimeType          String?
+  category          String?
+  categoryId        String?
+  categoryRecord    DocumentCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  accessLevel       DocumentAccessLevel @default(MEMBERS)
+  allowedRoles      Role[]              @default([])
+  version           Int                 @default(1)
+  versionGroupId    String              @default(cuid())
+  previousVersionId String?             @unique
+  previousVersion   Document?           @relation("DocumentVersions", fields: [previousVersionId], references: [id], onDelete: SetNull)
+  nextVersion       Document?           @relation("DocumentVersions")
+  status            DocumentStatus      @default(DRAFT)
+  effectiveAt       DateTime?
+  expiresAt         DateTime?
+  archivedAt        DateTime?
+  uploadedBy        String
+  uploader          User                @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
+  uploadedAt        DateTime            @default(now())
+  downloads         DocumentDownload[]
 
   publishedMeeting Meeting?
 
+  @@index([versionGroupId, version])
+  @@index([status, accessLevel])
+  @@index([categoryId])
   @@map("documents")
+}
+
+model DocumentCategory {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  documents Document[]
+  @@map("document_categories")
+}
+
+model DocumentDownload {
+  id           String   @id @default(cuid())
+  documentId   String
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress    String?
+  userAgent    String?
+  downloadedAt DateTime @default(now())
+  @@index([documentId, downloadedAt])
+  @@map("document_downloads")
 }
 
 model Meeting {
@@ -218,12 +735,96 @@ model Meeting {
   attendance          Int           @default(0)
   recordedBy          String
   recorder            User          @relation("MeetingRecorder", fields: [recordedBy], references: [id], onDelete: Cascade)
+  noticeBody          String?
+  noticeSentAt        DateTime?
+  audienceType        MeetingAudienceType @default(ALL_MEMBERS)
+  audienceRoles       Role[]        @default([])
+  approvedById        String?
+  approvedBy          User?         @relation("MeetingApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt          DateTime?
+  minutesVersion      Int           @default(1)
   publishedDocumentId String?       @unique
   publishedDocument   Document?     @relation(fields: [publishedDocumentId], references: [id], onDelete: SetNull)
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
+  invitations         MeetingInvitation[]
+  agendaItems         MeetingAgendaItem[]
+  actionPoints        MeetingActionPoint[]
+  decisions           MeetingDecision[]
+  versions            MeetingVersion[]
 
   @@map("meetings")
+}
+
+model MeetingInvitation {
+  id        String   @id @default(cuid())
+  meetingId String
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sentAt    DateTime?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  @@unique([meetingId, userId])
+  @@map("meeting_invitations")
+}
+
+model MeetingAgendaItem {
+  id          String   @id @default(cuid())
+  meetingId   String
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  position    Int
+  title       String
+  description String?
+  @@unique([meetingId, position])
+  @@map("meeting_agenda_items")
+}
+
+model MeetingActionPoint {
+  id          String            @id @default(cuid())
+  meetingId   String
+  meeting     Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  ownerId     String
+  owner       User              @relation("ActionPointOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  dueAt       DateTime?
+  status      ActionPointStatus @default(OPEN)
+  createdById String
+  createdBy   User              @relation("ActionPointCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  completedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  @@index([ownerId, status])
+  @@map("meeting_action_points")
+}
+
+model MeetingDecision {
+  id          String   @id @default(cuid())
+  meetingId   String
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  reference   String   @unique
+  title       String
+  decision    String
+  decidedAt   DateTime
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  @@index([decidedAt])
+  @@map("meeting_decisions")
+}
+
+model MeetingVersion {
+  id          String   @id @default(cuid())
+  meetingId   String
+  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  version     Int
+  snapshot    Json
+  reason      String
+  createdById String
+  createdAt   DateTime @default(now())
+  @@unique([meetingId, version])
+  @@map("meeting_versions")
 }
 
 model EmailLog {
@@ -248,6 +849,11 @@ model AuditLog {
   entity    String?
   entityId  String?
   meta      Json?
+  oldValue  Json?
+  newValue  Json?
+  reason    String?
+  ipAddress String?
+  userAgent String?
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -265,9 +871,97 @@ model ContactSubmission {
   message     String
   emailStatus String    @default("pending")
   readAt      DateTime?
+  status      ContactStatus @default(UNREAD)
+  assignedToId String?
+  assignedTo   User?    @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?
+  spamAt       DateTime?
+  retainUntil  DateTime?
+  replies      ContactReply[]
   createdAt   DateTime  @default(now())
 
   @@index([createdAt])
   @@index([readAt])
+  @@index([status, createdAt])
+  @@index([assignedToId])
   @@map("contact_submissions")
+}
+
+model ContactReply {
+  id           String @id @default(cuid())
+  submissionId String
+  submission   ContactSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  sentById     String
+  sentBy       User @relation(fields: [sentById], references: [id], onDelete: Restrict)
+  subject      String
+  body         String
+  method       String
+  deliveryStatus String @default("recorded")
+  sentAt       DateTime @default(now())
+  @@index([submissionId, sentAt])
+  @@map("contact_replies")
+}
+
+model AppSetting {
+  key       String @id
+  value     String
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  @@map("app_settings")
+}
+
+model PublicContent {
+  id          String @id @default(cuid())
+  group       ContentGroup @unique
+  status      ContentStatus @default(DRAFT)
+  draftData   Json
+  publishedData Json?
+  publishedAt DateTime?
+  versions    PublicContentVersion[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("public_content")
+}
+
+model PublicContentVersion {
+  id        String @id @default(cuid())
+  contentId String
+  content   PublicContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  editorId  String
+  editor    User @relation(fields: [editorId], references: [id], onDelete: Restrict)
+  data      Json
+  action    String
+  createdAt DateTime @default(now())
+  @@index([contentId, createdAt])
+  @@map("public_content_versions")
+}
+
+model CommitteeProfile {
+  id          String @id @default(cuid())
+  name        String
+  position    String
+  biography   String
+  photoUrl    String?
+  displayOrder Int @default(0)
+  termStart   DateTime?
+  termEnd     DateTime?
+  status      ContentStatus @default(DRAFT)
+  editedById  String
+  editedBy    User @relation("CommitteeEditor", fields: [editedById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([status, displayOrder])
+  @@map("committee_profiles")
+}
+
+model EmailVerificationChallenge {
+  id        String @id @default(cuid())
+  userId    String
+  codeHash  String
+  attempts  Int @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+  @@map("email_verification_challenges")
 }

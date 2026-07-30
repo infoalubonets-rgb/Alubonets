@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { setMemberStatus } from '@/app/actions/members'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
@@ -15,6 +16,9 @@ export type MembersTableUser = {
   isSuperAdmin: boolean
   phone: string | null
   location: string | null
+  membershipNumber: string | null
+  memberCategory: string | null
+  familyBranch: string | null
 }
 
 type Props = {
@@ -44,6 +48,10 @@ export default function MembersTable({ users }: Props) {
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
   const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('')
+  const [branch, setBranch] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 25
 
   useEffect(() => {
     setMounted(true)
@@ -62,15 +70,22 @@ export default function MembersTable({ users }: Props) {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return users
     return users.filter(
       (u) =>
-        u.fullName.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        ROLE_LABEL[u.role].toLowerCase().includes(q) ||
-        u.status.toLowerCase().includes(q)
+        (!category || u.memberCategory === category) &&
+        (!branch || u.familyBranch === branch) &&
+        (!q ||
+          u.fullName.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q) ||
+          u.membershipNumber?.toLowerCase().includes(q) ||
+          ROLE_LABEL[u.role].toLowerCase().includes(q) ||
+          u.status.toLowerCase().includes(q))
     )
-  }, [users, query])
+  }, [users, query, category, branch])
+  const categories = useMemo(() => [...new Set(users.map((u) => u.memberCategory).filter(Boolean))] as string[], [users])
+  const branches = useMemo(() => [...new Set(users.map((u) => u.familyBranch).filter(Boolean))] as string[], [users])
+  const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
 
   const close = () => setSelectedId(null)
 
@@ -95,16 +110,20 @@ export default function MembersTable({ users }: Props) {
         <p className="text-sm text-on-surface-variant max-w-xl">
           Directory of all members. Open a row for details, or suspend / restore an account.
         </p>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+        <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} className="rounded-xl border px-3 py-2 text-sm"><option value="">All categories</option>{categories.map((value) => <option key={value}>{value}</option>)}</select>
+        <select value={branch} onChange={(e) => { setBranch(e.target.value); setPage(1) }} className="rounded-xl border px-3 py-2 text-sm"><option value="">All branches</option>{branches.map((value) => <option key={value}>{value}</option>)}</select>
         <div className="relative w-full sm:w-64">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
             search
           </span>
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setPage(1) }}
             placeholder="Search members…"
             className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-sm focus:outline-none focus:ring-2 focus:ring-secondary-container/40 focus:border-secondary-container"
           />
+        </div>
         </div>
       </div>
 
@@ -138,7 +157,7 @@ export default function MembersTable({ users }: Props) {
                   </td>
                 </tr>
               ) : (
-                filtered.map((u, i) => (
+                visible.map((u, i) => (
                   <tr
                     key={u.id}
                     className={`border-t border-outline-variant/50 hover:bg-primary/[0.03] transition-colors ${
@@ -180,6 +199,7 @@ export default function MembersTable({ users }: Props) {
           </table>
         </div>
       </div>
+      {pages > 1 && <div className="flex items-center justify-end gap-3 text-sm"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border px-3 py-1.5 disabled:opacity-40">Previous</button><span>Page {page} of {pages}</span><button disabled={page === pages} onClick={() => setPage((value) => value + 1)} className="rounded-lg border px-3 py-1.5 disabled:opacity-40">Next</button></div>}
 
       {mounted &&
         selected &&
@@ -234,6 +254,9 @@ export default function MembersTable({ users }: Props) {
                 <p className="text-xs text-on-surface-variant">
                   Role and dashboard access are managed on the Roles page.
                 </p>
+                <Link href={`/admin/members/${selected.id}`} className="inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary">
+                  Open full application and history
+                </Link>
 
                 <section className="pt-1 border-t border-outline-variant">
                   <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary mb-2">

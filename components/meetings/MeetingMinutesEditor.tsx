@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   actionCreateMeeting,
-  actionPublishMeetingMinutes,
   actionUpdateMeeting,
 } from '@/app/actions/meetings'
+import { submitMinutesForApproval } from '@/app/actions/governance'
 import { SITE_LOGO } from '@/lib/constants'
 
 export type MeetingEditorValues = {
@@ -23,7 +23,7 @@ export type MeetingEditorValues = {
   agenda: string
   minutes: string
   nextMeetingAt: string
-  status?: 'DRAFT' | 'FINAL'
+  status?: 'DRAFT' | 'NOTICE' | 'PENDING_APPROVAL' | 'FINAL'
   publishedDocumentId?: string | null
 }
 
@@ -130,8 +130,11 @@ export default function MeetingMinutesEditor({
     setError(''); setMessage(''); setPublishing(true)
     try {
       await actionUpdateMeeting(buildFormData())
-      await actionPublishMeetingMinutes(values.id)
-      setValues((v) => ({ ...v, status: 'FINAL' }))
+      const approval = new FormData()
+      approval.set('meetingId', values.id)
+      approval.set('reason', 'Secretary submitted completed minutes for approval')
+      await submitMinutesForApproval(approval)
+      setValues((v) => ({ ...v, status: 'PENDING_APPROVAL' }))
       setMessage('Published as Final — PDF stored in documents library.')
       router.refresh()
     } catch (err) {

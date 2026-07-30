@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import ValuesCarousel from '@/components/about/ValuesCarousel'
 import { COMMITTEE_HEADSHOT, HERO_IMAGE } from '@/lib/constants'
+import { prisma } from '@/lib/prisma'
 
 export const metadata: Metadata = {
   title: 'About',
@@ -23,7 +24,9 @@ const COMMITTEE = [
   { name: 'Peter W.', role: 'Member Rep', alt: 'Member' },
 ]
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const managedCommittee = await prisma.committeeProfile.findMany({ where: { status: 'PUBLISHED' }, orderBy: { displayOrder: 'asc' } })
+  const committee = managedCommittee.length ? managedCommittee.map((member) => ({ name: member.name, role: member.position, alt: member.position, photoUrl: member.photoUrl })) : COMMITTEE.map((member) => ({ ...member, photoUrl: null }))
   return (
     <main className="flex-grow">
       <section className="relative py-xxl px-lg overflow-hidden">
@@ -154,12 +157,12 @@ export default function AboutPage() {
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-md md:gap-lg">
-          {COMMITTEE.map(member => (
+          {committee.map(member => (
             <div key={member.name} className="flex flex-col items-center w-36">
               <img
                 alt={member.alt}
                 className="w-28 h-28 rounded-full object-cover border border-primary/15 mb-sm"
-                src={COMMITTEE_HEADSHOT}
+                src={member.photoUrl || COMMITTEE_HEADSHOT}
               />
               <h4 className="font-label-bold text-[15px] text-primary text-center">{member.name}</h4>
               <span className="font-body-md text-[13px] text-primary/70 text-center mt-xs">

@@ -9,7 +9,7 @@ type Meeting = {
   title: string
   heldAt: Date
   attendance: number
-  status: 'DRAFT' | 'FINAL'
+  status: 'DRAFT' | 'NOTICE' | 'PENDING_APPROVAL' | 'FINAL'
   publishedDocument: { id: string; fileUrl: string } | null
 }
 

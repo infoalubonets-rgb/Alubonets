@@ -1,8 +1,8 @@
 'use client'
 
-// Dev/local seed accounts (see docs/DATA_MODEL.md). This component renders
-// nothing in production builds, so these credentials never reach real users.
-const ACCOUNTS: { email: string; password: string; label: string }[] = [
+// Seeded testing accounts. Set NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS=false before
+// public launch to hide this selector.
+export const TEST_ACCOUNTS: { email: string; password: string; label: string }[] = [
   { email: 'superadmin@alubonets.com', password: 'SuperAdmin@2026!', label: 'Super Admin' },
   { email: 'admin@alubonets.com', password: 'ChangeMe123!', label: 'Admin' },
   { email: 'executive@alubonets.com', password: 'ChangeMe123!', label: 'Executive' },
@@ -20,7 +20,7 @@ export default function DevAccountsDropdown({
   open: boolean
   onPick: (email: string, password: string) => void
 }) {
-  if (process.env.NODE_ENV === 'production' || !open) return null
+  if (process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === 'false' || !open) return null
 
   return (
     <div className="absolute z-40 top-full left-0 right-0 mt-1 rounded-lg border border-outline-variant bg-white shadow-lg overflow-hidden">
@@ -28,7 +28,7 @@ export default function DevAccountsDropdown({
         Dev accounts — click to autofill
       </p>
       <ul className="max-h-56 overflow-y-auto">
-        {ACCOUNTS.map((a) => (
+        {TEST_ACCOUNTS.map((a) => (
           <li key={a.email}>
             <button
               type="button"

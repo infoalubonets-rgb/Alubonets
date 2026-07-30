@@ -8,6 +8,9 @@ import { prisma } from '@/lib/prisma'
 import { ROLE_HOME } from '@/lib/auth/types'
 import { syncUserMetadata } from '@/lib/auth/session'
 import { toAuthUser } from '@/lib/auth/helpers'
+import { clearRateLimit, enforceRateLimit } from '@/lib/rate-limit'
+import { requestIp } from '@/lib/membership'
+import { verificationStillValid } from '@/lib/email-verification'
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -20,6 +23,14 @@ export async function POST(req: Request) {
     const parsed = bodySchema.safeParse(json)
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 400 })
+    }
+    const email = parsed.data.email.toLowerCase()
+    const ipAddress = requestIp(req)
+    const rateKey = `login:${ipAddress || 'unknown'}:${email}`
+    try {
+      await enforceRateLimit(rateKey, 5, 15)
+    } catch (cause) {
+      return NextResponse.json({ error: cause instanceof Error ? cause.message : 'Too many attempts.' }, { status: 429 })
     }
 
     const cookieStore = await cookies()
@@ -41,8 +52,18 @@ export async function POST(req: Request) {
         )
       }
       const knownProfile = await prisma.user.findUnique({
-        where: { email: parsed.data.email },
+        where: { email },
         select: { id: true },
+      })
+      await prisma.loginEvent.create({
+        data: {
+          userId: knownProfile?.id,
+          email,
+          success: false,
+          reason: 'INVALID_CREDENTIALS',
+          ipAddress,
+          userAgent: req.headers.get('user-agent'),
+        },
       })
       if (!knownProfile) {
         return NextResponse.json(
@@ -81,6 +102,16 @@ export async function POST(req: Request) {
     }
 
     await syncUserMetadata(profile)
+    await clearRateLimit(rateKey)
+    await prisma.loginEvent.create({
+      data: {
+        userId: profile.id,
+        email,
+        success: true,
+        ipAddress,
+        userAgent: req.headers.get('user-agent'),
+      },
+    })
 
     if (profile.status === 'PENDING') {
       return NextResponse.json({
@@ -107,6 +138,14 @@ export async function POST(req: Request) {
         { error: 'Your account is not active. Please contact the group administrator.' },
         { status: 403 }
       )
+    }
+    if (process.env.BYPASS_LOGIN_VERIFICATION !== 'true') {
+      const cookieStoreForVerification = await cookies()
+      const verificationHours = ['ADMIN', 'EXECUTIVE'].includes(profile.role) ? 6 : 24
+      const verified = await verificationStillValid(cookieStoreForVerification.get('alubonets-verified')?.value, profile.id, verificationHours)
+      if (!verified) {
+        return NextResponse.json({ user: toAuthUser(profile), redirectTo: '/verify-login', status: profile.status, requiresVerification: true })
+      }
     }
 
     const user = toAuthUser(profile)

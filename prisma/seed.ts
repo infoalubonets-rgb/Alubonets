@@ -205,6 +205,7 @@ async function main() {
       fileUrl: '/documents/constitution-summary.pdf',
       category: 'Governance',
       uploadedBy: secretary.id,
+      versionGroupId: 'seed-constitution',
     },
   })
 

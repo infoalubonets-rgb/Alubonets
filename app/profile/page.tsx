@@ -6,6 +6,9 @@ import ProfileView from '@/components/profile/ProfileView'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
 import type { Role } from '@/lib/auth/types'
+import AccountSecurity from '@/components/profile/AccountSecurity'
+import MemberDetailsForm from '@/components/profile/MemberDetailsForm'
+import { createServerClient } from '@/lib/supabase-server'
 
 export const metadata = {
   title: 'My profile',
@@ -21,15 +24,20 @@ export default async function ProfilePage() {
 
   const [agg, welfareCount] = await Promise.all([
     prisma.contribution.aggregate({
-      where: { userId: profile.id },
+      where: { userId: profile.id, status: { in: ['CONFIRMED','RECONCILED'] } },
       _sum: { amount: true },
       _count: true,
     }),
     prisma.welfareRequest.count({ where: { userId: profile.id } }),
   ])
 
-  const user = await prisma.user.findUnique({ where: { id: profile.id } })
+  const user = await prisma.user.findUnique({ where: { id: profile.id }, include: { memberProfile: true } })
   if (!user) redirect('/login')
+  let avatarUrl = user.avatarUrl
+  if (avatarUrl && !avatarUrl.startsWith('http')) {
+    const signed = await createServerClient().storage.from('member-avatars').createSignedUrl(avatarUrl, 3600)
+    avatarUrl = signed.data?.signedUrl ?? null
+  }
 
   const role = user.role as Role
 
@@ -42,7 +50,7 @@ export default async function ProfilePage() {
           email: user.email,
           phone: user.phone,
           location: user.location,
-          avatarUrl: user.avatarUrl,
+          avatarUrl,
           role,
           status: user.status,
           isSuperAdmin: user.isSuperAdmin,
@@ -52,6 +60,25 @@ export default async function ProfilePage() {
           welfareCount,
         }}
       />
+      <MemberDetailsForm data={{
+        phone: user.phone ?? '',
+        location: user.location ?? '',
+        familyBranch: user.memberProfile?.familyBranch ?? '',
+        nextOfKinName: user.memberProfile?.nextOfKinName ?? '',
+        nextOfKinPhone: user.memberProfile?.nextOfKinPhone ?? '',
+        nextOfKinRelationship: user.memberProfile?.nextOfKinRelationship ?? '',
+        profession: user.memberProfile?.profession ?? '',
+        skills: user.memberProfile?.skills ?? '',
+        achievements: user.memberProfile?.achievements ?? '',
+        mentorshipArea: user.memberProfile?.mentorshipArea ?? '',
+        interests: user.memberProfile?.interests ?? '',
+        emergencyContactName: user.memberProfile?.emergencyContactName ?? '',
+        emergencyContactPhone: user.memberProfile?.emergencyContactPhone ?? '',
+        educationLevel: user.memberProfile?.educationLevel ?? 'SECONDARY',
+      }} />
+      <div className="mx-auto mt-4 max-w-lg pb-12">
+        <AccountSecurity />
+      </div>
     </DashboardShell>
   )
 }

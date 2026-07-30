@@ -1,6 +1,7 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { TREASURER_NAV } from '@/lib/dashboard/nav'
-import { actionCreateContribution, actionEmailReceipt } from '@/app/actions/domain'
+import { actionEmailReceipt } from '@/app/actions/domain'
+import Link from 'next/link'
 import {
   getTreasurerDashboardData,
   getContributionChartSeries,
@@ -12,7 +13,6 @@ import {
   PaymentMethodChart,
   TopContributorsChart,
 } from '@/components/dashboard/Charts'
-import CsvImportForm from '@/components/dashboard/CsvImportForm'
 import MpesaStkForm from '@/components/dashboard/MpesaStkForm'
 import PaymentsModal from '@/components/dashboard/PaymentsModal'
 import { prisma } from '@/lib/prisma'
@@ -30,7 +30,7 @@ export default async function TreasurerContributionsPage() {
     getContributionChartSeries(),
     getContributionAnalytics(),
     prisma.contribution.findMany({
-      where: { paymentMethod: 'MPESA' },
+      where: { paymentMethod: 'MPESA', status: { in: ['CONFIRMED','RECONCILED'] } },
       include: { user: { select: { fullName: true, email: true } } },
       orderBy: { paidAt: 'desc' },
     }),
@@ -130,48 +130,15 @@ export default async function TreasurerContributionsPage() {
 
         <section className="rounded-xl border bg-surface p-4">
           <h2 className="font-semibold mb-3">Record contribution</h2>
-          <form action={actionCreateContribution} className="grid gap-3 md:grid-cols-2">
-            <select name="userId" required className="border rounded-lg px-3 py-2">
-              <option value="">Select member</option>
-              {data.members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.fullName} ({m.email})
-                </option>
-              ))}
-            </select>
-            <input
-              name="amount"
-              type="number"
-              step="0.01"
-              placeholder="Amount"
-              required
-              className="border rounded-lg px-3 py-2"
-            />
-            <input name="category" placeholder="Category" className="border rounded-lg px-3 py-2" />
-            <select name="paymentMethod" className="border rounded-lg px-3 py-2">
-              <option value="CASH">CASH</option>
-              <option value="MPESA">MPESA</option>
-              <option value="BANK">BANK</option>
-              <option value="OTHER">OTHER</option>
-            </select>
-            <input name="mpesaRef" placeholder="M-Pesa ref" className="border rounded-lg px-3 py-2" />
-            <input
-              name="description"
-              placeholder="Description"
-              className="border rounded-lg px-3 py-2"
-            />
-            <button className="bg-primary text-on-primary rounded-lg px-4 py-2 md:col-span-2">
-              Save contribution
-            </button>
-          </form>
+          <p className="text-sm text-on-surface-variant">All new contributions must be recorded through the immutable financial ledger.</p>
+          <Link href="/dashboard/treasurer/ledger" className="mt-3 inline-flex rounded-full bg-primary px-4 py-2 text-on-primary">Open ledger entry</Link>
         </section>
 
         <section className="rounded-xl border bg-surface p-4">
           <h2 className="font-semibold mb-3">CSV import</h2>
           <p className="text-sm text-on-surface-variant mb-2">
-            Columns: email, amount, description, category, paymentMethod, mpesaRef
+            Legacy direct CSV import is disabled because every movement must produce balanced ledger entries. Use the ledger entry screen.
           </p>
-          <CsvImportForm />
         </section>
 
         <section className="rounded-xl border bg-surface p-4 overflow-x-auto">

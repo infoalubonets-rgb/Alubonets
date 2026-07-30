@@ -27,7 +27,7 @@ export const getAdminDashboardData = unstable_cache(
       prisma.user.count({ where: { status: 'ACTIVE' } }),
       prisma.user.count({ where: { status: 'PENDING' } }),
       prisma.user.findMany({ where: { status: 'PENDING' }, orderBy: { createdAt: 'desc' }, take: 20 }),
-      prisma.contribution.aggregate({ _sum: { amount: true }, _count: true }),
+      prisma.contribution.aggregate({ where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.welfareRequest.count({ where: { status: 'PENDING' } }),
       prisma.auditLog.findMany({
         take: 10, orderBy: { createdAt: 'desc' },
@@ -51,7 +51,7 @@ export const getExecutiveDashboardData = unstable_cache(
   async () => {
     const [members, contributions, projects, events, announcements] = await Promise.all([
       prisma.user.count({ where: { status: 'ACTIVE' } }),
-      prisma.contribution.aggregate({ _sum: { amount: true } }),
+      prisma.contribution.aggregate({ where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true } }),
       prisma.project.findMany({ orderBy: { updatedAt: 'desc' }, take: 10 }),
       prisma.event.count({ where: { startsAt: { gte: new Date() } } }),
       prisma.announcement.findMany({
@@ -73,14 +73,14 @@ export const getExecutiveDashboardData = unstable_cache(
 export const getTreasurerDashboardData = unstable_cache(
   async () => {
     const [agg, recent, byCategory, pendingWelfare, members] = await Promise.all([
-      prisma.contribution.aggregate({ _sum: { amount: true }, _count: true }),
+      prisma.contribution.aggregate({ where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.contribution.findMany({
-        take: 20, orderBy: { paidAt: 'desc' },
+        where: { status: { in: ['CONFIRMED','RECONCILED'] } }, take: 20, orderBy: { paidAt: 'desc' },
         include: { user: { select: { fullName: true, email: true } } },
       }),
-      prisma.contribution.groupBy({ by: ['category'], _sum: { amount: true }, _count: true }),
+      prisma.contribution.groupBy({ by: ['category'], where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.welfareRequest.findMany({
-        where: { status: 'PENDING' },
+        where: { status: { in: ['PENDING', 'APPROVED'] } },
         include: { user: { select: { fullName: true, email: true } } },
         orderBy: { createdAt: 'desc' },
       }),
@@ -94,7 +94,7 @@ export const getTreasurerDashboardData = unstable_cache(
     monthStart.setDate(1)
     monthStart.setHours(0, 0, 0, 0)
     const monthAgg = await prisma.contribution.aggregate({
-      where: { paidAt: { gte: monthStart } },
+      where: { paidAt: { gte: monthStart }, status: { in: ['CONFIRMED','RECONCILED'] } },
       _sum: { amount: true },
     })
     return {
@@ -216,7 +216,7 @@ export const getOrganizerGalleryPhotos = unstable_cache(
 export const getMemberDashboardData = unstable_cache(
   async (userId: string) => {
     const [contributions, announcements, events, documents, welfare] = await Promise.all([
-      prisma.contribution.findMany({ where: { userId }, orderBy: { paidAt: 'desc' } }),
+      prisma.contribution.findMany({ where: { userId, status: { in: ['CONFIRMED','RECONCILED'] } }, orderBy: { paidAt: 'desc' } }),
       prisma.announcement.findMany({
         where: { broadcast: true }, orderBy: { publishedAt: 'desc' }, take: 5,
       }),
@@ -302,6 +302,7 @@ export const getPublicEvents = unstable_cache(
 export const getContributionChartSeries = unstable_cache(
   async () => {
     const rows = await prisma.contribution.findMany({
+      where: { status: { in: ['CONFIRMED','RECONCILED'] } },
       select: { amount: true, paidAt: true, category: true },
       orderBy: { paidAt: 'asc' },
     })
@@ -319,9 +320,9 @@ export const getContributionChartSeries = unstable_cache(
 export const getContributionAnalytics = unstable_cache(
   async () => {
     const [byMethod, byUser] = await Promise.all([
-      prisma.contribution.groupBy({ by: ['paymentMethod'], _sum: { amount: true }, _count: true }),
+      prisma.contribution.groupBy({ by: ['paymentMethod'], where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.contribution.groupBy({
-        by: ['userId'], _sum: { amount: true }, orderBy: { _sum: { amount: 'desc' } },
+        by: ['userId'], where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, orderBy: { _sum: { amount: 'desc' } },
       }),
     ])
     const top = byUser.slice(0, 8)
@@ -603,7 +604,7 @@ export async function createMeeting(data: {
   heldAt: Date
   attendance: number
   recordedBy: string
-  status?: 'DRAFT' | 'FINAL'
+  status?: 'DRAFT' | 'NOTICE' | 'PENDING_APPROVAL' | 'FINAL'
 }) {
   return prisma.meeting.create({ data })
 }
@@ -622,8 +623,10 @@ export async function updateMeeting(
     nextMeetingAt?: Date | null
     heldAt?: Date
     attendance?: number
-    status?: 'DRAFT' | 'FINAL'
+    status?: 'DRAFT' | 'NOTICE' | 'PENDING_APPROVAL' | 'FINAL'
     publishedDocumentId?: string | null
+    approvedById?: string | null
+    approvedAt?: Date | null
   }
 ) {
   return prisma.meeting.update({ where: { id }, data })
@@ -635,7 +638,7 @@ export async function createDocument(data: {
   category?: string
   uploadedBy: string
 }) {
-  return prisma.document.create({ data })
+  return prisma.document.create({ data: { ...data, versionGroupId: crypto.randomUUID() } })
 }
 
 export async function createGalleryPhoto(data: {

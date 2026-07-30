@@ -67,13 +67,17 @@ export default function AuthModal() {
 
   useEffect(() => {
     _open = (t: AuthTab = 'signin') => {
+      if (t === 'signup') {
+        router.push('/register')
+        return
+      }
       setTab(t)
       setOpen(true)
     }
     return () => {
       _open = null
     }
-  }, [])
+  }, [router])
 
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : ''
@@ -177,7 +181,7 @@ export default function AuthModal() {
                     onBlur={() => setDevOpen(false)}
                     required
                   />
-                  {process.env.NODE_ENV === 'development' && (
+                  {process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS !== 'false' && (
                     <DevAccountsDropdown
                       open={devOpen}
                       onPick={(devEmail, devPassword) => {
@@ -209,7 +213,7 @@ export default function AuthModal() {
                 <button type="button" onClick={() => setTab('forgot')} className="hover:text-primary">
                   Forgot password?
                 </button>
-                <button type="button" onClick={() => setTab('signup')} className="hover:text-on-surface">
+                <button type="button" onClick={() => { setOpen(false); router.push('/register') }} className="hover:text-on-surface">
                   No account? <span className="auth-link-accent">Create account</span>
                 </button>
               </div>
@@ -301,10 +305,10 @@ export default function AuthModal() {
             <div className="auth-tab-content flex flex-col gap-md">
               <h2 className="font-h3 text-h3 text-primary">Reset Password</h2>
               <p className="text-sm text-on-surface-variant">
-                Please contact the group administrator and they will help you reset your password.
+                We will email you a secure password-reset link.
               </p>
-              <button type="button" onClick={() => setTab('signin')} className="auth-primary-btn">
-                Back to sign in
+              <button type="button" onClick={() => { setOpen(false); router.push('/forgot-password') }} className="auth-primary-btn">
+                Continue
               </button>
             </div>
           )}

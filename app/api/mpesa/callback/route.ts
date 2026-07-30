@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
+import { createLedgerContribution, getOpenPeriod } from '@/lib/finance'
 
 type CallbackBody = {
   Body?: {
@@ -98,22 +99,36 @@ export async function POST(req: NextRequest) {
   const receipt = String(items.find((i) => i.Name === 'MpesaReceiptNumber')?.Value || '')
   const phone = String(items.find((i) => i.Name === 'PhoneNumber')?.Value || '')
 
-  if (receipt) {
-    const existing = await prisma.contribution.findFirst({ where: { mpesaRef: receipt } })
-    if (existing) return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
+  const providerReference = receipt || checkoutRequestId
+  if (!providerReference || amount <= 0) return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
+  let paymentEvent
+  try {
+    paymentEvent = await prisma.paymentEvent.create({
+      data: { provider: 'MPESA', providerReference, amount, phone, receivedAt: new Date(), rawPayload: body as Prisma.InputJsonValue, sourceAccountId: 'acct-mpesa' },
+    })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
+    }
+    throw error
   }
 
-  if (targetUserId && amount > 0) {
-    await prisma.contribution.create({
-      data: {
-        userId: targetUserId,
-        amount,
-        description: `M-Pesa STK ${phone}`,
-        category: 'M-Pesa',
-        paymentMethod: 'MPESA',
-        mpesaRef: receipt || checkoutRequestId || undefined,
-      },
-    })
+  if (targetUserId) {
+    try {
+      const result = await createLedgerContribution({
+        userId: targetUserId, amount, description: `M-Pesa STK ${phone}`, categoryId: 'cat-other-income',
+        sourceAccountId: 'acct-mpesa', paymentMethod: 'MPESA', providerReference,
+        receivedBy: 'M-Pesa Daraja', actorId: targetUserId, status: 'RECONCILED',
+      })
+      const period = await getOpenPeriod(new Date())
+      await prisma.$transaction([
+        prisma.paymentEvent.update({ where: { id: paymentEvent.id }, data: { status: 'MATCHED', matchedUserId: targetUserId, matchedContributionId: result.contribution.id } }),
+        prisma.reconciliation.create({ data: { transactionId: result.financial.id, paymentEventId: paymentEvent.id, periodId: period.id, notes: 'Automatically matched from the initiating STK request.', reconciledById: targetUserId } }),
+        prisma.financialTransaction.update({ where: { id: result.financial.id }, data: { reconciledAt: new Date() } }),
+      ])
+    } catch (error) {
+      console.error('M-Pesa automatic reconciliation deferred to unmatched queue', error)
+    }
     // Save success log so the status-polling endpoint can confirm to the client
     try {
       await prisma.auditLog.create({
@@ -127,7 +142,7 @@ export async function POST(req: NextRequest) {
     } catch { /* non-fatal */ }
     revalidateTag('contributions')
 
-  } else if (amount > 0) {
+  } else {
     console.error('M-Pesa callback: paid but no matching STK init audit', {
       checkoutRequestId,
       receipt,

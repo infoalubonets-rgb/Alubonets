@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { formatAuditAction, formatAuditMeta } from '@/lib/audit-labels'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
+import { deleteAuditRecord } from '@/app/actions/audit'
 
 export type AuditLogRow = {
   id: string
@@ -282,6 +283,11 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
                     </ul>
                   </div>
                 )}
+                <form action={deleteAuditRecord} className="rounded-xl border border-error/30 p-3">
+                  <input type="hidden" name="id" value={selected.id} />
+                  <input name="reason" required minLength={5} placeholder="Reason for deleting this audit record" className="w-full rounded-lg border px-3 py-2 text-sm" />
+                  <button className="mt-2 text-sm text-error underline">Delete audit record</button>
+                </form>
               </div>
             </div>
           </div>,

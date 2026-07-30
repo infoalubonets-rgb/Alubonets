@@ -36,15 +36,19 @@ export async function actionInitiateStkPush(data: {
   }
 
   // Record a pending contribution — mpesaRef holds CheckoutRequestID until callback confirms
-  await prisma.contribution.create({
+  await prisma.auditLog.create({
     data: {
       userId:        profile.id,
-      amount,
-      category:      data.category,
-      description:   data.description || null,
-      paymentMethod: 'MPESA',
-      mpesaRef:      result.CheckoutRequestID,
-      receivedBy:    'M-Pesa STK Push (pending)',
+      action: 'MPESA_STK_INIT',
+      entity: 'PaymentEvent',
+      meta: {
+        checkoutRequestId: result.CheckoutRequestID,
+        targetUserId: profile.id,
+        amount,
+        phone: data.phone,
+        category: data.category,
+        description: data.description || null,
+      },
     },
   })
 

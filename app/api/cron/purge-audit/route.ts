@@ -27,11 +27,15 @@ export async function GET(req: NextRequest) {
   const result = await prisma.auditLog.deleteMany({
     where: { createdAt: { lt: cutoff } },
   })
+  const contacts = await prisma.contactSubmission.deleteMany({
+    where: { retainUntil: { lte: new Date() }, status: { in: ['RESOLVED', 'SPAM'] } },
+  })
 
   return NextResponse.json({
     ok: true,
     deleted: result.count,
     cutoff: cutoff.toISOString(),
     months,
+    contactSubmissionsDeleted: contacts.count,
   })
 }

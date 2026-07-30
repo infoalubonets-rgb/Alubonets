@@ -8,10 +8,13 @@ import { sendMemberApprovedEmail } from '@/lib/email/resend'
 import type { Role } from '@prisma/client'
 import { ALL_ROLES } from '@/lib/auth/types'
 import { writeAudit } from '@/lib/audit'
+import { nextMembershipNumber } from '@/lib/membership'
 
 const approveSchema = z.object({
   userId: z.string().min(1),
   approve: z.boolean(),
+  note: z.string().trim().min(3).max(1000),
+  identityVerified: z.boolean(),
 })
 
 const roleSchema = z.object({
@@ -47,15 +50,29 @@ function revalidateAdmin() {
 
 export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
   const actor = await requireAdmin()
-  const { userId, approve } = approveSchema.parse(input)
+  const { userId, approve, note, identityVerified } = approveSchema.parse(input)
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new Error('User not found')
+  if (user.rejectedAt) throw new Error('This application was permanently rejected and cannot be reopened.')
+  if (approve && !identityVerified) throw new Error('Confirm identity verification before approval.')
 
   const status = approve ? 'ACTIVE' : 'INACTIVE'
-  const updated = await prisma.user.update({
-    where: { id: userId },
-    data: { status },
+  const updated = await prisma.$transaction(async (tx) => {
+    const membershipNumber =
+      approve && !user.membershipNumber ? await nextMembershipNumber(tx) : user.membershipNumber
+    return tx.user.update({
+      where: { id: userId },
+      data: {
+        status,
+        membershipNumber,
+        approvalNotes: approve ? note : null,
+        rejectionReason: approve ? null : note,
+        approvedAt: approve ? new Date() : null,
+        rejectedAt: approve ? null : new Date(),
+        identityVerificationStatus: identityVerified ? 'VERIFIED' : approve ? 'VERIFIED' : 'REJECTED',
+      },
+    })
   })
 
   await syncUserMetadata(updated)
@@ -65,6 +82,13 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
     action: approve ? 'MEMBER_APPROVE' : 'MEMBER_REJECT',
     entity: 'User',
     entityId: userId,
+    meta: {
+      oldStatus: user.status,
+      newStatus: status,
+      note,
+      membershipNumber: updated.membershipNumber,
+      identityVerificationStatus: updated.identityVerificationStatus,
+    },
   })
 
   if (approve) {
@@ -106,7 +130,7 @@ export async function setMemberRole(input: z.infer<typeof roleSchema>) {
     action: 'MEMBER_ROLE_CHANGE',
     entity: 'User',
     entityId: userId,
-    meta: { role },
+    meta: { oldRole: target.role, newRole: role },
   })
 
   revalidateAdmin()
@@ -135,7 +159,7 @@ export async function setMemberDashboardAccess(input: z.infer<typeof accessSchem
     action: 'MEMBER_DASHBOARD_ACCESS',
     entity: 'User',
     entityId: userId,
-    meta: { dashboardAccess },
+    meta: { oldDashboardAccess: target.dashboardAccess, newDashboardAccess: dashboardAccess },
   })
 
   revalidateAdmin()
@@ -173,7 +197,7 @@ export async function setMemberStatus(input: z.infer<typeof statusSchema>) {
     action: status === 'SUSPENDED' ? 'MEMBER_SUSPEND' : 'MEMBER_STATUS_CHANGE',
     entity: 'User',
     entityId: userId,
-    meta: { status },
+    meta: { oldStatus: target.status, newStatus: status },
   })
 
   revalidateAdmin()

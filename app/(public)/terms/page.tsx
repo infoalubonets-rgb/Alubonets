@@ -1,0 +1,8 @@
+import Link from 'next/link'
+import { POLICY_VERSION } from '@/lib/membership'
+
+export const metadata = { title: 'Terms of Use' }
+
+export default function TermsPage() {
+  return <main className="mx-auto max-w-3xl px-4 py-12"><article className="prose prose-slate max-w-none"><h1>Alubonets Terms of Use</h1><p><strong>Draft version:</strong> {POLICY_VERSION}. This draft should be reviewed and replaced with committee-approved terms.</p><h2>Membership applications</h2><p>Applicants must provide complete and accurate information. Registration does not create active membership. Access is granted only after administrator approval, and rejected applications are final under the current membership process.</p><h2>Account responsibilities</h2><p>Members must protect their credentials, use the portal lawfully, and promptly report suspected account misuse. Accounts may be suspended to protect the group or enforce its rules.</p><h2>Acceptable use</h2><p>Users must not misuse member information, disrupt the service, impersonate others, upload harmful content, or use the portal for unlawful, fraudulent, or abusive activity.</p><h2>Member content and records</h2><p>Members remain responsible for information they submit. Official contribution, meeting, membership, and audit records may be retained for governance, accountability, and legal obligations.</p><h2>Service availability</h2><p>The group aims to maintain the portal but cannot guarantee uninterrupted availability. Features and these terms may change following appropriate notice and committee approval.</p><h2>Contact</h2><p>Questions or corrections should be directed to an Alubonets administrator through the website’s <Link href="/contact">contact page</Link>.</p></article></main>
+}

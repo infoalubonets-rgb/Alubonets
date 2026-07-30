@@ -20,6 +20,9 @@ export async function GET(
   if (!contribution) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
+  if (!['CONFIRMED', 'RECONCILED'].includes(contribution.status)) {
+    return NextResponse.json({ error: 'Receipt is available only for confirmed contributions.' }, { status: 409 })
+  }
 
   const canView =
     profile.role === 'ADMIN' ||

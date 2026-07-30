@@ -27,6 +27,7 @@ export default async function AdminAuditLogsPage() {
 
   return (
     <DashboardShell role="ADMIN" title="Activity logs" nav={ADMIN_NAV}>
+      <div className="mb-4 flex justify-end"><a href="/api/export/audit" className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Export audit CSV</a></div>
       <AuditLogsTable
         logs={logs.map((row) => {
           const key = targetKey(row.entity, row.entityId)

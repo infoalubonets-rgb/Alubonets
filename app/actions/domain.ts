@@ -7,7 +7,6 @@ import { requireActiveRole, requireAdmin, requireSessionProfile } from '@/lib/au
 import {
   TAGS,
   approveGalleryPhoto,
-  createContribution,
   createDocument,
   createEvent,
   createGalleryPhoto,
@@ -30,46 +29,9 @@ import { sendBroadcastEmail, sendContributionReceiptEmail, sendWelfareStatusEmai
 import { writeAudit } from '@/lib/audit'
 
 export async function actionCreateContribution(formData: FormData) {
-  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
-  const schema = z.object({
-    userId: z.string().min(1),
-    amount: z.coerce.number().positive(),
-    description: z.string().optional(),
-    category: z.string().optional(),
-    paymentMethod: z.enum(['CASH', 'MPESA', 'BANK', 'OTHER']).default('CASH'),
-    mpesaRef: z.string().optional(),
-  })
-  const parsed = schema.parse({
-    userId: formData.get('userId'),
-    amount: formData.get('amount'),
-    description: formData.get('description') || undefined,
-    category: formData.get('category') || undefined,
-    paymentMethod: formData.get('paymentMethod') || 'CASH',
-    mpesaRef: formData.get('mpesaRef') || undefined,
-  })
-
-  const row = await createContribution({
-    ...parsed,
-    receivedBy: actor.fullName,
-  })
-
-  const created = await prisma.contribution.findUnique({
-    where: { id: row.id },
-    include: { user: true },
-  })
-  if (created) await sendContributionReceiptEmail(created)
-
-  await writeAudit({
-    userId: actor.id,
-    action: 'CONTRIBUTION_CREATE',
-    entity: 'Contribution',
-    entityId: row.id,
-  })
-
-  revalidatePath('/dashboard/treasurer')
-  revalidatePath('/dashboard/member')
-  revalidatePath('/admin')
-  revalidateTag(TAGS.contributions)
+  void formData
+  await requireActiveRole(['TREASURER', 'ADMIN'])
+  throw new Error('Direct contribution entry is disabled. Use the immutable financial ledger.')
 }
 
 export async function actionEmailReceipt(formData: FormData) {
@@ -111,9 +73,9 @@ export async function actionCreateWelfare(formData: FormData) {
 export async function actionReviewWelfare(formData: FormData) {
   const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
   const id = String(formData.get('id') || '')
-  const status = String(formData.get('status') || '') as 'APPROVED' | 'REJECTED' | 'PAID'
+  const status = String(formData.get('status') || '') as 'APPROVED' | 'REJECTED'
   const reviewNote = String(formData.get('reviewNote') || '') || undefined
-  if (!id || !['APPROVED', 'REJECTED', 'PAID'].includes(status)) {
+  if (!id || !['APPROVED', 'REJECTED'].includes(status)) {
     throw new Error('Invalid welfare review')
   }
   const updated = await updateWelfareStatus(id, status, reviewNote)
@@ -374,7 +336,7 @@ export async function actionCreateDocument(formData: FormData) {
 }
 
 export async function actionDeleteDocument(id: string) {
-  await requireActiveRole(['SECRETARY', 'ADMIN'])
+  await requireAdmin()
   await prisma.document.delete({ where: { id } })
   revalidatePath('/dashboard/secretary')
   revalidatePath('/dashboard/member')
@@ -561,44 +523,8 @@ export async function actionDeleteProject(id: string) {
   revalidateTag(TAGS.projects)
 }
 
-export async function actionImportContributionsCsv(csvText: string) {
-  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
-  const Papa = (await import('papaparse')).default
-  const parsed = Papa.parse<Record<string, string>>(csvText, {
-    header: true,
-    skipEmptyLines: true,
-  })
-  if (parsed.errors.length) {
-    throw new Error(parsed.errors[0]?.message || 'CSV parse error')
-  }
-
-  let created = 0
-  for (const row of parsed.data) {
-    const email = (row.email || row.Email || '').trim().toLowerCase()
-    const amount = Number(row.amount || row.Amount || 0)
-    if (!email || !amount) continue
-    const user = await prisma.user.findUnique({ where: { email } })
-    if (!user) continue
-    await createContribution({
-      userId: user.id,
-      amount,
-      description: row.description || row.Description || 'CSV import',
-      category: row.category || row.Category || 'Import',
-      paymentMethod: (row.paymentMethod as 'CASH' | 'MPESA' | 'BANK' | 'OTHER') || 'CASH',
-      mpesaRef: row.mpesaRef || row.MpesaRef || undefined,
-      receivedBy: actor.fullName,
-    })
-    created += 1
-  }
-
-  await writeAudit({
-    userId: actor.id,
-    action: 'CONTRIBUTION_CSV_IMPORT',
-    entity: 'Contribution',
-    meta: { created },
-  })
-
-  revalidatePath('/dashboard/treasurer')
-  revalidateTag(TAGS.contributions)
-  return { created }
+export async function actionImportContributionsCsv(csvText: string): Promise<{ created: number }> {
+  void csvText
+  await requireActiveRole(['TREASURER', 'ADMIN'])
+  throw new Error('Legacy CSV import is disabled. Record payments through the immutable ledger.')
 }

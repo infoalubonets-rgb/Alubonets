@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { ADMIN_LOGIN_LOGO } from '@/lib/constants'
-import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
+import DevAccountsDropdown, { TEST_ACCOUNTS } from '@/components/auth/DevAccountsDropdown'
 import { homeForRole, loginRequest, logoutRequest, meRequest, registerRequest, type AuthUser } from '@/lib/auth/client'
 
 type Props = {
@@ -26,6 +26,14 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
+
+  const fillTestAccount = (selectedEmail: string) => {
+    const account = TEST_ACCOUNTS.find((item) => item.email === selectedEmail)
+    if (!account) return
+    setEmail(account.email)
+    setPassword(account.password)
+    setError('')
+  }
 
   useEffect(() => {
     meRequest().then((user: AuthUser | null) => {
@@ -101,6 +109,38 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
             <h1 className="font-h3 text-h3 text-secondary-container">{title}</h1>
           </div>
           <form onSubmit={onSubmit} className="flex flex-col gap-md">
+            {false && mode === 'signin' && process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS !== 'false' && (
+              <div>
+                <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
+                  Testing account
+                </label>
+                <select
+                  defaultValue=""
+                  onChange={(event) => fillTestAccount(event.currentTarget.value)}
+                  onInput={(event) => fillTestAccount(event.currentTarget.value)}
+                  className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
+                >
+                  <option value="">Select a role to autofill</option>
+                  {TEST_ACCOUNTS.map((account) => (
+                    <option key={account.email} value={account.email}>
+                      {account.label} — {account.email}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {TEST_ACCOUNTS.map((account) => (
+                    <button
+                      key={account.email}
+                      type="button"
+                      onClick={() => fillTestAccount(account.email)}
+                      className="rounded-full border border-secondary-container px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-secondary-container/10"
+                    >
+                      {account.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {mode === 'register' && (
               <>
                 <div>
@@ -148,7 +188,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   required
                   className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
                 />
-                {mode === 'signin' && process.env.NODE_ENV === 'development' && (
+                {mode === 'signin' && process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS !== 'false' && (
                   <DevAccountsDropdown
                     open={devOpen}
                     onPick={(devEmail, devPassword) => {
@@ -223,6 +263,11 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
               </button>
             </div>
           </form>
+          {mode === 'signin' && (
+            <p className="mt-3 text-center text-sm">
+              <Link href="/forgot-password" className="text-primary hover:underline">Forgot password?</Link>
+            </p>
+          )}
 
           {allowRegister && (
             <p className="text-center mt-md text-[13px] text-on-surface-variant">
@@ -233,9 +278,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                     type="button"
                     className="text-primary font-semibold"
                     onClick={() => {
-                      setMode('register')
-                      setConfirmPassword('')
-                      setError('')
+                      router.push('/register')
                     }}
                   >
                     Register

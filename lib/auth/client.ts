@@ -16,12 +16,11 @@ export async function loginRequest(email: string, password: string) {
   return data as { user: AuthUser; redirectTo: string; status?: string }
 }
 
-export async function registerRequest(input: {
-  email: string
-  password: string
-  fullName: string
-  phone?: string
-}) {
+import type { RegistrationInput } from '@/lib/membership'
+
+export async function registerRequest(
+  input: RegistrationInput | { email: string; password: string; fullName: string; phone?: string }
+) {
   const res = await fetch('/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

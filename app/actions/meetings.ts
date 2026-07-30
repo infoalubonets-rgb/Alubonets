@@ -92,6 +92,7 @@ export async function actionUpdateMeeting(formData: FormData) {
 
   const existing = await prisma.meeting.findUnique({ where: { id } })
   if (!existing) throw new Error('Meeting not found')
+  if (existing.status === 'FINAL') throw new Error('Final minutes are locked. Create a new minutes version before editing.')
 
   const parsed = meetingFields.parse({
     title: formData.get('title'),
@@ -134,12 +135,13 @@ export async function actionUpdateMeeting(formData: FormData) {
 }
 
 export async function actionPublishMeetingMinutes(meetingId: string) {
-  const actor = await requireActiveRole(['SECRETARY', 'ADMIN'])
+  const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE'])
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
     include: { recorder: { select: { fullName: true, email: true } } },
   })
   if (!meeting) throw new Error('Meeting not found')
+  if (meeting.status !== 'PENDING_APPROVAL') throw new Error('Minutes must be submitted for approval first.')
 
   const hasContent =
     Boolean(meeting.minutes?.trim()) ||
@@ -151,14 +153,14 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
 
   const bytes = await buildMeetingMinutesPdf(meeting)
   const filename = minutesFilename(meeting)
-  const storagePath = `minutes/${meeting.id}.pdf`
+  const storagePath = `minutes/${meeting.id}/v${meeting.minutesVersion}-${crypto.randomUUID()}.pdf`
 
   const supabase = createServerClient()
   const { error: uploadError } = await supabase.storage
     .from('documents')
     .upload(storagePath, Buffer.from(bytes), {
       contentType: 'application/pdf',
-      upsert: true,
+      upsert: false,
     })
 
   if (uploadError) {
@@ -170,10 +172,10 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
     .createSignedUrl(storagePath, 60 * 60 * 24 * 365)
 
   // Prefer signed URL; fall back to path for app-relative storage reference
-  const fileUrl = !signError && signed?.signedUrl ? signed.signedUrl : `storage://documents/${storagePath}`
+  const fileUrl = `storage://documents/${storagePath}`
 
   let documentId = meeting.publishedDocumentId
-  if (documentId) {
+  if (documentId && meeting.minutesVersion < 0) {
     await prisma.document.update({
       where: { id: documentId },
       data: {
@@ -189,6 +191,14 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
         fileUrl,
         category: 'Minutes',
         uploadedBy: actor.id,
+        versionGroupId: `meeting-${meeting.id}`,
+        version: meeting.minutesVersion,
+        previousVersionId: documentId ?? undefined,
+        storagePath,
+        mimeType: 'application/pdf',
+        accessLevel: 'MEMBERS',
+        status: 'PUBLISHED',
+        effectiveAt: new Date(),
       },
     })
     documentId = doc.id
@@ -197,6 +207,8 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
   await updateMeeting(meetingId, {
     status: 'FINAL',
     publishedDocumentId: documentId,
+    approvedById: actor.id,
+    approvedAt: new Date(),
   })
 
   await writeAudit({

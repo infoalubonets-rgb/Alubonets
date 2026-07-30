@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import HeroActions from '@/components/home/HeroActions'
 import { HERO_IMAGE } from '@/lib/constants'
+import { getPublicContent } from '@/lib/public-content'
 
 export const metadata: Metadata = {
   title: {
@@ -9,7 +10,8 @@ export const metadata: Metadata = {
   },
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const content = await getPublicContent('HOME')
   return (
     <main className="flex-grow">
       <section className="bg-primary text-on-primary py-xxl px-md md:px-lg relative overflow-hidden">
@@ -25,10 +27,10 @@ export default function HomePage() {
         <div className="max-w-container-max mx-auto flex flex-col md:flex-row items-center gap-xl relative z-10">
           <div className="w-full md:w-1/2 flex flex-col gap-lg">
             <h1 className="font-h1-mobile text-h1-mobile md:font-h1 md:text-h1 text-on-primary">
-              One Family, One Vision, Endless Possibilities.
+              {content.headline}
             </h1>
             <p className="font-body-lg text-body-lg text-on-primary/90 max-w-lg">
-              Alubonets Self-Help Group brings together the descendants of the Alubokho family to strengthen unity, provide welfare support and create opportunities for social and economic development.
+              {content.introduction}
             </p>
             <HeroActions />
           </div>
@@ -55,14 +57,14 @@ export default function HomePage() {
               <h3 className="mvv-title font-h3 text-[20px] leading-snug text-primary mb-sm">Mission</h3>
               <span className="mvv-rule block w-8 h-0.5 bg-primary mb-md" aria-hidden="true" />
               <p className="mvv-body font-body-md text-[15px] leading-relaxed text-on-surface">
-                To unite members of the Alubokho family, strengthen family relationships, provide mutual welfare support, and empower members through education, health, economic opportunities, and transparent governance.
+                {content.mission}
               </p>
             </article>
             <article className="mvv-card mvv-card-orange bg-primary p-md md:p-lg rounded-2xl border border-transparent flex flex-col text-left group">
               <h3 className="mvv-title font-h3 text-[20px] leading-snug text-on-primary mb-sm">Vision</h3>
               <span className="mvv-rule block w-8 h-0.5 bg-secondary-container mb-md" aria-hidden="true" />
               <p className="mvv-body font-body-md text-[15px] leading-relaxed text-on-primary/90">
-                To build a united, inclusive, and empowered family that preserves its shared heritage, supports its members, embraces digital transformation, and contributes positively to the wider community.
+                {content.vision}
               </p>
             </article>
             <article className="mvv-card mvv-card-navy bg-white p-md md:p-lg rounded-2xl border border-primary/10 flex flex-col text-left group">

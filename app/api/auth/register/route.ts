@@ -1,31 +1,28 @@
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { createServerClient as createServiceClient } from '@/lib/supabase-server'
 import { prisma } from '@/lib/prisma'
 import { syncUserMetadata } from '@/lib/auth/session'
 import { toAuthUser } from '@/lib/auth/helpers'
-
-const bodySchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  fullName: z.string().min(2),
-  phone: z.string().optional(),
-})
+import { POLICY_VERSION, registrationSchema, requestIp } from '@/lib/membership'
+import { enforceRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
   try {
     const json = await req.json()
-    const parsed = bodySchema.safeParse(json)
+    const parsed = registrationSchema.safeParse(json)
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Provide a valid name, email, and password (min 8 characters).' },
+        { error: parsed.error.issues[0]?.message || 'Complete every required registration field.' },
         { status: 400 }
       )
     }
 
-    const { email, password, fullName, phone } = parsed.data
+    const data = parsed.data
+    const { email, password, fullName, phone } = data
+    const ipAddress = requestIp(req)
+    await enforceRateLimit(`register:${ipAddress || email}`, 5, 30)
     const existing = await prisma.user.findUnique({ where: { email } })
     if (existing?.status === 'ACTIVE' && existing.authUserId) {
       return NextResponse.json(
@@ -63,11 +60,13 @@ export async function POST(req: Request) {
             authUserId: created.user.id,
             fullName,
             phone: phone || existing.phone,
+            location: data.location,
             role: 'MEMBER',
             status: 'PENDING',
             isSuperAdmin: false,
             dashboardAccess: [],
           },
+          include: { memberProfile: true },
         })
       : await prisma.user.create({
           data: {
@@ -75,12 +74,66 @@ export async function POST(req: Request) {
             email,
             fullName,
             phone,
+            location: data.location,
             role: 'MEMBER',
             status: 'PENDING',
             isSuperAdmin: false,
             dashboardAccess: [],
           },
+          include: { memberProfile: true },
         })
+
+    await prisma.$transaction([
+      prisma.memberProfile.upsert({
+        where: { userId: profile.id },
+        create: {
+          userId: profile.id,
+          gender: data.gender,
+          dateOfBirth: data.dateOfBirth,
+          address: data.location,
+          familyBranch: data.familyBranch,
+          nextOfKinName: data.nextOfKinName,
+          nextOfKinPhone: data.nextOfKinPhone,
+          nextOfKinRelationship: data.nextOfKinRelationship,
+          profession: data.profession,
+          skills: data.skills,
+          educationLevel: data.educationLevel,
+          achievements: data.achievements,
+          mentorshipArea: data.mentorshipArea,
+          interests: data.interests,
+          emergencyContactName: data.emergencyContactName,
+          emergencyContactPhone: data.emergencyContactPhone,
+          memberCategory: data.memberCategory,
+        },
+        update: {
+          gender: data.gender,
+          dateOfBirth: data.dateOfBirth,
+          address: data.location,
+          familyBranch: data.familyBranch,
+          nextOfKinName: data.nextOfKinName,
+          nextOfKinPhone: data.nextOfKinPhone,
+          nextOfKinRelationship: data.nextOfKinRelationship,
+          profession: data.profession,
+          skills: data.skills,
+          educationLevel: data.educationLevel,
+          achievements: data.achievements,
+          mentorshipArea: data.mentorshipArea,
+          interests: data.interests,
+          emergencyContactName: data.emergencyContactName,
+          emergencyContactPhone: data.emergencyContactPhone,
+          memberCategory: data.memberCategory,
+        },
+      }),
+      prisma.consentRecord.create({
+        data: {
+          userId: profile.id,
+          termsVersion: POLICY_VERSION,
+          privacyVersion: POLICY_VERSION,
+          ipAddress,
+          userAgent: req.headers.get('user-agent'),
+        },
+      }),
+    ])
 
     await syncUserMetadata(profile)
 

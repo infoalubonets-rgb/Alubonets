@@ -1,0 +1,27 @@
+ALTER TABLE public.financial_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.transaction_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.accounting_periods ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.financial_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ledger_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contribution_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.member_contribution_obligations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payment_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reconciliations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.disbursements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.adjustments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.supporting_documents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY finance_accounts_read ON public.financial_accounts FOR SELECT TO authenticated USING (public.is_active_member());
+CREATE POLICY finance_categories_read ON public.transaction_categories FOR SELECT TO authenticated USING (public.is_active_member());
+CREATE POLICY finance_periods_read ON public.accounting_periods FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER','EXECUTIVE'));
+CREATE POLICY finance_transactions_staff_read ON public.financial_transactions FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER','EXECUTIVE'));
+CREATE POLICY finance_ledger_staff_read ON public.ledger_entries FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER','EXECUTIVE'));
+CREATE POLICY finance_campaigns_read ON public.contribution_campaigns FOR SELECT TO authenticated USING (public.is_active_member());
+CREATE POLICY finance_obligations_read ON public.member_contribution_obligations FOR SELECT TO authenticated USING ("userId"=public.current_app_user_id() OR public.current_app_role() IN ('ADMIN','TREASURER'));
+CREATE POLICY finance_payment_events_staff_read ON public.payment_events FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER'));
+CREATE POLICY finance_reconciliation_staff_read ON public.reconciliations FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER','EXECUTIVE'));
+CREATE POLICY finance_expenses_staff_read ON public.expenses FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER','EXECUTIVE'));
+CREATE POLICY finance_disbursements_staff_read ON public.disbursements FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER','EXECUTIVE'));
+CREATE POLICY finance_adjustments_staff_read ON public.adjustments FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER'));
+CREATE POLICY finance_documents_staff_read ON public.supporting_documents FOR SELECT TO authenticated USING (public.current_app_role() IN ('ADMIN','TREASURER'));

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { CONTACT_EMAIL } from '@/lib/constants'
 import { sendContactMessage } from '@/app/actions/contact'
+import Script from 'next/script'
+import { TURNSTILE_TEST_SITE_KEY } from '@/lib/turnstile'
+import { getPublicContent } from '@/lib/public-content'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
@@ -12,6 +15,8 @@ export default async function ContactPage({
   searchParams: Promise<{ sent?: string; error?: string }>
 }) {
   const { sent, error } = await searchParams
+  const content = await getPublicContent('CONTACT')
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || (process.env.NODE_ENV === 'development' ? TURNSTILE_TEST_SITE_KEY : '')
   return (
     <main className="flex-grow max-w-container-max mx-auto w-full px-md md:px-lg py-lg md:py-xl relative">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-lg md:gap-xl items-start relative z-10">
@@ -22,7 +27,7 @@ export default async function ContactPage({
             </p>
             <h1 className="font-h1 text-h1 text-primary mb-sm">Get in Touch</h1>
             <p className="font-body-lg text-[16px] leading-relaxed text-on-surface">
-              Have a question or want to connect? We&apos;d love to hear from you.
+              {content.introduction}
             </p>
           </div>
           <div className="flex flex-col gap-md">
@@ -33,10 +38,10 @@ export default async function ContactPage({
               <div>
                 <p className="font-label-bold text-[15px] text-primary mb-xs">Email</p>
                 <a
-                  href={`mailto:${CONTACT_EMAIL}`}
+                  href={`mailto:${content.email || CONTACT_EMAIL}`}
                   className="font-body-md text-[15px] text-on-surface-variant hover:text-primary transition-colors"
                 >
-                  {CONTACT_EMAIL}
+                  {content.email || CONTACT_EMAIL}
                 </a>
               </div>
             </div>
@@ -46,7 +51,7 @@ export default async function ContactPage({
               </div>
               <div>
                 <p className="font-label-bold text-[15px] text-primary mb-xs">Phone</p>
-                <p className="font-body-md text-[15px] text-on-surface-variant">Coming soon</p>
+                <p className="font-body-md text-[15px] text-on-surface-variant">{content.phone}</p>
               </div>
             </div>
             <div className="contact-info-row flex items-start gap-md">
@@ -56,7 +61,7 @@ export default async function ContactPage({
               <div>
                 <p className="font-label-bold text-[15px] text-primary mb-xs">Location</p>
                 <p className="font-body-md text-[15px] text-on-surface-variant">
-                  Butere, Kakamega County, Kenya
+                  {content.location}
                 </p>
               </div>
             </div>
@@ -83,8 +88,11 @@ export default async function ContactPage({
                 </p>
               </div>
             )}
+            {error === 'captcha' && <div className="mb-md rounded-xl bg-red-50 p-3 text-sm text-red-700">Please complete the security check and try again.</div>}
+            {error === 'rate' && <div className="mb-md rounded-xl bg-red-50 p-3 text-sm text-red-700">Too many messages were submitted. Please wait before trying again.</div>}
 
             <form action={sendContactMessage} className="flex flex-col gap-md">
+              <input name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
               <div>
                 <div className="contact-section-label mb-sm">
                   <span className="font-label-bold text-label-bold text-primary uppercase tracking-[0.14em] text-[12px]">
@@ -206,6 +214,7 @@ export default async function ContactPage({
               </div>
 
               <div className="flex flex-col sm:flex-row gap-sm">
+                {siteKey && <><Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer /><div className="cf-turnstile" data-sitekey={siteKey} data-theme="auto" /></>}
                 <button
                   className="contact-submit bg-primary text-on-primary rounded-full min-h-[48px] flex-1 font-label-bold text-[15px] flex items-center justify-center"
                   type="submit"

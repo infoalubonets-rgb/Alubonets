@@ -42,6 +42,7 @@ export async function GET(
   const contributions = await prisma.contribution.findMany({
     where: {
       userId,
+      status: { in: ['CONFIRMED', 'RECONCILED'] },
       ...(startDate || endDate
         ? { paidAt: { ...(startDate ? { gte: startDate } : {}), ...(endDate ? { lte: endDate } : {}) } }
         : {}),

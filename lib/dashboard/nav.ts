@@ -18,6 +18,10 @@ export const ADMIN_NAV: NavItem[] = [
   { icon: 'pending_actions', label: 'Approvals', href: '/admin/approvals' },
   { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
   { icon: 'contact_mail', label: 'Contact inbox', href: '/admin/contact-messages' },
+  { icon: 'account_balance', label: 'Finance', href: '/admin/finance' },
+  { icon: 'folder_managed', label: 'Documents', href: '/documents/manage' },
+  { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
+  { icon: 'edit_note', label: 'Public content', href: '/admin/content' },
   { icon: 'admin_panel_settings', label: 'Roles', href: '/admin/roles' },
   { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
   ANNOUNCEMENTS_NAV,
@@ -26,7 +30,11 @@ export const ADMIN_NAV: NavItem[] = [
 
 export const EXECUTIVE_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/executive' },
+  { icon: 'contact_mail', label: 'Contact inbox', href: '/dashboard/executive/contact-messages' },
   { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
+  { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
+  { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
+  { icon: 'folder', label: 'Documents', href: '/documents' },
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
 ]
@@ -34,6 +42,9 @@ export const EXECUTIVE_NAV: NavItem[] = [
 export const TREASURER_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/treasurer' },
   { icon: 'payments', label: 'Member contributions', href: '/dashboard/treasurer/contributions' },
+  { icon: 'account_balance', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
+  { icon: 'rule', label: 'Reconciliation', href: '/dashboard/treasurer/reconciliation' },
+  { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
   { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/treasurer/welfare' },
   { icon: 'savings', label: 'My contributions', href: '/contributions' },
   ANNOUNCEMENTS_NAV,
@@ -43,6 +54,8 @@ export const SECRETARY_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/secretary' },
   ANNOUNCEMENTS_NAV,
   { icon: 'groups', label: 'Meetings', href: '/dashboard/secretary/meetings' },
+  { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
+  { icon: 'folder_managed', label: 'Documents', href: '/documents/manage' },
   CONTRIBUTIONS_NAV,
 ]
 
@@ -60,6 +73,8 @@ export const MEMBER_NAV: NavItem[] = [
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
   { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/member/welfare' },
+  { icon: 'folder', label: 'Documents', href: '/documents' },
+  { icon: 'gavel', label: 'Governance', href: '/governance' },
 ]
 
 export function navForRole(role: Role): NavItem[] {
