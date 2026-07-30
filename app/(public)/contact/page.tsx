@@ -75,10 +75,12 @@ export default async function ContactPage({
                 <p className="text-[14px] font-medium">Message sent! We&apos;ll get back to you shortly.</p>
               </div>
             )}
-            {error === 'missing' && (
+            {(error === 'missing' || error === 'invalid') && (
               <div className="mb-md flex items-center gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-red-700">
                 <span className="material-symbols-outlined icon-fill text-red-500">error</span>
-                <p className="text-[14px] font-medium">Please fill in all required fields.</p>
+                <p className="text-[14px] font-medium">
+                  Please provide a valid name, email address and message.
+                </p>
               </div>
             )}
 

@@ -10,7 +10,8 @@ function getResend() {
   return new Resend(key)
 }
 
-const from = () => process.env.FROM_EMAIL || 'noreply@alubonets.com'
+const from = () =>
+  process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
 // When set, ALL outgoing emails are redirected here (use until domain is verified)
 const testEmailOverride = () => process.env.RESEND_TEST_EMAIL || null

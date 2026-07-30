@@ -213,14 +213,51 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
 }
 
 export async function actionDeleteMeeting(id: string) {
-  await requireActiveRole(['SECRETARY', 'ADMIN'])
+  const actor = await requireActiveRole(['SECRETARY', 'ADMIN'])
+  const meeting = await prisma.meeting.findUnique({
+    where: { id },
+    select: { id: true, status: true, title: true },
+  })
+  if (!meeting) throw new Error('Meeting not found')
+  if (meeting.status !== 'DRAFT') {
+    throw new Error('Only draft meetings can be deleted')
+  }
+
   await prisma.meeting.delete({ where: { id } })
+  await writeAudit({
+    userId: actor.id,
+    action: 'MEETING_DELETE',
+    entity: 'Meeting',
+    entityId: id,
+    meta: { title: meeting.title },
+  })
   revalidateMeetings()
 }
 
 export async function actionDeleteMeetings(ids: string[]) {
   if (!ids.length) return
-  await requireActiveRole(['SECRETARY', 'ADMIN'])
-  await prisma.meeting.deleteMany({ where: { id: { in: ids } } })
+  const actor = await requireActiveRole(['SECRETARY', 'ADMIN'])
+  const drafts = await prisma.meeting.findMany({
+    where: { id: { in: ids }, status: 'DRAFT' },
+    select: { id: true, title: true },
+  })
+  if (drafts.length !== ids.length) {
+    throw new Error('Only draft meetings can be deleted')
+  }
+
+  await prisma.meeting.deleteMany({
+    where: { id: { in: drafts.map((meeting) => meeting.id) }, status: 'DRAFT' },
+  })
+  await Promise.all(
+    drafts.map((meeting) =>
+      writeAudit({
+        userId: actor.id,
+        action: 'MEETING_DELETE',
+        entity: 'Meeting',
+        entityId: meeting.id,
+        meta: { title: meeting.title },
+      })
+    )
+  )
   revalidateMeetings()
 }

@@ -177,14 +177,16 @@ export default function AuthModal() {
                     onBlur={() => setDevOpen(false)}
                     required
                   />
-                  <DevAccountsDropdown
-                    open={devOpen}
-                    onPick={(devEmail, devPassword) => {
-                      setEmail(devEmail)
-                      setPassword(devPassword)
-                      setDevOpen(false)
-                    }}
-                  />
+                  {process.env.NODE_ENV === 'development' && (
+                    <DevAccountsDropdown
+                      open={devOpen}
+                      onPick={(devEmail, devPassword) => {
+                        setEmail(devEmail)
+                        setPassword(devPassword)
+                        setDevOpen(false)
+                      }}
+                    />
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-xs">

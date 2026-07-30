@@ -63,6 +63,8 @@ function MeetingCard({
             type="checkbox"
             checked={isSelected}
             onChange={onToggle}
+            disabled={!isDraft}
+            aria-label={isDraft ? `Select draft meeting ${m.title}` : 'Published meetings cannot be deleted'}
             className="mt-1.5 h-4 w-4 flex-shrink-0 rounded border-outline-variant cursor-pointer accent-primary"
           />
 
@@ -168,8 +170,8 @@ function MeetingCard({
             <span className="material-symbols-outlined text-[15px]">description</span>
           </a>
 
-          {/* Delete */}
-          <div className="ml-auto relative">
+          {/* Only drafts may be deleted. */}
+          {isDraft && <div className="ml-auto relative">
             {confirming && (
               <div className="absolute bottom-full right-0 mb-1 z-10 bg-surface border border-outline-variant dark:border-[#1e3461] rounded-xl shadow-xl p-3 w-44">
                 <p className="text-[12px] font-semibold text-on-surface mb-2">Delete this meeting?</p>
@@ -199,7 +201,7 @@ function MeetingCard({
               <span className="material-symbols-outlined text-[14px]">delete</span>
               Delete
             </button>
-          </div>
+          </div>}
         </div>
       </div>
     </div>
@@ -225,7 +227,7 @@ export default function MeetingsListClient({ meetings: initial }: { meetings: Me
     })
 
   const toggleAll = () =>
-    setSelected(selected.size === items.length ? new Set() : new Set(items.map((m) => m.id)))
+    setSelected(selected.size === drafts.length ? new Set() : new Set(drafts.map((m) => m.id)))
 
   const handleDelete = (id: string) => {
     setConfirmingId(null)
@@ -345,11 +347,12 @@ export default function MeetingsListClient({ meetings: initial }: { meetings: Me
         <label className="flex items-center gap-2 text-[12px] text-on-surface-variant cursor-pointer select-none">
           <input
             type="checkbox"
-            checked={selected.size === items.length && items.length > 0}
+            checked={selected.size === drafts.length && drafts.length > 0}
             onChange={toggleAll}
+            disabled={drafts.length === 0}
             className="h-4 w-4 rounded border-outline-variant cursor-pointer accent-primary"
           />
-          Select all ({items.length})
+          Select all drafts ({drafts.length})
         </label>
       </div>
 

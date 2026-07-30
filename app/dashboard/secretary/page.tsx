@@ -3,6 +3,7 @@ import { SECRETARY_NAV } from '@/lib/dashboard/nav'
 import { getSecretaryDashboardData } from '@/lib/data/queries'
 import Link from 'next/link'
 import DocumentsSection from '@/components/dashboard/DocumentsSection'
+import DeleteDraftMeetingButton from '@/components/meetings/DeleteDraftMeetingButton'
 
 export default async function SecretaryPage() {
   const data = await getSecretaryDashboardData()
@@ -142,10 +143,10 @@ export default async function SecretaryPage() {
                 {recentMeetings.map((m) => {
                   const isFinal = m.status === 'FINAL'
                   return (
-                    <li key={m.id}>
+                    <li key={m.id} className="flex items-center gap-1 pr-3">
                       <Link
                         href={`/dashboard/secretary/meetings/${m.id}`}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-surface-container/50 dark:hover:bg-[#111f36]/60 transition-colors group"
+                        className="group flex min-w-0 flex-1 items-center gap-3 px-4 py-3 hover:bg-surface-container/50 dark:hover:bg-[#111f36]/60 transition-colors"
                       >
                         {/* Date badge */}
                         <div className={`flex-shrink-0 w-10 rounded-lg text-center py-1.5 border ${
@@ -179,6 +180,13 @@ export default async function SecretaryPage() {
                           </span>
                         )}
                       </Link>
+                      {!isFinal && (
+                        <DeleteDraftMeetingButton
+                          meetingId={m.id}
+                          meetingTitle={m.title}
+                          compact
+                        />
+                      )}
                     </li>
                   )
                 })}

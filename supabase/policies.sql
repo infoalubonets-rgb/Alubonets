@@ -137,6 +137,7 @@ alter table public.documents enable row level security;
 alter table public.meetings enable row level security;
 alter table public.email_logs enable row level security;
 alter table public.audit_logs enable row level security;
+alter table public.contact_submissions enable row level security;
 
 -- ── users ────────────────────────────────────────────────────────────────────
 
@@ -279,6 +280,10 @@ create policy projects_delete on public.projects
 drop policy if exists events_select on public.events;
 create policy events_select on public.events
   for select to authenticated using (public.is_active_member());
+
+drop policy if exists events_public_read on public.events;
+create policy events_public_read on public.events
+  for select to anon using ("isPublic" = true);
 
 drop policy if exists events_write on public.events;
 drop policy if exists events_insert on public.events;

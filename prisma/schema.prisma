@@ -145,10 +145,12 @@ model Announcement {
   id          String    @id @default(cuid())
   title       String
   content     String
+  imageUrl    String?
   authorId    String
   author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
   broadcast   Boolean   @default(true)
   publishedAt DateTime  @default(now())
+  expiresAt   DateTime?
   createdAt   DateTime  @default(now())
   emailSentAt DateTime?
 
@@ -206,7 +208,10 @@ model Meeting {
   opening             String?
   location            String?
   attendees           String?
+  membersAbsent       String?
+  membersApology      String?
   resolutions         String?
+  aob                 String?
   nextMeetingAt       DateTime?
   status              MeetingStatus @default(DRAFT)
   heldAt              DateTime
@@ -249,4 +254,20 @@ model AuditLog {
   @@index([createdAt])
   @@index([entity, entityId])
   @@map("audit_logs")
+}
+
+model ContactSubmission {
+  id          String    @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  category    String?
+  message     String
+  emailStatus String    @default("pending")
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([readAt])
+  @@map("contact_submissions")
 }

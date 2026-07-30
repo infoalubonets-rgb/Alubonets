@@ -15,6 +15,8 @@ export const ACTION_LABELS: Record<string, string> = {
   MEETING_PUBLISH: 'Published meeting minutes',
   MPESA_STK_INIT: 'Started an M-Pesa payment',
   ANNOUNCEMENT_SEND: 'Sent an announcement',
+  CONTACT_MESSAGE_READ: 'Marked a contact message as read',
+  CONTACT_MESSAGE_DELETE: 'Deleted a contact message',
   SEED: 'Seeded the database',
 }
 

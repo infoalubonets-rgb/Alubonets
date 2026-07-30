@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
-import { normalizeSupabaseUrl } from '@/lib/supabase-url'
+import { getServiceSupabaseConfig } from '@/lib/env'
 
 export function createServerClient() {
+  const { url, key } = getServiceSupabaseConfig()
   return createClient(
-    normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL!),
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    url,
+    key,
     {
       auth: {
         autoRefreshToken: false,

@@ -148,7 +148,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   required
                   className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
                 />
-                {mode === 'signin' && (
+                {mode === 'signin' && process.env.NODE_ENV === 'development' && (
                   <DevAccountsDropdown
                     open={devOpen}
                     onPick={(devEmail, devPassword) => {

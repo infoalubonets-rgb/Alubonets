@@ -55,13 +55,18 @@ async function uploadWithProgress(
 ): Promise<string> {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.')
+  if (!supabaseKey) throw new Error('Supabase publishable key is not configured.')
   const filePath = `project-covers/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
   const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/gallery/${filePath}`
 
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', uploadUrl)
-    xhr.setRequestHeader('Authorization', `Bearer ${session?.access_token}`)
+    xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`)
+    xhr.setRequestHeader('apikey', supabaseKey)
     xhr.setRequestHeader('Content-Type', 'image/jpeg')
     xhr.setRequestHeader('x-upsert', 'false')
     xhr.upload.addEventListener('progress', (e) => {

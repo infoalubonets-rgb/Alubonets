@@ -57,9 +57,30 @@ export async function middleware(req: NextRequest) {
     request: { headers: req.headers },
   })
 
+  const { pathname } = req.nextUrl
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // Keep the public site available during initial local setup. Authentication
+  // and protected routes still require real Supabase credentials in .env.local.
+  if (!supabaseUrl || !supabaseKey) {
+    if (isProtectedPath(pathname)) {
+      const url = req.nextUrl.clone()
+      url.pathname =
+        pathname === '/admin' || pathname.startsWith('/admin/')
+          ? '/admin/login'
+          : '/login'
+      url.searchParams.set('error', 'supabase_not_configured')
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
+
   const supabase = createServerClient(
-    normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL!),
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    normalizeSupabaseUrl(supabaseUrl),
+    supabaseKey,
     {
       cookies: {
         getAll() {
@@ -79,8 +100,6 @@ export async function middleware(req: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const { pathname } = req.nextUrl
 
   if (!isProtectedPath(pathname) && pathname !== '/pending') {
     return supabaseResponse

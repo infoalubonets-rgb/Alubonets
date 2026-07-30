@@ -4,3 +4,9 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[context.production.environment]
+  NEXT_PUBLIC_APP_ENV = "testing"
+
+[context.deploy-preview.environment]
+  NEXT_PUBLIC_APP_ENV = "preview"

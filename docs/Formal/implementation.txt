@@ -1,0 +1,854 @@
+Understood. I will not continue coding. This is a planning report only.
+
+Important: before your latest instruction, I had already started local changes for contact-message storage and an Admin inbox based on your previous request to begin implementation. I have stopped. Those changes have not been intentionally reverted or continued.
+
+Also, the corrected audit recognizes:
+
+- Executive Committee is implemented as a section on the About page.
+- “What We Do” is represented within the About page’s mission, values, welfare, empowerment and guiding-principles content.
+- Separate routes are not required.
+
+# Staged implementation plan
+
+## Stage 0 — Requirements confirmation and technical stabilization
+
+### Purpose
+
+Prevent further schema inconsistencies and avoid implementing business rules based on assumptions.
+
+### Outstanding work
+
+- Convert database updates from `prisma db push` into reviewed migrations.
+- Establish separate development, staging and production environments.
+- Add centralized environment-variable validation.
+- Hide preset development accounts outside development.
+- Add production error logging and monitoring.
+- Establish automated database and Storage backups.
+- Document recovery procedures.
+- Add a testing foundation.
+- Confirm unresolved committee decisions.
+
+### Implementation approach
+
+1. Create a requirements decision register.
+2. Record every unresolved committee decision with an owner and deadline.
+3. Generate a baseline migration matching the current production database.
+4. Require future database changes to use migrations.
+5. Add startup validation for required environment variables.
+6. Configure error tracking such as Sentry.
+7. Configure Supabase backup retention and Storage backup procedures.
+8. Add an automated CI workflow for type checking, linting and tests.
+9. prevent development credentials from appearing in production builds.
+
+### Decisions needed
+
+- Production domain
+- Official contact email
+- Production hosting owner
+- Backup retention period
+- Data-retention requirements
+- Development-account policy
+- Who approves production deployments
+
+### Completion criteria
+
+- Database can be recreated from migrations.
+- Development, staging and production are isolated.
+- No development credentials appear in production.
+- Failed server operations are centrally recorded.
+- Backup restoration has been tested.
+
+---
+
+# Stage 1 — Membership, registration and account management
+
+## 1.1 Complete registration form
+
+### Current limitation
+
+Registration only collects:
+
+- Full name
+- Phone
+- Email
+- Password
+
+### Missing fields
+
+- Gender
+- Date of birth
+- Location/address
+- Family branch/lineage
+- Next of kin name
+- Next of kin phone
+- Next-of-kin relationship
+- Profession/occupation
+- Skills
+- Education level
+- Achievements
+- Mentorship area
+- Interests
+- Emergency contact
+- Member category
+- Privacy and terms agreement
+
+### Implementation approach
+
+1. Separate authentication data from member-profile data.
+2. Keep `User` for identity, role and account status.
+3. Introduce a `MemberProfile` entity for personal, family and portfolio information.
+4. Divide registration into clear sections:
+   - Account
+   - Personal information
+   - Family information
+   - Portfolio
+   - Consent
+5. Validate sensitive fields on the server.
+6. Continue assigning every registration `MEMBER/PENDING`.
+7. Present all application fields in the Admin approval screen.
+8. Store consent version, timestamp and relevant policy version.
+9. Decide which sensitive fields Admin and Executive users may view.
+
+## 1.2 Complete member profile and portfolio
+
+### Current limitation
+
+Members can update only:
+
+- Name
+- Phone
+- Location
+- Avatar URL
+
+### Implementation approach
+
+1. Add a profile page divided into personal, family and portfolio sections.
+2. Permit members to update non-governance fields.
+3. Restrict changes to role, membership number, status and approval fields to Admin.
+4. Audit sensitive profile changes.
+5. Consider approval for changes to identity information.
+6. Add secure profile-image upload instead of URL-only entry.
+
+## 1.3 Password and account security
+
+### Missing functionality
+
+- Working password reset
+- Password change
+- Email-change verification
+- Optional two-factor authentication
+- Login history
+- Active-session management
+- Brute-force protection
+
+### Implementation approach
+
+1. Connect “Forgot password” to Supabase password recovery.
+2. Add a secure reset-password callback page.
+3. Add password change in account settings.
+4. Add rate limiting for login and registration.
+5. Record successful and failed login events.
+6. Add two-factor authentication later for privileged roles.
+7. Allow members to revoke other sessions.
+
+## 1.4 Admin member management
+
+### Partially implemented
+
+Admin can already:
+
+- Approve/reject users
+- Change status
+- Assign roles
+- Assign additional dashboard access
+
+### Missing functionality
+
+- Member application detail view
+- Member number
+- Member category
+- Family branch filters
+- Member export
+- Login history
+- Bulk operations
+- Documented rejection reasons
+- Approval notes
+- Identity verification status
+
+### Implementation approach
+
+1. Add a full member-detail screen.
+2. Record approval/rejection notes.
+3. Generate unique membership numbers.
+4. Add filters and pagination.
+5. Add CSV/Excel export.
+6. Add separate application, membership and login-history timelines.
+7. Record old and new values for Admin changes.
+
+### Stage 1 completion criteria
+
+- Registration captures all committee-approved fields.
+- New members cannot enter the portal before approval.
+- Admin can review the complete application.
+- Members can maintain their approved profile fields.
+- Password recovery works.
+- Member data is searchable, filterable and exportable.
+
+---
+
+# Stage 2 — Public contact and content administration
+
+## 2.1 Contact-message management
+
+### Current limitation
+
+The contact form emails a hard-coded address but does not reliably provide an Admin inbox.
+
+### Missing functionality
+
+- Database storage
+- Admin inbox
+- Read/unread status
+- Assignment
+- Resolution status
+- Spam protection
+- Configurable destination email
+- Reply tracking
+
+### Implementation approach
+
+1. Add a `ContactSubmission` entity.
+2. Store every valid message before attempting email.
+3. Record email-delivery status.
+4. Add an Admin contact inbox.
+5. Support:
+   - Unread
+   - In progress
+   - Resolved
+   - Spam
+6. Add rate limiting and CAPTCHA.
+7. Move the official destination address into an Admin setting.
+8. Escape message content before creating email HTML.
+9. Add retention and deletion rules.
+
+## 2.2 Public-content management
+
+### Current limitation
+
+Much public content is hard-coded in source files.
+
+### Missing Admin controls
+
+- Committee profiles
+- Contact information
+- Mission and vision
+- About content
+- Activity descriptions
+- Social/WhatsApp links
+- Homepage highlights
+- Public announcements
+- Footer information
+
+### Implementation approach
+
+1. Introduce structured content entities rather than a general unrestricted HTML editor.
+2. Create Admin forms for each content group.
+3. Support draft and published states.
+4. Store publication history and last editor.
+5. Keep Executive Committee and What We Do inside About unless the committee later requests separate pages.
+6. Provide preview before publication.
+7. Audit public-content changes.
+
+## 2.3 Privacy and legal content
+
+### Missing functionality
+
+- Privacy notice
+- Terms of use
+- Gallery consent policy
+- Data-retention explanation
+- Registration consent records
+
+### Implementation approach
+
+1. Obtain approved legal wording.
+2. Publish privacy and terms pages.
+3. Require explicit agreement during registration.
+4. Store policy version and acceptance date.
+5. Add consent status to gallery submissions.
+6. Define rules for withdrawing consent.
+
+### Stage 2 completion criteria
+
+- Contact messages are emailed and stored.
+- Admin can manage contact submissions.
+- Public information can be updated without a deployment.
+- Privacy and terms are published.
+- Registration and gallery consent are recorded.
+
+---
+
+# Stage 3 — Contributions, accounting and reconciliation
+
+This is the largest business-critical gap.
+
+## 3.1 Improve contribution records
+
+### Current implementation
+
+The system already supports:
+
+- Manual contribution entry
+- CSV import
+- Cash, bank, M-Pesa and other methods
+- M-Pesa references
+- Receipts
+- Individual PDF statements
+- Basic charts
+
+### Missing fields or behavior
+
+- Contribution status
+- Pending/confirmed/reversed state
+- Adjustment relationship
+- Correction reason
+- Source account
+- Reconciliation status
+- Reconciliation date
+- Transaction reference uniqueness
+- Supporting document
+- Contribution-period tracking
+- Arrears and expected amount
+- Configurable categories
+
+### Implementation approach
+
+1. Introduce configurable contribution categories.
+2. Add transaction lifecycle states:
+   - Pending
+   - Confirmed
+   - Reconciled
+   - Reversed
+3. Do not silently edit or delete confirmed transactions.
+4. Use reversal and adjustment records.
+5. Require a reason for corrections.
+6. Record old value, new value and actor.
+7. Add duplicate-reference detection.
+8. Add supporting-document attachments.
+9. Support daily, monthly, welfare, project and special collections.
+
+## 3.2 Create a proper financial ledger
+
+### Current limitation
+
+The `Contribution` table represents money received but cannot provide full accounting.
+
+### Required entities
+
+- FinancialAccount
+- FinancialTransaction
+- TransactionCategory
+- Expense
+- Disbursement
+- Adjustment
+- Reconciliation
+- SupportingDocument
+- AccountingPeriod
+
+### Implementation approach
+
+1. Treat contributions as one source of financial transactions.
+2. Record income and expenditure separately.
+3. Define accounts such as:
+   - Cash
+   - Bank
+   - M-Pesa
+   - Welfare fund
+   - Project fund
+4. Use immutable transaction records.
+5. Calculate balances from ledger entries.
+6. Require supporting evidence for selected expenditure categories.
+7. Add approval rules for high-value transactions if required.
+8. Close accounting periods to prevent unauthorized historical changes.
+
+## 3.3 Payment reconciliation
+
+### Missing functionality
+
+- Unmatched payments queue
+- Manual member matching
+- Duplicate detection
+- Reconciliation notes
+- Bank/M-Pesa comparison
+- Reconciliation report
+
+### Implementation approach
+
+1. Store incoming payment events before assigning them to contributions.
+2. Match by phone, reference, amount and member.
+3. Move uncertain records into an unmatched queue.
+4. Allow Treasurer to assign a member and category.
+5. Require notes for manual reconciliation.
+6. Audit every match and correction.
+7. Prevent one provider transaction from being reconciled twice.
+
+## 3.4 Financial reports
+
+### Missing reports
+
+- Daily collection report
+- Monthly contribution summary
+- Arrears report
+- Member balance report
+- Income/expenditure statement
+- Welfare-disbursement report
+- Investment-spending report
+- Reconciliation report
+- Cash/bank/M-Pesa balance report
+- Adjustment/reversal report
+
+### Implementation approach
+
+1. Define each report’s formula with the Treasurer.
+2. Add date, category, payment method and member filters.
+3. Generate reports from the ledger.
+4. Support screen view, PDF, CSV and Excel where appropriate.
+5. Include report-generation timestamp and filters.
+6. Restrict report access by role.
+7. Audit sensitive exports.
+
+### Stage 3 completion criteria
+
+- Every financial movement is represented in the ledger.
+- Confirmed transactions cannot be silently deleted.
+- Treasurer can reconcile unmatched payments.
+- Members can see accurate personal balances.
+- Authorized roles can produce approved financial statements.
+- Every correction has a reason and audit history.
+
+---
+
+# Stage 4 — Documents, meetings and governance
+
+## 4.1 Full document repository
+
+### Current implementation
+
+Documents exist, and published meeting minutes can create document records.
+
+### Missing functionality
+
+- Dedicated member repository
+- Access levels
+- Role targeting
+- Document versions
+- File replacement history
+- Categories
+- Search and filters
+- Download audit
+- Expiry/archive status
+- General upload workflow
+
+### Implementation approach
+
+1. Extend the document model with:
+   - Description
+   - Access level
+   - Allowed roles
+   - Version
+   - Status
+   - Effective date
+   - Archived date
+2. Add document categories:
+   - Constitution
+   - Policy
+   - Minutes
+   - Finance
+   - Project
+   - Correspondence
+3. Create separate Admin/Secretary management and member-reading pages.
+4. Generate signed Storage URLs at access time.
+5. Record document publication and replacement.
+6. Preserve old versions.
+7. Audit uploads, publications, replacements and deletions.
+
+## 4.2 Meeting notices and governance workflow
+
+### Current implementation
+
+Secretary meeting reports and Word/PDF exports are strong.
+
+### Missing functionality
+
+- Meeting notices
+- Invitations
+- Agenda circulation
+- Action-point ownership
+- Action deadlines
+- Decision register
+- Selected-role sharing
+- Member-facing approved reports
+- Version history
+
+### Implementation approach
+
+1. Separate meeting scheduling from minutes.
+2. Add a meeting notice state.
+3. Add invitee/audience records.
+4. Add agenda items as structured records where needed.
+5. Add action points with:
+   - Owner
+   - Due date
+   - Status
+6. Add a decision/resolution register.
+7. Publish final reports to the member document repository.
+8. Make drafts visible only to authorized roles.
+9. Lock final minutes or require a new version for changes.
+
+## 4.3 Comprehensive audit trail
+
+### Current implementation
+
+Many important actions already create audit records.
+
+### Missing functionality
+
+- Universal coverage
+- Old values
+- New values
+- Reason for change
+- IP/device where appropriate
+- Login records
+- Export records
+- Search/export
+- Tamper-resistant retention
+
+### Implementation approach
+
+1. Standardize an audit-event schema.
+2. Require old/new snapshots for sensitive updates.
+3. Require reasons for financial and status changes.
+4. Add login and export events.
+5. Add filters and export to the Admin audit viewer.
+6. Restrict audit deletion.
+7. Move retention deletion to a controlled scheduled process.
+8. Consider append-only database protections.
+
+### Stage 4 completion criteria
+
+- Members can access authorized documents and final minutes.
+- Draft documents remain restricted.
+- Meeting action points and decisions can be tracked.
+- Document versions are preserved.
+- Sensitive changes contain actor, time, old value, new value and reason.
+
+---
+
+# Stage 5 — Projects, investments and member participation
+
+## 5.1 Project comments
+
+### Missing functionality
+
+Members cannot comment on projects.
+
+### Required entities
+
+- ProjectComment
+- CommentModeration
+- CommentReaction, optional
+
+### Implementation approach
+
+1. Allow active members to submit comments.
+2. Support moderation states:
+   - Pending
+   - Published
+   - Hidden
+   - Rejected
+3. Permit Admin/Executive moderation.
+4. Notify project managers about new comments.
+5. Audit moderation actions.
+6. Prevent anonymous comments.
+
+## 5.2 Project investment management
+
+### Current limitation
+
+Projects contain basic title, description, status, progress and dates.
+
+### Missing functionality
+
+- Budget
+- Actual expenditure
+- Funding target
+- Member investment records
+- Project documents
+- Updates
+- Milestones
+- Responsible committee members
+- Financial visibility rules
+
+### Implementation approach
+
+1. Add project budget and funding fields.
+2. Link project expenses to the financial ledger.
+3. Add milestones and progress updates.
+4. Add project-document associations.
+5. Add responsible users.
+6. Separate public summaries from member and committee financial views.
+7. Add project reports and exports.
+
+### Stage 5 completion criteria
+
+- Members can submit moderated comments.
+- Project managers can publish updates.
+- Budgets and expenditures are recorded.
+- Public visitors cannot access restricted financial details.
+- Executive users can monitor project performance.
+
+---
+
+# Stage 6 — Events, RSVP and communication
+
+## 6.1 Event management
+
+### Current implementation
+
+Organizer can create, update and publish events with cover images.
+
+### Missing functionality
+
+- RSVP
+- Attendance
+- Invitations
+- Audience selection
+- Budget estimate
+- Event costs
+- Scheduled reminders
+- Post-event report
+- Attachments
+- Calendar management
+
+### Implementation approach
+
+1. Extend events with visibility and audience rules.
+2. Add `EventRSVP`.
+3. Add capacity and RSVP deadline where needed.
+4. Add attendance confirmation.
+5. Add reminder schedules.
+6. Add budget and actual cost.
+7. Link event expenses to the financial ledger.
+8. Add post-event reports and gallery references.
+9. Add calendar and list views.
+10. Support members-only events.
+
+## 6.2 Notification system
+
+### Current implementation
+
+The platform has announcements, email functions and dashboard activity notifications.
+
+### Missing functionality
+
+- Persistent notification records
+- Delivery status per recipient
+- Scheduled delivery
+- Family-branch targeting
+- Role targeting in all notification types
+- Selected-member targeting
+- Preferences
+- SMS/WhatsApp
+- Retry handling
+- Templates managed by Admin
+
+### Required entities
+
+- Notification
+- NotificationRecipient
+- NotificationTemplate
+- NotificationPreference
+- DeliveryAttempt
+
+### Implementation approach
+
+1. Store notifications independently of announcements.
+2. Generate one recipient record per member.
+3. Support channels:
+   - Dashboard
+   - Email
+   - SMS
+   - WhatsApp
+4. Add audience selection.
+5. Add scheduling and retry jobs.
+6. Track sent, delivered, failed and read states.
+7. Allow members to manage optional channels.
+8. Keep mandatory governance/financial notices enabled.
+9. Add Admin-managed templates.
+
+### Stage 6 completion criteria
+
+- Members can RSVP.
+- Organizers can record attendance.
+- Events support reminders and reports.
+- Notifications are targetable and traceable.
+- Failed deliveries can be reviewed and retried.
+
+---
+
+# Stage 7 — Loans and advanced finance
+
+This stage must wait for committee-approved lending rules.
+
+## Missing functionality
+
+- Loan applications
+- Eligibility calculation
+- Review
+- Approval workflow
+- Guarantors
+- Repayment schedules
+- Repayment allocation
+- Penalties
+- Outstanding balances
+- Defaults
+- Loan statements and reports
+
+## Decisions required first
+
+- Who qualifies?
+- Maximum loan amount
+- Contribution-to-loan ratio
+- Interest or administration fee
+- Repayment frequency
+- Required guarantors
+- Approval authorities
+- Late-payment penalties
+- Default procedure
+- Whether Executive approval is mandatory
+
+## Implementation approach
+
+1. Document the lending policy.
+2. Add configurable loan products.
+3. Add loan application and approval entities.
+4. Add guarantors where required.
+5. Generate immutable repayment schedules.
+6. Link repayments to financial transactions.
+7. Calculate balances from transactions.
+8. Add arrears/default processing.
+9. Notify applicants and guarantors.
+10. Produce loan statements and management reports.
+
+### Stage 7 completion criteria
+
+- Loan behavior matches an approved policy.
+- Applications and approvals are audited.
+- Repayment balances are transaction-derived.
+- Treasurer and Executive permissions follow the constitution.
+- Required loan reports can be generated.
+
+---
+
+# Stage 8 — Admin settings and master data
+
+## Missing functionality
+
+- Contribution categories
+- Welfare categories
+- Project categories
+- Member categories
+- Notification templates
+- Contact settings
+- Public social links
+- Password policy
+- Feature flags
+- Loan activation
+- Audit retention setting
+- System branding settings
+
+## Implementation approach
+
+1. Introduce typed setting and category entities.
+2. Avoid placing secrets in database-managed settings.
+3. Add validation for each setting type.
+4. Restrict settings to Admin or Super Admin.
+5. Audit every change.
+6. Add feature flags for optional modules.
+7. Add staging preview where settings affect public content.
+
+### Stage 8 completion criteria
+
+- Admin can manage approved master data without code deployment.
+- Optional features can be safely enabled or disabled.
+- Settings changes are validated and audited.
+
+---
+
+# Stage 9 — Quality, performance and final deliverables
+
+## Missing technical work
+
+- Automated unit tests
+- Integration tests
+- End-to-end tests
+- Authorization tests
+- Accessibility audit
+- Performance testing
+- Pagination
+- Search and filters
+- Monitoring
+- Backup verification
+- Disaster-recovery testing
+- Security review
+
+## Missing project deliverables
+
+- Admin user guide
+- Treasurer guide
+- Secretary guide
+- Organizer guide
+- Executive guide
+- Training material
+- Testing report
+- Deployment checklist
+- Backup plan
+- Restore guide
+- Final sign-off checklist
+
+## Implementation approach
+
+1. Add tests for every permission boundary.
+2. Test registration and approval end to end.
+3. Test financial calculations independently.
+4. Test Supabase RLS using each role.
+5. Add pagination to growing lists.
+6. Run accessibility checks and keyboard testing.
+7. Test slow mobile connections.
+8. Configure uptime and error monitoring.
+9. conduct a backup restoration exercise.
+10. Prepare role-specific guides and acceptance scripts.
+
+### Stage 9 completion criteria
+
+- Critical workflows have automated coverage.
+- Unauthorized access tests fail safely.
+- Large lists paginate.
+- Mobile and accessibility acceptance tests pass.
+- Backup restoration is demonstrated.
+- Required guides and sign-off records are delivered.
+
+# Recommended execution order
+
+1. Stage 0 — Stabilization and decisions
+2. Stage 1 — Membership and account management
+3. Stage 2 — Contact, public administration and privacy
+4. Stage 3 — Finance and reconciliation
+5. Stage 4 — Documents, meetings and audit
+6. Stage 5 — Projects and participation
+7. Stage 6 — Events and notifications
+8. Stage 8 — Admin settings
+9. Stage 7 — Loans, after policy approval
+10. Stage 9 — Quality work runs throughout, with final verification at the end
+
+No additional code was written after your instruction to stop coding.
