@@ -1,14 +1,20 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { TREASURER_NAV } from '@/lib/dashboard/nav'
-import { getTreasurerDashboardData, getContributionChartSeries } from '@/lib/data/queries'
-import { BudgetDoughnutChart, ContributionTrendChart } from '@/components/dashboard/Charts'
+import { getTreasurerDashboardData, getContributionChartSeries, getContributionAnalytics } from '@/lib/data/queries'
+import { BudgetDoughnutChart, ContributionTrendChart, TopContributorsChart } from '@/components/dashboard/Charts'
 import Link from 'next/link'
 
 export default async function TreasurerPage() {
-  const data = await getTreasurerDashboardData()
-  const chart = await getContributionChartSeries()
+  const [data, chart, analytics] = await Promise.all([
+    getTreasurerDashboardData(),
+    getContributionChartSeries(),
+    getContributionAnalytics(),
+  ])
+
   const catLabels = data.byCategory.map((c) => c.category || 'Uncategorized')
   const catValues = data.byCategory.map((c) => c._sum.amount ?? 0)
+  const topLabels = analytics.topContributors.map((t) => t.name)
+  const topValues = analytics.topContributors.map((t) => t.total)
 
   const stats = [
     { label: 'Total (KES)',     value: Math.round(data.total).toLocaleString(),      icon: 'account_balance',    color: 'bg-primary dark:bg-[#0c1e42]',           text: 'text-white', iconBg: 'bg-white/15' },
@@ -18,9 +24,9 @@ export default async function TreasurerPage() {
   ]
 
   const quickLinks = [
-    { label: 'Contributions', description: 'Record, import CSV, receipts, M-Pesa', icon: 'payments', href: '/dashboard/treasurer/contributions' },
+    { label: 'Contributions & Payments', description: 'Record contributions, M-Pesa payments, receipts', icon: 'payments', href: '/dashboard/treasurer/contributions' },
     { label: 'Welfare', description: `${data.pendingWelfare.length} pending review${data.pendingWelfare.length === 1 ? '' : 's'}`, icon: 'volunteer_activism', href: '/dashboard/treasurer/welfare', badge: data.pendingWelfare.length > 0 ? data.pendingWelfare.length : null },
-    { label: 'My contributions', description: 'View your own contribution history', icon: 'savings', href: '/contributions' },
+    { label: 'Announcements', description: 'Group announcements & payment notifications', icon: 'campaign', href: '/announcements' },
   ]
 
   return (
@@ -43,19 +49,32 @@ export default async function TreasurerPage() {
           ))}
         </div>
 
-        {/* Charts */}
-        <div className="grid lg:grid-cols-2 gap-4">
-          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+        {/* Line chart — full width */}
+        <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>trending_up</span>
+            <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Monthly contribution trend</h2>
+          </div>
+          <ContributionTrendChart
+            labels={chart.labels.length ? chart.labels : ['—']}
+            values={chart.values.length ? chart.values : [0]}
+          />
+        </section>
+
+        {/* Bar + Donut side by side */}
+        <div className="grid lg:grid-cols-5 gap-4">
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5 lg:col-span-3">
             <div className="flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>trending_up</span>
-              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Trend</h2>
+              <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>leaderboard</span>
+              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Top contributors</h2>
             </div>
-            <ContributionTrendChart
-              labels={chart.labels.length ? chart.labels : ['—']}
-              values={chart.values.length ? chart.values : [0]}
+            <TopContributorsChart
+              labels={topLabels.length ? topLabels : ['None']}
+              values={topValues.length ? topValues : [0]}
             />
           </section>
-          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5 lg:col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>donut_large</span>
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">By category</h2>

@@ -2,6 +2,7 @@ import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 import type { Contribution, User } from '@prisma/client'
 import { buildReceiptPdf } from '@/lib/pdf/receipt'
+import { SITE_LOGO } from '@/lib/constants'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -17,9 +18,23 @@ const testEmailOverride = () => process.env.RESEND_TEST_EMAIL || null
 function baseHtml(body: string) {
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f7fa;font-family:sans-serif;">
 <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);">
-  <div style="background:#003d82;padding:24px 32px;">
-    <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-.5px;">Alubonets SHG</span>
+  <div style="background:#001f50;padding:20px 28px;">
+    <table cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="vertical-align:middle;padding-right:14px;">
+        <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:44px;width:44px;v-text-anchor:middle;" arcsize="50%" fillcolor="#fe8015" strokecolor="#fe8015"><v:fill type="frame" src="${SITE_LOGO}" /></v:roundrect><![endif]-->
+        <!--[if !mso]><!-->
+        <div style="width:44px;height:44px;border-radius:22px;overflow:hidden;display:inline-block;line-height:0;background:#fe8015;">
+          <img src="${SITE_LOGO}" alt="Alubonets" width="44" height="44"
+            style="width:44px;height:44px;display:block;" />
+        </div>
+        <!--<![endif]-->
+      </td>
+      <td style="vertical-align:middle;">
+        <span style="color:#fff;font-size:17px;font-weight:700;letter-spacing:-.3px;font-family:sans-serif;">Alubonets SHG</span>
+      </td>
+    </tr></table>
   </div>
+  <div style="height:3px;background:#fe8015;"></div>
   <div style="padding:28px 32px;">${body}</div>
   <div style="padding:16px 32px;background:#f5f7fa;border-top:1px solid #e5e7eb;">
     <p style="margin:0;color:#9ca3af;font-size:12px;">Alubonets Self-Help Group · <a href="${appUrl()}" style="color:#9ca3af;">${appUrl()}</a></p>
@@ -152,7 +167,12 @@ export async function sendGalleryNotificationEmail({
 export async function sendMemberApprovedEmail(user: User) {
   const resend = getResend()
   const subject = 'Your Alubonets membership was approved'
-  const html = `<p>Hello ${user.fullName},</p><p>Your membership is now active. You can log in at ${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/login</p>`
+  const html = baseHtml(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Welcome to Alubonets SHG!</h2>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${user.fullName},</p>
+    <p style="margin:0 0 20px;color:#374151;">Your membership has been approved and your account is now active. You can log in and start using the member portal.</p>
+    <p><a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/login" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Log in to your account</a></p>
+  `)
 
   if (!resend) {
     await prisma.emailLog.create({
@@ -206,7 +226,13 @@ export async function sendContributionReceiptEmail(
   const resend = getResend()
   const { user, amount, mpesaRef: ref } = contribution
   const subject = `Contribution receipt — KES ${amount.toLocaleString()}`
-  const html = `<p>Hello ${user.fullName},</p><p>We received your contribution of <strong>KES ${amount.toLocaleString()}</strong>${ref ? ` (ref: ${ref})` : ''}.</p><p>Your receipt is attached as a PDF.</p>`
+  const html = baseHtml(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Payment received</h2>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${user.fullName},</p>
+    <p style="margin:0 0 8px;color:#374151;">We have received your contribution of <strong style="color:#974800;">KES ${Math.round(amount).toLocaleString()}</strong>${ref ? ` (M-Pesa ref: <strong>${ref}</strong>)` : ''}.</p>
+    <p style="margin:0 0 20px;color:#374151;">Your official receipt is attached as a PDF to this email.</p>
+    <p style="margin:0;font-size:13px;color:#6b7280;">Thank you for your continued support of Alubonets SHG.</p>
+  `)
 
   if (!resend) {
     await prisma.emailLog.create({
@@ -269,7 +295,13 @@ export async function sendWelfareStatusEmail(
 ) {
   const resend = getResend()
   const subject = `Welfare request ${status.toLowerCase()}`
-  const html = `<p>Hello ${user.fullName},</p><p>Your welfare request is now <strong>${status}</strong>.</p>${note ? `<p>Note: ${note}</p>` : ''}`
+  const statusColor = status === 'APPROVED' ? '#15803d' : status === 'REJECTED' ? '#dc2626' : '#374151'
+  const html = baseHtml(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Welfare request update</h2>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${user.fullName},</p>
+    <p style="margin:0 0 12px;color:#374151;">Your welfare request is now <strong style="color:${statusColor};">${status}</strong>.</p>
+    ${note ? `<p style="margin:0;color:#374151;">Note: ${note}</p>` : ''}
+  `)
 
   if (!resend) {
     await prisma.emailLog.create({

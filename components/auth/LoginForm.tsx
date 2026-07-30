@@ -109,6 +109,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   </label>
                   <input
                     type="text"
+                    name="name"
+                    autoComplete="name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
@@ -121,6 +123,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   </label>
                   <input
                     type="tel"
+                    name="tel"
+                    autoComplete="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
@@ -135,6 +139,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
               <div className="relative">
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setDevOpen(true)}
@@ -161,6 +167,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
               <div className="relative">
                 <input
                   type={showPw ? 'text' : 'password'}
+                  name="password"
+                  autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -185,6 +193,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                 </label>
                 <input
                   type={showPw ? 'text' : 'password'}
+                  name="confirm-password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required

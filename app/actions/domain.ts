@@ -131,13 +131,45 @@ export async function actionReviewWelfare(formData: FormData) {
   revalidateTag(TAGS.welfare)
 }
 
+export async function actionUploadAnnouncementImage(
+  formData: FormData,
+): Promise<{ url: string }> {
+  await requireActiveRole(['ADMIN', 'ORGANIZER', 'SECRETARY', 'EXECUTIVE', 'TREASURER'])
+
+  const file = formData.get('file') as File | null
+  if (!file || file.size === 0) throw new Error('No file provided')
+
+  const { createClient } = await import('@supabase/supabase-js')
+  const { normalizeSupabaseUrl } = await import('@/lib/supabase-url')
+
+  const admin = createClient(
+    normalizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL!),
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  )
+
+  const ext = (file.name.split('.').pop() ?? 'jpg').toLowerCase()
+  const path = `announcements/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+  const bytes = await file.arrayBuffer()
+  const { error } = await admin.storage
+    .from('gallery')
+    .upload(path, bytes, { contentType: file.type, upsert: false })
+
+  if (error) throw new Error(`Upload failed: ${error.message}`)
+
+  const { data } = admin.storage.from('gallery').getPublicUrl(path)
+  return { url: data.publicUrl }
+}
+
 export async function actionSendAnnouncement(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN', 'ORGANIZER', 'SECRETARY', 'EXECUTIVE'])
+  const actor = await requireActiveRole(['ADMIN', 'ORGANIZER', 'SECRETARY', 'EXECUTIVE', 'TREASURER'])
   const title = String(formData.get('title') || '').trim()
   const content = String(formData.get('content') || '').trim()
+  const imageUrl = String(formData.get('imageUrl') || '').trim() || undefined
   const audience = String(formData.get('audience') || 'ALL')
   const memberIds = formData.getAll('memberIds').map(String).filter(Boolean)
   const sendEmail = formData.get('sendEmail') !== 'off'
+  const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000)
   if (!title || !content) throw new Error('Title and content required')
   const broadcast = audience !== 'SELECTED'
   if (!broadcast && memberIds.length === 0) {
@@ -147,8 +179,10 @@ export async function actionSendAnnouncement(formData: FormData) {
     authorId: actor.id,
     title,
     content,
+    imageUrl,
     broadcast,
     memberIds,
+    expiresAt,
   })
   await writeAudit({
     userId: actor.id,
@@ -197,9 +231,21 @@ export async function actionMarkAnnouncementsRead() {
 }
 
 export async function actionDeleteAnnouncement(id: string) {
-  await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER'])
+  const actor = await requireSessionProfile()
+  if (!actor || actor.status !== 'ACTIVE') throw new Error('Unauthorized')
+
+  const announcement = await prisma.announcement.findUnique({
+    where: { id },
+    select: { authorId: true },
+  })
+  if (!announcement) throw new Error('Announcement not found')
+
+  // Only the author or a super-admin may delete
+  if (actor.id !== announcement.authorId && !actor.isSuperAdmin) {
+    throw new Error('Only the person who sent this announcement can delete it')
+  }
+
   await deleteAnnouncement(id)
-  // Revalidate every path that shows announcements so it disappears for all users
   revalidatePath('/announcements')
   revalidatePath('/dashboard/member')
   revalidatePath('/dashboard/organizer')
@@ -322,6 +368,14 @@ export async function actionCreateDocument(formData: FormData) {
     category: String(formData.get('category') || '') || undefined,
     uploadedBy: actor.id,
   })
+  revalidatePath('/dashboard/secretary')
+  revalidatePath('/dashboard/member')
+  revalidateTag(TAGS.documents)
+}
+
+export async function actionDeleteDocument(id: string) {
+  await requireActiveRole(['SECRETARY', 'ADMIN'])
+  await prisma.document.delete({ where: { id } })
   revalidatePath('/dashboard/secretary')
   revalidatePath('/dashboard/member')
   revalidateTag(TAGS.documents)

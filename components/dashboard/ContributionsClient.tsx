@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import MemberContributeModal from './MemberContributeModal'
 
 type Contribution = {
@@ -48,6 +49,14 @@ export default function ContributionsClient({
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate]     = useState('')
   const [pdfLoading, setPdfLoading] = useState(false)
+
+  const router = useRouter()
+  useEffect(() => {
+    const tid = setInterval(() => {
+      if (document.visibilityState === 'visible') router.refresh()
+    }, 15_000)
+    return () => clearInterval(tid)
+  }, [router])
 
   function applyPreset(p: Preset) {
     setPreset(p)

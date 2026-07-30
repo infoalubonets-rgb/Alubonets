@@ -5,7 +5,7 @@ import Link from 'next/link'
 
 type NotifItem = {
   id: string
-  type: 'event' | 'project' | 'gallery'
+  type: 'event' | 'project' | 'gallery' | 'payment'
   title: string
   description: string
   imageUrl: string | null
@@ -59,9 +59,10 @@ function dismissCleanupReminder() {
 }
 
 const CFG = {
-  event:   { icon: 'event',         label: 'New event',   bg: 'bg-primary/10',     color: 'text-primary' },
-  project: { icon: 'work',          label: 'New project', bg: 'bg-green-100 dark:bg-green-900/20', color: 'text-green-700 dark:text-green-400' },
-  gallery: { icon: 'photo_library', label: 'New photo',   bg: 'bg-purple-100 dark:bg-purple-900/20', color: 'text-purple-700 dark:text-purple-400' },
+  event:   { icon: 'event',         label: 'New event',       bg: 'bg-primary/10',     color: 'text-primary' },
+  project: { icon: 'work',          label: 'New project',     bg: 'bg-green-100 dark:bg-green-900/20',   color: 'text-green-700 dark:text-green-400' },
+  gallery: { icon: 'photo_library', label: 'New photo',       bg: 'bg-purple-100 dark:bg-purple-900/20', color: 'text-purple-700 dark:text-purple-400' },
+  payment: { icon: 'payments',      label: 'New contribution', bg: 'bg-orange-100 dark:bg-orange-900/20', color: 'text-orange-600 dark:text-orange-400' },
 }
 
 export default function DashboardNotifications() {

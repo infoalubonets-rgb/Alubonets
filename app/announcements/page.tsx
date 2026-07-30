@@ -1,14 +1,16 @@
 import { redirect } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
-import AnnouncementComposer from '@/components/dashboard/AnnouncementComposer'
 import MarkAnnouncementsRead from '@/components/dashboard/MarkAnnouncementsRead'
 import AnnouncementsClient from '@/components/dashboard/AnnouncementsClient'
+import TreasurerNotificationsClient from '@/components/dashboard/TreasurerNotificationsClient'
 import { navForRole } from '@/lib/dashboard/nav'
 import { getAnnouncementsForUser } from '@/lib/data/queries'
 import { getSessionProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import type { Role } from '@/lib/auth/types'
+import type { Prisma } from '@prisma/client'
 
+export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Announcements — Alubonets' }
 
 export default async function AnnouncementsPage() {
@@ -17,10 +19,12 @@ export default async function AnnouncementsPage() {
   if (profile.status === 'SUSPENDED') redirect('/login?error=suspended')
 
   const role = profile.role as Role
-  const canSend = role === 'ADMIN' || profile.isSuperAdmin
-  const canDelete = ['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER'].includes(role)
+  const canSend =
+    ['ADMIN', 'EXECUTIVE', 'ORGANIZER', 'SECRETARY', 'TREASURER'].includes(role) ||
+    (profile.isSuperAdmin ?? false)
+  const showPaymentNotifs = ['TREASURER', 'ADMIN'].includes(role) || (profile.isSuperAdmin ?? false)
 
-  const [announcements, members] = await Promise.all([
+  const [announcements, members, paymentNotifs] = await Promise.all([
     getAnnouncementsForUser(profile.id),
     canSend
       ? prisma.user.findMany({
@@ -29,19 +33,44 @@ export default async function AnnouncementsPage() {
           orderBy: { fullName: 'asc' },
         })
       : Promise.resolve([]),
+    showPaymentNotifs
+      ? prisma.auditLog.findMany({
+          where: { action: 'MPESA_STK_SUCCESS' },
+          include: { user: { select: { fullName: true, email: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        })
+      : Promise.resolve([]),
   ])
 
   return (
     <DashboardShell role={role} title="Announcements" nav={navForRole(role)}>
       <MarkAnnouncementsRead />
-      <div className="max-w-3xl mx-auto space-y-5 pb-10">
-        {canSend && (
-          <section className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 border-t-4 border-t-secondary-container">
-            <h2 className="font-label-bold text-sm text-on-surface mb-3">Send announcement</h2>
-            <AnnouncementComposer members={members} />
-          </section>
+      <div className="max-w-3xl mx-auto pb-10 space-y-6">
+        {showPaymentNotifs && (
+          <div>
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>payments</span>
+              <h2 className="font-semibold text-[13px] text-on-surface uppercase tracking-wider">Payment Notifications</h2>
+            </div>
+            <TreasurerNotificationsClient
+              payments={paymentNotifs.map((p) => ({
+                id: p.id,
+                createdAt: p.createdAt.toISOString(),
+                meta: (p.meta ?? {}) as Prisma.JsonObject,
+                user: p.user,
+              }))}
+            />
+            <div className="border-t border-outline-variant my-6" />
+          </div>
         )}
-        <AnnouncementsClient announcements={announcements} canDelete={canDelete} />
+        <AnnouncementsClient
+          announcements={announcements}
+          currentUserId={profile.id}
+          isSuperAdmin={profile.isSuperAdmin ?? false}
+          canSend={canSend}
+          members={members}
+        />
       </div>
     </DashboardShell>
   )

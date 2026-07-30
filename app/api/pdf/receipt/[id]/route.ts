@@ -34,6 +34,7 @@ export async function GET(
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="receipt-${contribution.id}.pdf"`,
+      'Cache-Control': 'private, max-age=3600, immutable',
     },
   })
 }

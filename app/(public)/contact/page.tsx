@@ -1,11 +1,17 @@
 import type { Metadata } from 'next'
 import { CONTACT_EMAIL } from '@/lib/constants'
+import { sendContactMessage } from '@/app/actions/contact'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
 }
 
-export default function ContactPage() {
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sent?: string; error?: string }>
+}) {
+  const { sent, error } = await searchParams
   return (
     <main className="flex-grow max-w-container-max mx-auto w-full px-md md:px-lg py-lg md:py-xl relative">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-lg md:gap-xl items-start relative z-10">
@@ -62,7 +68,21 @@ export default function ContactPage() {
             <div className="mb-md">
               <h2 className="font-h3 text-[22px] leading-snug text-primary">Send a Message</h2>
             </div>
-            <form className="flex flex-col gap-md">
+
+            {sent === '1' && (
+              <div className="mb-md flex items-center gap-3 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-green-700">
+                <span className="material-symbols-outlined icon-fill text-green-500">check_circle</span>
+                <p className="text-[14px] font-medium">Message sent! We&apos;ll get back to you shortly.</p>
+              </div>
+            )}
+            {error === 'missing' && (
+              <div className="mb-md flex items-center gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-red-700">
+                <span className="material-symbols-outlined icon-fill text-red-500">error</span>
+                <p className="text-[14px] font-medium">Please fill in all required fields.</p>
+              </div>
+            )}
+
+            <form action={sendContactMessage} className="flex flex-col gap-md">
               <div>
                 <div className="contact-section-label mb-sm">
                   <span className="font-label-bold text-label-bold text-primary uppercase tracking-[0.14em] text-[12px]">

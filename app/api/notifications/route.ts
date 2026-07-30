@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
 import { getSessionProfile } from '@/lib/auth/session'
 import { getRecentItems, getOldAnnouncementsCount, getPastEventsCount, getOldGalleryCount } from '@/lib/data/queries'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 const MANAGER_ROLES = ['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER']
+const PAYMENT_ROLES = ['TREASURER', 'ADMIN']
 
 const EMPTY = { items: [], announcementCount: 0, pastEventsCount: 0, oldGalleryCount: 0 }
+
+type StkMeta = { amount?: number; receipt?: string; phone?: string; checkoutRequestId?: string }
 
 export async function GET() {
   try {
@@ -14,14 +18,27 @@ export async function GET() {
     if (!profile) return NextResponse.json({ items: [] }, { status: 401 })
 
     const isManager = MANAGER_ROLES.includes(profile.role)
+    const isPaymentRole = PAYMENT_ROLES.includes(profile.role)
     const windowHours = isManager ? 48 : 6
 
-    const [{ events, projects, photos }, announcementCount, pastEventsCount, oldGalleryCount] = await Promise.all([
-      getRecentItems(windowHours),
-      isManager ? getOldAnnouncementsCount() : Promise.resolve(0),
-      isManager ? getPastEventsCount() : Promise.resolve(0),
-      isManager ? getOldGalleryCount() : Promise.resolve(0),
-    ])
+    // Fetch recent payments for treasurer/admin (last 24h)
+    const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
+
+    const [{ events, projects, photos }, announcementCount, pastEventsCount, oldGalleryCount, recentPayments] =
+      await Promise.all([
+        getRecentItems(windowHours),
+        isManager ? getOldAnnouncementsCount() : Promise.resolve(0),
+        isManager ? getPastEventsCount() : Promise.resolve(0),
+        isManager ? getOldGalleryCount() : Promise.resolve(0),
+        isPaymentRole
+          ? prisma.auditLog.findMany({
+              where: { action: 'MPESA_STK_SUCCESS', createdAt: { gte: since24h } },
+              include: { user: { select: { fullName: true } } },
+              orderBy: { createdAt: 'desc' },
+              take: 10,
+            })
+          : Promise.resolve([]),
+      ])
 
     const items = [
       ...events.map((e) => ({
@@ -51,6 +68,19 @@ export async function GET() {
         href: '/gallery',
         createdAt: p.uploadedAt.toISOString(),
       })),
+      ...recentPayments.map((a) => {
+        const meta = (a.meta ?? {}) as StkMeta
+        const amount = meta.amount ?? 0
+        return {
+          id: `payment-${a.id}`,
+          type: 'payment' as const,
+          title: `KES ${Math.round(amount).toLocaleString()} from ${a.user.fullName}`,
+          description: meta.receipt || meta.phone || 'M-Pesa payment received',
+          imageUrl: null,
+          href: '/dashboard/treasurer/notifications',
+          createdAt: a.createdAt.toISOString(),
+        }
+      }),
     ].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 
     return NextResponse.json({ items, announcementCount, pastEventsCount, oldGalleryCount })

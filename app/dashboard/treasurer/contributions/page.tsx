@@ -14,16 +14,31 @@ import {
 } from '@/components/dashboard/Charts'
 import CsvImportForm from '@/components/dashboard/CsvImportForm'
 import MpesaStkForm from '@/components/dashboard/MpesaStkForm'
+import PaymentsModal from '@/components/dashboard/PaymentsModal'
+import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Member contributions',
 }
 
 export default async function TreasurerContributionsPage() {
-  const [data, chart, analytics] = await Promise.all([
+  const [data, chart, analytics, mpesaContributions, failedPayments] = await Promise.all([
     getTreasurerDashboardData(),
     getContributionChartSeries(),
     getContributionAnalytics(),
+    prisma.contribution.findMany({
+      where: { paymentMethod: 'MPESA' },
+      include: { user: { select: { fullName: true, email: true } } },
+      orderBy: { paidAt: 'desc' },
+    }),
+    prisma.auditLog.findMany({
+      where: { action: 'MPESA_STK_FAILED' },
+      include: { user: { select: { fullName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
   ])
 
   const catLabels = data.byCategory.map((c) => c.category || 'Uncategorized')
@@ -43,13 +58,40 @@ export default async function TreasurerContributionsPage() {
   return (
     <DashboardShell role="TREASURER" title="Member contributions" nav={TREASURER_NAV}>
       <div className="space-y-6 p-4 md:p-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {stats.map((s) => (
-            <div key={s.label} className="rounded-xl border bg-surface p-4">
-              <p className="text-xs text-on-surface-variant uppercase">{s.label}</p>
-              <p className="text-2xl font-semibold mt-1">{s.value}</p>
-            </div>
-          ))}
+
+        {/* Header row with Payments button */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-xl border bg-surface p-4">
+                <p className="text-xs text-on-surface-variant uppercase">{s.label}</p>
+                <p className="text-2xl font-semibold mt-1">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Payments modal trigger */}
+        <div className="flex items-center gap-3">
+          <PaymentsModal
+            successPayments={mpesaContributions.map((p) => ({
+              id: p.id,
+              amount: p.amount,
+              paidAt: p.paidAt.toISOString(),
+              mpesaRef: p.mpesaRef,
+              user: p.user,
+            }))}
+            failedPayments={failedPayments.map((f) => ({
+              id: f.id,
+              createdAt: f.createdAt.toISOString(),
+              meta: (f.meta ?? {}) as Prisma.JsonObject,
+              user: f.user,
+            }))}
+          />
+          <p className="text-[12px] text-on-surface-variant">
+            {mpesaContributions.length} M-Pesa payment{mpesaContributions.length !== 1 ? 's' : ''} recorded
+            {failedPayments.length > 0 && ` · ${failedPayments.length} failed`}
+          </p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-4">
@@ -152,7 +194,7 @@ export default async function TreasurerContributionsPage() {
                   <td>{c.amount.toLocaleString()}</td>
                   <td>{c.paymentMethod}</td>
                   <td>{c.mpesaRef || '—'}</td>
-                  <td>{c.paidAt.toLocaleDateString()}</td>
+                  <td>{new Date(c.paidAt).toLocaleDateString()}</td>
                   <td>
                     <div className="flex items-center gap-2">
                       <a className="text-primary underline" href={`/api/pdf/receipt/${c.id}`}>

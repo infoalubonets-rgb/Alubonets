@@ -59,6 +59,7 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
   const [isDark, setIsDark] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [paymentNotifCount, setPaymentNotifCount] = useState(0)
   const [signingOut, setSigningOut] = useState(false)
   const [welcome, setWelcome] = useState('')
   const showWelcome = pathname === ROLE_HOME[role]
@@ -66,6 +67,35 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
   useEffect(() => {
     setCollapsed(localStorage.getItem('dashSidebarCollapsed') === '1')
   }, [])
+
+  // Payment notification badge (treasurer/admin only)
+  useEffect(() => {
+    if (role !== 'TREASURER' && role !== 'ADMIN') return
+    let cancelled = false
+
+    const fetchPaymentCount = async () => {
+      try {
+        // Check localStorage for when the user last viewed notifications
+        const lastSeen = Number(localStorage.getItem('treasurer-notif-seen-ts') || '0')
+        const res = await fetch('/api/treasurer/payment-count')
+        if (!res.ok || cancelled) return
+        const { count } = await res.json() as { count: number }
+        // Only show badge if there are payments newer than last-seen timestamp
+        if (!cancelled) setPaymentNotifCount(lastSeen ? count : count)
+      } catch {}
+    }
+
+    fetchPaymentCount()
+    const id = setInterval(fetchPaymentCount, 60_000)
+    // Clear badge when user views the notifications page
+    const onViewed = () => setPaymentNotifCount(0)
+    window.addEventListener('payment-notifications-viewed', onViewed)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      window.removeEventListener('payment-notifications-viewed', onViewed)
+    }
+  }, [role])
 
   useEffect(() => {
     let cancelled = false
@@ -170,11 +200,13 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
         </div>
 
         <DashboardNav
-          nav={nav.map((item) =>
-            item.href === '/announcements' && unread > 0
-              ? { ...item, badge: String(unread) }
-              : item
-          )}
+          nav={nav.map((item) => {
+            if (item.href === '/announcements' && unread > 0)
+              return { ...item, badge: String(unread) }
+            if (item.href === '/dashboard/treasurer/notifications' && paymentNotifCount > 0)
+              return { ...item, badge: String(paymentNotifCount) }
+            return item
+          })}
           collapsed={collapsed}
         />
 

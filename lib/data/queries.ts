@@ -357,9 +357,12 @@ export const getAnnouncementsForUser = unstable_cache(
         id: true,
         title: true,
         content: true,
+        imageUrl: true,
         publishedAt: true,
         broadcast: true,
         emailSentAt: true,
+        expiresAt: true,
+        authorId: true,
         author: { select: { fullName: true } },
         receipts: { where: { userId }, select: { readAt: true } },
       },
@@ -495,9 +498,11 @@ export async function sendAnnouncement(input: {
   authorId: string
   title: string
   content: string
+  imageUrl?: string
   broadcast: boolean
   memberIds?: string[]
-  includeSelf?: boolean  // when true, author is included in broadcast receipts
+  includeSelf?: boolean
+  expiresAt?: Date
 }) {
   const recipientIds = input.broadcast
     ? (
@@ -509,14 +514,16 @@ export async function sendAnnouncement(input: {
           select: { id: true },
         })
       ).map((u) => u.id)
-    : (input.memberIds ?? []) // targeted: send to exactly who's specified
+    : (input.memberIds ?? [])
 
   return prisma.announcement.create({
     data: {
       authorId: input.authorId,
       title: input.title,
       content: input.content,
+      imageUrl: input.imageUrl ?? null,
       broadcast: input.broadcast,
+      expiresAt: input.expiresAt ?? null,
       receipts: { create: recipientIds.map((userId) => ({ userId })) },
     },
   })
@@ -588,9 +595,10 @@ export async function createMeeting(data: {
   agenda?: string
   minutes?: string
   opening?: string
-  location?: string
   attendees?: string
-  resolutions?: string
+  membersAbsent?: string
+  membersApology?: string
+  aob?: string
   nextMeetingAt?: Date
   heldAt: Date
   attendance: number
@@ -607,9 +615,10 @@ export async function updateMeeting(
     agenda?: string | null
     minutes?: string | null
     opening?: string | null
-    location?: string | null
     attendees?: string | null
-    resolutions?: string | null
+    membersAbsent?: string | null
+    membersApology?: string | null
+    aob?: string | null
     nextMeetingAt?: Date | null
     heldAt?: Date
     attendance?: number
