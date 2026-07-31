@@ -138,7 +138,12 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
   const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE'])
   const meeting = await prisma.meeting.findUnique({
     where: { id: meetingId },
-    include: { recorder: { select: { fullName: true, email: true } } },
+    include: {
+      recorder: { select: { fullName: true, email: true } },
+      agendaItems: { orderBy: { position: 'asc' } },
+      actionPoints: { include: { owner: { select: { fullName: true } } } },
+      decisions: { orderBy: { decidedAt: 'asc' } },
+    },
   })
   if (!meeting) throw new Error('Meeting not found')
   if (meeting.status !== 'PENDING_APPROVAL') throw new Error('Minutes must be submitted for approval first.')
@@ -174,6 +179,9 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
   // Prefer signed URL; fall back to path for app-relative storage reference
   const fileUrl = `storage://documents/${storagePath}`
 
+  const { findCategoryIdByName } = await import('@/lib/document-categories')
+  const minutesCategoryId = await findCategoryIdByName('Minutes')
+
   let documentId = meeting.publishedDocumentId
   if (documentId && meeting.minutesVersion < 0) {
     await prisma.document.update({
@@ -182,6 +190,7 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
         title: `Minutes — ${meeting.title}`,
         fileUrl,
         category: 'Minutes',
+        categoryId: minutesCategoryId,
       },
     })
   } else {
@@ -190,6 +199,7 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
         title: `Minutes — ${meeting.title}`,
         fileUrl,
         category: 'Minutes',
+        categoryId: minutesCategoryId,
         uploadedBy: actor.id,
         versionGroupId: `meeting-${meeting.id}`,
         version: meeting.minutesVersion,
@@ -216,7 +226,9 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
     action: 'MEETING_PUBLISH',
     entity: 'Meeting',
     entityId: meetingId,
-    meta: { documentId, storagePath, filename },
+    reason: 'Approved and published final minutes to document repository',
+    oldValue: { status: meeting.status, publishedDocumentId: meeting.publishedDocumentId },
+    newValue: { status: 'FINAL', documentId, storagePath, filename },
   })
 
   revalidateMeetings()

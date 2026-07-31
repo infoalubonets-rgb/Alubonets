@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "check": "npm run typecheck && npm run test",
     "db:push": "node scripts/prisma-with-env.mjs db push",
     "db:pull": "node scripts/prisma-with-env.mjs db pull",
@@ -48,6 +50,7 @@
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.15.12",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22",
     "@types/papaparse": "^5.3.14",
     "@types/react": "^19",

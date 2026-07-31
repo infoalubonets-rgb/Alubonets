@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import DashboardShell from '@/components/dashboard/DashboardShell'
-import { MEMBER_NAV } from '@/lib/dashboard/nav'
+import { navWithLoans } from '@/lib/dashboard/nav-async'
 import { getSessionProfile } from '@/lib/auth/session'
 import { getMemberDashboardData } from '@/lib/data/queries'
 import MemberContributeModal from '@/components/dashboard/MemberContributeModal'
@@ -12,9 +12,10 @@ export default async function MemberPage() {
 
   const { total, welfareCount, announcements, events, documents } =
     await getMemberDashboardData(profile.id)
+  const nav = await navWithLoans(profile.role)
 
   return (
-    <DashboardShell role="MEMBER" title="Member" nav={MEMBER_NAV}>
+    <DashboardShell role="MEMBER" title="Member" nav={nav}>
       <div className="space-y-5 p-4 md:p-6 max-w-4xl mx-auto">
 
         {/* Stats */}
@@ -173,9 +174,7 @@ export default async function MemberPage() {
               {documents.map((d) => (
                 <li key={d.id}>
                   <a
-                    href={d.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                    href={`/api/documents/${d.id}/download`}
                     className="group flex items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-surface-container dark:hover:bg-[#111f36] transition-colors"
                   >
                     <span className="material-symbols-outlined text-outline dark:text-blue-200/40 group-hover:text-primary transition-colors" style={{ fontSize: 16 }}>description</span>

@@ -196,7 +196,7 @@ Member asks for welfare support; treasurer reviews.
 
 ### `projects` (model `Project`)
 
-Group projects shown on public + executive/organizer dashboards.
+Group projects shown on public + executive/organizer/member dashboards.
 
 | Column | Type | Notes |
 |--------|------|--------|
@@ -204,10 +204,12 @@ Group projects shown on public + executive/organizer dashboards.
 | `title` / `description` | String | |
 | `status` | ProjectStatus | |
 | `imageUrl` | String? | |
+| `progress` | Int | 0–100 |
 | `startDate` / `endDate` | DateTime? | |
+| `budgetKes` / `fundingTargetKes` / `actualExpenditureKes` | Decimal(14,2) | Manager-only detail on public |
 | `createdAt` / `updatedAt` | DateTime | |
 
-No FK to users (group-owned).
+Related: `project_comments`, `project_investments` (pledge records, not ledger posts), `project_milestones`, `project_updates`, `project_responsibles`, `project_documents`. Optional `expenses.projectId`.
 
 ---
 
@@ -234,7 +236,27 @@ Public gallery only shows `isPublic = true`. Admin queue: `/admin/gallery-queue`
 | `id` | String | PK |
 | `title` / `content` | String | |
 | `authorId` | String FK → users | Cascade |
-| `publishedAt` / `createdAt` | DateTime | |
+| `broadcast` | Boolean | true = all active members |
+| `status` | AnnouncementPublishStatus | `DRAFT` \| `SCHEDULED` \| `SENT` |
+| `scheduledFor` | DateTime? | Cron sends when due |
+| `audienceRoles` | Role[] | Optional role targeting |
+| `familyBranch` | String? | Optional branch targeting |
+| `templateKey` | String? | FK-like to AnnouncementTemplate.key |
+| `mandatory` | Boolean | Ignores email opt-out |
+| `emailSentAt` / `publishedAt` / `createdAt` | DateTime | |
+
+### `announcement_receipts` (model `AnnouncementReceipt`)
+
+| Column | Type | Notes |
+|--------|------|--------|
+| `announcementId` / `userId` | String | Unique pair |
+| `readAt` | DateTime? | Dashboard read |
+| `emailStatus` | AnnouncementDeliveryStatus | PENDING\|SENT\|FAILED\|SKIPPED |
+| `emailError` / `emailSentAt` / `retryCount` | | Email delivery trace |
+
+### `announcement_templates` / `user_notification_preferences`
+
+Admin-managed HTML templates; members can set `emailOptional` (mandatory notices always send).
 
 Realtime: clients can subscribe (member home).
 
@@ -246,10 +268,20 @@ Realtime: clients can subscribe (member home).
 |--------|------|--------|
 | `id` | String | PK |
 | `title` | String | |
-| `description` / `location` | String? | |
-| `startsAt` | DateTime | Required |
-| `endsAt` | DateTime? | |
-| `createdAt` | DateTime | |
+| `description` / `location` / `imageUrl` | String? | |
+| `startsAt` / `endsAt` | DateTime | endsAt optional |
+| `isPublic` | Boolean | Public site listing |
+| `audienceType` | EventAudienceType | PUBLIC\|ALL_MEMBERS\|SELECTED_ROLES\|SELECTED_MEMBERS |
+| `audienceRoles` | Role[] | When SELECTED_ROLES |
+| `capacity` / `rsvpDeadlineAt` | | Optional RSVP limits |
+| `budgetKes` / `actualCostKes` | Decimal | Event money (no auto ledger) |
+| `reminderOffsetsHours` | Int[] | e.g. 24, 2 |
+| `remindersSent` | Json? | Offset → sentAt tracking |
+| `reportBody` / `reportPublishedAt` | | Post-event report |
+| `galleryPhotoIds` | String[] | Optional gallery refs |
+| `createdAt` / `updatedAt` | DateTime | |
+
+Related: `EventInvitation`, `EventRSVP` (GOING\|MAYBE\|NOT_GOING), `EventAttendance`, `EventAttachment`, `EventCost`. Optional `Expense.eventId` for manual finance link.
 
 ---
 
@@ -263,6 +295,31 @@ Realtime: clients can subscribe (member home).
 | `category` | String? | |
 | `uploadedBy` | String FK → users | Cascade |
 | `uploadedAt` | DateTime | |
+
+### `app_settings` (model `AppSetting`)
+
+Key/value configuration (no secrets). Typed helpers in `lib/settings.ts`.
+
+### `feature_flags` (model `FeatureFlag`)
+
+| Column | Type | Notes |
+|--------|------|--------|
+| `key` | String | PK e.g. `loans_enabled` |
+| `enabled` | Boolean | Default false |
+
+### Category master data
+
+`WelfareCategory`, `ProjectCategory`, `MembershipClass` (id, name, active, sortOrder). Contribution categories continue to use `TransactionCategory`.
+
+### Loans (Stage 7)
+
+`LoanApplication` — applicant, amountKes, purpose, dueAt?, status (SUBMITTED→…→DISBURSED/CLOSED), treasurer/admin decision fields.
+
+`LoanGuarantor` — loanId, userId, PENDING|ACCEPTED|DECLINED.
+
+`LoanLedgerLink` — loanId, transactionId, DISBURSEMENT|REPAYMENT. Outstanding = sum(confirmed disbursements) − sum(confirmed repayments).
+
+---
 
 Private Storage bucket `documents` (see `storage.sql`); signed URLs for downloads.
 
@@ -320,11 +377,33 @@ Members may download PDF only when `status = FINAL`. Staff (Secretary / Admin / 
 | Column | Type | Notes |
 |--------|------|--------|
 | `id` | String | PK |
-| `userId` | String FK | Actor |
-| `action` | String | e.g. `MEMBER_APPROVE`, `PROFILE_UPDATE` |
+| `userId` | String? FK | Actor (`ON DELETE SET NULL` — logs retained if user removed) |
+| `action` | String | e.g. `MEMBER_APPROVE`, `DOCUMENT_REPLACE` |
 | `entity` / `entityId` | String? | Target |
 | `meta` | Json? | Extra payload |
+| `oldValue` / `newValue` | Json? | Snapshots for sensitive updates |
+| `reason` | String? | Required for many status/finance changes |
+| `ipAddress` / `userAgent` | String? | Client context where captured |
 | `createdAt` | DateTime | |
+
+Append-only: app deletes are blocked by a DB trigger unless `app.allow_audit_purge=on` (retention cron/script only).
+
+---
+
+### `app_settings` / `feature_flags` (Stage 8)
+
+`AppSetting`: key/value (typed in `lib/settings.ts`; no secrets).  
+`FeatureFlag`: key + enabled (e.g. `loans_enabled`).
+
+Master categories: `WelfareCategory`, `ProjectCategory`, `MembershipClass`. Contribution categories use existing `TransactionCategory`.
+
+### Loans (Stage 7)
+
+| Model | Notes |
+|-------|--------|
+| `LoanApplication` | amountKes, purpose, status, treasurer/admin decision fields |
+| `LoanGuarantor` | PENDING \| ACCEPTED \| DECLINED |
+| `LoanLedgerLink` | DISBURSEMENT \| REPAYMENT → `FinancialTransaction`; outstanding = disbursed − repaid |
 
 ---
 

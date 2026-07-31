@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { formatAuditAction, formatAuditMeta } from '@/lib/audit-labels'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
-import { deleteAuditRecord } from '@/app/actions/audit'
 
 export type AuditLogRow = {
   id: string
@@ -12,14 +11,28 @@ export type AuditLogRow = {
   entity: string | null
   entityId: string | null
   meta: unknown
+  oldValue: unknown
+  newValue: unknown
+  reason: string | null
+  ipAddress: string | null
+  userAgent: string | null
   createdAt: string
-  user: { fullName: string; email: string }
+  user: { fullName: string; email: string } | null
   targetKind: string
   targetLabel: string
   targetSubtitle: string | null
 }
 
 const PAGE_SIZE = 25
+
+function jsonPreview(value: unknown): string | null {
+  if (value == null) return null
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
 
 function friendlyMetaLines(meta: unknown): { label: string; value: string }[] {
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return []
@@ -91,14 +104,16 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
     return logs.filter((row) => {
       const label = formatAuditAction(row.action).toLowerCase()
       const meta = formatAuditMeta(row.meta)?.toLowerCase() ?? ''
+      const reason = row.reason?.toLowerCase() ?? ''
       return (
-        row.user.fullName.toLowerCase().includes(q) ||
-        row.user.email.toLowerCase().includes(q) ||
+        (row.user?.fullName ?? '').toLowerCase().includes(q) ||
+        (row.user?.email ?? '').toLowerCase().includes(q) ||
         row.action.toLowerCase().includes(q) ||
         label.includes(q) ||
         row.targetKind.toLowerCase().includes(q) ||
         row.targetLabel.toLowerCase().includes(q) ||
         (row.targetSubtitle ?? '').toLowerCase().includes(q) ||
+        reason.includes(q) ||
         meta.includes(q)
       )
     })
@@ -106,19 +121,21 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
 
   const selected = useMemo(
     () => logs.find((r) => r.id === selectedId) ?? null,
-    [logs, selectedId]
+    [logs, selectedId],
   )
 
   const slice = filtered.slice(0, visible)
+  const oldPreview = selected ? jsonPreview(selected.oldValue) : null
+  const newPreview = selected ? jsonPreview(selected.newValue) : null
 
   return (
     <div className="space-y-4 pb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <p className="text-sm text-on-surface-variant max-w-xl">
-          Who did what — tap the eye for full detail. Newest first.
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="max-w-xl text-sm text-on-surface-variant">
+          Who did what — tap the eye for old/new values and reason. Audit records are append-only.
         </p>
         <div className="relative w-full sm:w-72">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline">
             search
           </span>
           <input
@@ -127,30 +144,30 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
               setQuery(e.target.value)
               setVisible(PAGE_SIZE)
             }}
-            placeholder="Search actor, action, member…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-sm focus:outline-none focus:ring-2 focus:ring-secondary-container/40 focus:border-secondary-container"
+            placeholder="Search actor, action, reason…"
+            className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest py-2.5 pl-9 pr-3 text-sm focus:border-secondary-container focus:outline-none focus:ring-2 focus:ring-secondary-container/40"
           />
         </div>
       </div>
 
-      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="text-left bg-surface-container-low border-b border-outline-variant">
-                <th className="py-2.5 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
+              <tr className="border-b border-outline-variant bg-surface-container-low text-left">
+                <th className="px-4 py-2.5 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
                   When
                 </th>
-                <th className="py-2.5 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
+                <th className="px-4 py-2.5 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
                   Who
                 </th>
-                <th className="py-2.5 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
+                <th className="px-4 py-2.5 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
                   What
                 </th>
-                <th className="py-2.5 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
+                <th className="px-4 py-2.5 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
                   About
                 </th>
-                <th className="py-2.5 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant text-right w-14">
+                <th className="w-14 px-4 py-2.5 text-right font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
                   View
                 </th>
               </tr>
@@ -170,29 +187,30 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
                       i % 2 === 1 ? 'bg-surface-container-low/40' : ''
                     }`}
                   >
-                    <td className="py-2.5 px-4 whitespace-nowrap text-[12px] text-on-surface-variant">
+                    <td className="whitespace-nowrap px-4 py-2.5 text-[12px] text-on-surface-variant">
                       {new Date(row.createdAt).toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-4 font-medium text-on-surface truncate max-w-[140px]">
-                      {row.user.fullName}
+                    <td className="max-w-[140px] truncate px-4 py-2.5 font-medium text-on-surface">
+                      {row.user?.fullName ?? 'System / removed user'}
                     </td>
-                    <td className="py-2.5 px-4">
-                      <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-label-bold bg-primary/8 text-primary">
+                    <td className="px-4 py-2.5">
+                      <span className="inline-flex rounded-full bg-primary/8 px-2 py-0.5 text-[11px] font-label-bold text-primary">
                         {formatAuditAction(row.action)}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 min-w-0">
-                      <p className="font-medium text-on-surface truncate">{row.targetLabel}</p>
-                      <p className="text-[11px] text-on-surface-variant truncate">
+                    <td className="min-w-0 px-4 py-2.5">
+                      <p className="truncate font-medium text-on-surface">{row.targetLabel}</p>
+                      <p className="truncate text-[11px] text-on-surface-variant">
                         {row.targetKind}
                         {row.targetSubtitle ? ` · ${row.targetSubtitle}` : ''}
+                        {row.reason ? ` · ${row.reason}` : ''}
                       </p>
                     </td>
-                    <td className="py-2.5 px-4 text-right">
+                    <td className="px-4 py-2.5 text-right">
                       <button
                         type="button"
                         onClick={() => setSelectedId(row.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant text-primary hover:border-secondary-container hover:bg-secondary-container/10 hover:text-secondary transition-colors"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant text-primary transition-colors hover:border-secondary-container hover:bg-secondary-container/10 hover:text-secondary"
                         title="View details"
                         aria-label="View log details"
                       >
@@ -212,7 +230,7 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
           <button
             type="button"
             onClick={() => setVisible((v) => v + PAGE_SIZE)}
-            className="rounded-full border border-outline-variant bg-surface-container-lowest px-5 py-2.5 text-sm font-label-bold text-primary hover:border-secondary-container hover:bg-secondary-container/10 transition-colors"
+            className="rounded-full border border-outline-variant bg-surface-container-lowest px-5 py-2.5 text-sm font-label-bold text-primary transition-colors hover:border-secondary-container hover:bg-secondary-container/10"
           >
             Load more ({filtered.length - visible} remaining)
           </button>
@@ -233,49 +251,64 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
               aria-label="Close"
               onClick={() => setSelectedId(null)}
             />
-            <div className="relative w-full max-w-md rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_24px_60px_rgba(0,31,80,0.28)] overflow-hidden">
+            <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_24px_60px_rgba(0,31,80,0.28)]">
               <div className="relative bg-primary px-5 py-4">
-                <div className="absolute bottom-0 inset-x-0 h-1 bg-secondary-container" />
+                <div className="absolute inset-x-0 bottom-0 h-1 bg-secondary-container" />
                 <div className="relative flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="font-h3 text-[18px] text-on-primary">
                       {formatAuditAction(selected.action)}
                     </h3>
-                    <p className="text-[12px] text-primary-fixed-dim mt-0.5">
+                    <p className="mt-0.5 text-[12px] text-primary-fixed-dim">
                       {new Date(selected.createdAt).toLocaleString()}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSelectedId(null)}
-                    className="h-9 w-9 rounded-lg hover:bg-white/10 flex items-center justify-center text-on-primary shrink-0"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-on-primary hover:bg-white/10"
                   >
                     <span className="material-symbols-outlined text-[22px]">close</span>
                   </button>
                 </div>
               </div>
 
-              <div className="p-5 space-y-4">
-                <DetailBlock label="Done by" value={selected.user.fullName} hint={selected.user.email} />
+              <div className="space-y-4 p-5">
+                <DetailBlock
+                  label="Done by"
+                  value={selected.user?.fullName ?? 'System / removed user'}
+                  hint={selected.user?.email ?? null}
+                />
                 <DetailBlock
                   label="About"
                   value={selected.targetLabel}
-                  hint={[selected.targetKind, selected.targetSubtitle].filter(Boolean).join(' · ') || null}
+                  hint={
+                    [selected.targetKind, selected.targetSubtitle].filter(Boolean).join(' · ') ||
+                    null
+                  }
                 />
+                {selected.reason && <DetailBlock label="Reason" value={selected.reason} />}
+                {(selected.ipAddress || selected.userAgent) && (
+                  <DetailBlock
+                    label="Client"
+                    value={selected.ipAddress || '—'}
+                    hint={selected.userAgent}
+                  />
+                )}
 
                 {friendlyMetaLines(selected.meta).length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-[11px] uppercase tracking-wide font-label-bold text-secondary">
+                    <p className="font-label-bold text-[11px] uppercase tracking-wide text-secondary">
                       Change details
                     </p>
-                    <ul className="rounded-xl border border-outline-variant divide-y divide-outline-variant/50 overflow-hidden">
+                    <ul className="overflow-hidden divide-y divide-outline-variant/50 rounded-xl border border-outline-variant">
                       {friendlyMetaLines(selected.meta).map((line) => (
                         <li
                           key={line.label}
-                          className="flex justify-between gap-3 px-3 py-2.5 text-sm bg-surface-container-low/40"
+                          className="flex justify-between gap-3 bg-surface-container-low/40 px-3 py-2.5 text-sm"
                         >
                           <span className="text-on-surface-variant">{line.label}</span>
-                          <span className="font-medium text-on-surface text-right break-all">
+                          <span className="break-all text-right font-medium text-on-surface">
                             {line.value}
                           </span>
                         </li>
@@ -283,15 +316,35 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
                     </ul>
                   </div>
                 )}
-                <form action={deleteAuditRecord} className="rounded-xl border border-error/30 p-3">
-                  <input type="hidden" name="id" value={selected.id} />
-                  <input name="reason" required minLength={5} placeholder="Reason for deleting this audit record" className="w-full rounded-lg border px-3 py-2 text-sm" />
-                  <button className="mt-2 text-sm text-error underline">Delete audit record</button>
-                </form>
+
+                {oldPreview && (
+                  <div>
+                    <p className="mb-1 font-label-bold text-[11px] uppercase tracking-wide text-secondary">
+                      Old value
+                    </p>
+                    <pre className="overflow-x-auto rounded-xl border bg-surface-container-low p-3 text-[11px]">
+                      {oldPreview}
+                    </pre>
+                  </div>
+                )}
+                {newPreview && (
+                  <div>
+                    <p className="mb-1 font-label-bold text-[11px] uppercase tracking-wide text-secondary">
+                      New value
+                    </p>
+                    <pre className="overflow-x-auto rounded-xl border bg-surface-container-low p-3 text-[11px]">
+                      {newPreview}
+                    </pre>
+                  </div>
+                )}
+
+                <p className="text-xs text-on-surface-variant">
+                  Audit records cannot be deleted here. Retention purge removes only aged rows.
+                </p>
               </div>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   )
@@ -308,11 +361,11 @@ function DetailBlock({
 }) {
   return (
     <div className="rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5">
-      <p className="text-[10px] uppercase tracking-wide font-label-bold text-on-surface-variant">
+      <p className="font-label-bold text-[10px] uppercase tracking-wide text-on-surface-variant">
         {label}
       </p>
       <p className="mt-0.5 text-sm font-medium text-on-surface">{value}</p>
-      {hint ? <p className="text-[12px] text-on-surface-variant mt-0.5">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-[12px] text-on-surface-variant">{hint}</p> : null}
     </div>
   )
 }

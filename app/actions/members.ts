@@ -82,6 +82,13 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
     action: approve ? 'MEMBER_APPROVE' : 'MEMBER_REJECT',
     entity: 'User',
     entityId: userId,
+    reason: note || (approve ? 'Member approved' : 'Member rejected'),
+    oldValue: { status: user.status },
+    newValue: {
+      status,
+      membershipNumber: updated.membershipNumber,
+      identityVerificationStatus: updated.identityVerificationStatus,
+    },
     meta: {
       oldStatus: user.status,
       newStatus: status,
@@ -130,6 +137,9 @@ export async function setMemberRole(input: z.infer<typeof roleSchema>) {
     action: 'MEMBER_ROLE_CHANGE',
     entity: 'User',
     entityId: userId,
+    reason: `Role changed from ${target.role} to ${role}`,
+    oldValue: { role: target.role },
+    newValue: { role },
     meta: { oldRole: target.role, newRole: role },
   })
 
@@ -197,6 +207,9 @@ export async function setMemberStatus(input: z.infer<typeof statusSchema>) {
     action: status === 'SUSPENDED' ? 'MEMBER_SUSPEND' : 'MEMBER_STATUS_CHANGE',
     entity: 'User',
     entityId: userId,
+    reason: `Member status changed to ${status}`,
+    oldValue: { status: target.status },
+    newValue: { status },
     meta: { oldStatus: target.status, newStatus: status },
   })
 

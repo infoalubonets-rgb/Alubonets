@@ -51,9 +51,7 @@ export default function DocumentsSection({ documents: initial }: { documents: Do
 
               {/* Info */}
               <a
-                href={d.fileUrl}
-                target="_blank"
-                rel="noreferrer"
+                href={`/api/documents/${d.id}/download`}
                 className="min-w-0 flex-1"
               >
                 <p className="text-[13px] font-semibold text-on-surface dark:text-blue-50 truncate group-hover:text-[#fe8015] transition-colors">

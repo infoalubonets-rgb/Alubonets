@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export type AuditEntry = {
-  userId: string
+  userId?: string | null
   action: string
   entity?: string | null
   entityId?: string | null
@@ -19,7 +19,7 @@ export async function writeAudit(entry: AuditEntry): Promise<void> {
   try {
     await prisma.auditLog.create({
       data: {
-        userId: entry.userId,
+        userId: entry.userId ?? null,
         action: entry.action,
         entity: entry.entity ?? null,
         entityId: entry.entityId ?? null,

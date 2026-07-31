@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { actionDeleteEvent, actionDeleteEvents } from '@/app/actions/domain'
 import CreateEventForm from './CreateEventForm'
 import EventsGrid, { EventRow } from './EventsGrid'
+import EventsCalendar from './EventsCalendar'
 
 type MemberOption = { id: string; fullName: string; email: string }
 
@@ -22,6 +23,7 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
   const [editing, setEditing] = useState<EventRow | null>(null)
   const [localUpcoming, setLocalUpcoming] = useState(upcoming)
   const [localPast, setLocalPast] = useState(past)
+  const [view, setView] = useState<'list' | 'calendar'>('list')
 
   // Sync when server refreshes props (after background save completes)
   useEffect(() => { setLocalUpcoming(upcoming) }, [upcoming])
@@ -114,6 +116,22 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex rounded-xl border overflow-hidden text-[12px]">
+            <button
+              type="button"
+              onClick={() => setView('list')}
+              className={`px-3 py-2 ${view === 'list' ? 'bg-primary text-on-primary' : 'bg-surface'}`}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              onClick={() => setView('calendar')}
+              className={`px-3 py-2 ${view === 'calendar' ? 'bg-primary text-on-primary' : 'bg-surface'}`}
+            >
+              Calendar
+            </button>
+          </div>
           {anySelected && (
             <>
               <span className="text-[12px] text-on-surface-variant dark:text-blue-200/50">
@@ -147,6 +165,13 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
         </div>
       </div>
 
+      {view === 'calendar' ? (
+        <EventsCalendar
+          events={[...localUpcoming, ...localPast]}
+          hrefFor={(id) => `/dashboard/organizer/events/${id}`}
+        />
+      ) : (
+        <>
       {/* Upcoming */}
       <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
         <div className="flex items-center justify-between gap-2 mb-4">
@@ -174,6 +199,7 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
           onToggleSelect={toggleSelect}
           onDelete={handleDelete}
           onViewDetails={setDetail}
+          manageHref={(id) => `/dashboard/organizer/events/${id}`}
         />
       </section>
 
@@ -204,8 +230,11 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
             onToggleSelect={toggleSelect}
             onDelete={handleDelete}
             onViewDetails={setDetail}
+            manageHref={(id) => `/dashboard/organizer/events/${id}`}
           />
         </section>
+      )}
+        </>
       )}
 
       {/* Event detail modal */}
@@ -311,13 +340,12 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
 
               {/* Footer */}
               <div className="flex gap-2 p-4 border-t border-outline-variant/30 dark:border-[#1a2d4f] flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setDetail(null)}
-                  className="flex-1 rounded-xl border border-outline-variant dark:border-[#1a2d4f] bg-surface-container dark:bg-[#111f36] hover:bg-surface-container-high py-2.5 text-[13px] font-semibold text-on-surface dark:text-blue-50 transition-colors"
+                <a
+                  href={`/dashboard/organizer/events/${detail.id}`}
+                  className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 text-primary py-2.5 text-[13px] font-semibold"
                 >
-                  Close
-                </button>
+                  Manage
+                </a>
                 <button
                   type="button"
                   onClick={() => { setEditing(detail); setDetail(null) }}

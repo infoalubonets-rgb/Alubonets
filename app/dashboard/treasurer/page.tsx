@@ -1,14 +1,15 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
-import { TREASURER_NAV } from '@/lib/dashboard/nav'
+import { navWithLoans } from '@/lib/dashboard/nav-async'
 import { getTreasurerDashboardData, getContributionChartSeries, getContributionAnalytics } from '@/lib/data/queries'
 import { BudgetDoughnutChart, ContributionTrendChart, TopContributorsChart } from '@/components/dashboard/Charts'
 import Link from 'next/link'
 
 export default async function TreasurerPage() {
-  const [data, chart, analytics] = await Promise.all([
+  const [data, chart, analytics, nav] = await Promise.all([
     getTreasurerDashboardData(),
     getContributionChartSeries(),
     getContributionAnalytics(),
+    navWithLoans('TREASURER'),
   ])
 
   const catLabels = data.byCategory.map((c) => c.category || 'Uncategorized')
@@ -30,7 +31,7 @@ export default async function TreasurerPage() {
   ]
 
   return (
-    <DashboardShell role="TREASURER" title="Treasurer" nav={TREASURER_NAV}>
+    <DashboardShell role="TREASURER" title="Treasurer" nav={nav}>
       <div className="space-y-5 p-4 md:p-6 max-w-4xl mx-auto">
 
         {/* Stats */}

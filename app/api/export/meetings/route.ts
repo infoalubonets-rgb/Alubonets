@@ -192,6 +192,13 @@ export async function GET() {
   })
 
   const buffer = await Packer.toBuffer(doc)
+  const { writeAudit } = await import('@/lib/audit')
+  await writeAudit({
+    userId: profile.id,
+    action: 'MEETING_EXPORT',
+    entity: 'Meeting',
+    meta: { format: 'docx-bulk', count: meetings.length },
+  })
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

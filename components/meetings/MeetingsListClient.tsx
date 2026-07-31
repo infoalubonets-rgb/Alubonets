@@ -141,7 +141,11 @@ function MeetingCard({
           </Link>
           {/* View PDF — finals use stored copy, drafts generate on the fly */}
           <a
-            href={m.publishedDocument?.fileUrl ?? `/api/pdf/minutes/${m.id}`}
+            href={
+              m.publishedDocument?.id
+                ? `/api/documents/${m.publishedDocument.id}/download`
+                : `/api/pdf/minutes/${m.id}`
+            }
             target="_blank"
             rel="noreferrer"
             className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[12px] font-semibold border transition-colors ${

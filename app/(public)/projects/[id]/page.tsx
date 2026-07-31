@@ -1,33 +1,53 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getPublicProject } from '@/lib/data/queries'
 import type { Metadata } from 'next'
+import { prisma } from '@/lib/prisma'
+import { getSessionProfile } from '@/lib/auth/session'
+import { submitProjectComment } from '@/app/actions/projects'
+import { moneyNumber, projectFinanceVisibility } from '@/lib/projects'
 
 type Props = { params: Promise<{ id: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const project = await getPublicProject(id)
+  const project = await prisma.project.findUnique({ where: { id }, select: { title: true } })
   return { title: project ? `${project.title} — Alubonets` : 'Project' }
 }
 
 const STATUS_STYLES: Record<string, { label: string; classes: string; icon: string }> = {
-  ONGOING:   { label: 'Ongoing',   classes: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',        icon: 'sync' },
-  COMPLETED: { label: 'Completed', classes: 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-blue-300',             icon: 'check_circle' },
-  UPCOMING:  { label: 'Upcoming',  classes: 'bg-secondary-container/20 text-secondary-container dark:text-orange-400',     icon: 'upcoming' },
+  ONGOING: { label: 'Ongoing', classes: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: 'sync' },
+  COMPLETED: { label: 'Completed', classes: 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-blue-300', icon: 'check_circle' },
+  UPCOMING: { label: 'Upcoming', classes: 'bg-secondary-container/20 text-secondary-container dark:text-orange-400', icon: 'upcoming' },
 }
 
 export default async function ProjectDetailPage({ params }: Props) {
   const { id } = await params
-  const project = await getPublicProject(id)
+  const profile = await getSessionProfile()
+  const project = await prisma.project.findUnique({
+    where: { id },
+    include: {
+      updates: { orderBy: { publishedAt: 'desc' }, take: 20 },
+      comments: {
+        where: { status: 'PUBLISHED' },
+        include: { author: { select: { fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      },
+      investments: profile ? { select: { amount: true } } : false,
+      milestones: { orderBy: { position: 'asc' } },
+    },
+  })
   if (!project) notFound()
 
   const status = STATUS_STYLES[project.status] ?? STATUS_STYLES.UPCOMING
+  const visibility = projectFinanceVisibility(profile?.role)
+  const raised = Array.isArray(project.investments)
+    ? project.investments.reduce((sum, row) => sum + moneyNumber(row.amount), 0)
+    : 0
+  const target = moneyNumber(project.fundingTargetKes)
 
   return (
     <main className="flex-grow bg-surface-container-lowest">
-
-      {/* Hero */}
       {project.imageUrl ? (
         <div className="relative w-full h-[300px] md:h-[400px] overflow-hidden">
           <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover" />
@@ -44,7 +64,6 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       ) : (
         <div className="relative bg-gradient-to-br from-primary to-[#001435] py-xxl px-md md:px-lg overflow-hidden">
-          <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[160px] font-black text-white/[0.04] leading-none select-none pointer-events-none">P</span>
           <div className="max-w-container-max mx-auto relative">
             <Link href="/projects" className="inline-flex items-center gap-1.5 text-on-primary/60 hover:text-on-primary text-[13px] mb-6 transition-colors">
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>
@@ -57,67 +76,139 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       )}
 
-      {/* Content */}
       <div className="max-w-container-max mx-auto px-md md:px-lg py-xl">
         <div className="grid md:grid-cols-3 gap-xl">
-
-          {/* Main */}
           <div className="md:col-span-2 space-y-lg">
-            {project.imageUrl && (
-              <Link href="/projects" className="inline-flex items-center gap-1.5 text-on-surface-variant hover:text-primary text-[13px] transition-colors">
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_back</span>
-                All projects
-              </Link>
-            )}
             <div className="space-y-4">
               {project.description.split('\n').map((p, i) => (
                 <p key={i} className="text-[15px] text-on-surface-variant leading-relaxed">{p}</p>
               ))}
             </div>
+
+            {project.updates.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="font-h3 text-xl text-primary">Updates</h2>
+                {project.updates.map((u) => (
+                  <article key={u.id} className="rounded-2xl border bg-surface p-4">
+                    <b>{u.title}</b>
+                    <p className="text-xs text-on-surface-variant">{u.publishedAt.toLocaleString()}</p>
+                    <p className="mt-2 whitespace-pre-line text-sm">{u.body}</p>
+                  </article>
+                ))}
+              </section>
+            )}
+
+            {project.milestones.length > 0 && (
+              <section className="space-y-3">
+                <h2 className="font-h3 text-xl text-primary">Milestones</h2>
+                <ul className="space-y-2">
+                  {project.milestones.map((m) => (
+                    <li key={m.id} className="rounded-xl border bg-surface px-4 py-3 text-sm">
+                      {m.completedAt ? '✓ ' : '○ '}
+                      {m.title}
+                      {m.dueAt ? ` · due ${m.dueAt.toLocaleDateString()}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <section className="space-y-3">
+              <h2 className="font-h3 text-xl text-primary">Comments</h2>
+              {project.comments.map((c) => (
+                <article key={c.id} className="rounded-2xl border bg-surface p-4 text-sm">
+                  <b>{c.author.fullName}</b>
+                  <p className="mt-1 whitespace-pre-line">{c.body}</p>
+                </article>
+              ))}
+              {!project.comments.length && (
+                <p className="text-sm text-on-surface-variant">No published comments yet.</p>
+              )}
+              {profile?.status === 'ACTIVE' ? (
+                <form action={submitProjectComment} className="rounded-2xl border bg-surface p-4 space-y-2">
+                  <input type="hidden" name="projectId" value={project.id} />
+                  <textarea
+                    name="body"
+                    required
+                    minLength={2}
+                    placeholder="Share a comment (pending moderation)"
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    rows={3}
+                  />
+                  <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">
+                    Submit comment
+                  </button>
+                </form>
+              ) : (
+                <p className="text-sm">
+                  <Link href="/login" className="text-primary underline">
+                    Sign in
+                  </Link>{' '}
+                  as an active member to comment.
+                </p>
+              )}
+            </section>
           </div>
 
-          {/* Sidebar */}
           <aside>
             <div className="rounded-2xl border border-outline-variant bg-surface p-5 space-y-4 shadow-sm sticky top-6">
-
-              {/* Status */}
               <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[12px] font-bold ${status.classes}`}>
                 <span className="material-symbols-outlined icon-fill" style={{ fontSize: 15 }}>{status.icon}</span>
                 {status.label}
               </div>
 
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Progress</p>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-outline-variant/30">
+                  <div className="h-full bg-primary" style={{ width: `${project.progress}%` }} />
+                </div>
+                <p className="mt-1 text-sm font-medium">{project.progress}%</p>
+              </div>
+
+              {visibility !== 'public' && target > 0 && (
+                <div className="border-t border-outline-variant/40 pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+                    Funding progress
+                  </p>
+                  <p className="mt-1 text-sm">
+                    KES {raised.toLocaleString()} raised of {target.toLocaleString()}
+                  </p>
+                </div>
+              )}
+
+              {visibility === 'manager' && (
+                <div className="space-y-1 border-t border-outline-variant/40 pt-3 text-sm">
+                  <p>Budget: KES {moneyNumber(project.budgetKes).toLocaleString()}</p>
+                  <p>Expenditure: KES {moneyNumber(project.actualExpenditureKes).toLocaleString()}</p>
+                </div>
+              )}
+
               <div className="space-y-3 pt-2 border-t border-outline-variant/40">
                 {project.startDate && (
-                  <div className="flex items-start gap-3">
-                    <span className="material-symbols-outlined text-primary mt-0.5" style={{ fontSize: 18 }}>play_circle</span>
-                    <div>
-                      <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Start date</p>
-                      <p className="text-[14px] font-medium text-on-surface">
-                        {new Date(project.startDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Start date</p>
+                    <p className="text-[14px] font-medium">
+                      {new Date(project.startDate).toLocaleDateString('en-KE', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </p>
                   </div>
                 )}
                 {project.endDate && (
-                  <div className="flex items-start gap-3">
-                    <span className="material-symbols-outlined text-secondary-container mt-0.5" style={{ fontSize: 18 }}>flag</span>
-                    <div>
-                      <p className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">End date</p>
-                      <p className="text-[14px] font-medium text-on-surface">
-                        {new Date(project.endDate).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">End date</p>
+                    <p className="text-[14px] font-medium">
+                      {new Date(project.endDate).toLocaleDateString('en-KE', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })}
+                    </p>
                   </div>
                 )}
               </div>
-
-              <Link
-                href="/projects"
-                className="flex items-center justify-center gap-2 w-full rounded-xl border border-outline-variant bg-surface-container py-2.5 text-[13px] font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>assignment</span>
-                View all projects
-              </Link>
             </div>
           </aside>
         </div>

@@ -120,6 +120,8 @@ export default function CreateEventForm({
   const [description, setDescription] = useState(initial?.description ?? '')
   const [isPublic, setIsPublic]       = useState(initial?.isPublic !== false)
   const [sendEmail, setSendEmail]     = useState(true)
+  const [capacity, setCapacity]       = useState('')
+  const [reminders, setReminders]     = useState('24,2')
   const [emailAudience, setEmailAudience] = useState<'ALL' | 'SELECTED'>('ALL')
   const [selectedEmailMembers, setSelectedEmailMembers] = useState<Set<string>>(new Set())
   const [memberModalOpen, setMemberModalOpen] = useState(false)
@@ -222,6 +224,8 @@ export default function CreateEventForm({
     fd.set('description', description)
     fd.set('imageUrl', effectiveUrl)
     fd.set('isPublic', isPublic ? 'on' : 'off')
+    if (capacity.trim()) fd.set('capacity', capacity.trim())
+    fd.set('reminderOffsetsHours', reminders.trim() || '24,2')
 
     if (isEditing) {
       // Edit mode — optimistic update and close
@@ -480,6 +484,29 @@ export default function CreateEventForm({
             </div>
           </button>
         )}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <label className="block text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+          Capacity (optional)
+          <input
+            type="number"
+            min={1}
+            value={capacity}
+            onChange={(e) => setCapacity(e.target.value)}
+            placeholder="Unlimited"
+            className="mt-1 w-full rounded-xl border px-3 py-2 text-[13px] font-normal normal-case tracking-normal"
+          />
+        </label>
+        <label className="block text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">
+          Reminder hours before
+          <input
+            value={reminders}
+            onChange={(e) => setReminders(e.target.value)}
+            placeholder="24,2"
+            className="mt-1 w-full rounded-xl border px-3 py-2 text-[13px] font-normal normal-case tracking-normal"
+          />
+        </label>
       </div>
 
       {/* Email audience picker — shown when email is enabled (create mode only) */}

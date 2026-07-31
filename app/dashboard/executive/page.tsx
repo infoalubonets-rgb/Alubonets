@@ -1,12 +1,15 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
-import { EXECUTIVE_NAV } from '@/lib/dashboard/nav'
+import { navWithLoans } from '@/lib/dashboard/nav-async'
 import { getExecutiveDashboardData, getContributionChartSeries } from '@/lib/data/queries'
 import { ContributionTrendChart } from '@/components/dashboard/Charts'
 import Link from 'next/link'
 
 export default async function ExecutivePage() {
-  const data = await getExecutiveDashboardData()
-  const chart = await getContributionChartSeries()
+  const [data, chart, nav] = await Promise.all([
+    getExecutiveDashboardData(),
+    getContributionChartSeries(),
+    navWithLoans('EXECUTIVE'),
+  ])
 
   const stats = [
     { label: 'Active members',  value: data.members,                                                   icon: 'group',                  color: 'bg-primary dark:bg-[#0c1e42]',           text: 'text-white', iconBg: 'bg-white/15' },
@@ -22,7 +25,7 @@ export default async function ExecutivePage() {
   ]
 
   return (
-    <DashboardShell role="EXECUTIVE" title="Executive Committee" nav={EXECUTIVE_NAV}>
+    <DashboardShell role="EXECUTIVE" title="Executive Committee" nav={nav}>
       <div className="space-y-5 p-4 md:p-6 max-w-4xl mx-auto">
 
         {/* Stats */}

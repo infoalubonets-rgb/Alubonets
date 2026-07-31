@@ -15,8 +15,10 @@ import {
 } from '@/components/dashboard/Charts'
 import MpesaStkForm from '@/components/dashboard/MpesaStkForm'
 import PaymentsModal from '@/components/dashboard/PaymentsModal'
+import PaginationBar from '@/components/ui/PaginationBar'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,22 +26,54 @@ export const metadata = {
   title: 'Member contributions',
 }
 
-export default async function TreasurerContributionsPage() {
-  const [data, chart, analytics, mpesaContributions, failedPayments] = await Promise.all([
-    getTreasurerDashboardData(),
-    getContributionChartSeries(),
-    getContributionAnalytics(),
-    prisma.contribution.findMany({
-      where: { paymentMethod: 'MPESA', status: { in: ['CONFIRMED','RECONCILED'] } },
-      include: { user: { select: { fullName: true, email: true } } },
-      orderBy: { paidAt: 'desc' },
-    }),
-    prisma.auditLog.findMany({
-      where: { action: 'MPESA_STK_FAILED' },
-      include: { user: { select: { fullName: true, email: true } } },
-      orderBy: { createdAt: 'desc' },
-    }),
-  ])
+export default async function TreasurerContributionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; q?: string }>
+}) {
+  const sp = await searchParams
+  const page = parsePage(sp.page)
+  const pageSize = 25
+  const q = (sp.q || '').trim()
+  const contributionWhere = {
+    status: { in: ['CONFIRMED', 'RECONCILED'] as const },
+    ...(q
+      ? {
+          OR: [
+            { user: { fullName: { contains: q, mode: 'insensitive' as const } } },
+            { user: { email: { contains: q, mode: 'insensitive' as const } } },
+            { mpesaRef: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }
+      : {}),
+  }
+
+  const [data, chart, analytics, mpesaContributions, failedPayments, contribTotal, recent] =
+    await Promise.all([
+      getTreasurerDashboardData(),
+      getContributionChartSeries(),
+      getContributionAnalytics(),
+      prisma.contribution.findMany({
+        where: { paymentMethod: 'MPESA', status: { in: ['CONFIRMED', 'RECONCILED'] } },
+        include: { user: { select: { fullName: true, email: true } } },
+        orderBy: { paidAt: 'desc' },
+        take: 100,
+      }),
+      prisma.auditLog.findMany({
+        where: { action: 'MPESA_STK_FAILED' },
+        include: { user: { select: { fullName: true, email: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      prisma.contribution.count({ where: contributionWhere }),
+      prisma.contribution.findMany({
+        where: contributionWhere,
+        include: { user: { select: { fullName: true, email: true } } },
+        orderBy: { paidAt: 'desc' },
+        skip: paginationSkip(page, pageSize),
+        take: pageSize,
+      }),
+    ])
 
   const catLabels = data.byCategory.map((c) => c.category || 'Uncategorized')
   const catValues = data.byCategory.map((c) => c._sum.amount ?? 0)
@@ -142,7 +176,18 @@ export default async function TreasurerContributionsPage() {
         </section>
 
         <section className="rounded-xl border bg-surface p-4 overflow-x-auto">
-          <h2 className="font-semibold mb-3">Recent contributions</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Recent contributions</h2>
+            <form method="get" className="flex gap-2">
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Search member or ref"
+                className="rounded-lg border px-3 py-1.5 text-sm"
+              />
+              <button className="rounded-lg border px-3 py-1.5 text-sm">Search</button>
+            </form>
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-on-surface-variant">
@@ -155,7 +200,7 @@ export default async function TreasurerContributionsPage() {
               </tr>
             </thead>
             <tbody>
-              {data.recent.map((c) => (
+              {recent.map((c) => (
                 <tr key={c.id} className="border-t">
                   <td className="py-2">{c.user.fullName}</td>
                   <td>{c.amount.toLocaleString()}</td>
@@ -179,6 +224,12 @@ export default async function TreasurerContributionsPage() {
               ))}
             </tbody>
           </table>
+          <PaginationBar
+            pathname="/dashboard/treasurer/contributions"
+            page={page}
+            totalPages={totalPages(contribTotal, pageSize)}
+            params={{ q }}
+          />
         </section>
 
         <section className="rounded-xl border bg-surface p-4">

@@ -7,7 +7,6 @@ import { requireActiveRole, requireAdmin, requireSessionProfile } from '@/lib/au
 import {
   TAGS,
   approveGalleryPhoto,
-  createDocument,
   createEvent,
   createGalleryPhoto,
   createWelfareRequest,
@@ -230,6 +229,14 @@ export async function actionCreateEvent(formData: FormData) {
   const location = String(formData.get('location') || '') || undefined
   const description = String(formData.get('description') || '') || undefined
 
+  const capacityRaw = String(formData.get('capacity') || '').trim()
+  const capacity = capacityRaw ? Number(capacityRaw) : null
+  const reminderRaw = String(formData.get('reminderOffsetsHours') || '24,2')
+  const reminderOffsetsHours = reminderRaw
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0)
+
   const event = await createEvent({
     title,
     description,
@@ -237,6 +244,8 @@ export async function actionCreateEvent(formData: FormData) {
     imageUrl,
     startsAt: new Date(startsAt),
     isPublic,
+    capacity: capacity && Number.isFinite(capacity) ? capacity : null,
+    reminderOffsetsHours,
   })
 
   const actorId = actor.id
@@ -319,27 +328,38 @@ export async function actionDeleteEvents(ids: string[]) {
   revalidateTag(TAGS.events)
 }
 
-export async function actionCreateDocument(formData: FormData) {
-  const actor = await requireActiveRole(['SECRETARY', 'ADMIN'])
-  const title = String(formData.get('title') || '')
-  const fileUrl = String(formData.get('fileUrl') || '')
-  if (!title || !fileUrl) throw new Error('Title and file URL required')
-  await createDocument({
-    title,
-    fileUrl,
-    category: String(formData.get('category') || '') || undefined,
-    uploadedBy: actor.id,
-  })
-  revalidatePath('/dashboard/secretary')
-  revalidatePath('/dashboard/member')
-  revalidateTag(TAGS.documents)
+export async function actionCreateDocument(_formData: FormData) {
+  throw new Error(
+    'Legacy URL-only document upload is retired. Use /documents/manage to upload into the repository.',
+  )
 }
 
 export async function actionDeleteDocument(id: string) {
-  await requireAdmin()
+  const actor = await requireAdmin()
+  const reason = 'Deleted from legacy dashboard widget; prefer repository manage page.'
+  const document = await prisma.document.findUniqueOrThrow({ where: { id } })
+  if (document.storagePath) {
+    try {
+      const { createServerClient } = await import('@/lib/supabase-server')
+      await createServerClient().storage.from('documents').remove([document.storagePath])
+    } catch {
+      // best-effort storage cleanup
+    }
+  }
   await prisma.document.delete({ where: { id } })
+  const { writeAudit } = await import('@/lib/audit')
+  await writeAudit({
+    userId: actor.id,
+    action: 'DOCUMENT_DELETE',
+    entity: 'Document',
+    entityId: id,
+    reason,
+    oldValue: { title: document.title, version: document.version },
+  })
   revalidatePath('/dashboard/secretary')
   revalidatePath('/dashboard/member')
+  revalidatePath('/documents')
+  revalidatePath('/documents/manage')
   revalidateTag(TAGS.documents)
 }
 
@@ -489,11 +509,24 @@ export async function actionUpdateEvent(id: string, formData: FormData) {
   const imageUrl = String(formData.get('imageUrl') || '') || null
   const location = String(formData.get('location') || '') || null
   const description = String(formData.get('description') || '') || null
+  const capacityRaw = String(formData.get('capacity') || '').trim()
+  const capacity = capacityRaw ? Number(capacityRaw) : null
+  const reminderRaw = String(formData.get('reminderOffsetsHours') || '')
+  const reminderOffsetsHours = reminderRaw
+    ? reminderRaw
+        .split(',')
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    : undefined
   await updateEvent(id, {
-    title, description, location,
+    title,
+    description,
+    location,
     imageUrl: imageUrl ?? undefined,
     startsAt: new Date(startsAt),
     isPublic,
+    capacity: capacity && Number.isFinite(capacity) ? capacity : null,
+    reminderOffsetsHours,
   })
   EVENT_PATHS.forEach((p) => revalidatePath(p))
   revalidateTag(TAGS.events)

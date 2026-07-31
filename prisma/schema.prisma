@@ -86,11 +86,39 @@ enum ProjectStatus {
   COMPLETED
 }
 
+enum ProjectCommentStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+  REJECTED
+}
+
 enum WelfareStatus {
   PENDING
   APPROVED
   REJECTED
   PAID
+}
+
+enum LoanApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  DISBURSED
+  CLOSED
+}
+
+enum LoanGuarantorStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum LoanLedgerKind {
+  DISBURSEMENT
+  REPAYMENT
 }
 
 enum PaymentMethod {
@@ -186,6 +214,32 @@ enum ActionPointStatus {
   CANCELLED
 }
 
+enum EventAudienceType {
+  PUBLIC
+  ALL_MEMBERS
+  SELECTED_ROLES
+  SELECTED_MEMBERS
+}
+
+enum EventRsvpStatus {
+  GOING
+  MAYBE
+  NOT_GOING
+}
+
+enum AnnouncementDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum AnnouncementPublishStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+}
+
 model User {
   id              String       @id @default(cuid())
   authUserId      String?      @unique
@@ -234,6 +288,22 @@ model User {
   createdActionPoints MeetingActionPoint[] @relation("ActionPointCreator")
   createdDecisions MeetingDecision[]
   approvedMeetings Meeting[] @relation("MeetingApprover")
+  projectResponsibilities ProjectResponsible[]
+  projectComments ProjectComment[] @relation("ProjectCommentAuthor")
+  moderatedProjectComments ProjectComment[] @relation("ProjectCommentModerator")
+  projectInvestments ProjectInvestment[] @relation("ProjectInvestor")
+  recordedProjectInvestments ProjectInvestment[] @relation("ProjectInvestmentRecorder")
+  projectUpdates ProjectUpdate[]
+  eventInvitations EventInvitation[]
+  eventRsvps EventRSVP[]
+  eventAttendances EventAttendance[] @relation("EventAttendee")
+  recordedEventAttendances EventAttendance[] @relation("EventAttendanceRecorder")
+  eventCostsRecorded EventCost[]
+  notificationPreference UserNotificationPreference?
+  loanApplications LoanApplication[] @relation("LoanApplicant")
+  loanReviews LoanApplication[] @relation("LoanTreasurerReviewer")
+  loanDecisions LoanApplication[] @relation("LoanDecider")
+  loanGuarantees LoanGuarantor[]
 
   @@map("users")
 }
@@ -432,6 +502,7 @@ model FinancialTransaction {
   adjustment Adjustment?
   reconciliation Reconciliation?
   supportingDocuments SupportingDocument[]
+  loanLedgerLinks LoanLedgerLink[]
   createdAt DateTime @default(now())
   @@index([occurredAt, status])
   @@index([categoryId, occurredAt])
@@ -532,6 +603,12 @@ model Expense {
   payee String
   purpose String
   approvalRequired Boolean @default(false)
+  projectId String?
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  eventId String?
+  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  @@index([projectId])
+  @@index([eventId])
   @@map("expenses")
 }
 
@@ -579,27 +656,140 @@ model WelfareRequest {
   amount      Float?
   status      WelfareStatus @default(PENDING)
   reviewNote  String?
+  categoryId  String?
+  category    WelfareCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
   @@index([userId])
   @@index([status])
+  @@index([categoryId])
   @@map("welfare_requests")
 }
 
 model Project {
-  id          String        @id @default(cuid())
-  title       String
-  description String
-  status      ProjectStatus @default(UPCOMING)
-  imageUrl    String?
-  progress    Int           @default(0)
-  startDate   DateTime?
-  endDate     DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  title                 String
+  description           String
+  status                ProjectStatus @default(UPCOMING)
+  imageUrl              String?
+  progress              Int           @default(0)
+  startDate             DateTime?
+  endDate               DateTime?
+  budgetKes             Decimal       @default(0) @db.Decimal(14, 2)
+  fundingTargetKes      Decimal       @default(0) @db.Decimal(14, 2)
+  actualExpenditureKes  Decimal       @default(0) @db.Decimal(14, 2)
+  categoryId            String?
+  category              ProjectCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
+  responsibles ProjectResponsible[]
+  comments     ProjectComment[]
+  investments  ProjectInvestment[]
+  milestones   ProjectMilestone[]
+  updates      ProjectUpdate[]
+  documents    ProjectDocument[]
+  expenses     Expense[]
+
+  @@index([categoryId])
   @@map("projects")
+}
+
+model ProjectResponsible {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label     String?
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_responsibles")
+}
+
+model ProjectComment {
+  id             String               @id @default(cuid())
+  projectId      String
+  project        Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User                 @relation("ProjectCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  body           String
+  status         ProjectCommentStatus @default(PENDING)
+  moderatedById  String?
+  moderatedBy    User?                @relation("ProjectCommentModerator", fields: [moderatedById], references: [id], onDelete: SetNull)
+  moderatedAt    DateTime?
+  moderationNote String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([projectId, status])
+  @@index([authorId])
+  @@map("project_comments")
+}
+
+model ProjectInvestment {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("ProjectInvestor", fields: [userId], references: [id], onDelete: Restrict)
+  amount       Decimal  @db.Decimal(14, 2)
+  investedAt   DateTime @default(now())
+  notes        String?
+  recordedById String
+  recordedBy   User     @relation("ProjectInvestmentRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now())
+
+  @@index([projectId, investedAt])
+  @@index([userId])
+  @@map("project_investments")
+}
+
+model ProjectMilestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  dueAt       DateTime?
+  completedAt DateTime?
+  position    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([projectId, position])
+  @@map("project_milestones")
+}
+
+model ProjectUpdate {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  body        String
+  publishedAt DateTime @default(now())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+
+  @@index([projectId, publishedAt])
+  @@map("project_updates")
+}
+
+model ProjectDocument {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([projectId, documentId])
+  @@index([documentId])
+  @@map("project_documents")
 }
 
 model GalleryPhoto {
@@ -617,48 +807,179 @@ model GalleryPhoto {
 }
 
 model Announcement {
-  id          String    @id @default(cuid())
-  title       String
-  content     String
-  imageUrl    String?
-  authorId    String
-  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  broadcast   Boolean   @default(true)
-  publishedAt DateTime  @default(now())
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  emailSentAt DateTime?
+  id            String                    @id @default(cuid())
+  title         String
+  content       String
+  imageUrl      String?
+  authorId      String
+  author        User                      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  broadcast     Boolean                   @default(true)
+  publishedAt   DateTime                  @default(now())
+  expiresAt     DateTime?
+  createdAt     DateTime                  @default(now())
+  emailSentAt   DateTime?
+  status        AnnouncementPublishStatus @default(SENT)
+  scheduledFor  DateTime?
+  audienceRoles Role[]                    @default([])
+  familyBranch  String?
+  templateKey   String?
+  mandatory     Boolean                   @default(false)
 
   receipts AnnouncementReceipt[]
 
+  @@index([status, scheduledFor])
   @@map("announcements")
 }
 
 model AnnouncementReceipt {
-  id             String       @id @default(cuid())
+  id             String                     @id @default(cuid())
   announcementId String
-  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  announcement   Announcement               @relation(fields: [announcementId], references: [id], onDelete: Cascade)
   userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   readAt         DateTime?
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime                   @default(now())
+  emailStatus    AnnouncementDeliveryStatus @default(PENDING)
+  emailError     String?
+  emailSentAt    DateTime?
+  retryCount     Int                        @default(0)
 
   @@unique([announcementId, userId])
+  @@index([emailStatus, retryCount])
   @@map("announcement_receipts")
 }
 
-model Event {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  location    String?
-  startsAt    DateTime
-  endsAt      DateTime?
-  imageUrl    String?
-  isPublic    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+model AnnouncementTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  subject   String
+  bodyHtml  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@map("announcement_templates")
+}
+
+model UserNotificationPreference {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailOptional   Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+
+  @@map("user_notification_preferences")
+}
+
+model Event {
+  id                   String            @id @default(cuid())
+  title                String
+  description          String?
+  location             String?
+  startsAt             DateTime
+  endsAt               DateTime?
+  imageUrl             String?
+  isPublic             Boolean           @default(true)
+  audienceType         EventAudienceType @default(PUBLIC)
+  audienceRoles        Role[]            @default([])
+  capacity             Int?
+  rsvpDeadlineAt       DateTime?
+  budgetKes            Decimal           @default(0) @db.Decimal(14, 2)
+  actualCostKes        Decimal           @default(0) @db.Decimal(14, 2)
+  reminderOffsetsHours Int[]             @default([])
+  remindersSent        Json?
+  reportBody           String?
+  reportPublishedAt    DateTime?
+  galleryPhotoIds      String[]          @default([])
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  invitations EventInvitation[]
+  rsvps       EventRSVP[]
+  attendance  EventAttendance[]
+  attachments EventAttachment[]
+  costs       EventCost[]
+  expenses    Expense[]
+
+  @@index([startsAt])
+  @@index([isPublic, startsAt])
   @@map("events")
+}
+
+model EventInvitation {
+  id        String    @id @default(cuid())
+  eventId   String
+  event     Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sentAt    DateTime?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([eventId, userId])
+  @@map("event_invitations")
+}
+
+model EventRSVP {
+  id          String          @id @default(cuid())
+  eventId     String
+  event       Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      EventRsvpStatus
+  note        String?
+  respondedAt DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([eventId, userId])
+  @@index([eventId, status])
+  @@map("event_rsvps")
+}
+
+model EventAttendance {
+  id           String   @id @default(cuid())
+  eventId      String
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("EventAttendee", fields: [userId], references: [id], onDelete: Cascade)
+  present      Boolean  @default(true)
+  recordedById String
+  recordedBy   User     @relation("EventAttendanceRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  recordedAt   DateTime @default(now())
+
+  @@unique([eventId, userId])
+  @@map("event_attendances")
+}
+
+model EventAttachment {
+  id          String   @id @default(cuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title       String
+  fileUrl     String
+  storagePath String?
+  mimeType    String?
+  createdAt   DateTime @default(now())
+
+  @@index([eventId])
+  @@map("event_attachments")
+}
+
+model EventCost {
+  id           String   @id @default(cuid())
+  eventId      String
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  label        String
+  amount       Decimal  @db.Decimal(14, 2)
+  notes        String?
+  recordedById String
+  recordedBy   User     @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime @default(now())
+
+  @@index([eventId])
+  @@map("event_costs")
 }
 
 model Document {
@@ -686,6 +1007,7 @@ model Document {
   uploader          User                @relation(fields: [uploadedBy], references: [id], onDelete: Restrict)
   uploadedAt        DateTime            @default(now())
   downloads         DocumentDownload[]
+  projectLinks      ProjectDocument[]
 
   publishedMeeting Meeting?
 
@@ -843,8 +1165,8 @@ model EmailLog {
 
 model AuditLog {
   id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   action    String
   entity    String?
   entityId  String?
@@ -908,6 +1230,109 @@ model AppSetting {
   updatedBy String?
   updatedAt DateTime @updatedAt
   @@map("app_settings")
+}
+
+model FeatureFlag {
+  key       String   @id
+  enabled   Boolean  @default(false)
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  @@map("feature_flags")
+}
+
+model WelfareCategory {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  requests  WelfareRequest[]
+  @@map("welfare_categories")
+}
+
+model ProjectCategory {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  projects  Project[]
+  @@map("project_categories")
+}
+
+/// Master-data labels for membership classes (distinct from MemberCategory enum on profiles).
+model MembershipClass {
+  id        String   @id @default(cuid())
+  name      String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("membership_classes")
+}
+
+model LoanApplication {
+  id             String                @id @default(cuid())
+  applicantId    String
+  applicant      User                  @relation("LoanApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
+  amountKes      Decimal               @db.Decimal(14, 2)
+  purpose        String
+  dueAt          DateTime?
+  installmentNotes String?
+  notes          String?
+  status         LoanApplicationStatus @default(SUBMITTED)
+  treasurerNote  String?
+  reviewedById   String?
+  reviewedBy     User?                 @relation("LoanTreasurerReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt     DateTime?
+  decidedById    String?
+  decidedBy      User?                 @relation("LoanDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt      DateTime?
+  decisionNote   String?
+  disbursedAt    DateTime?
+  closedAt       DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  guarantors  LoanGuarantor[]
+  ledgerLinks LoanLedgerLink[]
+
+  @@index([applicantId, status])
+  @@index([status, createdAt])
+  @@map("loan_applications")
+}
+
+model LoanGuarantor {
+  id          String              @id @default(cuid())
+  loanId      String
+  loan        LoanApplication     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      LoanGuarantorStatus @default(PENDING)
+  note        String?
+  respondedAt DateTime?
+  createdAt   DateTime            @default(now())
+
+  @@unique([loanId, userId])
+  @@index([userId, status])
+  @@map("loan_guarantors")
+}
+
+model LoanLedgerLink {
+  id            String             @id @default(cuid())
+  loanId        String
+  loan          LoanApplication    @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  transactionId String
+  transaction   FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  kind          LoanLedgerKind
+  createdAt     DateTime           @default(now())
+
+  @@unique([transactionId])
+  @@index([loanId, kind])
+  @@map("loan_ledger_links")
 }
 
 model PublicContent {

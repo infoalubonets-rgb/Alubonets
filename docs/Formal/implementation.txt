@@ -432,107 +432,34 @@ The `Contribution` table represents money received but cannot provide full accou
 
 ## 4.1 Full document repository
 
-### Current implementation
+### Status: IMPLEMENTED
 
-Documents exist, and published meeting minutes can create document records.
-
-### Missing functionality
-
-- Dedicated member repository
-- Access levels
-- Role targeting
-- Document versions
-- File replacement history
-- Categories
-- Search and filters
-- Download audit
-- Expiry/archive status
-- General upload workflow
-
-### Implementation approach
-
-1. Extend the document model with:
-   - Description
-   - Access level
-   - Allowed roles
-   - Version
-   - Status
-   - Effective date
-   - Archived date
-2. Add document categories:
-   - Constitution
-   - Policy
-   - Minutes
-   - Finance
-   - Project
-   - Correspondence
-3. Create separate Admin/Secretary management and member-reading pages.
-4. Generate signed Storage URLs at access time.
-5. Record document publication and replacement.
-6. Preserve old versions.
-7. Audit uploads, publications, replacements and deletions.
+- Member repository at `/documents`; Admin/Secretary manage at `/documents/manage`
+- Access levels, role targeting, versions/replacement history, search/filters
+- Prescribed categories: Constitution, Policy, Minutes, Finance, Project, Correspondence
+- Signed Storage URLs via `/api/documents/[id]/download` with download audit
+- EXPIRED status sync (on page load + `/api/cron/stage4-maintenance`)
+- Legacy URL-only document create retired; dashboard links use signed download
 
 ## 4.2 Meeting notices and governance workflow
 
-### Current implementation
+### Status: IMPLEMENTED (unified meeting notice → minutes; not split into separate schedule entities)
 
-Secretary meeting reports and Word/PDF exports are strong.
-
-### Missing functionality
-
-- Meeting notices
-- Invitations
-- Agenda circulation
-- Action-point ownership
-- Action deadlines
-- Decision register
-- Selected-role sharing
-- Member-facing approved reports
-- Version history
-
-### Implementation approach
-
-1. Separate meeting scheduling from minutes.
-2. Add a meeting notice state.
-3. Add invitee/audience records.
-4. Add agenda items as structured records where needed.
-5. Add action points with:
-   - Owner
-   - Due date
-   - Status
-6. Add a decision/resolution register.
-7. Publish final reports to the member document repository.
-8. Make drafts visible only to authorized roles.
-9. Lock final minutes or require a new version for changes.
+- Notice circulate, invitations (`readAt` on member view), structured agenda, action points, decisions
+- Member `/governance` and manage `/governance/manage` with minutes version history UI
+- Final minutes locked; revisions create new draft + snapshot; publish to document repository
+- PDF/Word exports include structured agenda, action points, and decisions
+- Overdue action points auto-marked via sync/cron
 
 ## 4.3 Comprehensive audit trail
 
-### Current implementation
+### Status: IMPLEMENTED (with controlled retention)
 
-Many important actions already create audit records.
-
-### Missing functionality
-
-- Universal coverage
-- Old values
-- New values
-- Reason for change
-- IP/device where appropriate
-- Login records
-- Export records
-- Search/export
-- Tamper-resistant retention
-
-### Implementation approach
-
-1. Standardize an audit-event schema.
-2. Require old/new snapshots for sensitive updates.
-3. Require reasons for financial and status changes.
-4. Add login and export events.
-5. Add filters and export to the Admin audit viewer.
-6. Restrict audit deletion.
-7. Move retention deletion to a controlled scheduled process.
-8. Consider append-only database protections.
+- `AuditLog` schema: oldValue, newValue, reason, ipAddress, userAgent
+- Sensitive member/finance/document/governance updates write old/new/reason where required
+- Admin viewer: filters, old/new/reason/IP detail, login events section, CSV export
+- Routine audit deletion disabled; append-only DB trigger; retention only via purge cron/script
+- User deletion no longer cascades audit rows away (`userId` SetNull)
 
 ### Stage 4 completion criteria
 
@@ -548,56 +475,23 @@ Many important actions already create audit records.
 
 ## 5.1 Project comments
 
-### Missing functionality
+### Status: IMPLEMENTED
 
-Members cannot comment on projects.
-
-### Required entities
-
-- ProjectComment
-- CommentModeration
-- CommentReaction, optional
-
-### Implementation approach
-
-1. Allow active members to submit comments.
-2. Support moderation states:
-   - Pending
-   - Published
-   - Hidden
-   - Rejected
-3. Permit Admin/Executive moderation.
-4. Notify project managers about new comments.
-5. Audit moderation actions.
-6. Prevent anonymous comments.
+- Active members submit comments (`PENDING`); no anonymous posts
+- Admin/Executive moderate to Published / Hidden / Rejected with audit reason
+- Project responsibles notified via in-app announcement on new pending comments
+- Published comments shown on public project detail; reactions skipped
 
 ## 5.2 Project investment management
 
-### Current limitation
+### Status: IMPLEMENTED
 
-Projects contain basic title, description, status, progress and dates.
-
-### Missing functionality
-
-- Budget
-- Actual expenditure
-- Funding target
-- Member investment records
-- Project documents
-- Updates
-- Milestones
-- Responsible committee members
-- Financial visibility rules
-
-### Implementation approach
-
-1. Add project budget and funding fields.
-2. Link project expenses to the financial ledger.
-3. Add milestones and progress updates.
-4. Add project-document associations.
-5. Add responsible users.
-6. Separate public summaries from member and committee financial views.
-7. Add project reports and exports.
+- Project fields: budgetKes, fundingTargetKes, actualExpenditureKes
+- Models: ProjectInvestment (pledge records, no ledger auto-post), ProjectMilestone, ProjectUpdate, ProjectResponsible, ProjectDocument
+- Optional `Expense.projectId` for manual ledger linkage
+- Financial visibility: public (no finance) / member (funding summary) / manager (full)
+- Manager UI at `/dashboard/executive/projects/[id]` and organizer equivalent; CSV export
+- Member projects list at `/dashboard/member/projects`
 
 ### Stage 5 completion criteria
 
@@ -611,232 +505,147 @@ Projects contain basic title, description, status, progress and dates.
 
 # Stage 6 — Events, RSVP and communication
 
-## 6.1 Event management
+## Decisions
 
-### Current implementation
+- Channels: email + dashboard only (no SMS/WhatsApp).
+- Notifications: extend Announcement + AnnouncementReceipt + Resend/EmailLog (no parallel Notification system).
+- Event money: budget/actual fields and EventCost records; optional Expense.eventId for manual link (no auto ledger post).
 
-Organizer can create, update and publish events with cover images.
+## 6.1 Event management — implemented
 
-### Missing functionality
+### Schema
 
-- RSVP
-- Attendance
-- Invitations
-- Audience selection
-- Budget estimate
-- Event costs
-- Scheduled reminders
-- Post-event report
-- Attachments
-- Calendar management
+Event extended with audienceType, audienceRoles, capacity, rsvpDeadlineAt, budgetKes, actualCostKes,
+reminderOffsetsHours, remindersSent, reportBody, reportPublishedAt, galleryPhotoIds.
 
-### Implementation approach
+Child models: EventInvitation, EventRSVP, EventAttendance, EventAttachment, EventCost.
 
-1. Extend events with visibility and audience rules.
-2. Add `EventRSVP`.
-3. Add capacity and RSVP deadline where needed.
-4. Add attendance confirmation.
-5. Add reminder schedules.
-6. Add budget and actual cost.
-7. Link event expenses to the financial ledger.
-8. Add post-event reports and gallery references.
-9. Add calendar and list views.
-10. Support members-only events.
+### Actions / UI
 
-## 6.2 Notification system
+- `app/actions/events.ts` — details, invitations, RSVP, attendance, costs, attachments, report
+- Organizer manage: `/dashboard/organizer/events/[id]`
+- Member list + RSVP: `/dashboard/member/events` (list + calendar)
+- Public detail: `/events/[id]` with login RSVP for accessible events
+- Create flow sets audienceType, capacity, default reminders 24h/2h
+- Maintenance cron sends due event reminder emails via Resend
 
-### Current implementation
+## 6.2 Communication — implemented (extend Announcement stack)
 
-The platform has announcements, email functions and dashboard activity notifications.
+### Do not build
 
-### Missing functionality
+Separate Notification / NotificationRecipient / NotificationTemplate / DeliveryAttempt tables.
 
-- Persistent notification records
-- Delivery status per recipient
-- Scheduled delivery
-- Family-branch targeting
-- Role targeting in all notification types
-- Selected-member targeting
-- Preferences
-- SMS/WhatsApp
-- Retry handling
-- Templates managed by Admin
+### Implemented on existing stack
 
-### Required entities
+| Need | Approach |
+|------|----------|
+| Persistent records | Announcement + AnnouncementReceipt |
+| Delivery status | receipt emailStatus PENDING\|SENT\|FAILED\|SKIPPED + emailError, emailSentAt, retryCount |
+| Targeting | roles, familyBranch, selected members |
+| Preferences | UserNotificationPreference.emailOptional; mandatory notices always email |
+| Templates | AnnouncementTemplate Admin CRUD at `/admin/announcements` |
+| Scheduled delivery | Announcement.status DRAFT\|SCHEDULED\|SENT + scheduledFor; cron sends due |
+| Retry | Admin retry UI + cron batch for FAILED with retryCount < 3 |
+| Dashboard | Existing announcements feed; Admin surfaces scheduled/failed |
 
-- Notification
-- NotificationRecipient
-- NotificationTemplate
-- NotificationPreference
-- DeliveryAttempt
+### Cron (`/api/cron/stage4-maintenance`)
 
-### Implementation approach
-
-1. Store notifications independently of announcements.
-2. Generate one recipient record per member.
-3. Support channels:
-   - Dashboard
-   - Email
-   - SMS
-   - WhatsApp
-4. Add audience selection.
-5. Add scheduling and retry jobs.
-6. Track sent, delivered, failed and read states.
-7. Allow members to manage optional channels.
-8. Keep mandatory governance/financial notices enabled.
-9. Add Admin-managed templates.
+1. Document expiry / overdue APs
+2. Event reminder emails
+3. Scheduled announcements
+4. Failed announcement email retries
 
 ### Stage 6 completion criteria
 
-- Members can RSVP.
-- Organizers can record attendance.
-- Events support reminders and reports.
-- Notifications are targetable and traceable.
-- Failed deliveries can be reviewed and retried.
+- Members can RSVP; organizers record attendance — done
+- Events support reminders, budget/costs, reports, attachments, members-only audience — done
+- Announcements targetable, schedulable, email-traceable, failed emails retryable — done
+- Admin templates + member email preferences (mandatory forced on) — done
 
 ---
 
-# Stage 7 — Loans and advanced finance
+# Stage 7 — Loans (simple optional module)
 
-This stage must wait for committee-approved lending rules.
+## Decisions
 
-## Missing functionality
+- Module is **optional**: Admin / Super Admin toggle `loans_enabled` feature flag (default off).
+- Workflow: Member applies (with guarantors) → Treasurer reviews (profile + contribution/welfare history) → Admin / Super Admin approves or rejects → Treasurer records disbursement and repayments on the ledger.
+- Outstanding balance = confirmed disbursements − confirmed repayments (transaction-derived via `LoanLedgerLink`).
+- **Skipped in v1:** interest/fees, contribution-ratio hard eligibility, immutable installment products, penalties, default workflow, full PDF statement suite.
 
-- Loan applications
-- Eligibility calculation
-- Review
-- Approval workflow
-- Guarantors
-- Repayment schedules
-- Repayment allocation
-- Penalties
-- Outstanding balances
-- Defaults
-- Loan statements and reports
+### Admin-editable loan policy (when flag on)
 
-## Decisions required first
+- Max amount KES (default 50,000)
+- Min guarantors (default 1)
+- Require guarantor accept before approve (default yes)
 
-- Who qualifies?
-- Maximum loan amount
-- Contribution-to-loan ratio
-- Interest or administration fee
-- Repayment frequency
-- Required guarantors
-- Approval authorities
-- Late-payment penalties
-- Default procedure
-- Whether Executive approval is mandatory
+## Implemented
 
-## Implementation approach
-
-1. Document the lending policy.
-2. Add configurable loan products.
-3. Add loan application and approval entities.
-4. Add guarantors where required.
-5. Generate immutable repayment schedules.
-6. Link repayments to financial transactions.
-7. Calculate balances from transactions.
-8. Add arrears/default processing.
-9. Notify applicants and guarantors.
-10. Produce loan statements and management reports.
+- Models: `LoanApplication`, `LoanGuarantor`, `LoanLedgerLink`
+- Actions: [`app/actions/loans.ts`](app/actions/loans.ts)
+- UI: `/dashboard/member/loans`, `/dashboard/treasurer/loans/[id]`, `/admin/loans`, `/dashboard/executive/loans` (read-only outstanding report)
+- Nav items appear only when `loans_enabled`
+- Email notices via Resend for guarantor invite and decisions
 
 ### Stage 7 completion criteria
 
-- Loan behavior matches an approved policy.
+- Loan behavior matches the simple approved workflow and Admin policy settings.
 - Applications and approvals are audited.
 - Repayment balances are transaction-derived.
-- Treasurer and Executive permissions follow the constitution.
-- Required loan reports can be generated.
+- Treasurer and Admin permissions follow the workflow above; Executive has read-only report.
+- Simple outstanding report available to Executive.
 
 ---
 
 # Stage 8 — Admin settings and master data
 
-## Missing functionality
+## Implemented
 
-- Contribution categories
-- Welfare categories
-- Project categories
-- Member categories
-- Notification templates
-- Contact settings
-- Public social links
-- Password policy
-- Feature flags
-- Loan activation
-- Audit retention setting
-- System branding settings
-
-## Implementation approach
-
-1. Introduce typed setting and category entities.
-2. Avoid placing secrets in database-managed settings.
-3. Add validation for each setting type.
-4. Restrict settings to Admin or Super Admin.
-5. Audit every change.
-6. Add feature flags for optional modules.
-7. Add staging preview where settings affect public content.
+- Typed `AppSetting` helpers in [`lib/settings.ts`](lib/settings.ts) (validated keys; no secrets in DB)
+- `FeatureFlag` model + Admin toggle (`loans_enabled`)
+- Category master data: contribution/`TransactionCategory` UI, `WelfareCategory`, `ProjectCategory`, `MembershipClass`
+- Admin hub: `/admin/settings` — flags, branding, contact, password policy, audit retention, categories, loan policy
+- Notification templates: reuse Stage 6 `AnnouncementTemplate` at `/admin/announcements` (no parallel system)
+- Public social links: reuse `/admin/content` (`SOCIAL_LINKS`)
+- Branding site name drives root metadata preview
+- Password policy enforced on registration
+- Audit retention days read by `/api/cron/purge-audit`
 
 ### Stage 8 completion criteria
 
 - Admin can manage approved master data without code deployment.
-- Optional features can be safely enabled or disabled.
+- Optional features (loans) can be safely enabled or disabled.
 - Settings changes are validated and audited.
 
 ---
 
 # Stage 9 — Quality, performance and final deliverables
 
-## Missing technical work
+## Scope delivered (pragmatic + Playwright)
 
-- Automated unit tests
-- Integration tests
-- End-to-end tests
-- Authorization tests
-- Accessibility audit
-- Performance testing
-- Pagination
-- Search and filters
-- Monitoring
-- Backup verification
-- Disaster-recovery testing
-- Security review
+- Vitest: settings validation, loan outstanding math, nav/pagination helpers (plus existing URL tests)
+- Server-side pagination/search: admin members, documents, treasurer contributions, audit logs, announcements
+- Playwright happy paths: auth redirects, member contributions/welfare, admin approvals/settings (`e2e/`, secret-gated CI job)
+- Role cheat-sheets under `docs/guides/`
+- `docs/DEPLOYMENT_CHECKLIST.md`, `docs/TESTING_REPORT.md`, `docs/SIGN_OFF.md`
+- Backup restore drill template in `docs/BACKUP_AND_RECOVERY.md`
 
-## Missing project deliverables
+## Explicitly deferred
 
-- Admin user guide
-- Treasurer guide
-- Secretary guide
-- Organizer guide
-- Executive guide
-- Training material
-- Testing report
-- Deployment checklist
-- Backup plan
-- Restore guide
-- Final sign-off checklist
-
-## Implementation approach
-
-1. Add tests for every permission boundary.
-2. Test registration and approval end to end.
-3. Test financial calculations independently.
-4. Test Supabase RLS using each role.
-5. Add pagination to growing lists.
-6. Run accessibility checks and keyboard testing.
-7. Test slow mobile connections.
-8. Configure uptime and error monitoring.
-9. conduct a backup restoration exercise.
-10. Prepare role-specific guides and acceptance scripts.
+- Full a11y CI (axe/pa11y), formal load testing, OpenTelemetry product analytics
+- Exhaustive Supabase RLS matrix for every table/role
+- Long-form training curriculum (cheat-sheets are the starter pack)
 
 ### Stage 9 completion criteria
 
-- Critical workflows have automated coverage.
-- Unauthorized access tests fail safely.
-- Large lists paginate.
-- Mobile and accessibility acceptance tests pass.
-- Backup restoration is demonstrated.
-- Required guides and sign-off records are delivered.
+- Critical workflows have automated coverage (unit + Playwright) — done
+- Unauthorized access tests fail safely (redirect smoke) — done
+- Large lists paginate — done for hot lists
+- Mobile and accessibility acceptance tests pass — manual checklist in testing report
+- Backup restoration is demonstrated — process + record template; committee fills after drill
+- Required guides and sign-off records are delivered — done
+
+---
 
 # Recommended execution order
 
@@ -846,9 +655,7 @@ This stage must wait for committee-approved lending rules.
 4. Stage 3 — Finance and reconciliation
 5. Stage 4 — Documents, meetings and audit
 6. Stage 5 — Projects and participation
-7. Stage 6 — Events and notifications
-8. Stage 8 — Admin settings
-9. Stage 7 — Loans, after policy approval
+7. Stage 6 — Events, RSVP and communication (announcement stack extended)
+8. Stage 8 — Admin settings and master data
+9. Stage 7 — Simple optional loans (flag-gated)
 10. Stage 9 — Quality work runs throughout, with final verification at the end
-
-No additional code was written after your instruction to stop coding.

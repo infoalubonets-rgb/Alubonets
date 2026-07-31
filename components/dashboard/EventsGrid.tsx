@@ -21,6 +21,7 @@ type Props = {
   onToggleSelect?: (id: string) => void
   onDelete?: (id: string) => void
   onViewDetails?: (event: EventRow) => void
+  manageHref?: (id: string) => string
 }
 
 export default function EventsGrid({
@@ -32,6 +33,7 @@ export default function EventsGrid({
   onToggleSelect,
   onDelete,
   onViewDetails,
+  manageHref,
 }: Props) {
   if (events.length === 0) {
     return <p className="text-[13px] text-on-surface-variant dark:text-blue-200/50 py-2">{emptyMessage}</p>
@@ -48,6 +50,7 @@ export default function EventsGrid({
           isSelected={selected?.has(e.id) ?? false}
           onToggleSelect={onToggleSelect ? () => onToggleSelect(e.id) : undefined}
           onDelete={onDelete ? () => onDelete(e.id) : undefined}
+          manageHref={manageHref?.(e.id)}
           onViewDetails={onViewDetails ? () => onViewDetails(e) : undefined}
         />
       ))}
@@ -63,6 +66,7 @@ function EventCard({
   onToggleSelect,
   onDelete,
   onViewDetails,
+  manageHref,
 }: {
   event: EventRow
   dimPast: boolean
@@ -71,6 +75,7 @@ function EventCard({
   onToggleSelect?: () => void
   onDelete?: () => void
   onViewDetails?: () => void
+  manageHref?: string
 }) {
   const [showPopover, setShowPopover] = useState(false)
   const date = new Date(event.startsAt)
@@ -219,6 +224,15 @@ function EventCard({
             View details
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
           </button>
+        )}
+        {manageHref && (
+          <a
+            href={manageHref}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary"
+          >
+            Manage RSVP & attendance
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>tune</span>
+          </a>
         )}
 
         {/* Delete — single button, popover on click */}

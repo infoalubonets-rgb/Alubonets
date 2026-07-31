@@ -1,9 +1,18 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type PDFImage } from 'pdf-lib'
-import type { Meeting, User } from '@prisma/client'
+import type {
+  Meeting,
+  MeetingActionPoint,
+  MeetingAgendaItem,
+  MeetingDecision,
+  User,
+} from '@prisma/client'
 import { SITE_LOGO } from '@/lib/constants'
 
 export type MeetingForPdf = Meeting & {
   recorder?: Pick<User, 'fullName' | 'email'> | null
+  agendaItems?: MeetingAgendaItem[]
+  actionPoints?: (MeetingActionPoint & { owner?: Pick<User, 'fullName'> | null })[]
+  decisions?: MeetingDecision[]
 }
 
 const PAGE_W = 595
@@ -189,7 +198,38 @@ export async function buildMeetingMinutesPdf(meeting: MeetingForPdf): Promise<Ui
   // ── Main sections ─────────────────────────────────────────────────────────
   drawSection(ctx, 'Opening', meeting.opening)
   drawSection(ctx, 'Agenda', meeting.agenda)
+
+  if (meeting.agendaItems?.length) {
+    const structured = meeting.agendaItems
+      .map((item, i) => `${i + 1}. ${item.title}${item.description ? ` — ${item.description}` : ''}`)
+      .join('\n')
+    drawSection(ctx, 'Structured agenda items', structured)
+  }
+
   drawSection(ctx, 'Discussion / Minutes', meeting.minutes)
+  drawSection(ctx, 'Resolutions (narrative)', meeting.resolutions)
+
+  if (meeting.decisions?.length) {
+    const register = meeting.decisions
+      .map(
+        (d) =>
+          `${d.reference}: ${d.title}\n${d.decision}\nDecided: ${new Date(d.decidedAt).toLocaleDateString('en-KE')}`,
+      )
+      .join('\n\n')
+    drawSection(ctx, 'Decision register', register)
+  }
+
+  if (meeting.actionPoints?.length) {
+    const actions = meeting.actionPoints
+      .map((p) => {
+        const owner = p.owner?.fullName ?? p.ownerId
+        const due = p.dueAt ? new Date(p.dueAt).toLocaleDateString('en-KE') : 'No deadline'
+        return `• ${p.title} — ${owner} — ${p.status} — due ${due}${p.description ? `\n  ${p.description}` : ''}`
+      })
+      .join('\n')
+    drawSection(ctx, 'Action points', actions)
+  }
+
   drawSection(ctx, 'Any Other Business (AOB)', meeting.aob)
 
   if (meeting.nextMeetingAt) {

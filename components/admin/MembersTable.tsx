@@ -23,6 +23,10 @@ export type MembersTableUser = {
 
 type Props = {
   users: MembersTableUser[]
+  categories?: string[]
+  branches?: string[]
+  filters?: { q: string; category: string; branch: string }
+  total?: number
 }
 
 function statusStyles(status: string) {
@@ -40,18 +44,19 @@ function statusStyles(status: string) {
   }
 }
 
-export default function MembersTable({ users }: Props) {
+export default function MembersTable({
+  users,
+  categories = [],
+  branches = [],
+  filters = { q: '', category: '', branch: '' },
+  total,
+}: Props) {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('')
-  const [branch, setBranch] = useState('')
-  const [page, setPage] = useState(1)
-  const pageSize = 25
 
   useEffect(() => {
     setMounted(true)
@@ -59,7 +64,7 @@ export default function MembersTable({ users }: Props) {
 
   const selected = useMemo(
     () => users.find((u) => u.id === selectedId) ?? null,
-    [users, selectedId]
+    [users, selectedId],
   )
 
   useEffect(() => {
@@ -67,25 +72,6 @@ export default function MembersTable({ users }: Props) {
     setError('')
     setOk('')
   }, [selected])
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return users.filter(
-      (u) =>
-        (!category || u.memberCategory === category) &&
-        (!branch || u.familyBranch === branch) &&
-        (!q ||
-          u.fullName.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q) ||
-          u.membershipNumber?.toLowerCase().includes(q) ||
-          ROLE_LABEL[u.role].toLowerCase().includes(q) ||
-          u.status.toLowerCase().includes(q))
-    )
-  }, [users, query, category, branch])
-  const categories = useMemo(() => [...new Set(users.map((u) => u.memberCategory).filter(Boolean))] as string[], [users])
-  const branches = useMemo(() => [...new Set(users.map((u) => u.familyBranch).filter(Boolean))] as string[], [users])
-  const visible = filtered.slice((page - 1) * pageSize, page * pageSize)
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
 
   const close = () => setSelectedId(null)
 
@@ -105,26 +91,53 @@ export default function MembersTable({ users }: Props) {
   }
 
   return (
-    <div className="space-y-4 pb-8">
+    <div className="space-y-4 pb-8 px-4 md:px-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <p className="text-sm text-on-surface-variant max-w-xl">
-          Directory of all members. Open a row for details, or suspend / restore an account.
+          Directory of all members
+          {typeof total === 'number' ? ` (${total} matching)` : ''}. Open a row for details, or
+          suspend / restore an account.
         </p>
-        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
-        <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1) }} className="rounded-xl border px-3 py-2 text-sm"><option value="">All categories</option>{categories.map((value) => <option key={value}>{value}</option>)}</select>
-        <select value={branch} onChange={(e) => { setBranch(e.target.value); setPage(1) }} className="rounded-xl border px-3 py-2 text-sm"><option value="">All branches</option>{branches.map((value) => <option key={value}>{value}</option>)}</select>
-        <div className="relative w-full sm:w-64">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
-            search
-          </span>
-          <input
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setPage(1) }}
-            placeholder="Search members…"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-sm focus:outline-none focus:ring-2 focus:ring-secondary-container/40 focus:border-secondary-container"
-          />
-        </div>
-        </div>
+        <form method="get" className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <select
+            name="category"
+            defaultValue={filters.category}
+            className="rounded-xl border px-3 py-2 text-sm"
+          >
+            <option value="">All categories</option>
+            {categories.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+          <select
+            name="branch"
+            defaultValue={filters.branch}
+            className="rounded-xl border px-3 py-2 text-sm"
+          >
+            <option value="">All branches</option>
+            {branches.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+          <div className="relative w-full sm:w-64">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
+              search
+            </span>
+            <input
+              name="q"
+              defaultValue={filters.q}
+              placeholder="Search members…"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-sm focus:outline-none focus:ring-2 focus:ring-secondary-container/40 focus:border-secondary-container"
+            />
+          </div>
+          <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm text-on-primary">
+            Filter
+          </button>
+        </form>
       </div>
 
       <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
@@ -150,14 +163,14 @@ export default function MembersTable({ users }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {users.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-10 text-center text-on-surface-variant">
                     No members found
                   </td>
                 </tr>
               ) : (
-                visible.map((u, i) => (
+                users.map((u, i) => (
                   <tr
                     key={u.id}
                     className={`border-t border-outline-variant/50 hover:bg-primary/[0.03] transition-colors ${
@@ -199,7 +212,6 @@ export default function MembersTable({ users }: Props) {
           </table>
         </div>
       </div>
-      {pages > 1 && <div className="flex items-center justify-end gap-3 text-sm"><button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border px-3 py-1.5 disabled:opacity-40">Previous</button><span>Page {page} of {pages}</span><button disabled={page === pages} onClick={() => setPage((value) => value + 1)} className="rounded-lg border px-3 py-1.5 disabled:opacity-40">Next</button></div>}
 
       {mounted &&
         selected &&
@@ -254,7 +266,10 @@ export default function MembersTable({ users }: Props) {
                 <p className="text-xs text-on-surface-variant">
                   Role and dashboard access are managed on the Roles page.
                 </p>
-                <Link href={`/admin/members/${selected.id}`} className="inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary">
+                <Link
+                  href={`/admin/members/${selected.id}`}
+                  className="inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
+                >
                   Open full application and history
                 </Link>
 
@@ -300,7 +315,7 @@ export default function MembersTable({ users }: Props) {
               </div>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   )

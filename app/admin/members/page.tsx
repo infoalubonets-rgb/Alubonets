@@ -1,19 +1,80 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import MembersTable from '@/components/admin/MembersTable'
+import PaginationBar from '@/components/ui/PaginationBar'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import type { Role } from '@/lib/auth/types'
+import type { MemberCategory, Prisma } from '@prisma/client'
 import Link from 'next/link'
+import { parsePage, parsePageSize, paginationSkip, totalPages } from '@/lib/pagination'
 
-export default async function AdminMembersPage() {
-  const users = await prisma.user.findMany({
-    orderBy: { fullName: 'asc' },
-    include: { memberProfile: true },
-  })
+export default async function AdminMembersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; q?: string; category?: string; branch?: string }>
+}) {
+  const sp = await searchParams
+  const page = parsePage(sp.page)
+  const pageSize = parsePageSize(sp.pageSize, 25)
+  const q = (sp.q || '').trim()
+  const category = (sp.category || '').trim()
+  const branch = (sp.branch || '').trim()
+
+  const where: Prisma.UserWhereInput = {
+    ...(q
+      ? {
+          OR: [
+            { fullName: { contains: q, mode: 'insensitive' } },
+            { email: { contains: q, mode: 'insensitive' } },
+            { membershipNumber: { contains: q, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+    ...(category || branch
+      ? {
+          memberProfile: {
+            ...(category ? { memberCategory: category as MemberCategory } : {}),
+            ...(branch ? { familyBranch: branch } : {}),
+          },
+        }
+      : {}),
+  }
+
+  const [total, users, categoryRows, branchRows] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      orderBy: { fullName: 'asc' },
+      include: { memberProfile: true },
+      skip: paginationSkip(page, pageSize),
+      take: pageSize,
+    }),
+    prisma.memberProfile.findMany({
+      where: { memberCategory: { not: null } },
+      select: { memberCategory: true },
+      distinct: ['memberCategory'],
+    }),
+    prisma.memberProfile.findMany({
+      where: { familyBranch: { not: null } },
+      select: { familyBranch: true },
+      distinct: ['familyBranch'],
+    }),
+  ])
+
+  const categories = categoryRows.map((f) => f.memberCategory!).filter(Boolean)
+  const branches = branchRows.map((f) => f.familyBranch!).filter(Boolean) as string[]
+  const pages = totalPages(total, pageSize)
 
   return (
     <DashboardShell role="ADMIN" title="Members" nav={ADMIN_NAV}>
-      <div className="px-4 pt-4 md:px-6"><Link href="/api/export/members" className="inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Export members CSV</Link></div>
+      <div className="px-4 pt-4 md:px-6">
+        <Link
+          href="/api/export/members"
+          className="inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
+        >
+          Export members CSV
+        </Link>
+      </div>
       <MembersTable
         users={users.map((u) => ({
           id: u.id,
@@ -28,7 +89,19 @@ export default async function AdminMembersPage() {
           memberCategory: u.memberProfile?.memberCategory ?? null,
           familyBranch: u.memberProfile?.familyBranch ?? null,
         }))}
+        categories={categories}
+        branches={branches}
+        filters={{ q, category, branch }}
+        total={total}
       />
+      <div className="px-4 md:px-6">
+        <PaginationBar
+          pathname="/admin/members"
+          page={page}
+          totalPages={pages}
+          params={{ q, category, branch }}
+        />
+      </div>
     </DashboardShell>
   )
 }

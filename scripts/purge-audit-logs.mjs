@@ -40,10 +40,11 @@ console.log(
 if (dryRun) {
   console.log('Dry run — no deletes.')
 } else if (count > 0) {
-  const result = await prisma.auditLog.deleteMany({
-    where: { createdAt: { lt: cutoff } },
+  const deleted = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.allow_audit_purge', 'on', true)`
+    return tx.$executeRaw`DELETE FROM "audit_logs" WHERE "createdAt" < ${cutoff}`
   })
-  console.log(`Deleted ${result.count} audit log row(s).`)
+  console.log(`Deleted ${Number(deleted)} audit log row(s).`)
 } else {
   console.log('Nothing to delete.')
 }

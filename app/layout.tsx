@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Sora, Inter, Orbitron } from 'next/font/google'
 import './globals.css'
+import { getBranding } from '@/lib/settings'
 
 const sora = Sora({
   subsets: ['latin'],
@@ -23,13 +24,20 @@ const orbitron = Orbitron({
   variable: '--font-orbitron',
 })
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Alubonets SHG',
-    template: '%s - Alubonets SHG',
-  },
-  description:
-    'Alubonets Self-Help Group — uniting the descendants of the Alubokho family to strengthen unity, provide welfare support and create opportunities for social and economic development.',
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getBranding().catch(() => ({
+    siteName: 'Alubonets',
+    primaryHex: '#003366',
+  }))
+  const name = branding.siteName || 'Alubonets'
+  return {
+    title: {
+      default: `${name} SHG`,
+      template: `%s - ${name} SHG`,
+    },
+    description:
+      `${name} Self-Help Group — uniting the descendants of the Alubokho family to strengthen unity, provide welfare support and create opportunities for social and economic development.`,
+  }
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

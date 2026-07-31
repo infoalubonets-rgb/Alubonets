@@ -11,7 +11,11 @@ export default async function ExecutiveProjectsPage() {
 
   return (
     <DashboardShell role="EXECUTIVE" title="Projects" nav={EXECUTIVE_NAV}>
-      <OrganizerProjectsClient projects={projects} members={members} />
+      <OrganizerProjectsClient
+        projects={projects}
+        members={members}
+        manageHrefBase="/dashboard/executive/projects"
+      />
     </DashboardShell>
   )
 }

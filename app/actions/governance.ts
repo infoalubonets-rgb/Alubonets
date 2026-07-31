@@ -94,7 +94,24 @@ export async function submitMinutesForApproval(formData: FormData) {
   const reason = z.string().trim().min(3).max(500).parse(formData.get('reason'))
   const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } })
   await prisma.$transaction([
-    prisma.meetingVersion.create({ data: { meetingId, version: meeting.minutesVersion, reason, createdById: actor.id, snapshot: { title: meeting.title, agenda: meeting.agenda, minutes: meeting.minutes, resolutions: meeting.resolutions, heldAt: meeting.heldAt } } }),
+    prisma.meetingVersion.create({
+      data: {
+        meetingId,
+        version: meeting.minutesVersion,
+        reason,
+        createdById: actor.id,
+        snapshot: {
+          title: meeting.title,
+          agenda: meeting.agenda,
+          minutes: meeting.minutes,
+          resolutions: meeting.resolutions,
+          opening: meeting.opening,
+          aob: meeting.aob,
+          heldAt: meeting.heldAt,
+          status: meeting.status,
+        },
+      },
+    }),
     prisma.meeting.update({ where: { id: meetingId }, data: { status: 'PENDING_APPROVAL' } }),
   ])
   await writeAudit({ userId: actor.id, action: 'MINUTES_SUBMIT_APPROVAL', entity: 'Meeting', entityId: meetingId, reason, oldValue: { status: meeting.status }, newValue: { status: 'PENDING_APPROVAL', version: meeting.minutesVersion } })
@@ -105,9 +122,56 @@ export async function createMinutesRevision(formData: FormData) {
   const actor = await requireActiveRole(['ADMIN','SECRETARY'])
   const meetingId = z.string().min(1).parse(formData.get('meetingId'))
   const reason = z.string().trim().min(5).max(1000).parse(formData.get('reason'))
-  const meeting = await prisma.meeting.findUniqueOrThrow({ where: { id: meetingId } })
+  const meeting = await prisma.meeting.findUniqueOrThrow({
+    where: { id: meetingId },
+    include: { agendaItems: true, actionPoints: true, decisions: true },
+  })
   if (meeting.status !== 'FINAL') throw new Error('Only final minutes require a new revision.')
-  const updated = await prisma.meeting.update({ where: { id: meetingId }, data: { status: 'DRAFT', minutesVersion: { increment: 1 }, approvedAt: null, approvedById: null } })
-  await writeAudit({ userId: actor.id, action: 'MINUTES_REVISION_CREATE', entity: 'Meeting', entityId: meetingId, reason, oldValue: { status: meeting.status, version: meeting.minutesVersion }, newValue: { status: updated.status, version: updated.minutesVersion } })
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.meetingVersion.create({
+      data: {
+        meetingId,
+        version: meeting.minutesVersion,
+        reason,
+        createdById: actor.id,
+        snapshot: {
+          title: meeting.title,
+          agenda: meeting.agenda,
+          minutes: meeting.minutes,
+          resolutions: meeting.resolutions,
+          heldAt: meeting.heldAt,
+          agendaItems: meeting.agendaItems,
+          actionPoints: meeting.actionPoints,
+          decisions: meeting.decisions,
+        },
+      },
+    })
+    return tx.meeting.update({
+      where: { id: meetingId },
+      data: {
+        status: 'DRAFT',
+        minutesVersion: { increment: 1 },
+        approvedAt: null,
+        approvedById: null,
+      },
+    })
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'MINUTES_REVISION_CREATE',
+    entity: 'Meeting',
+    entityId: meetingId,
+    reason,
+    oldValue: { status: meeting.status, version: meeting.minutesVersion },
+    newValue: { status: updated.status, version: updated.minutesVersion },
+  })
   refresh(meetingId)
+}
+
+export async function markMeetingNoticesRead() {
+  const actor = await requireActiveRole(['ADMIN','SECRETARY','EXECUTIVE','TREASURER','ORGANIZER','MEMBER'])
+  await prisma.meetingInvitation.updateMany({
+    where: { userId: actor.id, readAt: null },
+    data: { readAt: new Date() },
+  })
 }

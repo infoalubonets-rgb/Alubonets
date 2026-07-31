@@ -133,8 +133,23 @@ export async function approveFinancialTransaction(formData: FormData) {
     if (disbursement?.welfareRequestId) {
       await tx.welfareRequest.update({ where: { id: disbursement.welfareRequestId }, data: { status: 'PAID' } })
     }
+    const loanLink = await tx.loanLedgerLink.findUnique({ where: { transactionId: id } })
+    if (loanLink?.kind === 'DISBURSEMENT') {
+      await tx.loanApplication.update({
+        where: { id: loanLink.loanId },
+        data: { status: 'DISBURSED', disbursedAt: new Date() },
+      })
+    }
   })
-  await writeAudit({ userId: actor.id, action: 'FINANCIAL_TRANSACTION_APPROVE', entity: 'FinancialTransaction', entityId: id })
+  await writeAudit({
+    userId: actor.id,
+    action: 'FINANCIAL_TRANSACTION_APPROVE',
+    entity: 'FinancialTransaction',
+    entityId: id,
+    reason: 'Pending financial transaction approved',
+    oldValue: { status: transaction.status },
+    newValue: { status: 'CONFIRMED', approvedById: actor.id },
+  })
   refreshFinance()
 }
 
@@ -147,7 +162,7 @@ export async function proposeReversal(formData: FormData) {
   const reversal = await prisma.financialTransaction.create({
     data: { transactionNumber: transactionNumber(), type: 'REVERSAL', status: 'PENDING', amount: original.amount, description: `Reversal of ${original.transactionNumber}`, occurredAt: new Date(), correctionReason: reason, periodId: (await getOpenPeriod(new Date())).id, createdById: actor.id, originalTransactionId: original.id, entries: { create: original.entries.map((entry) => ({ accountId: entry.accountId, debit: entry.credit, credit: entry.debit, memo: reason })) }, adjustment: { create: { reason, oldValue: { status: original.status }, newValue: { requestedStatus: 'REVERSED' } } } },
   })
-  await writeAudit({ userId: actor.id, action: 'REVERSAL_PROPOSE', entity: 'FinancialTransaction', entityId: reversal.id, meta: { originalId: id, reason } })
+  await writeAudit({ userId: actor.id, action: 'REVERSAL_PROPOSE', entity: 'FinancialTransaction', entityId: reversal.id, reason, oldValue: { originalId: id, status: original.status }, newValue: { reversalId: reversal.id, status: 'PENDING' }, meta: { originalId: id, reason } })
   refreshFinance()
 }
 
@@ -161,7 +176,7 @@ export async function approveReversal(formData: FormData) {
     prisma.financialTransaction.update({ where: { id: reversal.originalTransactionId }, data: { status: 'REVERSED', reversedAt: new Date() } }),
     prisma.contribution.updateMany({ where: { financialTransactionId: reversal.originalTransactionId }, data: { status: 'REVERSED', correctionReason: reversal.correctionReason } }),
   ])
-  await writeAudit({ userId: actor.id, action: 'REVERSAL_APPROVE', entity: 'FinancialTransaction', entityId: id, meta: { originalId: reversal.originalTransactionId } })
+  await writeAudit({ userId: actor.id, action: 'REVERSAL_APPROVE', entity: 'FinancialTransaction', entityId: id, reason: reversal.correctionReason || 'Reversal approved', oldValue: { status: reversal.status }, newValue: { status: 'CONFIRMED', originalId: reversal.originalTransactionId }, meta: { originalId: reversal.originalTransactionId } })
   refreshFinance()
 }
 
@@ -190,7 +205,7 @@ export async function closeAccountingPeriod(formData: FormData) {
   const openPending = await prisma.financialTransaction.count({ where: { periodId: id, status: 'PENDING' } })
   if (openPending) throw new Error('Resolve pending transactions before closing this period.')
   await prisma.accountingPeriod.update({ where: { id }, data: { status: 'CLOSED', closedAt: new Date(), closedBy: actor.id } })
-  await writeAudit({ userId: actor.id, action: 'ACCOUNTING_PERIOD_CLOSE', entity: 'AccountingPeriod', entityId: id })
+  await writeAudit({ userId: actor.id, action: 'ACCOUNTING_PERIOD_CLOSE', entity: 'AccountingPeriod', entityId: id, reason: 'Accounting period closed', oldValue: { status: 'OPEN' }, newValue: { status: 'CLOSED' } })
   refreshFinance()
 }
 
@@ -198,7 +213,7 @@ export async function reopenAccountingPeriod(formData: FormData) {
   const actor = await requireAdmin()
   const id = z.string().min(1).parse(formData.get('id'))
   await prisma.accountingPeriod.update({ where: { id }, data: { status: 'OPEN', closedAt: null, closedBy: null } })
-  await writeAudit({ userId: actor.id, action: 'ACCOUNTING_PERIOD_REOPEN', entity: 'AccountingPeriod', entityId: id })
+  await writeAudit({ userId: actor.id, action: 'ACCOUNTING_PERIOD_REOPEN', entity: 'AccountingPeriod', entityId: id, reason: 'Accounting period reopened', oldValue: { status: 'CLOSED' }, newValue: { status: 'OPEN' } })
   refreshFinance()
 }
 

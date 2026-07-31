@@ -31,3 +31,19 @@ Database backups do not automatically prove that uploaded files in Supabase Stor
 7. Restore production.
 8. Run `/api/health`, login, contribution, meeting and document checks.
 9. Record the recovery in the audit/incident log.
+
+## Restore drill record (fill after each non-prod exercise)
+
+| Field | Value |
+|-------|--------|
+| Date | |
+| Operator | |
+| Source project / backup id | |
+| Target scratch project | |
+| Duration | |
+| Member count check | Pass / Fail |
+| Auth `authUserId` link check | Pass / Fail |
+| Storage sample file check | Pass / Fail |
+| Notes | |
+| Sign-off | |
+

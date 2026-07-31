@@ -26,9 +26,11 @@ const STATUS_COLORS: Record<string, string> = {
 export default function OrganizerProjectsClient({
   projects: initialProjects,
   members,
+  manageHrefBase = '/dashboard/organizer/projects',
 }: {
   projects: ProjectRow[]
   members: MemberOption[]
+  manageHrefBase?: string
 }) {
   const [localProjects, setLocalProjects] = useState(initialProjects)
   const [open, setOpen]       = useState(false)
@@ -92,6 +94,7 @@ export default function OrganizerProjectsClient({
               key={project.id}
               project={project}
               isPending={isPending}
+              manageHref={`${manageHrefBase}/${project.id}`}
               onView={() => setDetail(project)}
               onEdit={() => openEdit(project)}
               onDelete={() => handleDelete(project.id)}
@@ -173,13 +176,12 @@ export default function OrganizerProjectsClient({
 
             {/* Footer */}
             <div className="flex gap-2 p-4 border-t border-outline-variant/30 dark:border-[#1a2d4f] flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setDetail(null)}
-                className="flex-1 rounded-xl border border-outline-variant dark:border-[#1a2d4f] bg-surface-container dark:bg-[#111f36] py-2.5 text-[13px] font-semibold text-on-surface dark:text-blue-50 transition-colors hover:bg-surface-container-high"
+              <a
+                href={`${manageHrefBase}/${detail.id}`}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-outline-variant dark:border-[#1a2d4f] bg-surface-container dark:bg-[#111f36] py-2.5 text-[13px] font-semibold text-on-surface dark:text-blue-50 transition-colors hover:bg-surface-container-high"
               >
-                Close
-              </button>
+                Manage
+              </a>
               <button
                 type="button"
                 onClick={() => { openEdit(detail); setDetail(null) }}
@@ -243,10 +245,11 @@ export default function OrganizerProjectsClient({
 }
 
 function ProjectCard({
-  project, isPending, onView, onEdit, onDelete,
+  project, isPending, manageHref, onView, onEdit, onDelete,
 }: {
   project: ProjectRow
   isPending: boolean
+  manageHref: string
   onView: () => void
   onEdit: () => void
   onDelete: () => void
@@ -284,6 +287,13 @@ function ProjectCard({
         <div className="flex items-center justify-between mt-2.5">
           <span className="text-[11px] text-on-surface-variant dark:text-blue-200/30">Updated {date}</span>
           <div className="flex items-center gap-1.5">
+            <a
+              href={manageHref}
+              className="flex items-center gap-1 rounded-lg border border-outline-variant dark:border-[#1e3461] bg-surface-container dark:bg-[#111f36] px-2.5 py-1.5 text-[11px] font-semibold text-on-surface dark:text-blue-200 hover:border-primary/40 transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>tune</span>
+              Manage
+            </a>
             <button
               type="button"
               onClick={onView}

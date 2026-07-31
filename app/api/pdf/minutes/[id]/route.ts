@@ -15,7 +15,12 @@ export async function GET(
 
   const meeting = await prisma.meeting.findUnique({
     where: { id },
-    include: { recorder: { select: { fullName: true, email: true } } },
+    include: {
+      recorder: { select: { fullName: true, email: true } },
+      agendaItems: { orderBy: { position: 'asc' } },
+      actionPoints: { include: { owner: { select: { fullName: true } } } },
+      decisions: { orderBy: { decidedAt: 'asc' } },
+    },
   })
   if (!meeting) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })

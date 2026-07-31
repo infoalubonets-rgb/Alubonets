@@ -75,6 +75,7 @@ export default function MeetingMinutesEditor({
   const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const locked = values.status === 'FINAL' || values.status === 'PENDING_APPROVAL'
 
   const set = (key: keyof MeetingEditorValues, value: string | number) =>
     setValues((v) => ({ ...v, [key]: value }))
@@ -106,6 +107,10 @@ export default function MeetingMinutesEditor({
   }
 
   const onSave = async () => {
+    if (locked) {
+      setError('Final or pending minutes are locked. Create a revision to edit.')
+      return
+    }
     setError(''); setMessage(''); setSaving(true)
     try {
       if (mode === 'create') {
@@ -135,7 +140,7 @@ export default function MeetingMinutesEditor({
       approval.set('reason', 'Secretary submitted completed minutes for approval')
       await submitMinutesForApproval(approval)
       setValues((v) => ({ ...v, status: 'PENDING_APPROVAL' }))
-      setMessage('Published as Final — PDF stored in documents library.')
+      setMessage('Submitted for Admin/Executive approval. Publishing to the document repository happens after approval.')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Publish failed')
@@ -181,7 +186,15 @@ export default function MeetingMinutesEditor({
           )}
         </div>
 
-        <div className="rounded-2xl border border-outline-variant/50 dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4 space-y-4 shadow-sm">
+        {locked && (
+          <p className="rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant">
+            {values.status === 'FINAL'
+              ? 'Final minutes are locked. Create a revision from Governance management to edit.'
+              : 'Minutes are pending approval and cannot be edited until approved or returned to draft.'}
+          </p>
+        )}
+
+        <div className={`rounded-2xl border border-outline-variant/50 dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4 space-y-4 shadow-sm ${locked ? 'opacity-80' : ''}`}>
           {/* Title */}
           <Field label="Title">
             <input
@@ -190,6 +203,7 @@ export default function MeetingMinutesEditor({
               placeholder="e.g. January General Meeting"
               className={INPUT}
               required
+              disabled={locked}
             />
           </Field>
 
@@ -201,6 +215,7 @@ export default function MeetingMinutesEditor({
                 onChange={(e) => set('heldAt', e.target.value)}
                 className={INPUT}
                 required
+                disabled={locked}
               />
             </Field>
             <Field label="Attendance" hint="(total present)">
@@ -210,6 +225,7 @@ export default function MeetingMinutesEditor({
                 value={values.attendance}
                 onChange={(e) => set('attendance', Number(e.target.value))}
                 className={INPUT}
+                disabled={locked}
               />
             </Field>
           </div>
@@ -221,6 +237,7 @@ export default function MeetingMinutesEditor({
               rows={2}
               placeholder="Opening remarks or prayers…"
               className={INPUT}
+              disabled={locked}
             />
           </Field>
 
@@ -237,6 +254,7 @@ export default function MeetingMinutesEditor({
                 rows={3}
                 placeholder="Jane Doe&#10;John Smith&#10;…"
                 className={INPUT}
+                disabled={locked}
               />
             </Field>
             <Field label="Absent with Apology" hint="(one per line)">
@@ -246,6 +264,7 @@ export default function MeetingMinutesEditor({
                 rows={2}
                 placeholder="Mary Wanjiku&#10;…"
                 className={INPUT}
+                disabled={locked}
               />
             </Field>
             <Field label="Absent" hint="(no apology — one per line)">
@@ -255,6 +274,7 @@ export default function MeetingMinutesEditor({
                 rows={2}
                 placeholder="Peter Otieno&#10;…"
                 className={INPUT}
+                disabled={locked}
               />
             </Field>
           </div>
@@ -266,6 +286,7 @@ export default function MeetingMinutesEditor({
               rows={3}
               placeholder="1. Opening prayer&#10;2. Confirmation of previous minutes&#10;3. …"
               className={INPUT}
+              disabled={locked}
             />
           </Field>
 
@@ -276,6 +297,7 @@ export default function MeetingMinutesEditor({
               rows={6}
               placeholder="Record of discussions…"
               className={INPUT}
+              disabled={locked}
             />
           </Field>
 
@@ -286,6 +308,7 @@ export default function MeetingMinutesEditor({
               rows={2}
               placeholder="Additional matters raised…"
               className={INPUT}
+              disabled={locked}
             />
           </Field>
 
@@ -295,6 +318,7 @@ export default function MeetingMinutesEditor({
               value={values.nextMeetingAt}
               onChange={(e) => set('nextMeetingAt', e.target.value)}
               className={INPUT}
+              disabled={locked}
             />
           </Field>
 
@@ -305,7 +329,7 @@ export default function MeetingMinutesEditor({
             <button
               type="button"
               onClick={onSave}
-              disabled={saving}
+              disabled={saving || locked}
               className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-on-primary text-[13px] font-semibold disabled:opacity-60 hover:opacity-90 active:scale-95 transition-all"
             >
               <span className="material-symbols-outlined text-[16px]">{saving ? 'hourglass_empty' : 'save'}</span>
@@ -320,7 +344,7 @@ export default function MeetingMinutesEditor({
                   <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
                   Download PDF
                 </a>
-                {values.status !== 'FINAL' && (
+                {values.status !== 'FINAL' && values.status !== 'PENDING_APPROVAL' && (
                   <button
                     type="button"
                     onClick={onPublish}
@@ -328,7 +352,7 @@ export default function MeetingMinutesEditor({
                     className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-secondary-container text-on-primary text-[13px] font-semibold disabled:opacity-60 hover:opacity-90 active:scale-95 transition-all"
                   >
                     <span className="material-symbols-outlined text-[16px]">{publishing ? 'hourglass_empty' : 'publish'}</span>
-                    {publishing ? 'Publishing…' : 'Mark final & publish'}
+                    {publishing ? 'Submitting…' : 'Submit for approval'}
                   </button>
                 )}
               </>

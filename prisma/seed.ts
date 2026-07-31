@@ -199,13 +199,36 @@ async function main() {
     ],
   })
 
+  const prescribedCategories = [
+    'Constitution',
+    'Policy',
+    'Minutes',
+    'Finance',
+    'Project',
+    'Correspondence',
+  ] as const
+  for (const name of prescribedCategories) {
+    await prisma.documentCategory.upsert({
+      where: { name },
+      create: { name, active: true },
+      update: { active: true },
+    })
+  }
+  const constitutionCategory = await prisma.documentCategory.findUniqueOrThrow({
+    where: { name: 'Constitution' },
+  })
+
   await prisma.document.create({
     data: {
       title: 'Constitution (summary)',
       fileUrl: '/documents/constitution-summary.pdf',
-      category: 'Governance',
+      category: 'Constitution',
+      categoryId: constitutionCategory.id,
       uploadedBy: secretary.id,
       versionGroupId: 'seed-constitution',
+      status: 'PUBLISHED',
+      accessLevel: 'MEMBERS',
+      effectiveAt: new Date(),
     },
   })
 

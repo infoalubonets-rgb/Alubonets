@@ -549,8 +549,26 @@ export async function createEvent(data: {
   endsAt?: Date
   imageUrl?: string
   isPublic?: boolean
+  capacity?: number | null
+  reminderOffsetsHours?: number[]
 }) {
-  return prisma.event.create({ data })
+  const isPublic = data.isPublic !== false
+  return prisma.event.create({
+    data: {
+      title: data.title,
+      description: data.description,
+      location: data.location,
+      startsAt: data.startsAt,
+      endsAt: data.endsAt,
+      imageUrl: data.imageUrl,
+      isPublic,
+      audienceType: isPublic ? 'PUBLIC' : 'ALL_MEMBERS',
+      capacity: data.capacity ?? null,
+      reminderOffsetsHours: data.reminderOffsetsHours?.length
+        ? data.reminderOffsetsHours
+        : [24, 2],
+    },
+  })
 }
 
 export async function updateEvent(id: string, data: {
@@ -560,8 +578,14 @@ export async function updateEvent(id: string, data: {
   startsAt?: Date
   imageUrl?: string | null
   isPublic?: boolean
+  capacity?: number | null
+  reminderOffsetsHours?: number[]
 }) {
-  return prisma.event.update({ where: { id }, data })
+  const patch: Parameters<typeof prisma.event.update>[0]['data'] = { ...data }
+  if (data.isPublic !== undefined) {
+    patch.audienceType = data.isPublic ? 'PUBLIC' : 'ALL_MEMBERS'
+  }
+  return prisma.event.update({ where: { id }, data: patch })
 }
 
 export async function updateGalleryPhoto(id: string, data: {

@@ -16,7 +16,12 @@ export async function GET() {
   const meetings = await prisma.meeting.findMany({
     orderBy: { heldAt: 'desc' },
     take: 50,
-    include: { recorder: { select: { fullName: true, email: true } } },
+    include: {
+      recorder: { select: { fullName: true, email: true } },
+      agendaItems: { orderBy: { position: 'asc' } },
+      actionPoints: { include: { owner: { select: { fullName: true } } } },
+      decisions: { orderBy: { decidedAt: 'asc' } },
+    },
   })
 
   const merged = await PDFDocument.create()
@@ -30,6 +35,14 @@ export async function GET() {
 
   const output = await merged.save()
   const date = new Date().toISOString().slice(0, 10)
+
+  const { writeAudit } = await import('@/lib/audit')
+  await writeAudit({
+    userId: profile.id,
+    action: 'MEETING_EXPORT',
+    entity: 'Meeting',
+    meta: { format: 'pdf-bulk', count: meetings.length },
+  })
 
   return new NextResponse(Buffer.from(output), {
     headers: {

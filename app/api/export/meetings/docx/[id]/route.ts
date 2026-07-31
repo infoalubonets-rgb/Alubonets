@@ -72,12 +72,16 @@ export async function GET(
 
   const meeting = await prisma.meeting.findUnique({
     where: { id },
-    include: { recorder: { select: { fullName: true } } },
+    include: {
+      recorder: { select: { fullName: true } },
+      agendaItems: { orderBy: { position: 'asc' } },
+      actionPoints: { include: { owner: { select: { fullName: true } } } },
+      decisions: { orderBy: { decidedAt: 'asc' } },
+    },
   })
   if (!meeting) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const children: Paragraph[] = [
-    // Header
     new Paragraph({
       children: [new TextRun({ text: 'ALUBONETS SHG', bold: true, size: 36, color: '001f50' })],
       alignment: AlignmentType.CENTER,
@@ -88,13 +92,11 @@ export async function GET(
       alignment: AlignmentType.CENTER,
       spacing: { after: 200 },
     }),
-    // Meeting title
     new Paragraph({
       children: [new TextRun({ text: meeting.title, bold: true, size: 32, color: '001f50' })],
       spacing: { after: 80 },
       border: { bottom: { style: BorderStyle.THICK, size: 8, color: 'fe8015', space: 4 } },
     }),
-    // Status + date
     new Paragraph({
       children: [
         new TextRun({
@@ -107,7 +109,6 @@ export async function GET(
       ],
       spacing: { after: 60 },
     }),
-    // Attendance summary
     new Paragraph({
       children: [
         new TextRun({ text: 'Total present: ', bold: true, size: 18, color: '001f50' }),
@@ -115,7 +116,6 @@ export async function GET(
       ],
       spacing: { after: 60 },
     }),
-    // Recorder
     ...(meeting.recorder
       ? [
           new Paragraph({
@@ -146,8 +146,39 @@ export async function GET(
   if (meeting.agenda?.trim()) {
     children.push(sectionHeading('Agenda'), ...bodyPara(meeting.agenda))
   }
+  if (meeting.agendaItems.length) {
+    children.push(
+      sectionHeading('Structured agenda items'),
+      ...meeting.agendaItems.flatMap((item, i) =>
+        bodyPara(`${i + 1}. ${item.title}${item.description ? ` — ${item.description}` : ''}`),
+      ),
+    )
+  }
   if (meeting.minutes?.trim()) {
     children.push(sectionHeading('Discussion / Minutes'), ...bodyPara(meeting.minutes))
+  }
+  if (meeting.resolutions?.trim()) {
+    children.push(sectionHeading('Resolutions (narrative)'), ...bodyPara(meeting.resolutions))
+  }
+  if (meeting.decisions.length) {
+    children.push(
+      sectionHeading('Decision register'),
+      ...meeting.decisions.flatMap((d) =>
+        bodyPara(`${d.reference}: ${d.title}\n${d.decision}\nDecided: ${fmtDate(d.decidedAt)}`),
+      ),
+    )
+  }
+  if (meeting.actionPoints.length) {
+    children.push(
+      sectionHeading('Action points'),
+      ...meeting.actionPoints.flatMap((p) =>
+        bodyPara(
+          `• ${p.title} — ${p.owner.fullName} — ${p.status} — due ${
+            p.dueAt ? fmtDate(p.dueAt) : 'No deadline'
+          }${p.description ? `\n  ${p.description}` : ''}`,
+        ),
+      ),
+    )
   }
   if (meeting.aob?.trim()) {
     children.push(sectionHeading('Any Other Business'), ...bodyPara(meeting.aob))
@@ -161,6 +192,15 @@ export async function GET(
       }),
     )
   }
+
+  const { writeAudit } = await import('@/lib/audit')
+  await writeAudit({
+    userId: profile.id,
+    action: 'MEETING_EXPORT',
+    entity: 'Meeting',
+    entityId: meeting.id,
+    meta: { format: 'docx', title: meeting.title },
+  })
 
   const doc = new Document({
     styles: {

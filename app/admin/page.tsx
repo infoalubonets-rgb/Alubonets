@@ -1,5 +1,5 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
-import { ADMIN_NAV } from '@/lib/dashboard/nav'
+import { navWithLoans } from '@/lib/dashboard/nav-async'
 import { getAdminDashboardData, getContributionChartSeries } from '@/lib/data/queries'
 import {
   ApprovalStatusChart,
@@ -14,6 +14,7 @@ export default async function AdminPage() {
   const chart = await getContributionChartSeries()
   const statusCounts = await prisma.user.groupBy({ by: ['status'], _count: true })
   const statusMap = Object.fromEntries(statusCounts.map((s) => [s.status, s._count]))
+  const nav = await navWithLoans('ADMIN')
 
   const stats = [
     { label: 'Total members',       value: data.totalMembers,                                    icon: 'group',                  href: '/admin/members',   color: 'bg-primary dark:bg-[#0c1e42]',           text: 'text-white', iconBg: 'bg-white/15' },
@@ -32,7 +33,7 @@ export default async function AdminPage() {
   ]
 
   return (
-    <DashboardShell role="ADMIN" title="Administrator" nav={ADMIN_NAV}>
+    <DashboardShell role="ADMIN" title="Administrator" nav={nav}>
       <div className="space-y-5 p-4 md:p-6 max-w-5xl mx-auto">
 
         {/* Stats */}

@@ -55,13 +55,14 @@ export async function uploadRepositoryDocument(formData: FormData) {
     status: formData.get('status'), effectiveAt: formData.get('effectiveAt') || undefined,
     expiresAt: formData.get('expiresAt') || undefined,
   })
+  const category = await prisma.documentCategory.findUniqueOrThrow({ where: { id: data.categoryId } })
   const groupId = crypto.randomUUID()
   const file = await upload(actor.id, formData.get('file') as File, groupId, 1)
   const document = await prisma.document.create({ data: {
-    ...data, allowedRoles: roles(formData), storagePath: file.path, fileUrl: `storage://documents/${file.path}`,
+    ...data, category: category.name, allowedRoles: roles(formData), storagePath: file.path, fileUrl: `storage://documents/${file.path}`,
     mimeType: file.mimeType, uploadedBy: actor.id, versionGroupId: groupId,
   } })
-  await writeAudit({ userId: actor.id, action: data.status === 'PUBLISHED' ? 'DOCUMENT_PUBLISH' : 'DOCUMENT_UPLOAD', entity: 'Document', entityId: document.id, newValue: { ...data, version: 1 } })
+  await writeAudit({ userId: actor.id, action: data.status === 'PUBLISHED' ? 'DOCUMENT_PUBLISH' : 'DOCUMENT_UPLOAD', entity: 'Document', entityId: document.id, newValue: { ...data, category: category.name, version: 1 } })
   refresh()
 }
 
@@ -88,10 +89,16 @@ export async function replaceRepositoryDocument(formData: FormData) {
 export async function setDocumentStatus(formData: FormData) {
   const actor = await requireActiveRole(['ADMIN','SECRETARY'])
   const id = z.string().min(1).parse(formData.get('id'))
-  const status = z.enum(['DRAFT','PUBLISHED','ARCHIVED']).parse(formData.get('status'))
+  const status = z.enum(['DRAFT','PUBLISHED','ARCHIVED','EXPIRED']).parse(formData.get('status'))
   const reason = z.string().trim().min(3).max(500).parse(formData.get('reason'))
   const old = await prisma.document.findUniqueOrThrow({ where: { id } })
-  const updated = await prisma.document.update({ where: { id }, data: { status, archivedAt: status === 'ARCHIVED' ? new Date() : null } })
+  const updated = await prisma.document.update({
+    where: { id },
+    data: {
+      status,
+      archivedAt: status === 'ARCHIVED' ? new Date() : null,
+    },
+  })
   await writeAudit({ userId: actor.id, action: 'DOCUMENT_STATUS_CHANGE', entity: 'Document', entityId: id, reason, oldValue: { status: old.status }, newValue: { status: updated.status } })
   refresh()
 }

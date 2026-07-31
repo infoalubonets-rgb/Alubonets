@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     include: { user: { select: { fullName: true, email: true } } },
     orderBy: { createdAt: 'desc' },
   })
-  const output = [['Time','Actor','Email','Action','Entity','Entity ID','Reason','Old value','New value','Metadata','IP','Device'], ...rows.map((row)=>[row.createdAt.toISOString(),row.user.fullName,row.user.email,row.action,row.entity,row.entityId,row.reason,JSON.stringify(row.oldValue),JSON.stringify(row.newValue),JSON.stringify(row.meta),row.ipAddress,row.userAgent])]
+  const output = [['Time','Actor','Email','Action','Entity','Entity ID','Reason','Old value','New value','Metadata','IP','Device'], ...rows.map((row)=>[row.createdAt.toISOString(),row.user?.fullName ?? '',row.user?.email ?? '',row.action,row.entity,row.entityId,row.reason,JSON.stringify(row.oldValue),JSON.stringify(row.newValue),JSON.stringify(row.meta),row.ipAddress,row.userAgent])]
   await writeAudit({ userId: actor.id, action: 'AUDIT_EXPORT', entity: 'AuditLog', meta: { count: rows.length, action, entity, fromRaw, toRaw } })
   return new NextResponse(output.map((row)=>row.map(csv).join(',')).join('\r\n'), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="alubonets-audit.csv"' } })
 }
