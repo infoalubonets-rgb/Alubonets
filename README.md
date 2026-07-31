@@ -11,9 +11,10 @@ Public website and member platform for **Alubonets Self-Help Group**.
 | Doc | Purpose |
 |-----|---------|
 | **This README** | What the product is and **how it works** |
-| [docs/BACKEND_SETUP.md](docs/BACKEND_SETUP.md) | **How to set up** env, Supabase, seed, RLS, Resend, Daraja, deploy |
-| [docs/DATA_MODEL.md](docs/DATA_MODEL.md) | Tables, relationships, ERD, **local seed accounts** |
-| [docs/DESIGN.md](docs/DESIGN.md) | UI / design tokens |
+| [docs/OPERATIONS.md](docs/OPERATIONS.md) | Setup, environments, deploy, backups, monitoring |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data model, design system, decisions, security |
+| [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Expected / implemented / remaining vs brief |
+| [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | Testing, sign-off, role guides |
 
 ---
 
@@ -21,15 +22,15 @@ Public website and member platform for **Alubonets Self-Help Group**.
 
 ```bash
 npm install
-copy .env.local.example .env.local   # fill secrets — see BACKEND_SETUP
+copy .env.local.example .env.local   # fill secrets — see docs/OPERATIONS.md
 npm run db:push
 npm run db:seed
 npm run db:bootstrap-auth
 npm run dev
 ```
 
-Full setup: **[docs/BACKEND_SETUP.md](docs/BACKEND_SETUP.md)**.  
-Local seed emails/passwords (dev only): **[docs/DATA_MODEL.md](docs/DATA_MODEL.md#seeded-dev-accounts)**.
+Full setup: **[docs/OPERATIONS.md](docs/OPERATIONS.md)**.  
+Local seed emails/passwords (dev only): **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#seeded-dev-accounts)**.
 
 ---
 
@@ -67,7 +68,7 @@ components/          # layout, auth, dashboard shell, profile
 lib/                 # prisma, auth, email, data queries, mpesa
 prisma/              # schema + seed
 supabase/            # policies.sql, storage.sql
-docs/                # setup, data model, design
+docs/                # OPERATIONS, ARCHITECTURE, IMPLEMENTATION, ACCEPTANCE (+ Formal/)
 ```
 
 ---

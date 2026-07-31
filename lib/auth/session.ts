@@ -1,8 +1,10 @@
+import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
 import { createServerClient as createServiceClient } from '@/lib/supabase-server'
 import type { AuthUser, Role } from './types'
+import { ROLE_HOME } from './types'
 import { isAppRole, toAuthUser } from './helpers'
 import type { MemberStatus, User } from '@prisma/client'
 
@@ -140,12 +142,14 @@ export async function requireSessionProfile() {
 
 export async function requireActiveRole(roles?: Role[]) {
   const profile = await requireSessionProfile()
-  if (profile.status !== 'ACTIVE') throw new Error('Account is not active')
+  if (profile.status !== 'ACTIVE') {
+    redirect('/login?error=inactive')
+  }
   if (!roles) return profile
   if (profile.isSuperAdmin || profile.role === 'ADMIN') return profile
   if (roles.includes(profile.role)) return profile
   if ((profile.dashboardAccess ?? []).some((r) => roles.includes(r))) return profile
-  throw new Error('Forbidden')
+  redirect(ROLE_HOME[profile.role])
 }
 
 export async function requireAdmin() {

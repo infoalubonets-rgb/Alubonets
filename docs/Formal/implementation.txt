@@ -626,9 +626,8 @@ Separate Notification / NotificationRecipient / NotificationTemplate / DeliveryA
 - Vitest: settings validation, loan outstanding math, nav/pagination helpers (plus existing URL tests)
 - Server-side pagination/search: admin members, documents, treasurer contributions, audit logs, announcements
 - Playwright happy paths: auth redirects, member contributions/welfare, admin approvals/settings (`e2e/`, secret-gated CI job)
-- Role cheat-sheets under `docs/guides/`
-- `docs/DEPLOYMENT_CHECKLIST.md`, `docs/TESTING_REPORT.md`, `docs/SIGN_OFF.md`
-- Backup restore drill template in `docs/BACKUP_AND_RECOVERY.md`
+- Role cheat-sheets, testing report, and sign-off in `docs/ACCEPTANCE.md`
+- Deployment checklist and backup restore drill template in `docs/OPERATIONS.md`
 
 ## Explicitly deferred
 

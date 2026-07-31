@@ -88,3 +88,16 @@ export function roleForDashboardPath(pathname: string): Role | null {
   if (pathname.startsWith('/dashboard/member')) return 'MEMBER'
   return null
 }
+
+/** Paths every authenticated ACTIVE user may open; page-level auth still enforces role. */
+export function isSharedAuthenticatedPath(pathname: string): boolean {
+  const roots = [
+    '/profile',
+    '/contributions',
+    '/announcements',
+    '/governance',
+    '/documents',
+    '/financial-reports',
+  ]
+  return roots.some((root) => pathname === root || pathname.startsWith(`${root}/`))
+}

@@ -265,7 +265,16 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
           </form>
           {mode === 'signin' && (
             <p className="mt-3 text-center text-sm">
-              <Link href="/forgot-password" className="text-primary hover:underline">Forgot password?</Link>
+              <Link
+                href="/forgot-password"
+                className="text-primary hover:underline"
+                onClick={(e) => {
+                  e.preventDefault()
+                  router.push('/forgot-password')
+                }}
+              >
+                Forgot password?
+              </Link>
             </p>
           )}
 

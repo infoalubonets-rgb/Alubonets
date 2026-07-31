@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import {
   ROLE_HOME,
   allowedDashboards,
+  isSharedAuthenticatedPath,
   roleForDashboardPath,
   type Role,
 } from '@/lib/auth/types'
@@ -198,15 +199,9 @@ export async function middleware(req: NextRequest) {
     return redirectWithCookies(url)
   }
 
-  // Shared profile, personal contributions & announcements for every authenticated role
-  if (
-    pathname === '/profile' ||
-    pathname.startsWith('/profile/') ||
-    pathname === '/contributions' ||
-    pathname.startsWith('/contributions/') ||
-    pathname === '/announcements' ||
-    pathname.startsWith('/announcements/')
-  ) {
+  // Shared portals (profile, contributions, announcements, governance, documents, reports).
+  // Page-level requireActiveRole still enforces manage vs view access.
+  if (isSharedAuthenticatedPath(pathname)) {
     return supabaseResponse
   }
 

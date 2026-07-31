@@ -38,6 +38,9 @@ export default function Footer() {
               <Link href="/projects" className={linkClass('/projects')}>
                 Projects
               </Link>
+              <Link href="/events" className={linkClass('/events')}>
+                Events
+              </Link>
             </nav>
           </div>
 
@@ -86,18 +89,18 @@ export default function Footer() {
               © 2026 Alubonets Self-Help Group. All rights reserved.
             </p>
             <div className="flex gap-lg text-on-primary/60 dark:text-on-primary-container/60">
-              <a
-                href="#"
+              <Link
+                href="/privacy"
                 className="hover:text-on-primary dark:hover:text-on-primary-container transition-colors duration-200"
               >
                 Privacy Policy
-              </a>
-              <a
-                href="#"
+              </Link>
+              <Link
+                href="/terms"
                 className="hover:text-on-primary dark:hover:text-on-primary-container transition-colors duration-200"
               >
                 Terms of Service
-              </a>
+              </Link>
             </div>
           </div>
         </div>

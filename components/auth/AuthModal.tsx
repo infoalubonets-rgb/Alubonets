@@ -71,6 +71,10 @@ export default function AuthModal() {
         router.push('/register')
         return
       }
+      if (t === 'forgot') {
+        router.push('/forgot-password')
+        return
+      }
       setTab(t)
       setOpen(true)
     }
@@ -210,7 +214,14 @@ export default function AuthModal() {
               </div>
               <GoogleButton onClick={onGoogle} disabled={loading} />
               <div className="flex items-center justify-between text-[12px] text-on-surface-variant">
-                <button type="button" onClick={() => setTab('forgot')} className="hover:text-primary">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false)
+                    router.push('/forgot-password')
+                  }}
+                  className="hover:text-primary"
+                >
                   Forgot password?
                 </button>
                 <button type="button" onClick={() => { setOpen(false); router.push('/register') }} className="hover:text-on-surface">

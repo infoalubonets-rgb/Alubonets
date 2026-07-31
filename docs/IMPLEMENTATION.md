@@ -1,9 +1,11 @@
-# Alubonets Self-Help Group — Implementation Report
+# Alubonets Self-Help Group - Implementation Report
 
 **Document purpose:** Single record of what the Developer Brief expects, what is already built, and what remains.  
 **Sources:** Developer Brief v1.0; staged plan (`docs/Formal/implementation.txt`)  
 **Audit date:** July 2026 (Stage 9 close-out)  
 **Important:** “Implemented” means present in the **codebase**. Much of Stages 4–9 may still be **local / uncommitted** and not yet deployed to production.
+
+Companion docs: [OPERATIONS.md](./OPERATIONS.md) | [ARCHITECTURE.md](./ARCHITECTURE.md) | [ACCEPTANCE.md](./ACCEPTANCE.md)
 
 ---
 
@@ -211,7 +213,7 @@ Built in the current codebase (routes/models/actions as examples). Status vs exp
 | **Events/Comms** | Audience, capacity, RSVP, attendance, attachments, costs, reminders | Stage 6 | Met; email + dashboard only |
 | **Loans** | Apply, guarantors, review, approve, ledger link, outstanding | Stage 7 | Met simple v1 |
 | **Quality** | Vitest, Playwright smoke, CI, hot-list pagination | Stage 9 | Met pragmatic scope |
-| **Deliverables** | Role guides, deployment/testing/sign-off, backup restore template | `docs/guides/`, checklists | Met docs pack |
+| **Deliverables** | Role guides, deployment/testing/sign-off, backup restore template | `docs/ACCEPTANCE.md (role guides)`, checklists | Met docs pack |
 | **Stack** | Next.js + Prisma/Postgres + Supabase Auth/Storage + Resend + Sentry | Repo | Met tech choice |
 
 ### 2.1 Acceptance criteria — current status
@@ -261,9 +263,9 @@ Not done, partial, deferred, or process/ops only. Do not treat older “Missing�
 |------|----------------|----------|-------|
 | **Ops** | Commit, migrate, deploy Stages 4–9 | **High** | Large local/uncommitted tree |
 | **Ops** | Run `prisma migrate deploy` on staging/prod | **High** | DB must match schema |
-| **Ops** | Backup **restore drill** recorded | **High** | Template in `BACKUP_AND_RECOVERY.md`; fill after drill |
+| **Ops** | Backup **restore drill** recorded | **High** | Template in `OPERATIONS.md` §4; fill after drill |
 | **Ops** | Staging/prod isolation; close committee decisions | **High** | Domain, host owner, contact email, etc. |
-| **Ops** | Committee sign-off (`SIGN_OFF.md`) | **High** | Deliverable |
+| **Ops** | Committee sign-off (`ACCEPTANCE.md` §2) | **High** | Deliverable |
 | **Privacy** | Gallery **publication consent** | Medium | Brief §16 / Stage 2.3 |
 | **Security** | TOTP / authenticator **2FA** for Admin/Treasurer/Secretary | Medium | Email OTP only today |
 | **Security** | Seed/test accounts forced off in production builds | Medium | Flag exists; example env may default on |
@@ -339,5 +341,5 @@ Not done, partial, deferred, or process/ops only. Do not treat older “Missing�
 | Title | Alubonets Implementation Report (expected / implemented / remaining) |
 | Version | 1.0 |
 | Based on | Developer Brief v1.0 + staged implementation plan |
-| Replaces | Split `IMPLEMENTATION_STATUS.md` + `IMPLEMENTATION_REMAINING.md` companions |
+| Replaces | Former split docs (setup, data model, design, checklists, guides, etc.) now in four files: OPERATIONS, ARCHITECTURE, IMPLEMENTATION, ACCEPTANCE |
 | Next update | After ship of Stages 4–9 or next product gap close-out |
