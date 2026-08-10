@@ -1,11 +1,5 @@
-import type { Metadata } from 'next'
-import RegistrationForm from '@/components/auth/RegistrationForm'
-
-export const metadata: Metadata = {
-  title: 'Membership application',
-  description: 'Apply to become an Alubonets member.',
-}
+import { redirect } from 'next/navigation'
 
 export default function RegisterPage() {
-  return <RegistrationForm />
+  redirect('/?register=1')
 }

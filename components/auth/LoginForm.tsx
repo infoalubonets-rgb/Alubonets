@@ -60,6 +60,16 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
+    if (mode === 'signin' && !admin) {
+      try {
+        const draft = JSON.parse(localStorage.getItem('alubonets-registration-draft-v1') || 'null')
+        if (draft?.form?.email?.toLowerCase() === email.trim().toLowerCase() && draft.step > 0) {
+          setError('Your registration is not finished. Continue your saved application before signing in.')
+          window.setTimeout(() => router.push('/register'), 900)
+          return
+        }
+      } catch { localStorage.removeItem('alubonets-registration-draft-v1') }
+    }
     if (mode === 'register' && password !== confirmPassword) {
       setError('Passwords do not match')
       return

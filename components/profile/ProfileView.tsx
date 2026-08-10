@@ -3,8 +3,34 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent } from 'react'
-import { updateMyProfile } from '@/app/actions/profile'
+import { createPortal } from 'react-dom'
+import { updateMyAvatarPath, updateMyProfile } from '@/app/actions/profile'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
+import { createClient } from '@/utils/supabase/client'
+
+async function optimizeAvatar(file: File) {
+  if (!file.type.startsWith('image/')) throw new Error('Please choose an image file.')
+
+  const bitmap = await createImageBitmap(file)
+  const maxSide = 1200
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Could not prepare this image.')
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) => result ? resolve(result) : reject(new Error('Could not optimize this image.')),
+      'image/webp',
+      0.82,
+    )
+  })
+  return new File([blob], 'avatar.webp', { type: 'image/webp' })
+}
 
 export type ProfileViewData = {
   id: string
@@ -30,6 +56,8 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
   const [fullName, setFullName] = useState(data.fullName)
   const [phone, setPhone] = useState(data.phone ?? '')
   const [location, setLocation] = useState(data.location ?? '')
+  const [viewingAvatar, setViewingAvatar] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const locationLine = data.location?.trim() || 'Alubonets SHG · Kenya'
 
@@ -52,6 +80,28 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
     }
   }
 
+  const changeAvatar = async (file: File) => {
+    setUploadingAvatar(true)
+    setError('')
+    try {
+      const optimized = await optimizeAvatar(file)
+      const supabase = createClient()
+      const { data: auth } = await supabase.auth.getUser()
+      if (!auth.user) throw new Error('Please sign in again.')
+      const path = `${auth.user.id}/avatar.webp`
+      const { error: uploadError } = await supabase.storage
+        .from('member-avatars')
+        .upload(path, optimized, { upsert: true, contentType: optimized.type })
+      if (uploadError) throw uploadError
+      await updateMyAvatarPath(path)
+      router.refresh()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not update profile image.')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
   return (
     <div className="max-w-lg mx-auto pb-16 space-y-4">
       <section className="relative pt-2">
@@ -61,18 +111,31 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
 
         <div className="relative mt-[72px] bg-surface-container-lowest rounded-[28px] shadow-[0_12px_40px_rgba(0,31,80,0.12)] px-5 pt-2 pb-6">
           <div className="flex justify-center -mt-[52px] mb-1">
-            {data.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={data.avatarUrl}
-                alt=""
-                className="h-[104px] w-[104px] rounded-full object-cover border-[5px] border-white shadow-lg bg-surface-container"
-              />
-            ) : (
-              <div className="h-[104px] w-[104px] rounded-full border-[5px] border-white shadow-lg bg-primary text-on-primary flex items-center justify-center font-h3 text-[32px]">
-                {data.initials}
+            <div className="group relative h-[104px] w-[104px] rounded-full focus-within:ring-4 focus-within:ring-secondary-container/30">
+              {data.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={data.avatarUrl}
+                  alt={`${data.fullName}'s profile`}
+                  className="h-[104px] w-[104px] rounded-full object-cover border-[5px] border-white shadow-lg bg-surface-container"
+                />
+              ) : (
+                <div className="h-[104px] w-[104px] rounded-full border-[5px] border-white shadow-lg bg-primary text-on-primary flex items-center justify-center font-h3 text-[32px]">
+                  {data.initials}
+                </div>
+              )}
+              <div className="absolute inset-[5px] flex items-center justify-center gap-2 rounded-full bg-primary/75 opacity-100 backdrop-blur-[2px] transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                {data.avatarUrl && (
+                  <button type="button" onClick={() => setViewingAvatar(true)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-primary shadow-md hover:bg-secondary-fixed" aria-label="View full profile image" title="View image">
+                    <span className="material-symbols-outlined text-[19px]">visibility</span>
+                  </button>
+                )}
+                <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-secondary-container text-on-primary shadow-md hover:brightness-105" aria-label="Change profile image" title="Change image">
+                  <span className={`material-symbols-outlined text-[19px] ${uploadingAvatar ? 'animate-spin' : ''}`}>{uploadingAvatar ? 'progress_activity' : 'edit'}</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingAvatar} onChange={(event) => event.target.files?.[0] && changeAvatar(event.target.files[0])} className="sr-only" />
+                </label>
               </div>
-            )}
+            </div>
           </div>
 
           <div className="flex items-center justify-between mb-3 px-1 gap-2">
@@ -110,6 +173,10 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
             </p>
           </div>
 
+          {!editing && error && (
+            <p className="mt-3 text-center text-[12px] text-error" role="alert">{error}</p>
+          )}
+
           {editing && (
             <form
               onSubmit={onSave}
@@ -117,7 +184,7 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
             >
               {(
                 [
-                  ['Full name', fullName, setFullName, true],
+                  ['Username', fullName, setFullName, true],
                   ['Phone', phone, setPhone, false],
                   ['Location', location, setLocation, false],
                 ] as const
@@ -183,6 +250,17 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
         </div>
       </section>
 
+      {viewingAvatar && data.avatarUrl && createPortal(
+        <div className="fixed inset-0 z-[300] flex h-[100dvh] w-screen items-center justify-center bg-primary/85 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Profile image preview" onClick={() => setViewingAvatar(false)}>
+          <button type="button" onClick={() => setViewingAvatar(false)} className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-white text-primary shadow-lg" aria-label="Close image preview">
+            <span className="material-symbols-outlined">close</span>
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={data.avatarUrl} alt={`${data.fullName}'s profile`} className="max-h-[85vh] max-w-[92vw] rounded-3xl object-contain shadow-2xl" onClick={(event) => event.stopPropagation()} />
+        </div>,
+        document.body,
+      )}
+
       <section className="bg-surface-container-lowest rounded-2xl shadow-[0_8px_24px_rgba(0,31,80,0.08)] px-4 py-3.5 flex items-center gap-3 border border-outline-variant/60">
         <div className="h-11 w-11 rounded-full bg-secondary-fixed flex items-center justify-center flex-shrink-0">
           <span className="material-symbols-outlined text-secondary text-[22px] icon-fill">
@@ -201,9 +279,6 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
               : ''}
           </p>
         </div>
-        <p className="text-[10px] text-on-surface-variant text-right max-w-[100px] leading-snug hidden sm:block">
-          Every member contributes — you are part of the team.
-        </p>
       </section>
     </div>
   )

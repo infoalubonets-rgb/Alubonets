@@ -1,4 +1,6 @@
-import type { CSSProperties } from 'react'
+'use client'
+
+import { useEffect, useState, type CSSProperties } from 'react'
 
 function Pulse({ className, style }: { className?: string; style?: CSSProperties }) {
   return <div className={`animate-pulse rounded-xl bg-gray-200 dark:bg-gray-700/50 ${className ?? ''}`} style={style} />
@@ -12,6 +14,13 @@ type Props = {
 }
 
 export default function PublicPageSkeleton({ rows = 3, grid = false }: Props) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), 450)
+    return () => window.clearTimeout(timer)
+  }, [])
+  if (!visible) return null
+
   return (
     <div className="min-h-screen bg-background dark:bg-[#060c1a]">
       {/* Navbar skeleton */}

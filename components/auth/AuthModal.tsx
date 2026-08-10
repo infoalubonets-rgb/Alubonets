@@ -1,13 +1,14 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { homeForRole, loginRequest, registerRequest } from '@/lib/auth/client'
 import { createClient } from '@/utils/supabase/client'
 import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
 import GoogleButton from '@/components/auth/GoogleButton'
+import RegistrationWizard from '@/components/auth/RegistrationWizard'
 
-type AuthTab = 'signin' | 'signup' | 'forgot'
+type AuthTab = 'signin' | 'signup' | 'signup-success' | 'forgot'
 
 let _open: ((tab?: AuthTab) => void) | null = null
 
@@ -54,6 +55,7 @@ function PasswordInput({
 
 export default function AuthModal() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<AuthTab>('signin')
   const [email, setEmail] = useState('')
@@ -64,13 +66,10 @@ export default function AuthModal() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
+  const [registrationName, setRegistrationName] = useState('')
 
   useEffect(() => {
     _open = (t: AuthTab = 'signin') => {
-      if (t === 'signup') {
-        router.push('/register')
-        return
-      }
       if (t === 'forgot') {
         router.push('/forgot-password')
         return
@@ -84,6 +83,14 @@ export default function AuthModal() {
   }, [router])
 
   useEffect(() => {
+    if (searchParams.get('register') === '1') {
+      setTab('signup')
+      setOpen(true)
+      router.replace('/', { scroll: false })
+    }
+  }, [router, searchParams])
+
+  useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : ''
     return () => {
       document.body.style.overflow = ''
@@ -93,6 +100,13 @@ export default function AuthModal() {
   const onSignIn = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
+    try {
+      const draft = JSON.parse(localStorage.getItem('alubonets-registration-draft-v1') || 'null')
+      if (draft?.form?.email?.toLowerCase() === email.trim().toLowerCase() && draft.step > 0) {
+        setTab('signup')
+        return
+      }
+    } catch { localStorage.removeItem('alubonets-registration-draft-v1') }
     setLoading(true)
     try {
       const { user, redirectTo, status } = await loginRequest(email, password)
@@ -224,7 +238,7 @@ export default function AuthModal() {
                 >
                   Forgot password?
                 </button>
-                <button type="button" onClick={() => { setOpen(false); router.push('/register') }} className="hover:text-on-surface">
+                <button type="button" onClick={() => setTab('signup')} className="hover:text-on-surface">
                   No account? <span className="auth-link-accent">Create account</span>
                 </button>
               </div>
@@ -232,6 +246,26 @@ export default function AuthModal() {
           )}
 
           {tab === 'signup' && (
+            <RegistrationWizard
+              onSignIn={() => setTab('signin')}
+              onComplete={(fullName) => {
+                setRegistrationName(fullName)
+                setTab('signup-success')
+              }}
+            />
+          )}
+
+          {tab === 'signup-success' && (
+            <div className="flex flex-col gap-4 text-center">
+              <span className="material-symbols-outlined mx-auto text-5xl text-secondary-container">mark_email_read</span>
+              <h2 className="font-h3 text-2xl text-primary">Thank you, {registrationName}!</h2>
+              <p className="text-sm text-on-surface-variant">Your membership application has been submitted successfully. An administrator will review it before you can use the member portal.</p>
+              <p className="rounded-xl bg-surface-container-low p-3 text-sm">Check your email for the account-approval message. After approval, return here and sign in using the email and password you entered.</p>
+              <button type="button" onClick={() => setOpen(false)} className="auth-primary-btn">Got it</button>
+            </div>
+          )}
+
+          {false && (
             <form className="auth-tab-content flex flex-col gap-md" onSubmit={onSignUp}>
               <h2 className="font-h3 text-h3 text-primary">Create Account</h2>
               <div className="grid grid-cols-2 gap-sm">

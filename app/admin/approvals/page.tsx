@@ -17,7 +17,7 @@ export default async function AdminApprovalsPage() {
     <DashboardShell role="ADMIN" title="Approvals" nav={ADMIN_NAV}>
       <div className="space-y-4 p-4 md:p-6">
         <p className="text-sm text-on-surface-variant">
-          Review the complete application. Approval assigns the next membership number; rejection is permanent.
+          Review the complete application. Approval assigns the next membership number; rejection permanently deletes the application and login account.
         </p>
         {pending.length === 0 && <p className="rounded-xl border bg-surface p-4 text-sm text-on-surface-variant">No pending members.</p>}
         {pending.map((user) => {
@@ -59,11 +59,11 @@ export default async function AdminApprovalsPage() {
                   identityVerified: formData.get('identityVerified') === 'on',
                 })
               }}>
-                <label className="block text-sm">Approval note or permanent rejection reason<textarea name="note" required minLength={3} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
+                <label className="block text-sm">Approval note or deletion reason<textarea name="note" required minLength={3} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="identityVerified" />Identity details have been verified</label>
                 <div className="flex flex-wrap gap-2">
                   <button name="decision" value="approve" className="rounded-lg bg-primary px-4 py-2 text-sm text-on-primary">Approve and assign number</button>
-                  <button name="decision" value="reject" className="rounded-lg border border-error px-4 py-2 text-sm text-error">Reject permanently</button>
+                  <button name="decision" value="reject" className="rounded-lg border border-error px-4 py-2 text-sm text-error">Reject and delete</button>
                 </div>
               </form>
             </article>

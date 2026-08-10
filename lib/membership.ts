@@ -5,12 +5,6 @@ export const POLICY_VERSION = '2026-07-30-v1'
 export const MEMBER_CATEGORIES = [
   'ORDINARY',
   'COMMITTEE_MEMBER',
-  'ADMIN',
-  'EXECUTIVE',
-  'TREASURER',
-  'SECRETARY',
-  'ORGANIZER',
-  'MEMBER',
 ] as const
 
 export const EDUCATION_LEVELS = [
@@ -31,7 +25,13 @@ const requiredText = (label: string, max = 500) =>
 
 export const registrationSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-  password: z.string().min(8).max(128),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128)
+    .regex(/[a-z]/, 'Password must include a lowercase letter')
+    .regex(/[A-Z]/, 'Password must include an uppercase letter')
+    .regex(/\d/, 'Password must include a number')
+    .regex(/[^A-Za-z0-9]/, 'Password must include a special character'),
   fullName: requiredText('Full name', 120),
   phone: requiredText('Phone', 40),
   location: requiredText('Location/address', 250),

@@ -13,16 +13,40 @@ const ANNOUNCEMENTS_NAV: NavItem = {
   label: 'Announcements',
   href: '/announcements',
 }
+const PROJECTS_VIEW_NAV: NavItem = {
+  icon: 'work',
+  label: 'Projects & investments',
+  href: '/dashboard/member/projects',
+}
+const EVENTS_VIEW_NAV: NavItem = {
+  icon: 'event',
+  label: 'Events',
+  href: '/dashboard/member/events',
+}
+const MEETINGS_REPORTS_NAV: NavItem = {
+  icon: 'summarize',
+  label: 'Meetings & reports',
+  href: '/meetings-reports',
+}
+const DOCUMENTS_VIEW_NAV: NavItem = {
+  icon: 'folder',
+  label: 'Document repository',
+  href: '/documents',
+}
 
 export const ADMIN_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/admin' },
-  { icon: 'group', label: 'Members', href: '/admin/members' },
+  { icon: 'group', label: 'Member registry', href: '/admin/members' },
+  { icon: 'assessment', label: 'Reports', href: '/reports/manage' },
   { icon: 'pending_actions', label: 'Approvals', href: '/admin/approvals' },
   { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
   { icon: 'contact_mail', label: 'Contact inbox', href: '/admin/contact-messages' },
   { icon: 'account_balance', label: 'Finance', href: '/admin/finance' },
   { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
+  EVENTS_VIEW_NAV,
+  MEETINGS_REPORTS_NAV,
   { icon: 'folder_managed', label: 'Documents', href: '/documents/manage' },
+  DOCUMENTS_VIEW_NAV,
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
   { icon: 'edit_note', label: 'Public content', href: '/admin/content' },
   { icon: 'admin_panel_settings', label: 'Roles', href: '/admin/roles' },
@@ -36,9 +60,11 @@ export const EXECUTIVE_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/executive' },
   { icon: 'contact_mail', label: 'Contact inbox', href: '/dashboard/executive/contact-messages' },
   { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
+  EVENTS_VIEW_NAV,
+  MEETINGS_REPORTS_NAV,
   { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
-  { icon: 'folder', label: 'Documents', href: '/documents' },
+  DOCUMENTS_VIEW_NAV,
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
 ]
@@ -50,7 +76,10 @@ export const TREASURER_NAV: NavItem[] = [
   { icon: 'rule', label: 'Reconciliation', href: '/dashboard/treasurer/reconciliation' },
   { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
   { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/treasurer/welfare' },
-  { icon: 'folder', label: 'Documents', href: '/documents' },
+  PROJECTS_VIEW_NAV,
+  EVENTS_VIEW_NAV,
+  MEETINGS_REPORTS_NAV,
+  DOCUMENTS_VIEW_NAV,
   { icon: 'gavel', label: 'Governance', href: '/governance' },
   { icon: 'savings', label: 'My contributions', href: '/contributions' },
   ANNOUNCEMENTS_NAV,
@@ -59,9 +88,12 @@ export const TREASURER_NAV: NavItem[] = [
 export const SECRETARY_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/secretary' },
   ANNOUNCEMENTS_NAV,
-  { icon: 'groups', label: 'Meetings', href: '/dashboard/secretary/meetings' },
+  { icon: 'summarize', label: 'Minutes & reports', href: '/dashboard/secretary/meetings' },
+  PROJECTS_VIEW_NAV,
+  EVENTS_VIEW_NAV,
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
   { icon: 'folder_managed', label: 'Documents', href: '/documents/manage' },
+  DOCUMENTS_VIEW_NAV,
   CONTRIBUTIONS_NAV,
 ]
 
@@ -70,7 +102,9 @@ export const ORGANIZER_NAV: NavItem[] = [
   { icon: 'event', label: 'Events', href: '/dashboard/organizer/events' },
   { icon: 'photo_library', label: 'Gallery', href: '/dashboard/organizer/gallery' },
   { icon: 'work', label: 'Projects', href: '/dashboard/organizer/projects' },
-  { icon: 'folder', label: 'Documents', href: '/documents' },
+  { icon: 'folder_managed', label: 'Manage documents', href: '/documents/manage' },
+  MEETINGS_REPORTS_NAV,
+  DOCUMENTS_VIEW_NAV,
   { icon: 'gavel', label: 'Governance', href: '/governance' },
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
@@ -80,10 +114,11 @@ export const MEMBER_NAV: NavItem[] = [
   { icon: 'home', label: 'Home', href: '/dashboard/member' },
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
-  { icon: 'work', label: 'Projects', href: '/dashboard/member/projects' },
-  { icon: 'event', label: 'Events', href: '/dashboard/member/events' },
+  PROJECTS_VIEW_NAV,
+  EVENTS_VIEW_NAV,
+  MEETINGS_REPORTS_NAV,
   { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/member/welfare' },
-  { icon: 'folder', label: 'Documents', href: '/documents' },
+  DOCUMENTS_VIEW_NAV,
   { icon: 'gavel', label: 'Governance', href: '/governance' },
 ]
 

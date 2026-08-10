@@ -24,7 +24,7 @@ export default async function AdminPage() {
   ]
 
   const quickLinks = [
-    { label: 'Members', description: 'View and manage all members', icon: 'group', href: '/admin/members' },
+    { label: 'Member registry', description: 'View or export the full member registry', icon: 'group', href: '/admin/members' },
     { label: 'Approvals', description: `${data.pendingMembers} pending registration${data.pendingMembers === 1 ? '' : 's'}`, icon: 'pending_actions', href: '/admin/approvals', badge: data.pendingMembers > 0 ? data.pendingMembers : null },
     { label: 'Gallery queue', description: `${data.galleryQueue.length} awaiting publish`, icon: 'photo_library', href: '/admin/gallery-queue', badge: data.galleryQueue.length > 0 ? data.galleryQueue.length : null },
     { label: 'Roles & access', description: 'Assign primary role and dashboards', icon: 'admin_panel_settings', href: '/admin/roles' },
@@ -138,7 +138,7 @@ export default async function AdminPage() {
                       {formatAuditAction(a.action)}
                     </p>
                     <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 mt-0.5">
-                      by {a.user.fullName}
+                      by {a.user?.fullName || 'System'}
                     </p>
                   </div>
                   <span className="text-[11px] text-outline dark:text-blue-200/30 shrink-0 mt-0.5">

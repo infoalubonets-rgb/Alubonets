@@ -11,7 +11,7 @@ import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; status?: string; page?: string }>
+  searchParams: Promise<{ q?: string; category?: string; page?: string }>
 }) {
   const actor = await requireActiveRole([
     'ADMIN',
@@ -22,10 +22,10 @@ export default async function DocumentsPage({
     'MEMBER',
   ])
   await Promise.all([ensureDocumentCategories(), syncExpiredDocuments()])
-  const { q = '', category = '', status = '', page: pageRaw } = await searchParams
+  const { q = '', category = '', page: pageRaw } = await searchParams
   const page = parsePage(pageRaw)
   const pageSize = 24
-  const staff = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
+  const canAdd = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || actor.role === 'ORGANIZER'
   const [documents, categories] = await Promise.all([
     prisma.document.findMany({
       where: {
@@ -38,11 +38,7 @@ export default async function DocumentsPage({
             }
           : {}),
         ...(category ? { categoryId: category } : {}),
-        ...(status
-          ? { status: status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'EXPIRED' }
-          : staff
-            ? {}
-            : { status: 'PUBLISHED' }),
+        status: 'PUBLISHED',
       },
       include: { categoryRecord: true, uploader: { select: { fullName: true } } },
       orderBy: [{ uploadedAt: 'desc' }],
@@ -61,32 +57,31 @@ export default async function DocumentsPage({
   return (
     <DashboardShell role={actor.role} title="Document repository" nav={navForRole(actor.role)}>
       <div className="space-y-5 p-4 md:p-6">
-        <form className="grid gap-2 rounded-2xl border bg-surface p-4 md:grid-cols-4">
-          <input
-            name="q"
-            defaultValue={q}
-            placeholder="Search title or description"
-            className="rounded-lg border px-3 py-2"
-          />
-          <select name="category" defaultValue={category} className="rounded-lg border px-3 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <form className="flex min-w-0 flex-1 flex-wrap gap-2 rounded-xl border bg-surface p-2.5">
+            <label className="relative min-w-[190px] flex-1">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[17px] text-on-surface-variant">search</span>
+              <input name="q" defaultValue={q} placeholder="Search documents" className="h-10 w-full rounded-lg border py-2 pl-9 pr-3 text-sm" />
+            </label>
+            <select name="category" defaultValue={category} className="h-10 rounded-lg border px-3 py-2 text-sm">
             <option value="">All categories</option>
             {categories.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.name}
               </option>
             ))}
-          </select>
-          {staff && (
-            <select name="status" defaultValue={status} className="rounded-lg border px-3 py-2">
-              <option value="">All statuses</option>
-              <option value="PUBLISHED">Published</option>
-              <option value="DRAFT">Draft</option>
-              <option value="ARCHIVED">Archived</option>
-              <option value="EXPIRED">Expired</option>
             </select>
+            <button className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-on-primary" aria-label="Search documents" title="Search">
+              <span className="material-symbols-outlined text-[18px]">search</span>
+            </button>
+          </form>
+          {canAdd && (
+            <Link href="/documents/manage" className="dashboard-page-action inline-flex h-10 items-center gap-1.5 rounded-full bg-secondary-container px-4 text-xs font-label-bold text-on-primary shadow-[0_3px_10px_rgba(254,128,21,0.22)]">
+              <span className="material-symbols-outlined text-[17px]">add</span>
+              Add document
+            </Link>
           )}
-          <button className="w-fit rounded-full bg-primary px-4 py-2 text-on-primary">Search</button>
-        </form>
+        </div>
         <div className="grid gap-3 md:grid-cols-2">
           {pageItems.map((document) => (
             <article key={document.id} className="rounded-2xl border bg-surface p-5">
@@ -106,25 +101,25 @@ export default async function DocumentsPage({
               <p className="mt-2 text-xs text-on-surface-variant">
                 Published {document.uploadedAt.toLocaleDateString()} by {document.uploader.fullName}
               </p>
-              <Link
+              <a
                 href={`/api/documents/${document.id}/download`}
+                target="_blank"
+                rel="noreferrer"
                 className="mt-4 inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
               >
-                Download
-              </Link>
+                View document
+              </a>
             </article>
           ))}
         </div>
         {!pageItems.length && (
-          <p className="rounded-xl border bg-surface p-5 text-sm">
-            No authorized documents match your search.
-          </p>
+          <p className="rounded-xl border border-dashed bg-surface p-8 text-center text-sm text-on-surface-variant">No documents found.</p>
         )}
         <PaginationBar
           pathname="/documents"
           page={page}
           totalPages={pages}
-          params={{ q, category, status }}
+          params={{ q, category }}
         />
       </div>
     </DashboardShell>

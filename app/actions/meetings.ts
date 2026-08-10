@@ -258,6 +258,47 @@ export async function actionDeleteMeeting(id: string) {
   revalidateMeetings()
 }
 
+export async function actionSubmitMeetingsForApproval(ids: string[]) {
+  const actor = await requireActiveRole(['SECRETARY', 'ADMIN'])
+  const selected = z.array(z.string().min(1)).min(1).max(100).parse(ids)
+  const meetings = await prisma.meeting.findMany({
+    where: { id: { in: selected }, status: { in: ['DRAFT', 'NOTICE'] } },
+  })
+  if (!meetings.length) throw new Error('Select at least one draft minute record.')
+  const incomplete = meetings.find((meeting) => !meeting.minutes?.trim() && !meeting.agenda?.trim() && !meeting.opening?.trim())
+  if (incomplete) throw new Error(`Add minutes or an agenda to “${incomplete.title}” before submitting.`)
+
+  await prisma.$transaction(async (tx) => {
+    for (const meeting of meetings) {
+      await tx.meetingVersion.create({ data: {
+        meetingId: meeting.id,
+        version: meeting.minutesVersion,
+        reason: 'Secretary submitted minutes for approval',
+        createdById: actor.id,
+        snapshot: {
+          title: meeting.title,
+          agenda: meeting.agenda,
+          minutes: meeting.minutes,
+          resolutions: meeting.resolutions,
+          opening: meeting.opening,
+          aob: meeting.aob,
+          heldAt: meeting.heldAt,
+          status: meeting.status,
+        },
+      } })
+      await tx.meeting.update({ where: { id: meeting.id }, data: { status: 'PENDING_APPROVAL' } })
+    }
+  })
+  await Promise.all(meetings.map((meeting) => writeAudit({
+    userId: actor.id,
+    action: 'MINUTES_SUBMIT_APPROVAL',
+    entity: 'Meeting',
+    entityId: meeting.id,
+    newValue: { status: 'PENDING_APPROVAL', version: meeting.minutesVersion },
+  })))
+  revalidateMeetings()
+}
+
 export async function actionDeleteMeetings(ids: string[]) {
   if (!ids.length) return
   const actor = await requireActiveRole(['SECRETARY', 'ADMIN'])

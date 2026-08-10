@@ -49,32 +49,6 @@ export async function upsertAnnouncementTemplate(formData: FormData) {
   revalidatePath('/admin/announcements')
 }
 
-export async function updateNotificationPreferences(formData: FormData) {
-  const actor = await requireActiveRole([
-    'ADMIN',
-    'EXECUTIVE',
-    'TREASURER',
-    'SECRETARY',
-    'ORGANIZER',
-    'MEMBER',
-  ])
-  const emailOptional = formData.has('emailOptional')
-  await prisma.userNotificationPreference.upsert({
-    where: { userId: actor.id },
-    create: { userId: actor.id, emailOptional },
-    update: { emailOptional },
-  })
-  await writeAudit({
-    userId: actor.id,
-    action: 'NOTIFICATION_PREFERENCE_UPDATE',
-    entity: 'UserNotificationPreference',
-    entityId: actor.id,
-    newValue: { emailOptional },
-  })
-  revalidatePath('/dashboard/member')
-  revalidatePath('/announcements')
-}
-
 export async function createTargetedAnnouncement(formData: FormData) {
   const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER'])
   const data = z
@@ -85,7 +59,6 @@ export async function createTargetedAnnouncement(formData: FormData) {
       familyBranch: z.string().trim().optional(),
       scheduledFor: z.coerce.date().optional(),
       sendEmail: z.enum(['on', 'off']).optional(),
-      mandatory: z.enum(['on', 'off']).optional(),
       templateKey: z.string().trim().optional(),
     })
     .parse({
@@ -95,7 +68,6 @@ export async function createTargetedAnnouncement(formData: FormData) {
       familyBranch: formData.get('familyBranch') || undefined,
       scheduledFor: formData.get('scheduledFor') || undefined,
       sendEmail: formData.has('sendEmail') ? 'on' : 'off',
-      mandatory: formData.has('mandatory') ? 'on' : 'off',
       templateKey: formData.get('templateKey') || undefined,
     })
   const audienceRoles = formData.getAll('audienceRoles').map(String) as Role[]
@@ -127,7 +99,6 @@ export async function createTargetedAnnouncement(formData: FormData) {
       audienceRoles,
       familyBranch: data.familyBranch ?? null,
       templateKey: data.templateKey ?? null,
-      mandatory: data.mandatory === 'on',
       receipts: {
         create: recipients.map((r) => ({
           userId: r.id,
@@ -163,7 +134,6 @@ export async function deliverAnnouncementEmails(announcementId: string, actorId?
               id: true,
               email: true,
               fullName: true,
-              notificationPreference: true,
             },
           },
         },
@@ -174,17 +144,7 @@ export async function deliverAnnouncementEmails(announcementId: string, actorId?
     ? await prisma.announcementTemplate.findUnique({ where: { key: announcement.templateKey } })
     : null
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
-  const eligible = announcement.receipts.filter((r) => {
-    if (announcement.mandatory) return true
-    return r.user.notificationPreference?.emailOptional !== false
-  })
-  const skipped = announcement.receipts.filter((r) => !eligible.includes(r))
-  if (skipped.length) {
-    await prisma.announcementReceipt.updateMany({
-      where: { id: { in: skipped.map((s) => s.id) } },
-      data: { emailStatus: 'SKIPPED' },
-    })
-  }
+  const eligible = announcement.receipts
   if (!eligible.length) return { sent: 0, failed: 0 }
 
   const subject = template?.subject?.replaceAll('{{title}}', announcement.title) || announcement.title

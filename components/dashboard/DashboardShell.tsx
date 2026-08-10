@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, type ReactNode } from 'react'
 import { ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
 import { meRequest, type AuthUser, type Role } from '@/lib/auth/client'
-import { ROLE_HOME, ROLE_LABEL } from '@/lib/auth/types'
+import { ROLE_LABEL } from '@/lib/auth/types'
 import ThemeLoader from '@/components/ui/ThemeLoader'
 import DashboardNav from './DashboardNav'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
@@ -38,8 +38,9 @@ function LiveDateBadge() {
 
   if (!now) return <span className="live-date-badge shrink-0" />
 
-  const weekday = now.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase()
-  const date = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`
+  const date = now.toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+  })
 
   return (
     <time
@@ -47,7 +48,7 @@ function LiveDateBadge() {
       className="live-date-badge shrink-0"
       title={now.toLocaleString()}
     >
-      {weekday} {date}
+      {date}
     </time>
   )
 }
@@ -62,7 +63,6 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
   const [paymentNotifCount, setPaymentNotifCount] = useState(0)
   const [signingOut, setSigningOut] = useState(false)
   const [welcome, setWelcome] = useState('')
-  const showWelcome = pathname === ROLE_HOME[role]
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('dashSidebarCollapsed') === '1')
@@ -138,7 +138,7 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
       setUser(u)
       const hour = new Date().getHours()
       const g = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-      setWelcome(`${g}, ${u.fullName.split(' ')[0]}.`)
+      setWelcome(`${g}, ${u.fullName.split(' ')[0]}`)
     })
   }, [router])
 
@@ -159,10 +159,12 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
   }
 
   const toggleTheme = () => {
+    document.documentElement.classList.add('theme-transitioning')
     const next = !document.documentElement.classList.contains('dark')
     document.documentElement.classList.toggle('dark', next)
     localStorage.setItem('adminTheme', next ? 'dark' : 'light')
     setIsDark(next)
+    window.setTimeout(() => document.documentElement.classList.remove('theme-transitioning'), 420)
   }
 
   const onLogout = () => {
@@ -176,9 +178,9 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-background text-on-background dark:bg-[#060c1a] dark:text-blue-50">
+    <div className="dashboard-shell h-screen flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50">
       <aside
-        className={`bg-primary dark:bg-[#0c1e42] text-on-primary fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] transition-[width] duration-300 ${collapsed ? 'w-[68px]' : 'w-56'}`}
+        className={`bg-primary dark:bg-[#03112b] text-on-primary fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] transition-[width] duration-300 ${collapsed ? 'w-[68px]' : 'w-56'}`}
       >
         <div
           className={`pt-lg pb-md flex items-center gap-sm border-b border-white/10 ${collapsed ? 'justify-center px-sm' : 'px-md'}`}
@@ -245,14 +247,14 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
         className={`flex-1 flex flex-col h-screen min-h-0 min-w-0 transition-[margin] duration-300 ${collapsed ? 'ml-[68px]' : 'ml-56'}`}
       >
         <header
-          className="bg-surface-container-lowest dark:bg-[#0d1729] border-b border-outline-variant dark:border-[#1a2d4f] shrink-0 z-40 flex items-center justify-between px-lg"
-          style={{ height: 52 }}
+          className="relative bg-surface-container-lowest dark:bg-[#091a30] border-b border-outline-variant/70 dark:border-[#173056] shrink-0 z-40 flex items-center justify-between gap-4 px-5 md:px-lg shadow-[0_2px_10px_rgba(0,31,80,0.035)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary dark:before:bg-primary-container"
+          style={{ height: 66 }}
         >
-          <div className="flex items-center gap-md flex-1">
+          <div className="flex min-w-0 items-center gap-3 md:gap-md">
             <button
               type="button"
               onClick={toggleSidebar}
-              className="text-on-surface-variant dark:text-blue-200/60 hover:text-primary transition-colors flex items-center"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary-container transition-colors hover:bg-secondary-container/10"
               title={collapsed ? 'Expand menu' : 'Collapse menu'}
               aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
             >
@@ -260,7 +262,12 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
                 {collapsed ? 'menu' : 'menu_open'}
               </span>
             </button>
-            <div className="relative flex-1 max-w-xs">
+            <div className="min-w-0">
+              <p className="truncate text-[13px] font-label-bold leading-tight text-on-surface dark:text-blue-50">
+                {welcome}
+              </p>
+            </div>
+            <div className="hidden">
               <span
                 className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline"
                 style={{ fontSize: 17 }}
@@ -274,12 +281,13 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
               />
             </div>
           </div>
-          <div className="flex items-center gap-md">
+          <div className="flex items-center gap-2.5 md:gap-4">
+            <div className="hidden lg:block"><LiveDateBadge /></div>
             {user && <WorkspaceSwitcher user={user} />}
             <button
               type="button"
               onClick={toggleTheme}
-              className="text-on-surface-variant dark:text-blue-200/60 hover:text-primary transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant dark:text-blue-200/60 hover:bg-surface-container dark:hover:bg-[#111f36] hover:text-primary transition-colors"
               title="Toggle theme"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
@@ -288,7 +296,7 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
             </button>
             <Link
               href="/announcements"
-              className="relative text-on-surface-variant dark:text-blue-200/60 hover:text-primary transition-colors"
+              className="relative flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant dark:text-blue-200/60 hover:bg-surface-container dark:hover:bg-[#111f36] hover:text-primary transition-colors"
               title="Notifications"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
@@ -316,14 +324,14 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
                     </p>
                     <p className="text-[10px] text-on-surface-variant">{user?.role && ROLE_LABEL[user.role]}</p>
                   </div>
-                  <div className="h-8 w-8 rounded-full border border-outline-variant bg-primary text-on-primary flex items-center justify-center font-label-bold text-[12px]">
+                  <div className="h-9 w-9 rounded-full border-2 border-white dark:border-[#1e3461] bg-primary text-on-primary flex items-center justify-center font-label-bold text-[12px] shadow-sm">
                     {user?.initials}
                   </div>
                 </Link>
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-secondary-container/40 bg-secondary-container text-on-primary px-md py-1.5 font-label-bold text-[12px] hover:opacity-90 active:scale-95 transition-all shadow-sm"
+                  className="inline-flex h-10 items-center gap-1.5 rounded-full border border-secondary-container/40 bg-secondary-container text-on-primary px-4 font-label-bold text-[12px] hover:opacity-90 active:scale-95 transition-all shadow-[0_3px_10px_rgba(254,128,21,0.22)]"
                   title="Sign out"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span>
@@ -343,17 +351,10 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
           </div>
         </header>
 
-        <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-lg space-y-lg">
-          <div className="flex items-start justify-between shrink-0 -mt-1">
-            <div>
-              <h1 className="font-h2 text-h2 text-primary dark:text-primary-fixed-dim">{title}</h1>
-              {showWelcome && welcome ? (
-                <p className="font-body-md text-body-md text-on-surface-variant dark:text-blue-200/60 mt-xs">
-                  {welcome}
-                </p>
-              ) : null}
-            </div>
-            <LiveDateBadge />
+        <main className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain p-lg space-y-lg">
+          <div className="shrink-0 -mt-1">
+            <h1 className="font-h2 text-h2 text-primary dark:text-primary-fixed-dim">{title}</h1>
+            <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{ROLE_LABEL[role]}</p>
           </div>
           {children}
         </main>

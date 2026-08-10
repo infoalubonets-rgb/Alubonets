@@ -299,7 +299,6 @@ model User {
   eventAttendances EventAttendance[] @relation("EventAttendee")
   recordedEventAttendances EventAttendance[] @relation("EventAttendanceRecorder")
   eventCostsRecorded EventCost[]
-  notificationPreference UserNotificationPreference?
   loanApplications LoanApplication[] @relation("LoanApplicant")
   loanReviews LoanApplication[] @relation("LoanTreasurerReviewer")
   loanDecisions LoanApplication[] @relation("LoanDecider")
@@ -823,7 +822,6 @@ model Announcement {
   audienceRoles Role[]                    @default([])
   familyBranch  String?
   templateKey   String?
-  mandatory     Boolean                   @default(false)
 
   receipts AnnouncementReceipt[]
 
@@ -860,17 +858,6 @@ model AnnouncementTemplate {
   updatedAt DateTime @updatedAt
 
   @@map("announcement_templates")
-}
-
-model UserNotificationPreference {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  emailOptional   Boolean  @default(true)
-  updatedAt       DateTime @updatedAt
-  createdAt       DateTime @default(now())
-
-  @@map("user_notification_preferences")
 }
 
 model Event {

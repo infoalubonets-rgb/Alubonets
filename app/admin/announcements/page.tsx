@@ -6,14 +6,13 @@ import {
   createTargetedAnnouncement,
   retryFailedAnnouncementEmails,
   upsertAnnouncementTemplate,
-  updateNotificationPreferences,
 } from '@/app/actions/announcements'
 
 const ROLES = ['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
 
 export default async function AdminAnnouncementsPage() {
   const actor = await requireAdmin()
-  const [announcements, templates, members, branches, pref] = await Promise.all([
+  const [announcements, templates, members, branches] = await Promise.all([
     prisma.announcement.findMany({
       orderBy: { createdAt: 'desc' },
       take: 40,
@@ -33,7 +32,6 @@ export default async function AdminAnnouncementsPage() {
       select: { familyBranch: true },
       distinct: ['familyBranch'],
     }),
-    prisma.userNotificationPreference.findUnique({ where: { userId: actor.id } }),
   ])
 
   return (
@@ -78,23 +76,8 @@ export default async function AdminAnnouncementsPage() {
             <label className="text-sm">
               <input type="checkbox" name="sendEmail" defaultChecked /> Send email
             </label>
-            <label className="text-sm">
-              <input type="checkbox" name="mandatory" /> Mandatory (ignore email opt-out)
-            </label>
             <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Publish / schedule</button>
           </form>
-        </section>
-
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-lg text-primary">Your email preference</h2>
-          <form action={updateNotificationPreferences} className="mt-2 flex items-center gap-3">
-            <label className="text-sm">
-              <input type="checkbox" name="emailOptional" defaultChecked={pref?.emailOptional !== false} />{' '}
-              Receive optional announcement emails
-            </label>
-            <button className="text-sm text-primary underline">Save</button>
-          </form>
-          <p className="mt-1 text-xs text-on-surface-variant">Mandatory governance/finance notices always send.</p>
         </section>
 
         <section className="rounded-2xl border bg-surface p-5">

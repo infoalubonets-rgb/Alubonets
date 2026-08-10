@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smooth theme change without permanently animating every interaction. */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow !important;
+  transition-duration: 380ms !important;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* Dark equivalents for shared semantic surface classes. */
+.dark .bg-background { background-color: #071426; }
+.dark .bg-surface { background-color: #0d1d33; }
+.dark .bg-surface-container-lowest { background-color: #0a192d; }
+.dark .bg-surface-container-low { background-color: #0d1d33; }
+.dark .bg-surface-container { background-color: #11233c; }
+.dark .bg-surface-container-high { background-color: #172b47; }
+.dark .bg-surface-container-highest { background-color: #1c3150; }
+.dark .bg-surface-variant { background-color: #172b47; }
+.dark .text-on-background,
+.dark .text-on-surface { color: #eef4ff; }
+.dark .text-on-surface-variant { color: #b7c7df; }
+.dark .text-primary { color: #b8ccff; }
+.dark .border-outline-variant { border-color: #294365; }
+.dark .divide-outline-variant > :not([hidden]) ~ :not([hidden]) { border-color: #294365; }
+
 /* Material Symbols variation settings */
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -40,7 +66,7 @@
 .reveal-left.is-visible,
 .reveal-scale.is-visible {
   opacity: 1;
-  transform: translate3d(0, 0, 0) scale(1);
+  transform: none;
 }
 
 /* —— Dashboard notification slide-in —— */
@@ -52,7 +78,7 @@
 /* —— CSS-driven page reveals via html[data-pr] (zero React DOM mutation) —— */
 @keyframes pr-up {
   from { opacity: 0; transform: translate3d(0, 18px, 0); }
-  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+  to   { opacity: 1; transform: none; }
 }
 
 html[data-pr] main > section:not(.site-motto-band),
@@ -79,6 +105,15 @@ html[data-pr] main .grid > *:nth-child(4),
 html[data-pr] main article:nth-child(4) { animation-delay: 240ms; }
 html[data-pr] main .grid > *:nth-child(n+5),
 html[data-pr] main article:nth-child(n+5) { animation-delay: 320ms; }
+
+/* Dashboard modals must remain viewport-fixed, never trapped by page reveal transforms. */
+html[data-pr] .dashboard-shell main > *,
+.dashboard-shell main .reveal.is-visible,
+.dashboard-shell main .reveal-left.is-visible,
+.dashboard-shell main .reveal-scale.is-visible {
+  animation: none !important;
+  transform: none !important;
+}
 
 @media (prefers-reduced-motion: reduce) {
   html[data-pr] main > section,
@@ -383,7 +418,7 @@ textarea.contact-field-modern {
   transition: max-width 0.2s ease;
 }
 .auth-modal-panel.auth-modal-wide {
-  max-width: 27rem !important;
+  max-width: 46rem !important;
 }
 .auth-modal-close {
   position: absolute;
@@ -661,24 +696,37 @@ textarea.contact-field-modern {
 /* Compact one-line digital date — Orbitron, bright navy */
 .live-date-badge {
   display: inline-block;
-  font-family: var(--font-orbitron), ui-monospace, monospace;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  line-height: 1;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
   white-space: nowrap;
-  padding: 6px 10px;
-  border-radius: 9999px;
-  border: 1px solid #001f50;
-  background: #001f50;
-  color: #b0c6ff;
-  -webkit-text-stroke: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #747782;
 }
 
 .dark .live-date-badge {
-  border-color: #b0c6ff;
-  background: #0c1e42;
-  color: #b0c6ff;
+  border-color: transparent;
+  background: transparent;
+  color: rgba(191, 211, 255, 0.68);
+}
+
+/* Reusable page action: aligned with the title row on wide screens. */
+.dashboard-page-action {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 10;
+}
+
+@media (max-width: 640px) {
+  .dashboard-page-action {
+    position: static;
+    margin-left: auto;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

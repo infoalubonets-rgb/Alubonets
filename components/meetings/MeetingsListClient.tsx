@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { actionDeleteMeeting, actionDeleteMeetings } from '@/app/actions/meetings'
+import { actionDeleteMeeting, actionDeleteMeetings, actionSubmitMeetingsForApproval } from '@/app/actions/meetings'
 
 type Meeting = {
   id: string
@@ -28,6 +28,7 @@ function MeetingCard({
   confirmingId,
   onConfirmStart,
   onConfirmCancel,
+  onSubmit,
 }: {
   m: Meeting
   isSelected: boolean
@@ -36,6 +37,7 @@ function MeetingCard({
   confirmingId: string | null
   onConfirmStart: (id: string) => void
   onConfirmCancel: () => void
+  onSubmit: (id: string) => void
 }) {
   const isDraft = m.status === 'DRAFT'
   const confirming = confirmingId === m.id
@@ -139,6 +141,11 @@ function MeetingCard({
             <span className="material-symbols-outlined text-[14px]">edit_note</span>
             Open editor
           </Link>
+          {isDraft && (
+            <button type="button" onClick={() => onSubmit(m.id)} title="Submit minutes for approval" className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#fe8015] text-white shadow-sm transition hover:opacity-90">
+              <span className="material-symbols-outlined text-[15px]">publish</span>
+            </button>
+          )}
           {/* View PDF — finals use stored copy, drafts generate on the fly */}
           <a
             href={
@@ -248,6 +255,12 @@ export default function MeetingsListClient({ meetings: initial }: { meetings: Me
     startTransition(() => actionDeleteMeetings(ids))
   }
 
+  const handleSubmit = (ids: string[]) => {
+    setItems((prev) => prev.map((item) => ids.includes(item.id) ? { ...item, status: 'PENDING_APPROVAL' } : item))
+    setSelected(new Set())
+    startTransition(() => actionSubmitMeetingsForApproval(ids))
+  }
+
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 rounded-2xl border-2 border-dashed border-orange-200 dark:border-orange-900/40 bg-orange-50/30 dark:bg-orange-950/10 text-center gap-3">
@@ -308,13 +321,13 @@ export default function MeetingsListClient({ meetings: initial }: { meetings: Me
           {confirmBulk ? (
             <>
               <span className="text-[12px] text-blue-200">Permanently delete {selected.size} meeting{selected.size !== 1 ? 's' : ''}?</span>
-              <button
+          <button
                 type="button"
                 onClick={handleBulkDelete}
                 className="px-3 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[12px] font-bold transition-colors"
               >
                 Yes, delete
-              </button>
+          </button>
               <button
                 type="button"
                 onClick={() => setConfirmBulk(false)}
@@ -325,6 +338,10 @@ export default function MeetingsListClient({ meetings: initial }: { meetings: Me
             </>
           ) : (
             <>
+              <button type="button" onClick={() => handleSubmit([...selected])} className="inline-flex items-center gap-1.5 rounded-lg bg-[#fe8015] px-3 py-1.5 text-[12px] font-semibold text-white">
+                <span className="material-symbols-outlined text-[15px]">publish</span>
+                Submit selected
+              </button>
               <button
                 type="button"
                 onClick={() => setConfirmBulk(true)}
@@ -383,6 +400,7 @@ export default function MeetingsListClient({ meetings: initial }: { meetings: Me
                 confirmingId={confirmingId}
                 onConfirmStart={(id) => setConfirmingId(id)}
                 onConfirmCancel={() => setConfirmingId(null)}
+                onSubmit={(id) => handleSubmit([id])}
               />
             ))}
           </div>
@@ -412,6 +430,7 @@ export default function MeetingsListClient({ meetings: initial }: { meetings: Me
                 confirmingId={confirmingId}
                 onConfirmStart={(id) => setConfirmingId(id)}
                 onConfirmCancel={() => setConfirmingId(null)}
+                onSubmit={(id) => handleSubmit([id])}
               />
             ))}
           </div>

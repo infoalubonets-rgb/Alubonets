@@ -6,18 +6,16 @@ import { ensureDocumentCategories } from '@/lib/document-categories'
 import { syncExpiredDocuments } from '@/lib/documents'
 import {
   createDocumentCategory,
-  deleteRepositoryDocument,
-  replaceRepositoryDocument,
-  setDocumentStatus,
+  setSelectedDocumentStatus,
   uploadRepositoryDocument,
 } from '@/app/actions/documents'
 
 const ROLES = ['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
 
 export default async function ManageDocumentsPage() {
-  const actor = await requireActiveRole(['ADMIN', 'SECRETARY'])
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
   await Promise.all([ensureDocumentCategories(), syncExpiredDocuments()])
-  const [categories, documents, recentDownloads] = await Promise.all([
+  const [categories, documents] = await Promise.all([
     prisma.documentCategory.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
     prisma.document.findMany({
       include: {
@@ -27,148 +25,101 @@ export default async function ManageDocumentsPage() {
       },
       orderBy: [{ uploadedAt: 'desc' }],
     }),
-    prisma.documentDownload.findMany({
-      take: 40,
-      orderBy: { downloadedAt: 'desc' },
-      include: {
-        document: { select: { title: true, version: true } },
-        user: { select: { fullName: true, email: true } },
-      },
-    }),
   ])
 
   return (
-    <DashboardShell role={actor.role} title="Manage documents" nav={navForRole(actor.role)}>
-      <div className="space-y-6 p-4 md:p-6">
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-xl text-primary">Upload document</h2>
-          <form action={uploadRepositoryDocument} className="mt-3 grid gap-2 md:grid-cols-3">
-            <input name="title" required placeholder="Title" className="rounded-lg border px-3 py-2" />
-            <select name="categoryId" required className="rounded-lg border px-3 py-2">
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+    <DashboardShell role={actor.role} title="Documents" nav={navForRole(actor.role)}>
+      <div className="space-y-5 p-4 md:p-6">
+        <details className="group overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 font-label-bold text-primary">
+            <span className="inline-flex items-center gap-2">
+              <span className="material-symbols-outlined text-[20px] text-secondary-container">add_circle</span>
+              Add new document
+            </span>
+            <span className="material-symbols-outlined transition-transform group-open:rotate-180">expand_more</span>
+          </summary>
+          <form action={uploadRepositoryDocument} className="grid gap-3 border-t border-outline-variant/40 p-4 md:grid-cols-2">
+            <input name="title" required placeholder="Document title" className="rounded-xl border px-3 py-2.5" />
+            <select name="categoryId" required className="rounded-xl border px-3 py-2.5">
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
-            <input name="file" type="file" required className="rounded-lg border px-3 py-2" />
-            <textarea name="description" placeholder="Description" className="rounded-lg border px-3 py-2" />
-            <select name="accessLevel" className="rounded-lg border px-3 py-2">
+            <label className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3 text-sm text-primary md:col-span-2">
+              <span className="font-label-bold">Choose PDF or Word document</span>
+              <span className="ml-2 text-xs text-on-surface-variant">Maximum 10 MB</span>
+              <input name="file" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required className="mt-2 block w-full text-xs" />
+            </label>
+            <textarea name="description" placeholder="Short description (optional)" className="rounded-xl border px-3 py-2.5 md:col-span-2" />
+            <select name="accessLevel" className="rounded-xl border px-3 py-2.5">
               <option value="MEMBERS">All approved members</option>
               <option value="SELECTED_ROLES">Selected roles</option>
-              <option value="ADMIN_SECRETARY">Admin/Secretary only</option>
+              <option value="ADMIN_SECRETARY">Admin and Secretary only</option>
               <option value="PUBLIC">Public</option>
             </select>
-            <select name="status" className="rounded-lg border px-3 py-2">
-              <option>DRAFT</option>
-              <option>PUBLISHED</option>
-            </select>
-            <input name="effectiveAt" type="date" className="rounded-lg border px-3 py-2" />
-            <input name="expiresAt" type="date" className="rounded-lg border px-3 py-2" />
-            <fieldset className="flex flex-wrap gap-2 text-xs">
-              {ROLES.map((role) => (
-                <label key={role}>
-                  <input type="checkbox" name="allowedRoles" value={role} /> {role}
-                </label>
-              ))}
+            <fieldset className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2 text-xs">
+              {ROLES.map((role) => <label key={role}><input type="checkbox" name="allowedRoles" value={role} /> {role}</label>)}
             </fieldset>
-            <button className="w-fit rounded-full bg-primary px-4 py-2 text-on-primary">Upload</button>
+            <input type="hidden" name="status" value="DRAFT" />
+            <button className="w-fit rounded-full bg-secondary-container px-5 py-2.5 text-sm font-label-bold text-on-primary shadow-[0_4px_14px_rgba(254,128,21,0.25)] md:col-span-2">Add document</button>
           </form>
-        </section>
+        </details>
+
+        <form action={setSelectedDocumentStatus}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-h3 text-xl text-primary">Your documents</h2>
+            <div className="flex gap-2">
+              <button name="status" value="DRAFT" className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 px-4 py-2 text-xs font-label-bold text-primary">
+                <span className="material-symbols-outlined text-[17px]">visibility_off</span> Hide selected
+              </button>
+              <button name="status" value="PUBLISHED" className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-label-bold text-on-primary">
+                <span className="material-symbols-outlined text-[17px]">publish</span> Publish selected
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {documents.map((document) => (
+              <article key={document.id} className="flex items-start gap-3 rounded-2xl border border-outline-variant/60 bg-surface p-4 shadow-[0_4px_16px_rgba(0,31,80,0.05)]">
+                <input type="checkbox" name="documentIds" value={document.id} aria-label={`Select ${document.title}`} className="mt-1 h-4 w-4 accent-primary" />
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/5 text-primary">
+                  <span className="material-symbols-outlined">{document.mimeType?.includes('pdf') ? 'picture_as_pdf' : 'description'}</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="font-label-bold text-primary">{document.title}</h3>
+                      <p className="mt-0.5 text-xs text-on-surface-variant">
+                        {document.categoryRecord?.name || 'Uncategorized'} · v{document.version}.0 · {document.downloads.length} downloads · {document.uploader.fullName}
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-[9px] font-label-bold uppercase tracking-wider ${document.status === 'PUBLISHED' ? 'bg-green-100 text-green-700' : 'bg-secondary-container/10 text-secondary'}`}>
+                      {document.status === 'PUBLISHED' ? 'Visible' : 'Hidden'}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <a href={`/api/documents/${document.id}/download`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full border border-outline-variant px-3 py-1.5 text-xs text-primary">
+                      <span className="material-symbols-outlined text-[16px]">open_in_new</span> View
+                    </a>
+                    <button name="singleId" value={document.id} className="inline-flex items-center gap-1 rounded-full bg-secondary-container/10 px-3 py-1.5 text-xs font-label-bold text-secondary" formAction={setSelectedDocumentStatus}>
+                      <span className="material-symbols-outlined text-[16px]">{document.status === 'PUBLISHED' ? 'visibility_off' : 'publish'}</span>
+                      {document.status === 'PUBLISHED' ? 'Hide' : 'Publish'}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+            {!documents.length && <p className="rounded-2xl border border-dashed p-10 text-center text-sm text-on-surface-variant">No documents added yet.</p>}
+          </div>
+        </form>
 
         {actor.role === 'ADMIN' && (
-          <section className="rounded-2xl border bg-surface p-5">
-            <h2 className="font-h3 text-lg text-primary">Add category</h2>
-            <form action={createDocumentCategory} className="mt-2 flex gap-2">
+          <details className="rounded-2xl border bg-surface p-4">
+            <summary className="cursor-pointer text-sm font-label-bold text-primary">Add document category</summary>
+            <form action={createDocumentCategory} className="mt-3 flex gap-2">
               <input name="name" required className="rounded-lg border px-3 py-2" />
               <button className="rounded-full bg-primary px-4 py-2 text-on-primary">Add</button>
             </form>
-          </section>
+          </details>
         )}
-
-        <section className="space-y-3">
-          <h2 className="font-h3 text-xl text-primary">Repository and version history</h2>
-          {documents.map((document) => (
-            <article key={document.id} className="rounded-2xl border bg-surface p-4">
-              <b>
-                {document.title} · v{document.version}.0 · {document.status}
-              </b>
-              <p className="text-sm">
-                {document.categoryRecord?.name} · {document.downloads.length} downloads ·{' '}
-                {document.uploader.fullName}
-                {document.expiresAt ? ` · Expires ${document.expiresAt.toLocaleDateString()}` : ''}
-              </p>
-              <a
-                href={`/api/documents/${document.id}/download`}
-                className="mt-1 inline-block text-sm text-primary underline"
-              >
-                Download via signed URL
-              </a>
-              <div className="mt-3 grid gap-2 md:grid-cols-3">
-                <form action={replaceRepositoryDocument}>
-                  <input type="hidden" name="id" value={document.id} />
-                  <input name="file" type="file" required className="block w-full text-xs" />
-                  <input
-                    name="reason"
-                    required
-                    minLength={5}
-                    placeholder="Replacement reason"
-                    className="mt-1 rounded-lg border px-2 py-1"
-                  />
-                  <button className="ml-2 text-sm text-primary underline">New version</button>
-                </form>
-                <form action={setDocumentStatus}>
-                  <input type="hidden" name="id" value={document.id} />
-                  <select name="status" defaultValue={document.status} className="rounded-lg border px-2 py-1">
-                    <option>DRAFT</option>
-                    <option>PUBLISHED</option>
-                    <option>ARCHIVED</option>
-                    <option>EXPIRED</option>
-                  </select>
-                  <input
-                    name="reason"
-                    required
-                    placeholder="Reason"
-                    className="ml-1 rounded-lg border px-2 py-1"
-                  />
-                  <button className="ml-2 text-sm text-primary underline">Update</button>
-                </form>
-                {actor.role === 'ADMIN' && (
-                  <form action={deleteRepositoryDocument}>
-                    <input type="hidden" name="id" value={document.id} />
-                    <input
-                      name="reason"
-                      required
-                      minLength={5}
-                      placeholder="Deletion reason"
-                      className="rounded-lg border px-2 py-1"
-                    />
-                    <button className="ml-2 text-sm text-error underline">Delete</button>
-                  </form>
-                )}
-              </div>
-            </article>
-          ))}
-        </section>
-
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-xl text-primary">Download audit</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">Recent repository downloads</p>
-          <ul className="mt-3 divide-y">
-            {recentDownloads.map((row) => (
-              <li key={row.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
-                <span>
-                  <b>{row.document.title}</b> v{row.document.version} · {row.user.fullName}
-                </span>
-                <span className="text-on-surface-variant">
-                  {row.downloadedAt.toLocaleString()}
-                  {row.ipAddress ? ` · ${row.ipAddress}` : ''}
-                </span>
-              </li>
-            ))}
-            {!recentDownloads.length && <li className="py-2 text-sm">No downloads recorded yet.</li>}
-          </ul>
-        </section>
       </div>
     </DashboardShell>
   )

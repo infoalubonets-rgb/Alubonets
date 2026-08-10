@@ -30,14 +30,34 @@ export default async function ContributionsPage() {
   if (profile.status === 'SUSPENDED') redirect('/login?error=suspended')
 
   const role = profile.role as Role
-  const [contributions, obligations] = await Promise.all([
-    getUserContributions(profile.id),
-    prisma.memberContributionObligation.findMany({
-      where: { userId: profile.id },
-      include: { campaign: { include: { contributions: { where: { userId: profile.id, status: { in: ['CONFIRMED','RECONCILED'] } } } } } },
-      orderBy: { campaign: { startsAt: 'desc' } },
-    }),
-  ])
+  let result
+  try {
+    result = await Promise.all([
+      getUserContributions(profile.id),
+      prisma.memberContributionObligation.findMany({
+        where: { userId: profile.id },
+        include: { campaign: { include: { contributions: { where: { userId: profile.id, status: { in: ['CONFIRMED','RECONCILED'] } } } } } },
+        orderBy: { campaign: { startsAt: 'desc' } },
+      }),
+    ])
+  } catch (error) {
+    console.error('Could not load member contributions', error)
+    return (
+      <DashboardShell role={role} title="My contributions" nav={navForRole(role)}>
+        <section className="mx-auto mt-8 max-w-xl rounded-2xl border border-error/30 bg-surface p-6 text-center">
+          <span className="material-symbols-outlined text-4xl text-error">cloud_off</span>
+          <h2 className="mt-2 font-h3 text-xl text-primary">Contributions are temporarily unavailable</h2>
+          <p className="mt-2 text-sm text-on-surface-variant">
+            The database could not be reached. Your records are safe; please try loading this page again.
+          </p>
+          <a href="/contributions" className="mt-4 inline-flex rounded-full bg-primary px-5 py-2 text-sm text-on-primary">
+            Try again
+          </a>
+        </section>
+      </DashboardShell>
+    )
+  }
+  const [contributions, obligations] = result
 
   return (
     <DashboardShell role={role} title="My contributions" nav={navForRole(role)}>

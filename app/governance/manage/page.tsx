@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
@@ -42,6 +43,34 @@ export default async function ManageGovernancePage() {
   return (
     <DashboardShell role={actor.role} title="Governance management" nav={navForRole(actor.role)}>
       <div className="space-y-5 p-4 md:p-6">
+        <section className="rounded-2xl border bg-surface p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <h2 className="font-h3 text-xl text-primary">Meeting governance workflow</h2>
+              <p className="mt-2 text-sm text-on-surface-variant">
+                Circulate notices, structure agendas, register decisions, assign action points,
+                approve minutes, and preserve revisions for accountability.
+              </p>
+            </div>
+            {canManage && (
+              <Link
+                href="/dashboard/secretary/meetings/new"
+                className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
+              >
+                Create meeting record
+              </Link>
+            )}
+          </div>
+        </section>
+        {!meetings.length && (
+          <section className="rounded-2xl border border-dashed bg-surface p-6 text-center">
+            <h2 className="font-h3 text-lg text-primary">No meeting records yet</h2>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Governance activity will appear here after a meeting record is created. No sample
+              decisions or minutes are shown because these must be official group records.
+            </p>
+          </section>
+        )}
         {meetings.map((meeting) => (
           <article key={meeting.id} className="rounded-2xl border bg-surface p-5">
             <div className="flex justify-between gap-3">

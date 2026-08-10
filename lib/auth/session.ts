@@ -136,7 +136,7 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
 
 export async function requireSessionProfile() {
   const profile = await getSessionProfile()
-  if (!profile) throw new Error('Unauthorized')
+  if (!profile) redirect('/login?error=session_expired')
   return profile
 }
 
@@ -154,7 +154,7 @@ export async function requireActiveRole(roles?: Role[]) {
 
 export async function requireAdmin() {
   const profile = await requireActiveRole(['ADMIN'])
-  if (profile.role !== 'ADMIN' && !profile.isSuperAdmin) throw new Error('Forbidden')
+  if (profile.role !== 'ADMIN' && !profile.isSuperAdmin) redirect(ROLE_HOME[profile.role])
   return profile
 }
 

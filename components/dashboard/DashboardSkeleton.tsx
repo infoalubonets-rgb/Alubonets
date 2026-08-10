@@ -1,3 +1,7 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
 /**
  * Full-page skeleton that mimics the DashboardShell structure.
  * Used by loading.tsx files so users see a shaped placeholder
@@ -15,10 +19,17 @@ type ContentSkeletonProps = {
 }
 
 export default function DashboardSkeleton({ variant }: ContentSkeletonProps) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), 450)
+    return () => window.clearTimeout(timer)
+  }, [])
+  if (!visible) return null
+
   return (
-    <div className="h-screen flex overflow-hidden bg-background dark:bg-[#060c1a]">
+    <div className="h-screen flex overflow-hidden bg-background dark:bg-[#071426]">
       {/* Sidebar */}
-      <aside className="w-56 bg-primary dark:bg-[#0c1e42] flex flex-col shrink-0 border-r border-white/[0.08]">
+      <aside className="w-56 bg-primary dark:bg-[#03112b] flex flex-col shrink-0 border-r border-white/[0.08]">
         {/* Logo area */}
         <div className="px-md pt-lg pb-md border-b border-white/10 flex items-center gap-sm">
           <div className="h-11 w-11 rounded-full bg-white/10 shrink-0 animate-pulse" />
@@ -47,7 +58,7 @@ export default function DashboardSkeleton({ variant }: ContentSkeletonProps) {
       {/* Main */}
       <div className="flex-1 flex flex-col h-screen min-h-0 min-w-0">
         {/* Header */}
-        <header className="bg-surface-container-lowest dark:bg-[#0d1729] border-b border-outline-variant dark:border-[#1a2d4f] shrink-0 flex items-center justify-between px-lg" style={{ height: 52 }}>
+        <header className="bg-surface-container-lowest dark:bg-[#091a30] border-b border-outline-variant dark:border-[#173056] shrink-0 flex items-center justify-between px-lg" style={{ height: 66 }}>
           <div className="flex items-center gap-md flex-1">
             <div className="h-5 w-5 rounded bg-on-surface/10 animate-pulse" />
             <div className="h-8 w-64 rounded-lg bg-on-surface/[0.06] animate-pulse" />

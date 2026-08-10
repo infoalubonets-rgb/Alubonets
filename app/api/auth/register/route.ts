@@ -7,6 +7,7 @@ import { syncUserMetadata } from '@/lib/auth/session'
 import { toAuthUser } from '@/lib/auth/helpers'
 import { POLICY_VERSION, registrationSchema, requestIp } from '@/lib/membership'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { COOKIE_NAME, registrationEmailIsVerified } from '@/lib/registration-email-verification'
 
 export async function POST(req: Request) {
   try {
@@ -21,6 +22,10 @@ export async function POST(req: Request) {
 
     const data = parsed.data
     const { email, password, fullName, phone } = data
+    const registrationCookies = await cookies()
+    if (!(await registrationEmailIsVerified(registrationCookies.get(COOKIE_NAME)?.value, email))) {
+      return NextResponse.json({ error: 'Verify your email before submitting the application.' }, { status: 403 })
+    }
     const [minLenSetting, mixedSetting] = await Promise.all([
       prisma.appSetting.findUnique({ where: { key: 'password_min_length' } }),
       prisma.appSetting.findUnique({ where: { key: 'password_require_mixed' } }),
@@ -161,6 +166,7 @@ export async function POST(req: Request) {
     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
     await supabase.auth.signInWithPassword({ email, password })
+    cookieStore.delete(COOKIE_NAME)
 
     return NextResponse.json({
       user: toAuthUser(profile),

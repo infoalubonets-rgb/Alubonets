@@ -7,7 +7,6 @@ import PaginationBar from '@/components/ui/PaginationBar'
 import { navForRole } from '@/lib/dashboard/nav'
 import { getSessionProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
-import { updateNotificationPreferences } from '@/app/actions/announcements'
 import type { Role } from '@/lib/auth/types'
 import type { Prisma } from '@prisma/client'
 import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
@@ -36,7 +35,7 @@ export default async function AnnouncementsPage({
     OR: [{ broadcast: true }, { receipts: { some: { userId: profile.id } } }],
   }
 
-  const [announcementTotal, announcements, members, paymentNotifs, pref] = await Promise.all([
+  const [announcementTotal, announcements, members, paymentNotifs] = await Promise.all([
     prisma.announcement.count({ where: announcementWhere }),
     prisma.announcement.findMany({
       where: announcementWhere,
@@ -72,26 +71,12 @@ export default async function AnnouncementsPage({
           take: 100,
         })
       : Promise.resolve([]),
-    prisma.userNotificationPreference.findUnique({ where: { userId: profile.id } }),
   ])
 
   return (
     <DashboardShell role={role} title="Announcements" nav={navForRole(role)}>
       <MarkAnnouncementsRead />
       <div className="max-w-3xl mx-auto pb-10 space-y-6">
-        <section className="rounded-2xl border bg-surface p-4">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wider text-on-surface">Email preference</h2>
-          <form action={updateNotificationPreferences} className="mt-2 flex flex-wrap items-center gap-3">
-            <label className="text-sm">
-              <input type="checkbox" name="emailOptional" defaultChecked={pref?.emailOptional !== false} />{' '}
-              Receive optional announcement emails
-            </label>
-            <button className="text-sm text-primary underline">Save</button>
-          </form>
-          <p className="mt-1 text-xs text-on-surface-variant">
-            Mandatory governance and finance notices always send by email.
-          </p>
-        </section>
         {showPaymentNotifs && (
           <div>
             <div className="flex items-center gap-2 mb-3 px-1">

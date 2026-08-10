@@ -7,12 +7,16 @@ import type { Role } from '@/lib/auth/types'
 import type { MemberCategory, Prisma } from '@prisma/client'
 import Link from 'next/link'
 import { parsePage, parsePageSize, paginationSkip, totalPages } from '@/lib/pagination'
+import { requireAdmin } from '@/lib/auth/session'
+
+export const metadata = { title: 'Member registry' }
 
 export default async function AdminMembersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string; category?: string; branch?: string }>
+  searchParams: Promise<{ page?: string; pageSize?: string; q?: string; category?: string; branch?: string }>
 }) {
+  await requireAdmin()
   const sp = await searchParams
   const page = parsePage(sp.page)
   const pageSize = parsePageSize(sp.pageSize, 25)
@@ -66,13 +70,15 @@ export default async function AdminMembersPage({
   const pages = totalPages(total, pageSize)
 
   return (
-    <DashboardShell role="ADMIN" title="Members" nav={ADMIN_NAV}>
-      <div className="px-4 pt-4 md:px-6">
+    <DashboardShell role="ADMIN" title="Member registry" nav={ADMIN_NAV}>
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 md:px-6">
+        <p className="text-sm text-on-surface-variant">View and export the full member registry.</p>
         <Link
           href="/api/export/members"
-          className="inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
+          className="dashboard-page-action inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
         >
-          Export members CSV
+          <span className="material-symbols-outlined text-[17px]">download</span>
+          Export full registry
         </Link>
       </div>
       <MembersTable

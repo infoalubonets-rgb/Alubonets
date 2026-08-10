@@ -19,7 +19,11 @@ const refresh = () => {
 
 async function upload(actorId: string, file: File, groupId: string, version: number) {
   if (!file?.size) throw new Error('Choose a document file.')
-  if (file.size > 15 * 1024 * 1024) throw new Error('Document must be 15 MB or smaller.')
+  if (file.size > 10 * 1024 * 1024) throw new Error('Document must be 10 MB or smaller.')
+  const extension = file.name.split('.').pop()?.toLowerCase()
+  if (!extension || !['pdf', 'doc', 'docx'].includes(extension)) {
+    throw new Error('Only PDF and Word documents (.pdf, .doc, .docx) are allowed.')
+  }
   const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `repository/${groupId}/v${version}-${crypto.randomUUID()}-${safe}`
   const { error } = await createServerClient().storage.from('documents').upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false })
@@ -40,7 +44,7 @@ export async function createDocumentCategory(formData: FormData) {
 }
 
 export async function uploadRepositoryDocument(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
   const data = z.object({
     title: z.string().trim().min(2).max(180),
     description: z.string().trim().max(2000).optional(),
@@ -66,8 +70,63 @@ export async function uploadRepositoryDocument(formData: FormData) {
   refresh()
 }
 
+export async function uploadReport(formData: FormData) {
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY'])
+  const data = z.object({
+    title: z.string().trim().min(2).max(180),
+    description: z.string().trim().max(4000).optional(),
+    status: z.enum(['DRAFT', 'PUBLISHED']),
+  }).parse({
+    title: formData.get('title'),
+    description: formData.get('description') || undefined,
+    status: formData.get('status'),
+  })
+  const source = formData.get('file') as File
+  if (!source?.size) throw new Error('Choose a report file.')
+  if (source.size > 15 * 1024 * 1024) throw new Error('Report must be 15 MB or smaller.')
+  const extension = source.name.split('.').pop()?.toLowerCase()
+  if (!extension || !['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'].includes(extension)) {
+    throw new Error('Reports must be PDF, Word, Excel, or CSV files.')
+  }
+  const groupId = crypto.randomUUID()
+  const safe = source.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `reports/${groupId}/${crypto.randomUUID()}-${safe}`
+  const { error } = await createServerClient().storage.from('documents').upload(
+    path,
+    await source.arrayBuffer(),
+    { contentType: source.type || 'application/octet-stream', upsert: false },
+  )
+  if (error) throw new Error(`Report upload failed: ${error.message}`)
+  const { findCategoryIdByName } = await import('@/lib/document-categories')
+  const categoryId = await findCategoryIdByName('Reports')
+  const report = await prisma.document.create({ data: {
+    title: data.title,
+    description: data.description,
+    category: 'Reports',
+    categoryId,
+    accessLevel: 'MEMBERS',
+    status: data.status,
+    storagePath: path,
+    fileUrl: `storage://documents/${path}`,
+    mimeType: source.type || 'application/octet-stream',
+    uploadedBy: actor.id,
+    versionGroupId: groupId,
+    effectiveAt: data.status === 'PUBLISHED' ? new Date() : null,
+  } })
+  await writeAudit({
+    userId: actor.id,
+    action: data.status === 'PUBLISHED' ? 'REPORT_PUBLISH' : 'REPORT_DRAFT_CREATE',
+    entity: 'Document',
+    entityId: report.id,
+    newValue: { title: report.title, status: report.status, format: extension },
+  })
+  revalidatePath('/reports/manage')
+  revalidatePath('/meetings-reports')
+  refresh()
+}
+
 export async function replaceRepositoryDocument(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
   const id = z.string().min(1).parse(formData.get('id'))
   const reason = z.string().trim().min(5).max(1000).parse(formData.get('reason'))
   const old = await prisma.document.findUniqueOrThrow({ where: { id } })
@@ -87,7 +146,7 @@ export async function replaceRepositoryDocument(formData: FormData) {
 }
 
 export async function setDocumentStatus(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
   const id = z.string().min(1).parse(formData.get('id'))
   const status = z.enum(['DRAFT','PUBLISHED','ARCHIVED','EXPIRED']).parse(formData.get('status'))
   const reason = z.string().trim().min(3).max(500).parse(formData.get('reason'))
@@ -103,6 +162,33 @@ export async function setDocumentStatus(formData: FormData) {
   refresh()
 }
 
+export async function setSelectedDocumentStatus(formData: FormData) {
+  const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
+  const singleId = z.string().optional().parse(formData.get('singleId') || undefined)
+  const ids = singleId ? [singleId] : formData.getAll('documentIds').map(String)
+  if (!ids.length) throw new Error('Select at least one document.')
+
+  const documents = await prisma.document.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, status: true, title: true },
+  })
+  const requestedStatus = formData.get('status')
+  const status = requestedStatus
+    ? z.enum(['DRAFT','PUBLISHED']).parse(requestedStatus)
+    : documents[0]?.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED'
+  await prisma.document.updateMany({ where: { id: { in: ids } }, data: { status } })
+  await Promise.all(documents.map((document) => writeAudit({
+    userId: actor.id,
+    action: status === 'PUBLISHED' ? 'DOCUMENT_PUBLISH' : 'DOCUMENT_HIDE',
+    entity: 'Document',
+    entityId: document.id,
+    reason: status === 'PUBLISHED' ? 'Published to the member repository' : 'Hidden from the member repository',
+    oldValue: { status: document.status },
+    newValue: { status, title: document.title },
+  })))
+  refresh()
+}
+
 export async function deleteRepositoryDocument(formData: FormData) {
   const actor = await requireAdmin()
   const id = z.string().min(1).parse(formData.get('id'))
@@ -113,4 +199,3 @@ export async function deleteRepositoryDocument(formData: FormData) {
   await writeAudit({ userId: actor.id, action: 'DOCUMENT_DELETE', entity: 'Document', entityId: id, reason, oldValue: { title: document.title, version: document.version, storagePath: document.storagePath } })
   refresh()
 }
-

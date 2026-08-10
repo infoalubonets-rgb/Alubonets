@@ -9,6 +9,7 @@ import type { Role } from '@prisma/client'
 import { ALL_ROLES } from '@/lib/auth/types'
 import { writeAudit } from '@/lib/audit'
 import { nextMembershipNumber } from '@/lib/membership'
+import { createServerClient } from '@/lib/supabase-server'
 
 const approveSchema = z.object({
   userId: z.string().min(1),
@@ -57,7 +58,27 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
   if (user.rejectedAt) throw new Error('This application was permanently rejected and cannot be reopened.')
   if (approve && !identityVerified) throw new Error('Confirm identity verification before approval.')
 
-  const status = approve ? 'ACTIVE' : 'INACTIVE'
+  if (!approve) {
+    await writeAudit({
+      userId: actor.id,
+      action: 'MEMBER_REJECT',
+      entity: 'User',
+      entityId: userId,
+      reason: note,
+      oldValue: { status: user.status, email: user.email },
+      newValue: { deleted: true },
+      meta: { rejectedApplicant: user.fullName, rejectedEmail: user.email },
+    })
+    await prisma.user.delete({ where: { id: userId } })
+    if (user.authUserId) {
+      const { error } = await createServerClient().auth.admin.deleteUser(user.authUserId)
+      if (error) console.error('Could not delete rejected Supabase user', error)
+    }
+    revalidateAdmin()
+    return null
+  }
+
+  const status = 'ACTIVE'
   const updated = await prisma.$transaction(async (tx) => {
     const membershipNumber =
       approve && !user.membershipNumber ? await nextMembershipNumber(tx) : user.membershipNumber

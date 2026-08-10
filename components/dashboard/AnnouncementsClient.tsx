@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import { actionDeleteAnnouncement } from '@/app/actions/domain'
 import AnnouncementComposer from './AnnouncementComposer'
 
@@ -36,7 +37,10 @@ export default function AnnouncementsClient({
   const [items, setItems] = useState(announcements)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [, startTransition] = useTransition()
+
+  useEffect(() => setMounted(true), [])
 
   function handleDelete(id: string) {
     setDeleting(null)
@@ -49,16 +53,8 @@ export default function AnnouncementsClient({
   return (
     <>
       {/* Page header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-[15px] font-bold text-[#001f50] dark:text-blue-50">
-            Notifications
-          </h2>
-          <p className="text-[12px] text-on-surface-variant mt-0.5">
-            {items.length} announcement{items.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        {canSend && (
+      {canSend && (
+        <div className="dashboard-page-action flex justify-end">
           <button
             type="button"
             onClick={() => setModalOpen(true)}
@@ -69,12 +65,12 @@ export default function AnnouncementsClient({
             </span>
             New notification
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {items.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <div className="flex min-h-[55vh] flex-col items-center justify-center text-center gap-3">
           <span className="material-symbols-outlined text-[56px] text-primary/15">campaign</span>
           <p className="text-[15px] font-semibold text-on-surface">No announcements yet</p>
           <p className="text-[13px] text-on-surface-variant">
@@ -239,8 +235,8 @@ export default function AnnouncementsClient({
       </div>
 
       {/* New notification modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {mounted && modalOpen && createPortal(
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => setModalOpen(false)}
@@ -277,7 +273,8 @@ export default function AnnouncementsClient({
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   )

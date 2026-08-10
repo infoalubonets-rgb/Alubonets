@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
@@ -37,6 +38,35 @@ export default async function GovernancePage() {
   return (
     <DashboardShell role={actor.role} title="Governance" nav={navForRole(actor.role)}>
       <div className="space-y-6 p-4 md:p-6">
+        <section className="rounded-2xl border bg-surface p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <h2 className="font-h3 text-xl text-primary">Group governance centre</h2>
+              <p className="mt-2 text-sm text-on-surface-variant">
+                Follow official meeting notices, decisions made by the group, and action points
+                assigned after meetings. Approved minutes and governance files are published in
+                the document repository.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/documents"
+                className="rounded-full border border-primary px-4 py-2 text-sm text-primary"
+              >
+                View approved records
+              </Link>
+              {(actor.role === 'ADMIN' || actor.role === 'SECRETARY') && (
+                <Link
+                  href="/governance/manage"
+                  className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
+                >
+                  Manage governance
+                </Link>
+              )}
+            </div>
+          </div>
+        </section>
+
         <section>
           <h2 className="font-h3 text-xl text-primary">Meeting notices</h2>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -78,11 +108,22 @@ export default async function GovernancePage() {
               </article>
             ))}
           </div>
+          {!decisions.length && (
+            <p className="mt-2 rounded-xl border bg-surface p-4 text-sm text-on-surface-variant">
+              No decisions have been published yet. Decisions will appear here after they are
+              formally recorded from a meeting.
+            </p>
+          )}
         </section>
 
-        {actionPoints.length > 0 && (
-          <section>
+        <section>
             <h2 className="font-h3 text-xl text-primary">Action points</h2>
+            {!actionPoints.length && (
+              <p className="mt-2 rounded-xl border bg-surface p-4 text-sm text-on-surface-variant">
+                You have no assigned action points. Tasks created from meeting resolutions will
+                appear here with their owner, deadline, and progress status.
+              </p>
+            )}
             <div className="mt-3 space-y-3">
               {actionPoints.map((point) => (
                 <article key={point.id} className="rounded-2xl border bg-surface p-4">
@@ -116,7 +157,6 @@ export default async function GovernancePage() {
               ))}
             </div>
           </section>
-        )}
       </div>
     </DashboardShell>
   )

@@ -167,6 +167,7 @@ export async function sendGalleryNotificationEmail({
 
 export async function sendMemberApprovedEmail(user: User) {
   const resend = getResend()
+  const recipient = process.env.RESEND_TEST_EMAIL || user.email
   const subject = 'Your Alubonets membership was approved'
   const html = baseHtml(`
     <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Welcome to Alubonets SHG!</h2>
@@ -179,7 +180,7 @@ export async function sendMemberApprovedEmail(user: User) {
     await prisma.emailLog.create({
       data: {
         userId: user.id,
-        toEmail: user.email,
+        toEmail: recipient,
         subject,
         template: 'member_approved',
         status: 'skipped',
@@ -192,14 +193,14 @@ export async function sendMemberApprovedEmail(user: User) {
   try {
     await resend.emails.send({
       from: from(),
-      to: user.email,
+      to: recipient,
       subject,
       html,
     })
     await prisma.emailLog.create({
       data: {
         userId: user.id,
-        toEmail: user.email,
+        toEmail: recipient,
         subject,
         template: 'member_approved',
         status: 'sent',
@@ -210,7 +211,7 @@ export async function sendMemberApprovedEmail(user: User) {
     await prisma.emailLog.create({
       data: {
         userId: user.id,
-        toEmail: user.email,
+        toEmail: recipient,
         subject,
         template: 'member_approved',
         status: 'failed',
