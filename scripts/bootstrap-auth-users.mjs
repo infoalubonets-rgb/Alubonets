@@ -58,18 +58,31 @@ const prisma = new PrismaClient()
 
 const users = await prisma.user.findMany()
 for (const user of users) {
+  if (
+    user.email.endsWith('@alubonets.local') ||
+    user.familyRegistrationState === 'RECORD_ONLY'
+  ) {
+    console.log(`skip record-only ${user.email}`)
+    continue
+  }
+
   const password =
     user.email.toLowerCase() === SUPER_ADMIN_EMAIL ? superAdminPassword : defaultPassword
+
+  const appMetadata = {
+    role: user.role,
+    status: user.status,
+    isSuperAdmin: user.isSuperAdmin,
+    dashboardAccess: user.dashboardAccess,
+    isPrincipal: user.isPrincipal,
+    dbUserId: user.id,
+    fullName: user.fullName,
+  }
 
   if (user.authUserId) {
     await admin.auth.admin.updateUserById(user.authUserId, {
       password,
-      app_metadata: {
-        role: user.role,
-        status: user.status,
-        isSuperAdmin: user.isSuperAdmin,
-        dashboardAccess: user.dashboardAccess,
-      },
+      app_metadata: appMetadata,
     })
     console.log(`updated ${user.email}`)
     continue
@@ -85,12 +98,7 @@ for (const user of users) {
       password,
       email_confirm: true,
       user_metadata: { full_name: user.fullName },
-      app_metadata: {
-        role: user.role,
-        status: user.status,
-        isSuperAdmin: user.isSuperAdmin,
-        dashboardAccess: user.dashboardAccess,
-      },
+      app_metadata: appMetadata,
     })
     if (error || !data.user) {
       console.error(`FAIL ${user.email}:`, error?.message)
@@ -99,12 +107,7 @@ for (const user of users) {
     authId = data.user.id
   } else {
     await admin.auth.admin.updateUserById(authId, {
-      app_metadata: {
-        role: user.role,
-        status: user.status,
-        isSuperAdmin: user.isSuperAdmin,
-        dashboardAccess: user.dashboardAccess,
-      },
+      app_metadata: appMetadata,
       password,
     })
   }

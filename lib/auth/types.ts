@@ -33,6 +33,7 @@ export type AuthUser = {
   isSuperAdmin?: boolean
   dashboardAccess?: Role[]
   status?: string
+  isPrincipal?: boolean
 }
 
 export type JwtPayload = {
@@ -98,6 +99,10 @@ export function isSharedAuthenticatedPath(pathname: string): boolean {
     '/governance',
     '/documents',
     '/financial-reports',
+    '/family',
   ]
+  if (pathname === '/dashboard/member/family' || pathname.startsWith('/dashboard/member/family/')) {
+    return true
+  }
   return roots.some((root) => pathname === root || pathname.startsWith(`${root}/`))
 }

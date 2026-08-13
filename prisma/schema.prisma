@@ -59,6 +59,30 @@ enum IdentityVerificationStatus {
   REJECTED
 }
 
+enum FamilyRelationship {
+  SPOUSE
+  SON
+  DAUGHTER
+  CHILD
+  DEPENDENT
+  OTHER
+}
+
+enum FamilyRegistrationState {
+  STANDARD
+  RECORD_ONLY
+  INVITED
+  ACTIVE_ATTACHED
+}
+
+enum FamilyTransitionType {
+  RECORD_CREATED
+  INVITED
+  INVITE_REVOKED
+  INVITE_EXPIRED
+  INVITE_ACCEPTED
+}
+
 enum ContactStatus {
   UNREAD
   IN_PROGRESS
@@ -258,8 +282,23 @@ model User {
   approvedAt        DateTime?
   rejectedAt        DateTime?
   identityVerificationStatus IdentityVerificationStatus @default(NOT_REVIEWED)
+  isPrincipal              Boolean                 @default(false)
+  principalMemberId        String?
+  familyRelationship       FamilyRelationship?
+  familyRegistrationState  FamilyRegistrationState @default(STANDARD)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+
+  principal            User?  @relation("FamilyBranch", fields: [principalMemberId], references: [id], onDelete: Restrict)
+  attachedMembers      User[] @relation("FamilyBranch")
+  familyInvitesSent    FamilyInvite[] @relation("FamilyInviteSender")
+  familyInvitesReceived FamilyInvite[] @relation("FamilyInviteMember")
+  familyBranchHistory  FamilyBranchHistory[] @relation("FamilyHistoryMember")
+  familyTransfersFrom  FamilyBranchHistory[] @relation("FamilyHistoryFromPrincipal")
+  familyTransfersTo    FamilyBranchHistory[] @relation("FamilyHistoryToPrincipal")
+  familyTransfersApproved FamilyBranchHistory[] @relation("FamilyHistoryApprover")
+  familyAccountTransitions FamilyAccountTransition[] @relation("FamilyTransitionMember")
+  familyTransitionsPerformed FamilyAccountTransition[] @relation("FamilyTransitionActor")
 
   contributions        Contribution[]
   welfareRequests      WelfareRequest[]
@@ -304,7 +343,69 @@ model User {
   loanDecisions LoanApplication[] @relation("LoanDecider")
   loanGuarantees LoanGuarantor[]
 
+  @@index([principalMemberId])
+  @@index([isPrincipal])
   @@map("users")
+}
+
+model FamilyInvite {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  userId      String
+  user        User      @relation("FamilyInviteMember", fields: [userId], references: [id], onDelete: Cascade)
+  invitedById String
+  invitedBy   User      @relation("FamilyInviteSender", fields: [invitedById], references: [id], onDelete: Cascade)
+  email       String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([invitedById])
+  @@index([email])
+  @@map("family_invites")
+}
+
+model FamilyAccountTransition {
+  id           String                  @id @default(cuid())
+  memberId     String
+  member       User                    @relation("FamilyTransitionMember", fields: [memberId], references: [id], onDelete: Restrict)
+  actorId      String?
+  actor        User?                   @relation("FamilyTransitionActor", fields: [actorId], references: [id], onDelete: SetNull)
+  inviteId     String?
+  type         FamilyTransitionType
+  fromState    FamilyRegistrationState
+  toState      FamilyRegistrationState
+  adulthoodAge Int?
+  dateOfBirth  DateTime?
+  reason       String
+  occurredAt   DateTime                @default(now())
+
+  @@index([memberId, occurredAt])
+  @@index([inviteId])
+  @@map("family_account_transitions")
+}
+
+model FamilyBranchHistory {
+  id                String   @id @default(cuid())
+  memberId          String
+  member            User     @relation("FamilyHistoryMember", fields: [memberId], references: [id], onDelete: Restrict)
+  fromPrincipalId   String?
+  fromPrincipal     User?    @relation("FamilyHistoryFromPrincipal", fields: [fromPrincipalId], references: [id], onDelete: Restrict)
+  toPrincipalId     String
+  toPrincipal       User     @relation("FamilyHistoryToPrincipal", fields: [toPrincipalId], references: [id], onDelete: Restrict)
+  relationship      FamilyRelationship
+  approvedById      String
+  approvedBy        User     @relation("FamilyHistoryApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  reason            String
+  effectiveAt       DateTime @default(now())
+
+  @@index([memberId, effectiveAt])
+  @@index([fromPrincipalId])
+  @@index([toPrincipalId])
+  @@index([approvedById])
+  @@map("family_branch_history")
 }
 
 model MemberProfile {

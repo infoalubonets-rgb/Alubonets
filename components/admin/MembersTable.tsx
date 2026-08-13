@@ -14,6 +14,7 @@ export type MembersTableUser = {
   role: Role
   status: string
   isSuperAdmin: boolean
+  isPrincipal?: boolean
   phone: string | null
   location: string | null
   membershipNumber: string | null
@@ -255,6 +256,10 @@ export default function MembersTable({
                   <DetailChip label="Status" value={selected.status} />
                   <DetailChip label="Phone" value={selected.phone?.trim() || '—'} />
                   <DetailChip label="Location" value={selected.location?.trim() || '—'} />
+                  <DetailChip
+                    label="Principal"
+                    value={selected.isPrincipal ? 'Yes' : 'No'}
+                  />
                 </div>
 
                 {selected.isSuperAdmin && (

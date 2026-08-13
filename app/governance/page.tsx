@@ -13,7 +13,6 @@ export default async function GovernancePage() {
     'EXECUTIVE',
     'TREASURER',
     'ORGANIZER',
-    'MEMBER',
   ])
   await Promise.all([syncOverdueActionPoints(), markMeetingNoticesRead()])
   const [notices, decisions, actionPoints] = await Promise.all([

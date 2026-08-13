@@ -22,6 +22,7 @@ export type AppMetadataPayload = {
   dashboardAccess: Role[]
   dbUserId: string   // stored so requests can skip the DB lookup
   fullName: string
+  isPrincipal?: boolean
 }
 
 export async function syncAppMetadata(
@@ -56,6 +57,7 @@ export async function syncUserMetadata(user: User) {
     dashboardAccess: user.dashboardAccess as Role[],
     dbUserId: user.id,
     fullName: user.fullName,
+    isPrincipal: user.isPrincipal,
   })
 }
 

@@ -122,6 +122,16 @@ export default async function AdminSettingsPage() {
           />
         </section>
 
+        <section className="rounded-2xl border bg-surface p-5">
+          <h2 className="font-h3 text-lg text-primary">Family account transition</h2>
+          <SettingForm
+            settingKey={SETTING_KEYS.familyAdulthoodAge}
+            label="Age at which a record-only child may be invited"
+            defaultValue={settings[SETTING_KEYS.familyAdulthoodAge] || '18'}
+            type="number"
+          />
+        </section>
+
         {loansOn && (
           <section className="rounded-2xl border bg-surface p-5">
             <h2 className="font-h3 text-lg text-primary">Loan policy</h2>

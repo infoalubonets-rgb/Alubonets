@@ -37,6 +37,7 @@ describe('navForRole', () => {
   it('returns role-specific nav', () => {
     expect(navForRole('TREASURER')[0]?.href).toBe('/dashboard/treasurer')
     expect(navForRole('MEMBER').some((n) => n.href === '/dashboard/member')).toBe(true)
+    expect(navForRole('MEMBER').some((n) => n.href?.startsWith('/governance'))).toBe(false)
   })
 })
 

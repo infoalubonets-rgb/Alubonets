@@ -15,7 +15,19 @@ export default async function MemberPage() {
   const nav = await navWithLoans(profile.role)
 
   return (
-    <DashboardShell role="MEMBER" title="Member" nav={nav}>
+    <DashboardShell
+      role="MEMBER"
+      title={
+        profile.isSuperAdmin
+          ? 'Super Administrator'
+          : profile.role === 'ADMIN'
+            ? 'Administrator'
+            : profile.isPrincipal
+              ? 'Principal Member'
+              : 'Member'
+      }
+      nav={nav}
+    >
       <div className="space-y-5 p-4 md:p-6 max-w-4xl mx-auto">
 
         {/* Stats */}

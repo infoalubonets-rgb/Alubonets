@@ -754,3 +754,66 @@ textarea.contact-field-modern {
     transform: none !important;
   }
 }
+/* Very thin, warm progress-style scrollbars across the application. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #f6b800 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 2px;
+  height: 2px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffd84d 0%, #f6b800 55%, #e99a00 100%);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #ffc400;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dashboard navigation uses a 1px custom progress indicator. */
+.dashboard-nav-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dashboard-nav-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Match the family dialog scrollbar to the sidebar's narrow progress line. */
+.family-modal-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.family-modal-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.family-modal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.family-modal-scroll::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: #ffc400;
+}

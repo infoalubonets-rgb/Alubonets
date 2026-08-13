@@ -89,6 +89,7 @@ export default async function AdminMembersPage({
           role: u.role as Role,
           status: u.status,
           isSuperAdmin: u.isSuperAdmin,
+          isPrincipal: u.isPrincipal,
           phone: u.phone,
           location: u.location,
           membershipNumber: u.membershipNumber,

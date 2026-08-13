@@ -341,3 +341,129 @@ export async function sendWelfareStatusEmail(
     })
   }
 }
+
+export async function sendFamilyInviteEmail({
+  toEmail,
+  fullName,
+  principalName,
+  inviteUrl,
+  userId,
+}: {
+  toEmail: string
+  fullName: string
+  principalName: string
+  inviteUrl: string
+  userId: string
+}) {
+  const resend = getResend()
+  const testRecipient = testEmailOverride()
+  const recipient = testRecipient || toEmail
+  const subject = `${principalName} invited you to Alubonets SHG`
+  const html = baseHtml(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Family membership invite</h2>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${fullName},</p>
+    <p style="margin:0 0 20px;color:#374151;"><strong>${principalName}</strong> added you under their family branch on Alubonets. Complete registration to create your login. An administrator may still need to approve your account before portal access.</p>
+    <p><a href="${inviteUrl}" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Accept invite &amp; register</a></p>
+  `)
+
+  if (!resend) {
+    await prisma.emailLog.create({
+      data: {
+        userId,
+        toEmail: recipient,
+        subject,
+        template: 'family_invite',
+        status: 'skipped',
+        meta: { reason: 'RESEND_API_KEY not configured', inviteUrl },
+      },
+    })
+    return { skipped: true as const }
+  }
+
+  try {
+    const delivery = await resend.emails.send({ from: from(), to: recipient, subject, html })
+    if (delivery.error) throw new Error(delivery.error.message)
+    await prisma.emailLog.create({
+      data: {
+        userId,
+        toEmail: recipient,
+        subject,
+        template: 'family_invite',
+        status: 'accepted',
+        meta: { inviteUrl, providerMessageId: delivery.data?.id || null, testMode: Boolean(testRecipient), intendedRecipient: toEmail },
+      },
+    })
+    return { skipped: false as const, accepted: true as const, deliveredTo: recipient, providerMessageId: delivery.data?.id, testMode: Boolean(testRecipient) }
+  } catch (err) {
+    await prisma.emailLog.create({
+      data: {
+        userId,
+        toEmail: recipient,
+        subject,
+        template: 'family_invite',
+        status: 'failed',
+        meta: { error: err instanceof Error ? err.message : 'unknown', inviteUrl, testMode: Boolean(testRecipient), intendedRecipient: toEmail },
+      },
+    })
+    return { skipped: true as const, error: true as const, deliveredTo: recipient, testMode: Boolean(testRecipient) }
+  }
+}
+
+export async function sendFamilyLinkedNoticeEmail({
+  member,
+  principalName,
+}: {
+  member: User
+  principalName: string
+}) {
+  if (member.email.endsWith('@alubonets.local') || !member.authUserId) {
+    return { skipped: true as const }
+  }
+  const resend = getResend()
+  const recipient = testEmailOverride() || member.email
+  const subject = `You were added to ${principalName}'s family branch`
+  const html = baseHtml(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Family branch update</h2>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${member.fullName},</p>
+    <p style="margin:0 0 20px;color:#374151;">You have been linked under <strong>${principalName}</strong> on Alubonets. Sign in to view your family branch details.</p>
+    <p><a href="${appUrl()}/login" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Log in</a></p>
+  `)
+
+  if (!resend) {
+    await prisma.emailLog.create({
+      data: {
+        userId: member.id,
+        toEmail: recipient,
+        subject,
+        template: 'family_linked',
+        status: 'skipped',
+      },
+    })
+    return { skipped: true as const }
+  }
+
+  try {
+    await resend.emails.send({ from: from(), to: recipient, subject, html })
+    await prisma.emailLog.create({
+      data: {
+        userId: member.id,
+        toEmail: recipient,
+        subject,
+        template: 'family_linked',
+        status: 'sent',
+      },
+    })
+    return { skipped: false as const }
+  } catch {
+    await prisma.emailLog.create({
+      data: {
+        userId: member.id,
+        toEmail: recipient,
+        subject,
+        template: 'family_linked',
+        status: 'failed',
+      },
+    })
+    return { skipped: true as const, error: true as const }
+  }
+}

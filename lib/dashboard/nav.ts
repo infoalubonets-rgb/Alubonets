@@ -34,6 +34,12 @@ const DOCUMENTS_VIEW_NAV: NavItem = {
   href: '/documents',
 }
 
+const FAMILY_NAV: NavItem = {
+  icon: 'family_restroom',
+  label: 'My Family / Branch',
+  href: '/dashboard/member/family',
+}
+
 export const ADMIN_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/admin' },
   { icon: 'group', label: 'Member registry', href: '/admin/members' },
@@ -53,6 +59,7 @@ export const ADMIN_NAV: NavItem[] = [
   { icon: 'campaign', label: 'Announcements', href: '/admin/announcements' },
   { icon: 'settings', label: 'Settings', href: '/admin/settings' },
   { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
+  FAMILY_NAV,
   CONTRIBUTIONS_NAV,
 ]
 
@@ -66,6 +73,7 @@ export const EXECUTIVE_NAV: NavItem[] = [
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
   DOCUMENTS_VIEW_NAV,
   ANNOUNCEMENTS_NAV,
+  FAMILY_NAV,
   CONTRIBUTIONS_NAV,
 ]
 
@@ -82,6 +90,7 @@ export const TREASURER_NAV: NavItem[] = [
   DOCUMENTS_VIEW_NAV,
   { icon: 'gavel', label: 'Governance', href: '/governance' },
   { icon: 'savings', label: 'My contributions', href: '/contributions' },
+  FAMILY_NAV,
   ANNOUNCEMENTS_NAV,
 ]
 
@@ -94,6 +103,7 @@ export const SECRETARY_NAV: NavItem[] = [
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
   { icon: 'folder_managed', label: 'Documents', href: '/documents/manage' },
   DOCUMENTS_VIEW_NAV,
+  FAMILY_NAV,
   CONTRIBUTIONS_NAV,
 ]
 
@@ -106,12 +116,14 @@ export const ORGANIZER_NAV: NavItem[] = [
   MEETINGS_REPORTS_NAV,
   DOCUMENTS_VIEW_NAV,
   { icon: 'gavel', label: 'Governance', href: '/governance' },
+  FAMILY_NAV,
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
 ]
 
 export const MEMBER_NAV: NavItem[] = [
   { icon: 'home', label: 'Home', href: '/dashboard/member' },
+  FAMILY_NAV,
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
   PROJECTS_VIEW_NAV,
@@ -119,7 +131,6 @@ export const MEMBER_NAV: NavItem[] = [
   MEETINGS_REPORTS_NAV,
   { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/member/welfare' },
   DOCUMENTS_VIEW_NAV,
-  { icon: 'gavel', label: 'Governance', href: '/governance' },
 ]
 
 export const LOANS_NAV_ITEMS = {

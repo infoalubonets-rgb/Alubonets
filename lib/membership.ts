@@ -53,6 +53,7 @@ export const registrationSchema = z.object({
   consentAccepted: z.literal(true),
   termsVersion: z.literal(POLICY_VERSION),
   privacyVersion: z.literal(POLICY_VERSION),
+  inviteToken: z.string().trim().min(10).optional(),
 })
 
 export type RegistrationInput = z.infer<typeof registrationSchema>

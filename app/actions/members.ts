@@ -5,11 +5,12 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, syncUserMetadata } from '@/lib/auth/session'
 import { sendMemberApprovedEmail } from '@/lib/email/resend'
-import type { Role } from '@prisma/client'
+import type { FamilyRelationship, Role } from '@prisma/client'
 import { ALL_ROLES } from '@/lib/auth/types'
 import { writeAudit } from '@/lib/audit'
 import { nextMembershipNumber } from '@/lib/membership'
 import { createServerClient } from '@/lib/supabase-server'
+import { branchHistoryData, validateFamilyAttachment, validateFamilyTransfer } from '@/lib/family-rules'
 
 const approveSchema = z.object({
   userId: z.string().min(1),
@@ -92,6 +93,9 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
         approvedAt: approve ? new Date() : null,
         rejectedAt: approve ? null : new Date(),
         identityVerificationStatus: identityVerified ? 'VERIFIED' : approve ? 'VERIFIED' : 'REJECTED',
+        familyRegistrationState: user.principalMemberId
+          ? 'ACTIVE_ATTACHED'
+          : user.familyRegistrationState,
       },
     })
   })
@@ -275,5 +279,173 @@ export async function setSuperAdminFlag(input: z.infer<typeof superSchema>) {
   })
 
   revalidateAdmin()
+  return updated
+}
+
+const principalSchema = z.object({
+  userId: z.string().min(1),
+  isPrincipal: z.boolean(),
+  reason: z.string().trim().max(1000).optional(),
+})
+
+export async function setPrincipalStatus(input: z.infer<typeof principalSchema>) {
+  const actor = await requireAdmin()
+  const { userId, isPrincipal, reason } = principalSchema.parse(input)
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { _count: { select: { attachedMembers: true } } },
+  })
+  if (!target) throw new Error('User not found')
+
+  if (target.status !== 'ACTIVE' && isPrincipal) {
+    throw new Error('Only ACTIVE members can be assigned as Principal')
+  }
+
+  if (target.principalMemberId && isPrincipal) {
+    throw new Error('Detach this member from their current Principal before making them a Principal')
+  }
+
+  if (!isPrincipal && target._count.attachedMembers > 0) {
+    throw new Error(
+      `Cannot remove Principal status while ${target._count.attachedMembers} attached member(s) remain. Transfer or detach them first.`,
+    )
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      isPrincipal,
+      principalMemberId: isPrincipal ? null : target.principalMemberId,
+      familyRelationship: isPrincipal ? null : target.familyRelationship,
+      familyRegistrationState: isPrincipal
+        ? 'STANDARD'
+        : target.familyRegistrationState === 'ACTIVE_ATTACHED'
+          ? 'STANDARD'
+          : target.familyRegistrationState,
+    },
+  })
+
+  await syncUserMetadata(updated)
+
+  await writeAudit({
+    userId: actor.id,
+    action: isPrincipal ? 'PRINCIPAL_ASSIGN' : 'PRINCIPAL_REVOKE',
+    entity: 'User',
+    entityId: userId,
+    reason: reason || (isPrincipal ? 'Assigned as Principal Member' : 'Removed Principal status'),
+    oldValue: { isPrincipal: target.isPrincipal },
+    newValue: { isPrincipal },
+    meta: { targetEmail: target.email, targetName: target.fullName },
+  })
+
+  revalidateAdmin()
+  revalidatePath('/dashboard/member/family')
+  return updated
+}
+
+const transferFamilyMemberSchema = z.object({
+  memberId: z.string().min(1),
+  newPrincipalId: z.string().min(1),
+  relationship: z.enum(['SPOUSE', 'CHILD', 'DEPENDENT', 'OTHER']),
+  reason: z.string().trim().min(5).max(1000),
+})
+
+export async function transferFamilyMember(input: z.infer<typeof transferFamilyMemberSchema>) {
+  const actor = await requireAdmin()
+  const data = transferFamilyMemberSchema.parse(input)
+
+  const [member, nextPrincipal] = await Promise.all([
+    prisma.user.findUnique({ where: { id: data.memberId } }),
+    prisma.user.findUnique({ where: { id: data.newPrincipalId } }),
+  ])
+  if (!member) throw new Error('Family member not found')
+  if (!nextPrincipal) throw new Error('New Principal Member not found')
+  if (!member.principalMemberId) throw new Error('This member is not currently attached to a branch')
+
+  const previousPrincipalId = member.principalMemberId
+  validateFamilyTransfer(member, previousPrincipalId, nextPrincipal)
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const moved = await tx.user.update({
+      where: { id: member.id },
+      data: {
+        principalMemberId: nextPrincipal.id,
+        familyRelationship: data.relationship as FamilyRelationship,
+        familyRegistrationState:
+          member.familyRegistrationState === 'STANDARD'
+            ? member.status === 'ACTIVE' ? 'ACTIVE_ATTACHED' : 'INVITED'
+            : member.familyRegistrationState,
+      },
+    })
+    await tx.familyBranchHistory.create({
+      data: branchHistoryData({
+        memberId: member.id,
+        fromPrincipalId: previousPrincipalId,
+        toPrincipalId: nextPrincipal.id,
+        relationship: data.relationship as FamilyRelationship,
+        approvedById: actor.id,
+        reason: data.reason,
+      }),
+    })
+    return moved
+  })
+
+  await writeAudit({
+    userId: actor.id,
+    action: 'FAMILY_BRANCH_TRANSFER',
+    entity: 'User',
+    entityId: member.id,
+    reason: data.reason,
+    oldValue: { principalMemberId: previousPrincipalId, familyRelationship: member.familyRelationship },
+    newValue: { principalMemberId: nextPrincipal.id, familyRelationship: data.relationship },
+    meta: { memberName: member.fullName, newPrincipalName: nextPrincipal.fullName },
+  })
+
+  await syncUserMetadata(updated)
+  revalidateAdmin()
+  revalidatePath('/dashboard/member/family')
+  return updated
+}
+
+const assignFamilyMemberSchema = z.object({
+  memberId: z.string().min(1),
+  principalId: z.string().min(1),
+  relationship: z.enum(['SPOUSE', 'CHILD', 'DEPENDENT', 'OTHER']),
+  reason: z.string().trim().min(5).max(1000),
+})
+
+export async function assignFamilyMember(input: z.infer<typeof assignFamilyMemberSchema>) {
+  const actor = await requireAdmin()
+  const data = assignFamilyMemberSchema.parse(input)
+  const [member, principal] = await Promise.all([
+    prisma.user.findUnique({ where: { id: data.memberId } }),
+    prisma.user.findUnique({ where: { id: data.principalId } }),
+  ])
+  if (!member) throw new Error('Member not found')
+  if (!principal) throw new Error('Principal Member not found')
+  if (member.principalMemberId) throw new Error('This member is already assigned; use transfer instead')
+  validateFamilyAttachment(member, principal)
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const attached = await tx.user.update({ where: { id: member.id }, data: {
+      principalMemberId: principal.id,
+      familyRelationship: data.relationship as FamilyRelationship,
+      familyRegistrationState: member.status === 'ACTIVE' ? 'ACTIVE_ATTACHED' : 'INVITED',
+    } })
+    await tx.familyBranchHistory.create({ data: branchHistoryData({
+      memberId: member.id, toPrincipalId: principal.id,
+      relationship: data.relationship as FamilyRelationship,
+      approvedById: actor.id, reason: data.reason,
+    }) })
+    return attached
+  })
+  await writeAudit({ userId: actor.id, action: 'FAMILY_BRANCH_ASSIGN', entity: 'User', entityId: member.id,
+    reason: data.reason, oldValue: { principalMemberId: null },
+    newValue: { principalMemberId: principal.id, familyRelationship: data.relationship },
+    meta: { memberName: member.fullName, principalName: principal.fullName } })
+  await syncUserMetadata(updated)
+  revalidateAdmin()
+  revalidatePath('/dashboard/member/family')
   return updated
 }

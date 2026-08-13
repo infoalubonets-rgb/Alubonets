@@ -447,6 +447,7 @@ Linking: register / OAuth / bootstrap sets `users.authUserId = auth.users.id`.
 | `treasurer@alubonets.com` | `ChangeMe123!` | TREASURER | ACTIVE | `/login` | `/dashboard/treasurer` |
 | `secretary@alubonets.com` | `ChangeMe123!` | SECRETARY | ACTIVE | `/login` | `/dashboard/secretary` |
 | `organizer@alubonets.com` | `ChangeMe123!` | ORGANIZER | ACTIVE | `/login` | `/dashboard/organizer` |
+| `principal@alubonets.com` | `ChangeMe123!` | MEMBER (Principal) | ACTIVE | `/login` | `/dashboard/member` (+ My Family) |
 | `member@alubonets.com` | `ChangeMe123!` | MEMBER | ACTIVE | `/login` | `/dashboard/member` |
 | `pending@alubonets.com` | `ChangeMe123!` | MEMBER | PENDING | `/login` | `/pending` |
 

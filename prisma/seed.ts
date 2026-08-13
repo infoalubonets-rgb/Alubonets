@@ -5,7 +5,7 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('Seeding Alubonets database...')
 
-  await prisma.auditLog.deleteMany()
+  // Audit logs are append-only in production DBs — do not wipe them during seed.
   await prisma.emailLog.deleteMany()
   await prisma.contribution.deleteMany()
   await prisma.welfareRequest.deleteMany()
@@ -15,6 +15,7 @@ async function main() {
   await prisma.meeting.deleteMany()
   await prisma.event.deleteMany()
   await prisma.project.deleteMany()
+  await prisma.familyInvite.deleteMany()
   await prisma.user.deleteMany()
 
   const admin = await prisma.user.create({
@@ -95,6 +96,18 @@ async function main() {
     },
   })
 
+  const principal = await prisma.user.create({
+    data: {
+      email: 'principal@alubonets.com',
+      fullName: 'Principal Otieno',
+      phone: '+254700000088',
+      role: Role.MEMBER,
+      status: MemberStatus.ACTIVE,
+      isPrincipal: true,
+      familyRegistrationState: 'STANDARD',
+    },
+  })
+
   const pending = await prisma.user.create({
     data: {
       email: 'pending@alubonets.com',
@@ -104,7 +117,7 @@ async function main() {
     },
   })
 
-  const members = [admin, executive, treasurer, secretary, organizer, member]
+  const members = [admin, executive, treasurer, secretary, organizer, member, principal]
 
   for (const [i, u] of members.entries()) {
     await prisma.contribution.create({
@@ -278,6 +291,7 @@ async function main() {
   console.log('- superadmin@alubonets.com (ADMIN / super)')
   console.log('- admin@alubonets.com (ADMIN)')
   console.log('- member@alubonets.com (MEMBER)')
+  console.log('- principal@alubonets.com (MEMBER / Principal)')
   console.log('- pending@alubonets.com (PENDING)')
 }
 

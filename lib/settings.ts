@@ -12,6 +12,7 @@ export const SETTING_KEYS = {
   loanMaxAmountKes: 'loan_max_amount_kes',
   loanMinGuarantors: 'loan_min_guarantors',
   loanRequireGuarantorAccept: 'loan_require_guarantor_accept',
+  familyAdulthoodAge: 'family_adulthood_age',
 } as const
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS]
@@ -27,6 +28,7 @@ const validators: Record<SettingKey, z.ZodType<string>> = {
   [SETTING_KEYS.loanMaxAmountKes]: z.string().regex(/^\d+(\.\d{1,2})?$/).refine((v) => Number(v) > 0),
   [SETTING_KEYS.loanMinGuarantors]: z.string().regex(/^\d+$/).refine((v) => Number(v) >= 0 && Number(v) <= 10),
   [SETTING_KEYS.loanRequireGuarantorAccept]: z.enum(['true', 'false']),
+  [SETTING_KEYS.familyAdulthoodAge]: z.string().regex(/^\d+$/).refine((v) => Number(v) >= 13 && Number(v) <= 25),
 }
 
 const defaults: Partial<Record<SettingKey, string>> = {
@@ -39,6 +41,7 @@ const defaults: Partial<Record<SettingKey, string>> = {
   [SETTING_KEYS.loanMaxAmountKes]: '50000',
   [SETTING_KEYS.loanMinGuarantors]: '1',
   [SETTING_KEYS.loanRequireGuarantorAccept]: 'true',
+  [SETTING_KEYS.familyAdulthoodAge]: '18',
 }
 
 export function validateSettingValue(key: SettingKey, value: string): string {

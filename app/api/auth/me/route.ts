@@ -10,7 +10,7 @@ export async function GET() {
   }
   const current = await prisma.user.findUnique({
     where: { id: profile.id },
-    select: { fullName: true },
+    select: { fullName: true, isPrincipal: true },
   })
   const fullName = current?.fullName || profile.fullName
   return NextResponse.json({
@@ -23,6 +23,7 @@ export async function GET() {
       status: profile.status,
       isSuperAdmin: profile.isSuperAdmin,
       dashboardAccess: profile.dashboardAccess,
+      isPrincipal: current?.isPrincipal ?? profile.isPrincipal ?? false,
     },
   })
 }

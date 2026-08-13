@@ -28,6 +28,13 @@ try {
   process.exit(1)
 }
 
+// Supabase's direct/session pooler endpoint can occasionally be unavailable
+// from local networks. This opt-in keeps normal behavior unchanged while
+// allowing migration commands to use the working transaction-pooler URL.
+if (process.env.PRISMA_USE_POOLER_FOR_DIRECT === 'true' && process.env.DATABASE_URL) {
+  process.env.DIRECT_URL = process.env.DATABASE_URL
+}
+
 const args = process.argv.slice(2)
 const result = spawnSync('npx', ['prisma', ...args], {
   cwd: root,

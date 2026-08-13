@@ -24,6 +24,7 @@ type Props = {
   title: string
   nav: NavItem[]
   children: ReactNode
+  hidePageHeading?: boolean
 }
 
 function LiveDateBadge() {
@@ -53,7 +54,7 @@ function LiveDateBadge() {
   )
 }
 
-export default function DashboardShell({ role, title, nav, children }: Props) {
+export default function DashboardShell({ role, title, nav, children, hidePageHeading = false }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -63,6 +64,13 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
   const [paymentNotifCount, setPaymentNotifCount] = useState(0)
   const [signingOut, setSigningOut] = useState(false)
   const [welcome, setWelcome] = useState('')
+  const displayRole = user?.isSuperAdmin
+    ? 'Super Administrator'
+    : user?.role === 'ADMIN'
+      ? 'Administrator'
+      : role === 'MEMBER' && user?.isPrincipal
+        ? 'Principal Member'
+        : ROLE_LABEL[role]
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('dashSidebarCollapsed') === '1')
@@ -195,7 +203,7 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
             <div>
               <p className="font-h3 text-[19px] font-bold text-on-primary leading-none">Alubonets</p>
               <p className="text-[11px] text-primary-fixed-dim/60 mt-0.5 font-caption">
-                {ROLE_LABEL[role]}
+                {displayRole}
               </p>
             </div>
           )}
@@ -322,7 +330,15 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
                     <p className="font-label-bold text-[12px] text-on-surface dark:text-blue-50 leading-tight">
                       {user?.fullName}
                     </p>
-                    <p className="text-[10px] text-on-surface-variant">{user?.role && ROLE_LABEL[user.role]}</p>
+                    <p className="text-[10px] text-on-surface-variant">
+                      {user?.isSuperAdmin
+                        ? 'Super Administrator'
+                        : user?.role === 'ADMIN'
+                          ? 'Administrator'
+                          : user?.role === 'MEMBER' && user.isPrincipal
+                            ? 'Principal Member'
+                            : user?.role && ROLE_LABEL[user.role]}
+                    </p>
                   </div>
                   <div className="h-9 w-9 rounded-full border-2 border-white dark:border-[#1e3461] bg-primary text-on-primary flex items-center justify-center font-label-bold text-[12px] shadow-sm">
                     {user?.initials}
@@ -351,11 +367,13 @@ export default function DashboardShell({ role, title, nav, children }: Props) {
           </div>
         </header>
 
-        <main className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain p-lg space-y-lg">
-          <div className="shrink-0 -mt-1">
-            <h1 className="font-h2 text-h2 text-primary dark:text-primary-fixed-dim">{title}</h1>
-            <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{ROLE_LABEL[role]}</p>
-          </div>
+        <main className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-lg pb-lg pt-1 space-y-lg">
+          {!hidePageHeading && (
+            <div className="shrink-0 -mt-1">
+              <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
+              <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>
+            </div>
+          )}
           {children}
         </main>
       </div>

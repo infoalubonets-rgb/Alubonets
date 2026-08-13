@@ -40,7 +40,7 @@ export async function circulateMeetingNotice(formData: FormData) {
     await tx.meetingInvitation.createMany({ data: members.map((member) => ({ meetingId, userId: member.id, sentAt: new Date() })) })
     return updated
   })
-  await sendBroadcastEmail({ subject: `Meeting notice: ${meeting.title}`, title: meeting.title, body: `<p>${noticeBody.replaceAll('<','&lt;').replaceAll('>','&gt;')}</p><p><strong>Date:</strong> ${meeting.heldAt.toLocaleString()}</p>`, ctaLabel: 'View governance portal', ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/governance`, template: 'meeting_notice', actorId: actor.id, memberIds: members.map((m) => m.id) })
+  await sendBroadcastEmail({ subject: `Meeting notice: ${meeting.title}`, title: meeting.title, body: `<p>${noticeBody.replaceAll('<','&lt;').replaceAll('>','&gt;')}</p><p><strong>Date:</strong> ${meeting.heldAt.toLocaleString()}</p>`, ctaLabel: 'View meetings and reports', ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/meetings-reports`, template: 'meeting_notice', actorId: actor.id, memberIds: members.map((m) => m.id) })
   await writeAudit({ userId: actor.id, action: 'MEETING_NOTICE_CIRCULATE', entity: 'Meeting', entityId: meetingId, newValue: { audienceType, audienceRoles, recipients: members.length, noticeBody } })
   refresh(meetingId)
 }

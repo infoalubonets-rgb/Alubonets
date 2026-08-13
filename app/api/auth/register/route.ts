@@ -8,6 +8,7 @@ import { toAuthUser } from '@/lib/auth/helpers'
 import { POLICY_VERSION, registrationSchema, requestIp } from '@/lib/membership'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { COOKIE_NAME, registrationEmailIsVerified } from '@/lib/registration-email-verification'
+import { getFamilyInviteByToken, markFamilyInviteAccepted } from '@/lib/family-invite'
 
 export async function POST(req: Request) {
   try {
@@ -21,9 +22,23 @@ export async function POST(req: Request) {
     }
 
     const data = parsed.data
-    const { email, password, fullName, phone } = data
+    const { email, password, fullName, phone, inviteToken } = data
+    const invite = inviteToken ? await getFamilyInviteByToken(inviteToken) : null
+    if (inviteToken && !invite) {
+      return NextResponse.json({ error: 'This family invite is invalid or has expired.' }, { status: 400 })
+    }
+    if (invite && invite.email.toLowerCase() !== email.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Register with the email address that received the family invite.' },
+        { status: 400 },
+      )
+    }
+
     const registrationCookies = await cookies()
-    if (!(await registrationEmailIsVerified(registrationCookies.get(COOKIE_NAME)?.value, email))) {
+    if (
+      !invite &&
+      !(await registrationEmailIsVerified(registrationCookies.get(COOKIE_NAME)?.value, email))
+    ) {
       return NextResponse.json({ error: 'Verify your email before submitting the application.' }, { status: 403 })
     }
     const [minLenSetting, mixedSetting] = await Promise.all([
@@ -48,12 +63,15 @@ export async function POST(req: Request) {
     }
     const ipAddress = requestIp(req)
     await enforceRateLimit(`register:${ipAddress || email}`, 5, 30)
-    const existing = await prisma.user.findUnique({ where: { email } })
+    const existing = await prisma.user.findUnique({ where: { email }, include: { memberProfile: true } })
     if (existing?.status === 'ACTIVE' && existing.authUserId) {
       return NextResponse.json(
         { error: 'An account with this email already exists. Please log in.' },
         { status: 409 }
       )
+    }
+    if (invite && existing && existing.id !== invite.user.id) {
+      return NextResponse.json({ error: 'Invite does not match this email record.' }, { status: 400 })
     }
 
     const admin = createServiceClient()
@@ -67,6 +85,7 @@ export async function POST(req: Request) {
         status: 'PENDING',
         isSuperAdmin: false,
         dashboardAccess: [],
+        isPrincipal: false,
       },
     })
 
@@ -78,32 +97,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: friendly }, { status: 400 })
     }
 
+    const profileBase = {
+      authUserId: created.user.id,
+      fullName,
+      phone: phone || existing?.phone,
+      location: data.location,
+      role: 'MEMBER' as const,
+      status: 'PENDING' as const,
+      isSuperAdmin: false,
+      dashboardAccess: [] as [],
+      ...(invite
+        ? {
+            principalMemberId: invite.user.principalMemberId,
+            familyRelationship: invite.user.familyRelationship,
+            familyRegistrationState: 'INVITED' as const,
+            isPrincipal: false,
+          }
+        : {}),
+    }
+
     const profile = existing
       ? await prisma.user.update({
           where: { id: existing.id },
-          data: {
-            authUserId: created.user.id,
-            fullName,
-            phone: phone || existing.phone,
-            location: data.location,
-            role: 'MEMBER',
-            status: 'PENDING',
-            isSuperAdmin: false,
-            dashboardAccess: [],
-          },
+          data: profileBase,
           include: { memberProfile: true },
         })
       : await prisma.user.create({
           data: {
-            authUserId: created.user.id,
+            ...profileBase,
             email,
-            fullName,
-            phone,
-            location: data.location,
-            role: 'MEMBER',
-            status: 'PENDING',
-            isSuperAdmin: false,
-            dashboardAccess: [],
           },
           include: { memberProfile: true },
         })
@@ -116,7 +138,7 @@ export async function POST(req: Request) {
           gender: data.gender,
           dateOfBirth: data.dateOfBirth,
           address: data.location,
-          familyBranch: data.familyBranch,
+          familyBranch: invite ? (existing?.memberProfile?.familyBranch || data.familyBranch) : data.familyBranch,
           nextOfKinName: data.nextOfKinName,
           nextOfKinPhone: data.nextOfKinPhone,
           nextOfKinRelationship: data.nextOfKinRelationship,
@@ -134,7 +156,7 @@ export async function POST(req: Request) {
           gender: data.gender,
           dateOfBirth: data.dateOfBirth,
           address: data.location,
-          familyBranch: data.familyBranch,
+          familyBranch: invite ? (existing?.memberProfile?.familyBranch || data.familyBranch) : data.familyBranch,
           nextOfKinName: data.nextOfKinName,
           nextOfKinPhone: data.nextOfKinPhone,
           nextOfKinRelationship: data.nextOfKinRelationship,
@@ -160,9 +182,12 @@ export async function POST(req: Request) {
       }),
     ])
 
+    if (inviteToken) {
+      await markFamilyInviteAccepted(inviteToken, profile.id)
+    }
+
     await syncUserMetadata(profile)
 
-    // Optional: sign them in so they land on /pending
     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
     await supabase.auth.signInWithPassword({ email, password })

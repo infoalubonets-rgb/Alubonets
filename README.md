@@ -10,10 +10,10 @@ Public website and member platform for **Alubonets Self-Help Group**.
 
 | Doc | Purpose |
 |-----|---------|
-| **This README** | What the product is and **how it works** |
+| **This README** | Product overview, how it works, **current platform status** |
 | [docs/OPERATIONS.md](docs/OPERATIONS.md) | Setup, environments, deploy, backups, monitoring |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data model, design system, decisions, security |
-| [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Expected / implemented / remaining vs brief |
+| [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | **Website Upgrade Guide** plan — feature scores & phases |
 | [docs/ACCEPTANCE.md](docs/ACCEPTANCE.md) | Testing, sign-off, role guides |
 
 ---
@@ -34,23 +34,56 @@ Local seed emails/passwords (dev only): **[docs/ARCHITECTURE.md](docs/ARCHITECTU
 
 ---
 
-## What is built (status)
+## What is built (platform status)
 
-| Layer | Wired end-to-end? |
-|-------|-------------------|
-| Next.js 15 + Tailwind + TypeScript | Yes — public site + role dashboards |
-| Supabase Auth (`@supabase/ssr`) | Yes — login, register, Google callback, middleware |
-| Prisma → Supabase Postgres | Yes — live queries on all dashboards |
-| Zod validation | Yes — auth + server actions |
-| React Hook Form | Partial — native forms + Zod on server |
-| Chart.js | Yes — dashboard aggregates |
-| Resend | Yes — approval / receipt / welfare (skipped if no key) |
-| PapaParse CSV | Yes — treasurer contributions import |
-| pdf-lib | Yes — receipt + statement PDFs |
-| docx | Yes — meetings export |
-| M-Pesa Daraja | Yes — STK + callback (needs Daraja env) |
-| Shared `/profile` | Yes — all roles |
-| Test JWT (`jose`) | Removed — replaced by Supabase `app_metadata` |
+Baseline from the Stage 0–9 member portal (July 2026). The next upgrade (Principal/family hierarchy, directory, Today’s Activities, payment purposes/account settings) is tracked in **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)** (~55% vs Upgrade Guide; family hierarchy ~18%).
+
+### Stack / wiring
+
+| Layer | Status |
+|-------|--------|
+| Next.js 15 + Tailwind + TypeScript | Done — public site + role dashboards |
+| Supabase Auth (`@supabase/ssr`) | Done — login, register, Google, middleware |
+| Prisma → Supabase Postgres | Done — dashboards live |
+| Roles: Admin, Executive, Treasurer, Secretary, Organizer, Member | Done |
+| Register → Admin approve → portal | Done |
+| Profile / own contributions / statements | Done |
+| Ledger, reconciliation, M-Pesa STK path | Done |
+| Documents + versions + governance meetings | Done |
+| Events RSVP, announcements (email + dashboard) | Done |
+| Projects, welfare, gallery approval | Done |
+| Optional loans (`loans_enabled`) | Done |
+| Audit logs | Done |
+| Vitest + Playwright smoke + CI | Done |
+
+### Acceptance (original brief)
+
+| Criterion | Status |
+|-----------|--------|
+| Public pages + contact form | Met |
+| No portal until Admin approve | Met |
+| Admin approve + assign roles | Met |
+| Member own contributions only | Met |
+| Treasurer finance / reconcile / reports | Met (some reports thin) |
+| Secretary Word/PDF minutes | Met |
+| Organizer events | Met |
+| Executive dashboards | Met |
+| Audit trail | Met |
+| Mobile usable | Met (formal a11y CI deferred) |
+| Backup restore drill recorded | Partial |
+
+### Not in baseline (Upgrade Guide gaps)
+
+| Gap | Notes |
+|-----|--------|
+| Principal Member / family branch model | Core of next upgrade |
+| Member directory + attached-profile visibility | Hidden-by-default privacy |
+| Today’s Activities feed | Member-only |
+| Official bank account setting + 20/80 fund rule | Configurable settings |
+| Child/dependent records without login | Record-only members |
+| Auditor role | Optional |
+
+Full expected / implemented / remaining tables for the upgrade live in **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)**.
 
 ---
 
@@ -195,7 +228,12 @@ SQL for buckets: `supabase/storage.sql`.
 
 ## Decisions still with the group
 
-1. Hosting domain (recommend Vercel + Supabase).  
-2. Official domain name.  
-3. M-Pesa Paybill/Till details.  
-4. Commercial terms in the Solution Design Document.
+1. Official domain / production host owner.  
+2. Official Alubonets bank / paybill details (Admin finance setting).  
+3. Attached-adult payment policy (own statement vs Principal-only).  
+4. Dependent age for independent login.  
+5. Whether 20% emergency / 80% reserve is automated.  
+6. Auditor role and final office-bearer matrix.  
+7. SMS/WhatsApp now or later.  
+
+Open questions also listed in **[docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md#0-open-questions-confirm-before--during-coding)**.

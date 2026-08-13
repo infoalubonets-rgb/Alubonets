@@ -9,6 +9,7 @@ export const TEST_ACCOUNTS: { email: string; password: string; label: string }[]
   { email: 'treasurer@alubonets.com', password: 'ChangeMe123!', label: 'Treasurer' },
   { email: 'secretary@alubonets.com', password: 'ChangeMe123!', label: 'Secretary' },
   { email: 'organizer@alubonets.com', password: 'ChangeMe123!', label: 'Organizer' },
+  { email: 'principal@alubonets.com', password: 'ChangeMe123!', label: 'Principal Member' },
   { email: 'member@alubonets.com', password: 'ChangeMe123!', label: 'Member' },
   { email: 'pending@alubonets.com', password: 'ChangeMe123!', label: 'Member (pending)' },
 ]

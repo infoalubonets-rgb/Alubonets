@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
 import type { NavItem } from './DashboardShell'
 
 function isNavActive(pathname: string, href: string, allHrefs: string[]) {
@@ -23,9 +24,32 @@ export default function DashboardNav({
 }) {
   const pathname = usePathname()
   const hrefs = nav.map((n) => n.href || '#')
+  const scrollRef = useRef<HTMLElement>(null)
+  const [scrollbar, setScrollbar] = useState({ visible: false, top: 0, height: 0 })
+
+  useEffect(() => {
+    const element = scrollRef.current
+    if (!element) return
+    const update = () => {
+      const visible = element.scrollHeight > element.clientHeight + 1
+      const height = visible ? Math.max(20, (element.clientHeight / element.scrollHeight) * element.clientHeight) : 0
+      const travel = Math.max(0, element.clientHeight - height)
+      const maxScroll = Math.max(1, element.scrollHeight - element.clientHeight)
+      setScrollbar({ visible, height, top: (element.scrollTop / maxScroll) * travel })
+    }
+    update()
+    element.addEventListener('scroll', update, { passive: true })
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => {
+      element.removeEventListener('scroll', update)
+      observer.disconnect()
+    }
+  }, [nav.length, collapsed])
 
   return (
-    <nav className="flex-1 overflow-y-auto py-sm px-sm space-y-0.5">
+    <div className="relative min-h-0 flex-1">
+    <nav ref={scrollRef} className="dashboard-nav-scroll h-full overflow-y-auto py-sm px-sm space-y-0.5">
       {nav.map((link) => {
         const href = link.href || '#'
         const active = isNavActive(pathname, href, hrefs)
@@ -64,5 +88,13 @@ export default function DashboardNav({
         )
       })}
     </nav>
+    {scrollbar.visible && (
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute right-px top-0 w-px rounded-full bg-[#ffc400]"
+        style={{ height: scrollbar.height, transform: `translateY(${scrollbar.top}px)` }}
+      />
+    )}
+    </div>
   )
 }
