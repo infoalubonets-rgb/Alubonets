@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import ErrorDialog from '@/components/ui/ErrorDialog'
+import { friendlyError } from '@/lib/safe-error'
 import {
   createAttachedMember,
   linkExistingFamilyMember,
@@ -69,6 +71,7 @@ export default function FamilyBranchClient({
   const [lineage, setLineage] = useState(defaultLineage)
   const [detailMember, setDetailMember] = useState<BranchMember | null>(null)
   const [error, setError] = useState('')
+  const friendly = error ? friendlyError(error, 'We could not update the family branch. Please try again.') : null
   const [ok, setOk] = useState('')
   const [inviteUrl, setInviteUrl] = useState('')
   const [pending, startTransition] = useTransition()
@@ -172,7 +175,7 @@ export default function FamilyBranchClient({
           </button>
         )}
       </div>
-      <section className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface shadow-[0_8px_24px_rgba(0,31,80,0.06)] dark:border-[#1a2d4f] dark:bg-[#0d1729]">
+      <section className="mx-auto w-full max-w-6xl overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface shadow-[0_8px_24px_rgba(0,31,80,0.06)] dark:border-[#1a2d4f] dark:bg-[#0d1729]">
         <div className="p-4">
           {principal && (
             <div className="flex items-center gap-3 rounded-xl bg-primary/[0.045] p-3 dark:bg-white/[0.04]">
@@ -250,7 +253,7 @@ export default function FamilyBranchClient({
       </section>
 
       {transitionHistory.length > 0 && (
-        <section className="mx-auto max-w-3xl rounded-2xl border border-outline-variant/70 bg-surface p-4">
+        <section className="mx-auto w-full max-w-6xl rounded-2xl border border-outline-variant/70 bg-surface p-4">
           <h2 className="text-sm font-bold text-primary">Account transition history</h2>
           <ol className="mt-3 space-y-2">
             {transitionHistory.map((item) => (
@@ -380,7 +383,7 @@ export default function FamilyBranchClient({
                 </label>
               )}
 
-              {error && <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
+              {error && <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">The request needs your attention.</p>}
               {ok && !error && <p className="rounded-lg bg-primary/5 px-3 py-2 text-sm text-primary">{ok}</p>}
               {inviteUrl && <p className="break-all rounded-lg bg-surface-container-low p-3 text-xs">Invite link: {inviteUrl}</p>}
 
@@ -420,6 +423,7 @@ export default function FamilyBranchClient({
           </div>
         </div>
       )}
+      {friendly && <ErrorDialog title={friendly.title} message={friendly.message} onClose={() => setError('')} />}
     </div>
   )
 }

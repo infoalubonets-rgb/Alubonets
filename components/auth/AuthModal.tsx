@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
 import GoogleButton from '@/components/auth/GoogleButton'
 import RegistrationWizard from '@/components/auth/RegistrationWizard'
+import { PasswordVisibilityIcon } from '@/components/auth/AuthIcons'
 
 type AuthTab = 'signin' | 'signup' | 'signup-success' | 'forgot'
 
@@ -45,9 +46,7 @@ function PasswordInput({
         aria-label={show ? 'Hide password' : 'Show password'}
         onClick={() => setShow(!show)}
       >
-        <span className="material-symbols-outlined text-[20px]">
-          {show ? 'visibility_off' : 'visibility'}
-        </span>
+        <PasswordVisibilityIcon hidden={show} />
       </button>
     </div>
   )

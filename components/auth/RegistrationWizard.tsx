@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { registerRequest } from '@/lib/auth/client'
+import { PasswordVisibilityIcon } from '@/components/auth/AuthIcons'
 import {
   EDUCATION_LEVELS,
   GENDERS,
@@ -371,9 +372,7 @@ export default function RegistrationWizard({
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-on-surface-variant hover:text-primary"
                 >
-                  <span className="material-symbols-outlined text-xl">
-                    {showPassword ? 'visibility_off' : 'visibility'}
-                  </span>
+                  <PasswordVisibilityIcon hidden={showPassword} />
                 </button>
               </span>
             </label>
@@ -394,9 +393,7 @@ export default function RegistrationWizard({
                   }
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-on-surface-variant hover:text-primary"
                 >
-                  <span className="material-symbols-outlined text-xl">
-                    {showConfirmPassword ? 'visibility_off' : 'visibility'}
-                  </span>
+                  <PasswordVisibilityIcon hidden={showConfirmPassword} />
                 </button>
               </span>
             </label>

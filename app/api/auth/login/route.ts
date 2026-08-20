@@ -11,6 +11,8 @@ import { toAuthUser } from '@/lib/auth/helpers'
 import { clearRateLimit, enforceRateLimit } from '@/lib/rate-limit'
 import { requestIp } from '@/lib/membership'
 import { verificationStillValid } from '@/lib/email-verification'
+import { logError } from '@/lib/logger'
+import { publicErrorMessage } from '@/lib/safe-error'
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -30,7 +32,8 @@ export async function POST(req: Request) {
     try {
       await enforceRateLimit(rateKey, 5, 15)
     } catch (cause) {
-      return NextResponse.json({ error: cause instanceof Error ? cause.message : 'Too many attempts.' }, { status: 429 })
+      logError('auth.login.rate_limit_failed', cause, { email, ipAddress })
+      return NextResponse.json({ error: publicErrorMessage(cause, 'Too many attempts. Please wait and try again.') }, { status: 429 })
     }
 
     const cookieStore = await cookies()
@@ -159,7 +162,7 @@ export async function POST(req: Request) {
       status: profile.status,
     })
   } catch (err) {
-    console.error('login error', err)
-    return NextResponse.json({ error: 'Login failed.' }, { status: 500 })
+    logError('auth.login.failed', err, { path: '/api/auth/login' })
+    return NextResponse.json({ error: publicErrorMessage(err, 'We could not sign you in right now. Please try again shortly.') }, { status: 503 })
   }
 }

@@ -299,6 +299,8 @@ model User {
   familyTransfersApproved FamilyBranchHistory[] @relation("FamilyHistoryApprover")
   familyAccountTransitions FamilyAccountTransition[] @relation("FamilyTransitionMember")
   familyTransitionsPerformed FamilyAccountTransition[] @relation("FamilyTransitionActor")
+  supportConversation SupportConversation? @relation("SupportConversationOwner")
+  supportMessages SupportMessage[] @relation("SupportMessageSender")
 
   contributions        Contribution[]
   welfareRequests      WelfareRequest[]
@@ -385,6 +387,36 @@ model FamilyAccountTransition {
   @@index([memberId, occurredAt])
   @@index([inviteId])
   @@map("family_account_transitions")
+}
+
+model SupportConversation {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation("SupportConversationOwner", fields: [userId], references: [id], onDelete: Cascade)
+  subject   String?
+  closedAt  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  SupportMessage[]
+
+  @@index([updatedAt])
+  @@map("support_conversations")
+}
+
+model SupportMessage {
+  id             String              @id @default(cuid())
+  conversationId String
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User                @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+  body           String
+  readByAdminAt  DateTime?
+  readByMemberAt DateTime?
+  createdAt      DateTime            @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([readByAdminAt, createdAt])
+  @@map("support_messages")
 }
 
 model FamilyBranchHistory {

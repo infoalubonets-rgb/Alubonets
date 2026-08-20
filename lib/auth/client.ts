@@ -34,10 +34,17 @@ export async function registerRequest(
 }
 
 export async function logoutRequest() {
+  // Bounded so a slow/hanging network call never delays the sign-out
+  // redirect — the caller navigates away regardless of the outcome, and a
+  // cookie that didn't clear in time just gets re-checked by middleware.
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 2500)
   try {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST', signal: controller.signal })
   } catch {
-    // Network hiccup — callers still redirect, middleware will re-check auth.
+    // Network hiccup or timeout — callers still redirect, middleware will re-check auth.
+  } finally {
+    window.clearTimeout(timeout)
   }
 }
 

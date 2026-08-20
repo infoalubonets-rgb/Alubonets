@@ -39,6 +39,7 @@ const FAMILY_NAV: NavItem = {
   label: 'My Family / Branch',
   href: '/dashboard/member/family',
 }
+const SUPPORT_CHAT_NAV: NavItem = { icon: 'support_agent', label: 'Support chat', href: '/support-chat' }
 
 export const ADMIN_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/admin' },
@@ -47,6 +48,7 @@ export const ADMIN_NAV: NavItem[] = [
   { icon: 'pending_actions', label: 'Approvals', href: '/admin/approvals' },
   { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
   { icon: 'contact_mail', label: 'Contact inbox', href: '/admin/contact-messages' },
+  SUPPORT_CHAT_NAV,
   { icon: 'account_balance', label: 'Finance', href: '/admin/finance' },
   { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
   EVENTS_VIEW_NAV,
@@ -66,6 +68,7 @@ export const ADMIN_NAV: NavItem[] = [
 export const EXECUTIVE_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/executive' },
   { icon: 'contact_mail', label: 'Contact inbox', href: '/dashboard/executive/contact-messages' },
+  SUPPORT_CHAT_NAV,
   { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
   EVENTS_VIEW_NAV,
   MEETINGS_REPORTS_NAV,
@@ -79,6 +82,7 @@ export const EXECUTIVE_NAV: NavItem[] = [
 
 export const TREASURER_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/treasurer' },
+  SUPPORT_CHAT_NAV,
   { icon: 'payments', label: 'Member contributions', href: '/dashboard/treasurer/contributions' },
   { icon: 'account_balance', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
   { icon: 'rule', label: 'Reconciliation', href: '/dashboard/treasurer/reconciliation' },
@@ -96,6 +100,7 @@ export const TREASURER_NAV: NavItem[] = [
 
 export const SECRETARY_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/secretary' },
+  SUPPORT_CHAT_NAV,
   ANNOUNCEMENTS_NAV,
   { icon: 'summarize', label: 'Minutes & reports', href: '/dashboard/secretary/meetings' },
   PROJECTS_VIEW_NAV,
@@ -109,6 +114,7 @@ export const SECRETARY_NAV: NavItem[] = [
 
 export const ORGANIZER_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/organizer' },
+  SUPPORT_CHAT_NAV,
   { icon: 'event', label: 'Events', href: '/dashboard/organizer/events' },
   { icon: 'photo_library', label: 'Gallery', href: '/dashboard/organizer/gallery' },
   { icon: 'work', label: 'Projects', href: '/dashboard/organizer/projects' },
@@ -123,6 +129,7 @@ export const ORGANIZER_NAV: NavItem[] = [
 
 export const MEMBER_NAV: NavItem[] = [
   { icon: 'home', label: 'Home', href: '/dashboard/member' },
+  SUPPORT_CHAT_NAV,
   FAMILY_NAV,
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,

@@ -31,27 +31,23 @@ const contactSchema = z.object({
   message: z.string().trim().min(5).max(5000),
 })
 
-export async function sendContactMessage(formData: FormData) {
-  if (String(formData.get('website') || '')) redirect('/contact?sent=1')
-  const requestHeaders = await headers()
-  const ip = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() || requestHeaders.get('x-real-ip')
-  try {
-    await enforceRateLimit(`contact:${ip || 'unknown'}`, 5, 60)
-  } catch {
-    redirect('/contact?error=rate')
-  }
-  const captchaOk = await verifyTurnstile(String(formData.get('cf-turnstile-response') || ''), ip)
-  if (!captchaOk) redirect('/contact?error=captcha')
-  const parsed = contactSchema.safeParse({
-    name: String(formData.get('name') || ''),
-    email: String(formData.get('email') || ''),
-    phone: String(formData.get('phone') || '') || undefined,
-    category: String(formData.get('category') || '') || undefined,
-    message: String(formData.get('message') || ''),
-  })
-  if (!parsed.success) redirect('/contact?error=invalid')
-  const { name, email, phone, category, message } = parsed.data
-
+// Shared by the full contact page and the public chat widget: creates the
+// record admins already see at /admin/contact-messages and emails a
+// notification. Emails route through RESEND_TEST_EMAIL (same as the rest of
+// the app) until a verified sending domain replaces the Resend sandbox.
+async function createContactSubmissionAndNotify({
+  name,
+  email,
+  phone,
+  category,
+  message,
+}: {
+  name: string
+  email: string
+  phone?: string
+  category?: string
+  message: string
+}) {
   const submission = await prisma.contactSubmission.create({
     data: {
       name,
@@ -61,14 +57,15 @@ export async function sendContactMessage(formData: FormData) {
       message,
     },
   })
-  const destination = (await prisma.appSetting.findUnique({ where: { key: 'contact_destination_email' } }))?.value || CONTACT_EMAIL
+  const configuredDestination =
+    (await prisma.appSetting.findUnique({ where: { key: 'contact_destination_email' } }))?.value || CONTACT_EMAIL
+  const destination = process.env.RESEND_TEST_EMAIL || configuredDestination
 
   const key = process.env.RESEND_API_KEY
   if (key && !key.startsWith('re_your-')) {
     try {
       const resend = new Resend(key)
-      const from =
-        process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
+      const from = process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
       const { error } = await resend.emails.send({
         from,
         to: destination,
@@ -100,6 +97,31 @@ export async function sendContactMessage(formData: FormData) {
       data: { emailStatus: 'not_configured' },
     })
   }
+
+  return submission
+}
+
+export async function sendContactMessage(formData: FormData) {
+  if (String(formData.get('website') || '')) redirect('/contact?sent=1')
+  const requestHeaders = await headers()
+  const ip = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() || requestHeaders.get('x-real-ip')
+  try {
+    await enforceRateLimit(`contact:${ip || 'unknown'}`, 5, 60)
+  } catch {
+    redirect('/contact?error=rate')
+  }
+  const captchaOk = await verifyTurnstile(String(formData.get('cf-turnstile-response') || ''), ip)
+  if (!captchaOk) redirect('/contact?error=captcha')
+  const parsed = contactSchema.safeParse({
+    name: String(formData.get('name') || ''),
+    email: String(formData.get('email') || ''),
+    phone: String(formData.get('phone') || '') || undefined,
+    category: String(formData.get('category') || '') || undefined,
+    message: String(formData.get('message') || ''),
+  })
+  if (!parsed.success) redirect('/contact?error=invalid')
+
+  await createContactSubmissionAndNotify(parsed.data)
 
   redirect('/contact?sent=1')
 }

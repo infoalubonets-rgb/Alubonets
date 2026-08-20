@@ -9,6 +9,8 @@ import { POLICY_VERSION, registrationSchema, requestIp } from '@/lib/membership'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { COOKIE_NAME, registrationEmailIsVerified } from '@/lib/registration-email-verification'
 import { getFamilyInviteByToken, markFamilyInviteAccepted } from '@/lib/family-invite'
+import { logError } from '@/lib/logger'
+import { publicErrorMessage } from '@/lib/safe-error'
 
 export async function POST(req: Request) {
   try {
@@ -199,7 +201,7 @@ export async function POST(req: Request) {
       status: 'PENDING',
     })
   } catch (err) {
-    console.error('register error', err)
-    return NextResponse.json({ error: 'Registration failed.' }, { status: 500 })
+    logError('auth.registration.failed', err, { path: '/api/auth/register' })
+    return NextResponse.json({ error: publicErrorMessage(err, 'We could not complete registration right now. Please try again shortly.') }, { status: 503 })
   }
 }

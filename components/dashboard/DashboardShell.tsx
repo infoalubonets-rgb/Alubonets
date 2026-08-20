@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
-import { meRequest, type AuthUser, type Role } from '@/lib/auth/client'
+import { logoutRequest, meRequest, type AuthUser, type Role } from '@/lib/auth/client'
 import { ROLE_LABEL } from '@/lib/auth/types'
 import ThemeLoader from '@/components/ui/ThemeLoader'
 import DashboardNav from './DashboardNav'
@@ -54,16 +54,29 @@ function LiveDateBadge() {
   )
 }
 
+const SIDEBAR_MIN_WIDTH = 200
+const SIDEBAR_MAX_WIDTH = 380
+const SIDEBAR_DEFAULT_WIDTH = 224
+const SIDEBAR_COLLAPSED_WIDTH = 68
+
 export default function DashboardShell({ role, title, nav, children, hidePageHeading = false }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [isDark, setIsDark] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
+  const [resizing, setResizing] = useState(false)
   const [unread, setUnread] = useState(0)
   const [paymentNotifCount, setPaymentNotifCount] = useState(0)
+  const [supportUnread, setSupportUnread] = useState(0)
+  const [supportBellCount, setSupportBellCount] = useState(0)
+  const [supportToast, setSupportToast] = useState(false)
+  const previousSupportUnread = useRef<number | null>(null)
   const [signingOut, setSigningOut] = useState(false)
   const [welcome, setWelcome] = useState('')
+  const pageScrollRef = useRef<HTMLElement>(null)
+  const [pageScrollbar, setPageScrollbar] = useState({ visible: false, top: 0, height: 0 })
   const displayRole = user?.isSuperAdmin
     ? 'Super Administrator'
     : user?.role === 'ADMIN'
@@ -71,10 +84,58 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
       : role === 'MEMBER' && user?.isPrincipal
         ? 'Principal Member'
         : ROLE_LABEL[role]
+  const notificationTotal = unread + supportBellCount + paymentNotifCount
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('dashSidebarCollapsed') === '1')
+    setSupportBellCount(Number(localStorage.getItem('supportBellCount') || '0'))
+    const savedWidth = Number(localStorage.getItem('dashSidebarWidth'))
+    if (savedWidth >= SIDEBAR_MIN_WIDTH && savedWidth <= SIDEBAR_MAX_WIDTH) {
+      setSidebarWidth(savedWidth)
+    }
   }, [])
+
+  useEffect(() => {
+    if (!resizing) return
+    const onMouseMove = (event: MouseEvent) => {
+      const next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, event.clientX))
+      setSidebarWidth(next)
+    }
+    const onMouseUp = () => {
+      setResizing(false)
+      setSidebarWidth((current) => {
+        localStorage.setItem('dashSidebarWidth', String(current))
+        return current
+      })
+    }
+    document.body.classList.add('select-none')
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      document.body.classList.remove('select-none')
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [resizing])
+
+  useEffect(() => {
+    const element = pageScrollRef.current
+    if (!element) return
+    const update = () => {
+      const visible = element.scrollHeight > element.clientHeight + 1
+      const height = visible ? Math.max(24, (element.clientHeight / element.scrollHeight) * element.clientHeight) : 0
+      const travel = Math.max(0, element.clientHeight - height)
+      const maxScroll = Math.max(1, element.scrollHeight - element.clientHeight)
+      setPageScrollbar({ visible, height, top: (element.scrollTop / maxScroll) * travel })
+    }
+    update()
+    element.addEventListener('scroll', update, { passive: true })
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    const contentObserver = new MutationObserver(update)
+    contentObserver.observe(element, { childList: true, subtree: true })
+    return () => { element.removeEventListener('scroll', update); observer.disconnect(); contentObserver.disconnect() }
+  }, [pathname, hidePageHeading])
 
   // Payment notification badge (treasurer/admin only)
   useEffect(() => {
@@ -104,6 +165,31 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
       window.removeEventListener('payment-notifications-viewed', onViewed)
     }
   }, [role])
+
+  useEffect(() => {
+    let cancelled = false
+    let toastTimer: number | undefined
+    const check = () => fetch('/api/support-chat/unread').then(r => r.ok ? r.json() : null).then(data => {
+      if (cancelled || !data) return
+      const next = Number(data.count || 0)
+      if (next > 0 && (previousSupportUnread.current === null || next > previousSupportUnread.current)) {
+        setSupportBellCount(current => {
+          const updated = Math.max(current, next)
+          localStorage.setItem('supportBellCount', String(updated))
+          return updated
+        })
+        setSupportToast(true)
+        window.clearTimeout(toastTimer)
+        toastTimer = window.setTimeout(() => setSupportToast(false), 5500)
+      }
+      previousSupportUnread.current = next
+      setSupportUnread(next)
+    }).catch(() => {})
+    const onRead = () => { previousSupportUnread.current = 0; setSupportUnread(0); setSupportToast(false) }
+    window.addEventListener('support-chat-read', onRead)
+    check(); const id = window.setInterval(check, 15_000)
+    return () => { cancelled = true; window.clearInterval(id); window.clearTimeout(toastTimer); window.removeEventListener('support-chat-read', onRead) }
+  }, [pathname])
 
   useEffect(() => {
     let cancelled = false
@@ -177,8 +263,11 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
 
   const onLogout = () => {
     setSigningOut(true)
-    // Single navigation: the route clears cookies and redirects to login.
-    window.location.assign(role === 'ADMIN' ? '/api/auth/logout?to=admin' : '/api/auth/logout')
+    // Clear cookies with a bounded request, then navigate regardless of the
+    // outcome — a slow/hanging network call must never stall the redirect.
+    logoutRequest().finally(() => {
+      window.location.assign(role === 'ADMIN' ? '/admin/login' : '/login')
+    })
   }
 
   if (signingOut) {
@@ -188,7 +277,8 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   return (
     <div className="dashboard-shell h-screen flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50">
       <aside
-        className={`bg-primary dark:bg-[#03112b] text-on-primary fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] transition-[width] duration-300 ${collapsed ? 'w-[68px]' : 'w-56'}`}
+        style={{ width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth }}
+        className={`bg-primary dark:bg-[#03112b] text-on-primary fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] ${resizing ? '' : 'transition-[width] duration-300'}`}
       >
         <div
           className={`pt-lg pb-md flex items-center gap-sm border-b border-white/10 ${collapsed ? 'justify-center px-sm' : 'px-md'}`}
@@ -210,7 +300,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
         </div>
 
         <DashboardNav
-          nav={nav.map((item) => {
+          nav={nav.filter(item => item.href !== '/support-chat').map((item) => {
             if (item.href === '/announcements' && unread > 0)
               return { ...item, badge: String(unread) }
             if (item.href === '/dashboard/treasurer/notifications' && paymentNotifCount > 0)
@@ -249,10 +339,30 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
             {!collapsed && 'Sign Out'}
           </button>
         </div>
+
+        {!collapsed && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            onMouseDown={(event) => {
+              event.preventDefault()
+              setResizing(true)
+            }}
+            onDoubleClick={() => {
+              setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)
+              localStorage.setItem('dashSidebarWidth', String(SIDEBAR_DEFAULT_WIDTH))
+            }}
+            className="group absolute right-0 top-0 z-10 h-full w-1.5 cursor-col-resize touch-none"
+          >
+            <span className="absolute inset-y-0 right-0 w-px bg-white/0 transition-colors group-hover:bg-white/25" />
+          </div>
+        )}
       </aside>
 
       <div
-        className={`flex-1 flex flex-col h-screen min-h-0 min-w-0 transition-[margin] duration-300 ${collapsed ? 'ml-[68px]' : 'ml-56'}`}
+        style={{ marginLeft: collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth }}
+        className={`relative flex-1 flex flex-col h-screen min-h-0 min-w-0 ${resizing ? '' : 'transition-[margin] duration-300'}`}
       >
         <header
           className="relative bg-surface-container-lowest dark:bg-[#091a30] border-b border-outline-variant/70 dark:border-[#173056] shrink-0 z-40 flex items-center justify-between gap-4 px-5 md:px-lg shadow-[0_2px_10px_rgba(0,31,80,0.035)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary dark:before:bg-primary-container"
@@ -303,20 +413,15 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
               </span>
             </button>
             <Link
-              href="/announcements"
+              href={supportBellCount > 0 ? '/support-chat' : '/announcements'}
+              onClick={() => { setSupportBellCount(0); localStorage.removeItem('supportBellCount') }}
               className="relative flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant dark:text-blue-200/60 hover:bg-surface-container dark:hover:bg-[#111f36] hover:text-primary transition-colors"
               title="Notifications"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
                 notifications
               </span>
-              <span
-                className={`absolute -top-1 -right-1 text-white text-[9px] font-bold px-1 rounded-full leading-[14px] ${
-                  unread > 0 ? 'bg-secondary' : 'bg-outline/70'
-                }`}
-              >
-                {unread}
-              </span>
+              {notificationTotal > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-secondary px-1 text-center text-[9px] font-bold leading-[18px] text-white shadow-sm">+{notificationTotal}</span>}
             </Link>
 
             {user ? (
@@ -367,7 +472,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
           </div>
         </header>
 
-        <main className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-lg pb-lg pt-1 space-y-lg">
+        <main ref={pageScrollRef} className="dashboard-page-scroll relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-lg pb-lg pt-1 space-y-lg">
           {!hidePageHeading && (
             <div className="shrink-0 -mt-1">
               <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
@@ -376,7 +481,19 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
           )}
           {children}
         </main>
+        {pageScrollbar.visible && <span aria-hidden="true" className="pointer-events-none absolute bottom-0 right-px top-[66px] z-50 w-px overflow-hidden"><span className="absolute right-0 top-0 w-px rounded-full bg-[#ffc400]" style={{ height: pageScrollbar.height, transform: `translateY(${pageScrollbar.top}px)` }} /></span>}
       </div>
+      {supportToast && (
+        <Link href="/support-chat" onClick={() => setSupportToast(false)} className="fixed bottom-24 right-5 z-[90] flex w-[310px] items-start gap-3 rounded-2xl border border-orange-200 bg-white p-4 text-slate-900 shadow-[0_18px_55px_rgba(0,31,80,.22)] transition hover:-translate-y-0.5 dark:border-orange-500/30 dark:bg-[#102039] dark:text-white">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-white"><span className="material-symbols-outlined text-[21px]">mark_chat_unread</span></span>
+          <span className="min-w-0"><span className="flex items-center justify-between"><b className="text-sm">New support message</b><span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-white">+{supportUnread}</span></span><span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-blue-100/60">You have a new reply. Click to open the conversation.</span></span>
+        </Link>
+      )}
+      <Link href="/support-chat" aria-label="Open support chat" title="Support chat" className="group fixed bottom-5 right-5 z-[85] flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff8b24] to-[#f56b00] text-white shadow-[0_12px_30px_rgba(245,107,0,.38)] transition hover:-translate-y-1 hover:shadow-[0_16px_38px_rgba(245,107,0,.48)]">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg>
+        {supportUnread > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-6 min-w-6 place-items-center rounded-full border-2 border-white bg-primary px-1 text-[10px] font-bold text-white">+{supportUnread}</span>}
+        <span className="pointer-events-none absolute right-16 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100">Chat with support</span>
+      </Link>
       <DashboardNotifications />
     </div>
   )

@@ -6,6 +6,9 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { ADMIN_LOGIN_LOGO } from '@/lib/constants'
 import DevAccountsDropdown, { TEST_ACCOUNTS } from '@/components/auth/DevAccountsDropdown'
 import { homeForRole, loginRequest, logoutRequest, meRequest, registerRequest, type AuthUser } from '@/lib/auth/client'
+import ErrorDialog from '@/components/ui/ErrorDialog'
+import { friendlyError } from '@/lib/safe-error'
+import { PasswordVisibilityIcon, UnlockIcon } from '@/components/auth/AuthIcons'
 
 type Props = {
   title?: string
@@ -24,6 +27,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   const [phone, setPhone] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
+  const friendly = error ? friendlyError(error, 'We could not sign you in. Please try again.') : null
   const [loading, setLoading] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
 
@@ -107,6 +111,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-[200] bg-primary flex items-center justify-center min-h-screen px-md overflow-y-auto py-xl">
       <div className="w-full max-w-[420px]">
         <div className="flex justify-center">
@@ -228,11 +233,11 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPw}
                   className="absolute right-sm top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors p-xs"
                 >
-                  <span className="material-symbols-outlined text-[20px]">
-                    {showPw ? 'visibility_off' : 'visibility'}
-                  </span>
+                  <PasswordVisibilityIcon hidden={showPw} />
                 </button>
               </div>
             </div>
@@ -253,16 +258,14 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                 />
               </div>
             )}
-            {error && (
-              <p className="text-error text-center font-caption text-caption text-[12px]">{error}</p>
-            )}
+            {error && <p className="text-error text-center font-caption text-caption text-[12px]">Sign-in needs your attention.</p>}
             <div className="flex justify-center mt-xs">
               <button
                 type="submit"
                 disabled={loading}
                 className="bg-secondary-container text-on-secondary font-label-bold text-label-bold py-[11px] px-xl rounded-full hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-sm min-h-[44px] shadow-md disabled:opacity-60"
               >
-                <span className="material-symbols-outlined text-[17px]">lock_open</span>
+                <UnlockIcon />
                 {loading
                   ? mode === 'register'
                     ? 'Creating…'
@@ -332,5 +335,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
         </p>
       </div>
     </div>
+      {friendly && <ErrorDialog title={friendly.title} message={friendly.message} onClose={() => setError('')} />}
+    </>
   )
 }

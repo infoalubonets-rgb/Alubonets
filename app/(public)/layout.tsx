@@ -3,6 +3,7 @@ import Footer from '@/components/layout/Footer'
 import MottoSection from '@/components/layout/MottoSection'
 import AuthModal from '@/components/auth/AuthModal'
 import SiteScripts from '@/components/layout/SiteScripts'
+import PublicChatWidget from '@/components/layout/PublicChatWidget'
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <Footer />
       <AuthModal />
       <SiteScripts />
+      <PublicChatWidget />
     </>
   )
 }
