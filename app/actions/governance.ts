@@ -9,6 +9,7 @@ import { writeAudit } from '@/lib/audit'
 import { sendBroadcastEmail } from '@/lib/email/resend'
 import { TAGS } from '@/lib/data/queries'
 import { GOVERNANCE_CATEGORIES } from '@/lib/governance-categories'
+import { governanceCommentSchema } from '@/lib/governance-comment'
 import { assertNotPast } from '@/lib/dates'
 import { createServerClient } from '@/lib/supabase-server'
 
@@ -224,6 +225,7 @@ export async function decideResolution(formData: FormData) {
   const id = z.string().min(1).parse(formData.get('id'))
   const decision = z.enum(['approve', 'reject']).parse(formData.get('decision'))
   const visibleToRoles = formData.getAll('visibleToRoles').map(String) as Role[]
+  const allowAnonymous = formData.get('allowAnonymous') === 'true'
   const reason = String(formData.get('reason') || '').trim()
 
   const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id } })
@@ -240,6 +242,7 @@ export async function decideResolution(formData: FormData) {
     data: {
       status: decision === 'approve' ? 'APPROVED' : 'REJECTED',
       visibleToRoles: decision === 'approve' ? visibleToRoles : [],
+      allowAnonymous: decision === 'approve' ? allowAnonymous : true,
       decidedById: actor.id,
       decidedAt: new Date(),
       rejectionReason: decision === 'reject' ? reason : null,
@@ -251,7 +254,7 @@ export async function decideResolution(formData: FormData) {
     entity: 'Resolution',
     entityId: id,
     reason: reason || undefined,
-    newValue: { status: updated.status, visibleToRoles: updated.visibleToRoles },
+    newValue: { status: updated.status, visibleToRoles: updated.visibleToRoles, allowAnonymous: updated.allowAnonymous },
   })
   refreshResolutions()
 }
@@ -260,13 +263,15 @@ export async function voteResolution(formData: FormData) {
   const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE', 'TREASURER', 'ORGANIZER', 'MEMBER'])
   const resolutionId = z.string().min(1).parse(formData.get('resolutionId'))
   const vote = z.enum(['APPROVE', 'REJECT']).parse(formData.get('vote'))
-  const comment = String(formData.get('comment') || '').trim().slice(0, 2000) || null
+  const commentRaw = String(formData.get('comment') || '').trim()
+  const comment = commentRaw ? governanceCommentSchema.parse(commentRaw) : null
   const anonymous = formData.get('anonymous') === 'true'
 
   const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: resolutionId } })
   if (resolution.status !== 'APPROVED') throw new Error('This resolution is not open for responses.')
   const canSee = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || resolution.visibleToRoles.includes(actor.role)
   if (!canSee) throw new Error('This resolution is not visible to your role.')
+  if (anonymous && !resolution.allowAnonymous) throw new Error('Anonymous responses are not allowed for this proposal.')
 
   await prisma.resolutionResponse.upsert({
     where: { resolutionId_userId: { resolutionId, userId: actor.id } },

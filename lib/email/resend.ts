@@ -72,6 +72,9 @@ export async function sendPasswordResetEmail(input: { userId: string; fullName: 
   await prisma.emailLog.create({ data: { userId: input.userId, toEmail: recipient, subject, template: 'password_reset', status: 'accepted', meta: { providerMessageId: delivery.data?.id || null, testMode: Boolean(testEmailOverride()), intendedRecipient: input.email } } })
 }
 
+type BroadcastAttachment = { filename: string; content: Buffer; contentType?: string }
+type BroadcastResult = { userId: string; ok: boolean; error?: string }
+
 // Sends an email to active members (all, or a specific subset by ID)
 export async function sendBroadcastEmail({
   subject,
@@ -83,6 +86,8 @@ export async function sendBroadcastEmail({
   template,
   actorId,
   memberIds,
+  attachments,
+  onProgress,
 }: {
   subject: string
   title: string
@@ -93,6 +98,8 @@ export async function sendBroadcastEmail({
   template: string
   actorId?: string
   memberIds?: string[] // if provided, only these members receive the email
+  attachments?: BroadcastAttachment[] // forces individual sends — see note below
+  onProgress?: (result: BroadcastResult) => void | Promise<void> // fires as each recipient (or batch chunk) completes
 }) {
   const resend = getResend()
   const where = memberIds?.length
@@ -117,6 +124,8 @@ export async function sendBroadcastEmail({
 <div style="color:#374151;line-height:1.7;">${body}</div>
 ${ctaBlock}`)
 
+  if (!members.length) return { sent: 0, failed: 0, results: [] as BroadcastResult[] }
+
   if (!resend) {
     await prisma.emailLog.create({
       data: {
@@ -132,31 +141,69 @@ ${ctaBlock}`)
   }
 
   const override = testEmailOverride()
-  // Send in chunks of 100 (Resend batch limit)
-  let sent = 0
-  for (let i = 0; i < members.length; i += 100) {
-    const chunk = members.slice(i, i + 100)
+  const results: BroadcastResult[] = []
+  const record = async (r: BroadcastResult) => {
+    results.push(r)
+    await onProgress?.(r)
+  }
+
+  if (attachments?.length) {
+    // Resend's batch endpoint does not support attachments, and duplicating a large
+    // attachment across up to 100 batched payloads would balloon the request body —
+    // so attachment sends go out one email at a time, a few in flight together.
+    const CONCURRENCY = 5
     if (override) {
-      // No domain yet — send one combined email to the override address
+      const names = members.map((m) => m.fullName).join(', ')
+      const { error } = await resend.emails.send({
+        from: from(),
+        to: override,
+        subject: `[TEST — would go to ${members.length} member(s): ${names}] ${subject}`,
+        html: html('members'),
+        attachments,
+      })
+      for (const m of members) await record({ userId: m.id, ok: !error, error: error?.message })
+    } else {
+      let cursor = 0
+      const worker = async () => {
+        while (cursor < members.length) {
+          const m = members[cursor++]
+          try {
+            const { error } = await resend.emails.send({ from: from(), to: m.email, subject, html: html(m.fullName), attachments })
+            await record({ userId: m.id, ok: !error, error: error?.message })
+          } catch (err) {
+            await record({ userId: m.id, ok: false, error: err instanceof Error ? err.message : 'Send failed' })
+          }
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, members.length) }, worker))
+    }
+  } else if (override) {
+    // No domain yet — send one combined email per chunk to the override address
+    for (let i = 0; i < members.length; i += 100) {
+      const chunk = members.slice(i, i + 100)
       const names = chunk.map((m) => m.fullName).join(', ')
-      await resend.emails.send({
+      const { error } = await resend.emails.send({
         from: from(),
         to: override,
         subject: `[TEST — would go to ${chunk.length} member(s): ${names}] ${subject}`,
         html: html('members'),
       })
-    } else {
-      await resend.batch.send(
-        chunk.map((m) => ({
-          from: from(),
-          to: m.email,
-          subject,
-          html: html(m.fullName),
-        })),
-      )
+      for (const m of chunk) await record({ userId: m.id, ok: !error, error: error?.message })
     }
-    sent += chunk.length
+  } else {
+    // Send in chunks of 100 (Resend batch limit). A chunk fails as a unit — that's a
+    // limit of the batch API, not something we can see per-recipient inside one call.
+    for (let i = 0; i < members.length; i += 100) {
+      const chunk = members.slice(i, i + 100)
+      const { error } = await resend.batch.send(
+        chunk.map((m) => ({ from: from(), to: m.email, subject, html: html(m.fullName) })),
+      )
+      for (const m of chunk) await record({ userId: m.id, ok: !error, error: error?.message })
+    }
   }
+
+  const sent = results.filter((r) => r.ok).length
+  const failed = results.length - sent
 
   await prisma.emailLog.create({
     data: {
@@ -164,11 +211,11 @@ ${ctaBlock}`)
       toEmail: 'BROADCAST',
       subject,
       template,
-      status: 'sent',
-      meta: { sent },
+      status: failed === 0 ? 'sent' : sent === 0 ? 'failed' : 'partial',
+      meta: { sent, failed, hadAttachments: Boolean(attachments?.length) },
     },
   })
-  return { sent }
+  return { sent, failed, results }
 }
 
 // Specific helper for gallery photo notifications

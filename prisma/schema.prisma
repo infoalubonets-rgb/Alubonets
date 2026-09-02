@@ -261,6 +261,7 @@ enum AnnouncementDeliveryStatus {
 enum AnnouncementPublishStatus {
   DRAFT
   SCHEDULED
+  SENDING
   SENT
 }
 
@@ -977,10 +978,25 @@ model Announcement {
   familyBranch  String?
   templateKey   String?
 
-  receipts AnnouncementReceipt[]
+  receipts    AnnouncementReceipt[]
+  attachments AnnouncementAttachment[]
 
   @@index([status, scheduledFor])
   @@map("announcements")
+}
+
+model AnnouncementAttachment {
+  id             String       @id @default(cuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  filename       String
+  storagePath    String
+  mimeType       String?
+  sizeBytes      Int
+  createdAt      DateTime     @default(now())
+
+  @@index([announcementId])
+  @@map("announcement_attachments")
 }
 
 model AnnouncementReceipt {
@@ -1306,6 +1322,7 @@ model Resolution {
   decidedAt        DateTime?
   rejectionReason  String?
   resultsPublished Boolean          @default(false)
+  allowAnonymous   Boolean          @default(true)
   publishedById    String?
   publishedBy      User?            @relation("ResolutionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
   publishedAt      DateTime?

@@ -1,6 +1,12 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import {
+  MAX_ANNOUNCEMENT_ATTACHMENTS,
+  MAX_ANNOUNCEMENT_ATTACHMENT_BYTES,
+  MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES,
+  formatMb,
+} from '@/lib/announcement-attachments'
 
 const ROLES = ['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
 
@@ -39,8 +45,32 @@ export default function AnnouncementsAdminClient({
   nowInputValue,
 }: Props) {
   const [modal, setModal] = useState<null | 'send' | 'history'>(null)
+  const [attachmentError, setAttachmentError] = useState('')
   const totalSent = announcements.reduce((sum, a) => sum + a.sent, 0)
   const totalFailed = announcements.reduce((sum, a) => sum + a.failed, 0)
+
+  function handleComposeSubmit(event: FormEvent<HTMLFormElement>) {
+    const files = new FormData(event.currentTarget).getAll('attachments').filter((f): f is File => f instanceof File && f.size > 0)
+    if (files.length > MAX_ANNOUNCEMENT_ATTACHMENTS) {
+      event.preventDefault()
+      setAttachmentError(`Attach at most ${MAX_ANNOUNCEMENT_ATTACHMENTS} files.`)
+      return
+    }
+    const tooBig = files.find((f) => f.size > MAX_ANNOUNCEMENT_ATTACHMENT_BYTES)
+    if (tooBig) {
+      event.preventDefault()
+      setAttachmentError(`"${tooBig.name}" is larger than ${formatMb(MAX_ANNOUNCEMENT_ATTACHMENT_BYTES)}MB.`)
+      return
+    }
+    const total = files.reduce((sum, f) => sum + f.size, 0)
+    if (total > MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES) {
+      event.preventDefault()
+      setAttachmentError(`Attachments total ${formatMb(total)}MB — keep the combined size under ${formatMb(MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES)}MB.`)
+      return
+    }
+    setAttachmentError('')
+    setModal(null)
+  }
 
   return (
     <>
@@ -64,9 +94,23 @@ export default function AnnouncementsAdminClient({
 
       {modal === 'send' && (
         <Modal title="Send notification" icon="send" onClose={() => setModal(null)}>
-          <form action={createAction} onSubmit={() => setModal(null)} className="grid gap-3 md:grid-cols-2">
+          <form action={createAction} onSubmit={handleComposeSubmit} className="grid gap-3 md:grid-cols-2">
             <input name="title" required placeholder="Title" className="rounded-lg border px-3 py-2 md:col-span-2" />
             <textarea name="content" required placeholder="Content" className="rounded-lg border px-3 py-2 md:col-span-2" rows={4} />
+            <label className="text-xs font-bold text-on-surface-variant md:col-span-2">
+              Attachments <span className="font-normal text-on-surface-variant">(optional)</span>
+              <input
+                name="attachments"
+                type="file"
+                multiple
+                onChange={() => setAttachmentError('')}
+                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-normal"
+              />
+              <span className="mt-1 block text-[11px] font-normal text-on-surface-variant">
+                Up to {MAX_ANNOUNCEMENT_ATTACHMENTS} files, {formatMb(MAX_ANNOUNCEMENT_ATTACHMENT_BYTES)}MB each, {formatMb(MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES)}MB combined.
+              </span>
+              {attachmentError && <span className="mt-1 block text-[11px] font-semibold text-error">{attachmentError}</span>}
+            </label>
             <select name="templateKey" className="rounded-lg border px-3 py-2">
               <option value="">No template</option>
               {templates.map((t) => (

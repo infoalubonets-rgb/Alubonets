@@ -4,7 +4,7 @@ import { GOVERNANCE_CATEGORIES } from '@/lib/governance-categories'
 export default function CreateResolutionForm() {
   return (
     <form action={createResolution} className="space-y-3 rounded-2xl border bg-surface p-5">
-      <h2 className="font-h3 text-lg text-primary">Share a resolution for approval</h2>
+      <h2 className="font-h3 text-lg text-primary">Share a proposal for approval</h2>
       <p className="text-sm text-on-surface-variant">
         Once submitted, an Admin or Super Admin must approve this before it appears on member dashboards.
       </p>
@@ -25,7 +25,7 @@ export default function CreateResolutionForm() {
         required
         minLength={5}
         rows={4}
-        placeholder="Describe the resolution members need to review…"
+        placeholder="Describe the proposal members need to review…"
         className="block w-full rounded-lg border px-3 py-2 text-sm"
       />
       <div className="grid gap-3 sm:grid-cols-2">

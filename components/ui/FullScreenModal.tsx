@@ -8,9 +8,10 @@ type Props = {
   title: string
   onClose: () => void
   children: ReactNode
+  size?: 'full' | 'compact'
 }
 
-export default function FullScreenModal({ open, title, onClose, children }: Props) {
+export default function FullScreenModal({ open, title, onClose, children, size = 'full' }: Props) {
   useEffect(() => {
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -36,7 +37,11 @@ export default function FullScreenModal({ open, title, onClose, children }: Prop
         if (event.target === event.currentTarget) onClose()
       }}
     >
-      <div className="flex h-[min(96dvh,920px)] w-full max-w-5xl flex-col overflow-hidden rounded-t-3xl border border-outline-variant/60 bg-surface shadow-2xl dark:bg-[#0a1628] sm:rounded-3xl">
+      <div className={`flex w-full flex-col overflow-hidden border border-outline-variant/60 bg-surface shadow-2xl dark:bg-[#0a1628] ${
+        size === 'compact'
+          ? 'max-h-[90dvh] max-w-2xl rounded-t-3xl sm:rounded-3xl'
+          : 'h-[min(96dvh,920px)] max-w-5xl rounded-t-3xl sm:rounded-3xl'
+      }`}>
         <header className="flex shrink-0 items-center gap-2 border-b border-outline-variant/70 px-3 py-3 sm:px-4">
           <button
             type="button"

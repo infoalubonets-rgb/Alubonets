@@ -10,6 +10,7 @@ import ThemeLoader from '@/components/ui/ThemeLoader'
 import DashboardNav from './DashboardNav'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import DashboardNotifications from './DashboardNotifications'
+import EmailSendProgressBanner from './EmailSendProgressBanner'
 
 export type NavItem = {
   icon: string
@@ -26,6 +27,7 @@ type Props = {
   nav: NavItem[]
   children: ReactNode
   hidePageHeading?: boolean
+  pageAction?: ReactNode
 }
 
 function LiveDateBadge() {
@@ -60,7 +62,7 @@ const SIDEBAR_MAX_WIDTH = 380
 const SIDEBAR_DEFAULT_WIDTH = 224
 const SIDEBAR_COLLAPSED_WIDTH = 68
 
-export default function DashboardShell({ role, title, nav, children, hidePageHeading = false }: Props) {
+export default function DashboardShell({ role, title, nav, children, hidePageHeading = false, pageAction }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -75,6 +77,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   const [supportToast, setSupportToast] = useState(false)
   const previousSupportUnread = useRef<number | null>(null)
   const [signingOut, setSigningOut] = useState(false)
+  const [emailsSending, setEmailsSending] = useState(false)
   const [welcome, setWelcome] = useState('')
   const pageScrollRef = useRef<HTMLElement>(null)
   const [pageScrollbar, setPageScrollbar] = useState({ visible: false, top: 0, height: 0 })
@@ -298,6 +301,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   }
 
   const onLogout = () => {
+    if (emailsSending) return
     setSigningOut(true)
     // Clear cookies with a bounded request, then navigate regardless of the
     // outcome — a slow/hanging network call must never stall the redirect.
@@ -312,6 +316,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
 
   return (
     <div className="dashboard-shell h-screen flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50">
+      {(role === 'ADMIN' || user?.isSuperAdmin) && <EmailSendProgressBanner onActiveChange={setEmailsSending} />}
       <aside
         style={{ width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth }}
         className={`bg-primary dark:bg-[#03112b] text-on-primary fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] ${resizing ? '' : 'transition-[width] duration-300'}`}
@@ -367,13 +372,14 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
           <button
             type="button"
             onClick={onLogout}
-            title={collapsed ? 'Sign Out' : undefined}
-            className={`flex items-center gap-sm text-primary-fixed-dim/60 hover:text-on-primary text-[13px] font-body-md transition-colors w-full group ${collapsed ? 'justify-center' : ''}`}
+            disabled={emailsSending}
+            title={emailsSending ? 'Finish sending notification emails before signing out' : collapsed ? 'Sign Out' : undefined}
+            className={`flex items-center gap-sm text-primary-fixed-dim/60 hover:text-on-primary text-[13px] font-body-md transition-colors w-full group disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-primary-fixed-dim/60 ${collapsed ? 'justify-center' : ''}`}
           >
             <span className="material-symbols-outlined text-[17px] group-hover:text-secondary-container transition-colors">
               logout
             </span>
-            {!collapsed && 'Sign Out'}
+            {!collapsed && (emailsSending ? 'Sending emails…' : 'Sign Out')}
           </button>
         </div>
 
@@ -489,11 +495,12 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-full border border-secondary-container/40 bg-secondary-container text-on-primary px-4 font-label-bold text-[12px] hover:opacity-90 active:scale-95 transition-all shadow-[0_3px_10px_rgba(254,128,21,0.22)]"
-                  title="Sign out"
+                  disabled={emailsSending}
+                  className="inline-flex h-10 items-center gap-1.5 rounded-full border border-secondary-container/40 bg-secondary-container text-on-primary px-4 font-label-bold text-[12px] hover:opacity-90 active:scale-95 transition-all shadow-[0_3px_10px_rgba(254,128,21,0.22)] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+                  title={emailsSending ? 'Finish sending notification emails before signing out' : 'Sign out'}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span>
-                  <span className="hidden sm:inline">Sign out</span>
+                  <span className="hidden sm:inline">{emailsSending ? 'Sending…' : 'Sign out'}</span>
                 </button>
               </>
             ) : (
@@ -517,6 +524,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
                   <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
                   {isOverviewPage && <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>}
                 </div>
+                {pageAction}
                 {relatedPageLinks.length > 0 && (
                   <nav aria-label={`Related ${activeNavGroup?.label} pages`} className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                     {relatedPageLinks.map((item) => {

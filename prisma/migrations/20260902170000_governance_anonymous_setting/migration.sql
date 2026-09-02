@@ -1,0 +1,2 @@
+ALTER TABLE "resolutions"
+ADD COLUMN IF NOT EXISTS "allowAnonymous" BOOLEAN NOT NULL DEFAULT true;

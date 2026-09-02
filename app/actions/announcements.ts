@@ -1,14 +1,74 @@
 'use server'
 
+import { after } from 'next/server'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import type { Role } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
+import { getSessionProfile, requireActiveRole, requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
 import { sendBroadcastEmail } from '@/lib/email/resend'
 import { assertNotPast } from '@/lib/dates'
+import { createServerClient } from '@/lib/supabase-server'
+import {
+  MAX_ANNOUNCEMENT_ATTACHMENTS,
+  MAX_ANNOUNCEMENT_ATTACHMENT_BYTES,
+  MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES,
+  formatMb,
+} from '@/lib/announcement-attachments'
+
+function validateAnnouncementAttachments(files: File[]) {
+  if (files.length > MAX_ANNOUNCEMENT_ATTACHMENTS) {
+    throw new Error(`Attach at most ${MAX_ANNOUNCEMENT_ATTACHMENTS} files.`)
+  }
+  const tooBig = files.find((f) => f.size > MAX_ANNOUNCEMENT_ATTACHMENT_BYTES)
+  if (tooBig) {
+    throw new Error(`"${tooBig.name}" is larger than ${formatMb(MAX_ANNOUNCEMENT_ATTACHMENT_BYTES)}MB.`)
+  }
+  const total = files.reduce((sum, f) => sum + f.size, 0)
+  if (total > MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES) {
+    throw new Error(`Attachments total ${formatMb(total)}MB — keep the combined size under ${formatMb(MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES)}MB.`)
+  }
+}
+
+async function uploadAnnouncementAttachments(announcementId: string, files: File[]) {
+  if (!files.length) return
+  const supabase = createServerClient()
+  for (const file of files) {
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_').slice(0, 80) || 'attachment'
+    const path = `announcement-attachments/${announcementId}/${Date.now()}-${safeName}`
+    const buf = Buffer.from(await file.arrayBuffer())
+    const { error } = await supabase.storage.from('documents').upload(path, buf, {
+      contentType: file.type || 'application/octet-stream',
+      upsert: false,
+    })
+    if (error) throw new Error(`Failed to upload "${file.name}": ${error.message}`)
+    await prisma.announcementAttachment.create({
+      data: {
+        announcementId,
+        filename: file.name || safeName,
+        storagePath: path,
+        mimeType: file.type || null,
+        sizeBytes: file.size,
+      },
+    })
+  }
+}
+
+async function downloadAnnouncementAttachments(
+  attachments: { filename: string; storagePath: string; mimeType: string | null }[],
+) {
+  if (!attachments.length) return undefined
+  const supabase = createServerClient()
+  const out: { filename: string; content: Buffer; contentType?: string }[] = []
+  for (const a of attachments) {
+    const { data, error } = await supabase.storage.from('documents').download(a.storagePath)
+    if (error || !data) continue // skip a missing/broken attachment rather than failing the whole send
+    out.push({ filename: a.filename, content: Buffer.from(await data.arrayBuffer()), contentType: a.mimeType ?? undefined })
+  }
+  return out.length ? out : undefined
+}
 
 function refreshAnnouncements() {
   revalidatePath('/announcements')
@@ -86,8 +146,12 @@ export async function createTargetedAnnouncement(formData: FormData) {
   const recipients = await prisma.user.findMany({ where, select: { id: true } })
   if (!recipients.length) throw new Error('No recipients match the selected audience.')
 
+  const attachmentFiles = formData.getAll('attachments').filter((f): f is File => f instanceof File && f.size > 0)
+  validateAnnouncementAttachments(attachmentFiles)
+
   assertNotPast(data.scheduledFor, 'Scheduled send time')
   const scheduled = Boolean(data.scheduledFor && data.scheduledFor > new Date())
+  const willDeliverNow = !scheduled && data.sendEmail !== 'off'
   const announcement = await prisma.announcement.create({
     data: {
       title: data.title,
@@ -95,7 +159,7 @@ export async function createTargetedAnnouncement(formData: FormData) {
       imageUrl: data.imageUrl ?? null,
       authorId: actor.id,
       broadcast: !memberIds.length && !audienceRoles.length && !data.familyBranch,
-      status: scheduled ? 'SCHEDULED' : 'SENT',
+      status: scheduled ? 'SCHEDULED' : willDeliverNow ? 'SENDING' : 'SENT',
       scheduledFor: scheduled ? data.scheduledFor : null,
       publishedAt: scheduled ? data.scheduledFor! : new Date(),
       audienceRoles,
@@ -110,9 +174,7 @@ export async function createTargetedAnnouncement(formData: FormData) {
     },
   })
 
-  if (!scheduled && data.sendEmail !== 'off') {
-    await deliverAnnouncementEmails(announcement.id, actor.id)
-  }
+  await uploadAnnouncementAttachments(announcement.id, attachmentFiles)
 
   await writeAudit({
     userId: actor.id,
@@ -122,6 +184,16 @@ export async function createTargetedAnnouncement(formData: FormData) {
     newValue: { recipients: recipients.length, scheduled },
   })
   refreshAnnouncements()
+
+  if (willDeliverNow) {
+    // Runs after the response is sent, so the compose modal closes and the admin
+    // can navigate away immediately — sending continues server-side regardless,
+    // and the sending banner (polling getActiveEmailSends) tracks its progress.
+    after(async () => {
+      await deliverAnnouncementEmails(announcement.id, actor.id)
+      refreshAnnouncements()
+    })
+  }
 }
 
 export async function deliverAnnouncementEmails(announcementId: string, actorId?: string) {
@@ -140,6 +212,7 @@ export async function deliverAnnouncementEmails(announcementId: string, actorId?
           },
         },
       },
+      attachments: true,
     },
   })
   const template = announcement.templateKey
@@ -147,7 +220,31 @@ export async function deliverAnnouncementEmails(announcementId: string, actorId?
     : null
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
   const eligible = announcement.receipts
-  if (!eligible.length) return { sent: 0, failed: 0 }
+  if (!eligible.length) {
+    // Nothing left to send — still clear a SENDING/SCHEDULED status so the banner drops it.
+    if (announcement.status === 'SENDING' || announcement.status === 'SCHEDULED') {
+      await prisma.announcement.update({ where: { id: announcementId }, data: { status: 'SENT' } })
+    }
+    return { sent: 0, failed: 0 }
+  }
+
+  // Mark in progress up front — matters for the scheduled-cron and retry paths, which
+  // don't already flip the status to SENDING the way the immediate-send path does.
+  if (announcement.status !== 'SENDING') {
+    await prisma.announcement.update({ where: { id: announcementId }, data: { status: 'SENDING' } })
+  }
+
+  const receiptIdByUserId = new Map(eligible.map((e) => [e.userId, e.id]))
+  const applyProgress = async (r: { userId: string; ok: boolean; error?: string }) => {
+    const receiptId = receiptIdByUserId.get(r.userId)
+    if (!receiptId) return
+    await prisma.announcementReceipt.update({
+      where: { id: receiptId },
+      data: r.ok
+        ? { emailStatus: 'SENT', emailSentAt: new Date(), emailError: null }
+        : { emailStatus: 'FAILED', emailError: r.error ?? 'Send failed', retryCount: { increment: 1 } },
+    })
+  }
 
   const subject = template?.subject?.replaceAll('{{title}}', announcement.title) || announcement.title
   const body =
@@ -156,6 +253,7 @@ export async function deliverAnnouncementEmails(announcementId: string, actorId?
       .replaceAll('{{content}}', announcement.content) || `<p>${announcement.content}</p>`
 
   try {
+    const attachments = await downloadAnnouncementAttachments(announcement.attachments)
     const result = await sendBroadcastEmail({
       subject,
       title: announcement.title,
@@ -166,25 +264,25 @@ export async function deliverAnnouncementEmails(announcementId: string, actorId?
       template: announcement.templateKey || 'announcement',
       actorId,
       memberIds: eligible.map((e) => e.userId),
+      attachments,
+      onProgress: applyProgress,
     })
-    const ok = 'sent' in result ? result.sent > 0 : false
-    await prisma.announcementReceipt.updateMany({
-      where: { id: { in: eligible.map((e) => e.id) } },
-      data: ok
-        ? { emailStatus: 'SENT', emailSentAt: new Date(), emailError: null }
-        : {
-            emailStatus: 'FAILED',
-            emailError: 'error' in result ? String(result.error) : 'Send failed',
-            retryCount: { increment: 1 },
-          },
-    })
-    if (ok) {
-      await prisma.announcement.update({
-        where: { id: announcementId },
-        data: { emailSentAt: new Date(), status: 'SENT' },
+
+    if (!result.results) {
+      // RESEND_API_KEY not configured — every eligible receipt was skipped alike.
+      await prisma.announcementReceipt.updateMany({
+        where: { id: { in: eligible.map((e) => e.id) } },
+        data: { emailStatus: 'FAILED', emailError: 'Email is not configured.', retryCount: { increment: 1 } },
       })
+      await prisma.announcement.update({ where: { id: announcementId }, data: { status: 'SENT' } })
+      return { sent: 0, failed: eligible.length }
     }
-    return { sent: ok ? eligible.length : 0, failed: ok ? 0 : eligible.length }
+
+    await prisma.announcement.update({
+      where: { id: announcementId },
+      data: result.sent > 0 ? { emailSentAt: new Date(), status: 'SENT' } : { status: 'SENT' },
+    })
+    return { sent: result.sent, failed: result.failed ?? 0 }
   } catch (e) {
     await prisma.announcementReceipt.updateMany({
       where: { id: { in: eligible.map((e) => e.id) } },
@@ -194,6 +292,7 @@ export async function deliverAnnouncementEmails(announcementId: string, actorId?
         retryCount: { increment: 1 },
       },
     })
+    await prisma.announcement.update({ where: { id: announcementId }, data: { status: 'SENT' } })
     return { sent: 0, failed: eligible.length }
   }
 }
@@ -213,6 +312,28 @@ export async function retryFailedAnnouncementEmails(formData: FormData) {
   return result
 }
 
+export async function getActiveEmailSends() {
+  // Polled from the client every few seconds — must never redirect on an expired/wrong
+  // session, so this checks the profile directly instead of using requireAdmin().
+  const profile = await getSessionProfile()
+  if (!profile || (profile.role !== 'ADMIN' && !profile.isSuperAdmin)) return []
+  const sending = await prisma.announcement.findMany({
+    where: { status: 'SENDING' },
+    select: {
+      id: true,
+      title: true,
+      receipts: { select: { emailStatus: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+  return sending.map((a) => {
+    const total = a.receipts.length
+    const sent = a.receipts.filter((r) => r.emailStatus === 'SENT' || r.emailStatus === 'SKIPPED').length
+    const failed = a.receipts.filter((r) => r.emailStatus === 'FAILED').length
+    return { id: a.id, title: a.title, total, sent, failed, pending: Math.max(0, total - sent - failed) }
+  })
+}
+
 export async function processScheduledAnnouncements() {
   const due = await prisma.announcement.findMany({
     where: { status: 'SCHEDULED', scheduledFor: { lte: new Date() } },
@@ -222,7 +343,7 @@ export async function processScheduledAnnouncements() {
   for (const row of due) {
     await prisma.announcement.update({
       where: { id: row.id },
-      data: { status: 'SENT', publishedAt: new Date() },
+      data: { status: 'SENDING', publishedAt: new Date() },
     })
     await deliverAnnouncementEmails(row.id, row.authorId)
     processed += 1

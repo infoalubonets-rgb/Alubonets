@@ -12,7 +12,6 @@ import { logError } from '@/lib/logger'
 import { headers } from 'next/headers'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { verifyTurnstile } from '@/lib/turnstile'
-import { requireActiveRole } from '@/lib/auth/session'
 
 function escapeHtml(value: string) {
   return value
@@ -32,7 +31,7 @@ const contactSchema = z.object({
 })
 
 // Shared by the full contact page and the public chat widget: creates the
-// record admins already see at /admin/contact-messages and emails a
+// record the Super Admin sees in Communications and email a
 // notification. Emails route through RESEND_TEST_EMAIL (same as the rest of
 // the app) until a verified sending domain replaces the Resend sandbox.
 async function createContactSubmissionAndNotify({
@@ -48,6 +47,11 @@ async function createContactSubmissionAndNotify({
   category?: string
   message: string
 }) {
+  const assignedAdmin = await prisma.user.findFirst({
+    where: { isSuperAdmin: true, status: 'ACTIVE' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  })
   const submission = await prisma.contactSubmission.create({
     data: {
       name,
@@ -55,6 +59,7 @@ async function createContactSubmissionAndNotify({
       phone: phone || null,
       category: category || null,
       message,
+      assignedToId: assignedAdmin?.id || null,
     },
   })
   const configuredDestination =
@@ -126,10 +131,18 @@ export async function sendContactMessage(formData: FormData) {
   redirect('/contact?sent=1')
 }
 
-export async function markContactMessageRead(formData: FormData) {
+async function requireAssignedSuperAdmin(id: string) {
   const actor = await requireAdmin()
+  if (!actor.isSuperAdmin) throw new Error('Only the Super Admin can manage the contact inbox.')
+  const submission = await prisma.contactSubmission.findUniqueOrThrow({ where: { id } })
+  if (submission.assignedToId !== actor.id) throw new Error('This enquiry is not assigned to you.')
+  return { actor, submission }
+}
+
+export async function markContactMessageRead(formData: FormData) {
   const id = String(formData.get('id') || '')
   if (!id) throw new Error('Message id required')
+  const { actor } = await requireAssignedSuperAdmin(id)
 
   await prisma.contactSubmission.update({
     where: { id },
@@ -141,13 +154,13 @@ export async function markContactMessageRead(formData: FormData) {
     entity: 'ContactSubmission',
     entityId: id,
   })
-  revalidatePath('/admin/contact-messages')
+  revalidatePath('/admin/announcements')
 }
 
 export async function deleteContactMessage(formData: FormData) {
-  const actor = await requireAdmin()
   const id = String(formData.get('id') || '')
   if (!id) throw new Error('Message id required')
+  const { actor } = await requireAssignedSuperAdmin(id)
 
   await prisma.contactSubmission.delete({ where: { id } })
   await writeAudit({
@@ -156,27 +169,25 @@ export async function deleteContactMessage(formData: FormData) {
     entity: 'ContactSubmission',
     entityId: id,
   })
-  revalidatePath('/admin/contact-messages')
+  revalidatePath('/admin/announcements')
 }
 
 export async function updateContactWorkflow(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE'])
   const id = z.string().min(1).parse(formData.get('id'))
+  const { actor } = await requireAssignedSuperAdmin(id)
   const status = z.enum(['UNREAD', 'IN_PROGRESS', 'RESOLVED', 'SPAM']).parse(formData.get('status'))
-  const assignedToId = String(formData.get('assignedToId') || '') || null
   const now = new Date()
   const retainUntil = status === 'RESOLVED' ? new Date(now.getTime() + 730 * 86400000) : status === 'SPAM' ? new Date(now.getTime() + 90 * 86400000) : null
-  await prisma.contactSubmission.update({ where: { id }, data: { status, assignedToId, readAt: now, resolvedAt: status === 'RESOLVED' ? now : null, spamAt: status === 'SPAM' ? now : null, retainUntil } })
-  await writeAudit({ userId: actor.id, action: 'CONTACT_WORKFLOW_UPDATE', entity: 'ContactSubmission', entityId: id, meta: { status, assignedToId, retainUntil } })
-  revalidatePath('/admin/contact-messages')
+  await prisma.contactSubmission.update({ where: { id }, data: { status, readAt: now, resolvedAt: status === 'RESOLVED' ? now : null, spamAt: status === 'SPAM' ? now : null, retainUntil } })
+  await writeAudit({ userId: actor.id, action: 'CONTACT_WORKFLOW_UPDATE', entity: 'ContactSubmission', entityId: id, meta: { status, assignedToId: actor.id, retainUntil } })
+  revalidatePath('/admin/announcements')
 }
 
 export async function replyToContact(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE'])
   const id = z.string().min(1).parse(formData.get('id'))
+  const { actor, submission } = await requireAssignedSuperAdmin(id)
   const subject = z.string().trim().min(1).max(200).parse(formData.get('subject'))
   const body = z.string().trim().min(1).max(5000).parse(formData.get('body'))
-  const submission = await prisma.contactSubmission.findUniqueOrThrow({ where: { id } })
   let deliveryStatus = 'not_configured'
   const key = process.env.RESEND_API_KEY
   if (key && !key.startsWith('re_your-')) {
@@ -187,14 +198,15 @@ export async function replyToContact(formData: FormData) {
   await prisma.contactReply.create({ data: { submissionId: id, sentById: actor.id, subject, body, method: 'in_site', deliveryStatus } })
   await prisma.contactSubmission.update({ where: { id }, data: { status: 'IN_PROGRESS', readAt: new Date() } })
   await writeAudit({ userId: actor.id, action: 'CONTACT_REPLY', entity: 'ContactSubmission', entityId: id, meta: { deliveryStatus } })
-  revalidatePath('/admin/contact-messages')
+  revalidatePath('/admin/announcements')
 }
 
 export async function updateContactDestination(formData: FormData) {
   const actor = await requireAdmin()
+  if (!actor.isSuperAdmin) throw new Error('Only the Super Admin can change the contact destination.')
   const value = z.string().email().parse(formData.get('email'))
   await prisma.appSetting.upsert({ where: { key: 'contact_destination_email' }, create: { key: 'contact_destination_email', value, updatedBy: actor.id }, update: { value, updatedBy: actor.id } })
   await writeAudit({ userId: actor.id, action: 'CONTACT_DESTINATION_UPDATE', entity: 'AppSetting', entityId: 'contact_destination_email' })
-  revalidatePath('/admin/contact-messages')
+  revalidatePath('/admin/announcements')
   revalidatePath('/contact')
 }

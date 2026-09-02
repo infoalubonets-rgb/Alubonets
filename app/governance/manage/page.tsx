@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import GovernanceRecordsClient from '@/components/governance/GovernanceRecordsClient'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { syncOverdueActionPoints } from '@/lib/documents'
-import { getResolutionsForViewer } from '@/lib/data/queries'
+import { getGovernanceRecordsDetailsForViewer, getResolutionsForViewer } from '@/lib/data/queries'
 import { actionPublishMeetingMinutes } from '@/app/actions/meetings'
 import CreateResolutionForm from '@/components/governance/CreateResolutionForm'
 import ResolutionsFeed from '@/components/governance/ResolutionsFeed'
@@ -24,7 +25,7 @@ export default async function ManageGovernancePage() {
   await syncOverdueActionPoints()
   const canManage = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
   const canCreateResolution = RESOLUTION_CREATOR_ROLES.includes(actor.role)
-  const [meetings, members, resolutions] = await Promise.all([
+  const [meetings, members, resolutions, proposals] = await Promise.all([
     prisma.meeting.findMany({
       include: {
         agendaItems: { orderBy: { position: 'asc' } },
@@ -41,6 +42,7 @@ export default async function ManageGovernancePage() {
       orderBy: { fullName: 'asc' },
     }),
     getResolutionsForViewer(actor),
+    getGovernanceRecordsDetailsForViewer(actor),
   ])
   const committee = members.filter(
     (member) => member.role !== 'MEMBER' || member.memberProfile?.memberCategory === 'COMMITTEE_MEMBER',
@@ -78,6 +80,30 @@ export default async function ManageGovernancePage() {
             fullDetail={resolutions.fullDetail}
           />
         </section>
+
+        {canManage && proposals.length > 0 && (
+          <section className="space-y-3 rounded-2xl border border-outline-variant bg-surface p-5">
+            <div>
+              <h2 className="font-h3 text-xl text-primary">Proposal comments</h2>
+              <p className="mt-1 text-sm text-on-surface-variant">
+                Review proposals, vote, and add optional comments for the group.
+              </p>
+            </div>
+            <GovernanceRecordsClient
+              records={proposals.map((record) => ({
+                id: record.id,
+                title: record.title,
+                category: record.category,
+                createdAt: record.createdAt,
+                approveCount: record.approveCount,
+                rejectCount: record.rejectCount,
+                myVote: record.myVote,
+                resultsPublished: record.resultsPublished,
+              }))}
+              details={proposals}
+            />
+          </section>
+        )}
 
         {!meetings.length && (
           <section className="rounded-2xl border border-dashed bg-surface p-6 text-center">

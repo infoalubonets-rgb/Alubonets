@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import GovernanceCommentField from '@/components/governance/GovernanceCommentField'
+import { validateGovernanceCommentText } from '@/lib/governance-comment'
 import { useRouter } from 'next/navigation'
 import { decideResolution, publishResolutionResults, voteResolution } from '@/app/actions/governance'
 import type { Role } from '@/lib/auth/types'
@@ -61,9 +63,9 @@ export default function ResolutionsFeed({
       )}
 
       <section className="space-y-3">
-        <h2 className="font-h3 text-lg text-primary">Resolutions</h2>
+        <h2 className="font-h3 text-lg text-primary">Proposals</h2>
         {approved.length === 0 && (
-          <p className="rounded-xl border bg-surface p-4 text-sm text-on-surface-variant">No resolutions to show yet.</p>
+          <p className="rounded-xl border bg-surface p-4 text-sm text-on-surface-variant">No proposals to show yet.</p>
         )}
         {approved.map((r) => (
           <ApprovedCard key={r.id} resolution={r} canPublish={canApprove} fullDetail={fullDetail} onDone={refresh} />
@@ -75,6 +77,7 @@ export default function ResolutionsFeed({
 
 function PendingCard({ resolution, onDone }: { resolution: PendingResolution; onDone: () => void }) {
   const [selectedRoles, setSelectedRoles] = useState<Role[]>([...ROLES])
+  const [allowAnonymous, setAllowAnonymous] = useState(true)
   const [reason, setReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
   const [error, setError] = useState('')
@@ -93,6 +96,7 @@ function PendingCard({ resolution, onDone }: { resolution: PendingResolution; on
     formData.set('id', resolution.id)
     formData.set('decision', 'approve')
     selectedRoles.forEach((role) => formData.append('visibleToRoles', role))
+    formData.set('allowAnonymous', allowAnonymous ? 'true' : 'false')
     startTransition(async () => {
       try {
         await decideResolution(formData)
@@ -152,6 +156,21 @@ function PendingCard({ resolution, onDone }: { resolution: PendingResolution; on
         </div>
       </div>
 
+      <label className="mt-3 flex items-start gap-2 rounded-xl bg-surface-container-low p-3 text-sm">
+        <input
+          type="checkbox"
+          checked={allowAnonymous}
+          onChange={(event) => setAllowAnonymous(event.target.checked)}
+          className="mt-1"
+        />
+        <span>
+          Allow anonymous responses
+          <span className="block text-xs text-on-surface-variant">
+            When enabled, a responder can hide their name from everyone, including Admin and Secretary.
+          </span>
+        </span>
+      </label>
+
       {error && <p className="mt-2 text-sm text-error">{error}</p>}
 
       {rejecting ? (
@@ -205,10 +224,15 @@ function ApprovedCard({
 
   const submitVote = (choice: 'APPROVE' | 'REJECT') => {
     setError('')
+    const commentError = validateGovernanceCommentText(comment)
+    if (commentError) {
+      setError(commentError)
+      return
+    }
     const formData = new FormData()
     formData.set('resolutionId', resolution.id)
     formData.set('vote', choice)
-    formData.set('comment', comment)
+    formData.set('comment', comment.trim())
     formData.set('anonymous', anonymous ? 'true' : 'false')
     startTransition(async () => {
       try {
@@ -256,11 +280,11 @@ function ApprovedCard({
 
       <div className="mt-3 rounded-xl bg-surface-container-low p-3">
         <label className="text-xs font-bold uppercase text-on-surface-variant">Your comment (optional)</label>
-        <textarea
+        <GovernanceCommentField
+          id={`resolution-comment-${resolution.id}`}
           value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          rows={2}
-          className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+          onChange={setComment}
+          placeholder="Optional comment…"
         />
         <label className="mt-2 flex items-center gap-2 text-xs text-on-surface-variant">
           <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} />

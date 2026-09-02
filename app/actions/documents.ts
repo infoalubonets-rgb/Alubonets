@@ -120,7 +120,6 @@ export async function uploadReport(formData: FormData) {
     entityId: report.id,
     newValue: { title: report.title, status: report.status, format: extension },
   })
-  revalidatePath('/reports/manage')
   revalidatePath('/meetings-reports')
   refresh()
 }

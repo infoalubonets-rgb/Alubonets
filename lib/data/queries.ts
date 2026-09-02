@@ -435,27 +435,92 @@ function governanceRecordWhere(actor: { role: Role }) {
 }
 
 export async function getGovernanceRecordsForViewer(actor: { id: string; role: Role }) {
+  const details = await getGovernanceRecordsDetailsForViewer(actor)
+  return details.map((record) => ({
+    id: record.id,
+    title: record.title,
+    category: record.category,
+    createdAt: record.createdAt,
+    approveCount: record.approveCount,
+    rejectCount: record.rejectCount,
+    myVote: record.myVote,
+    resultsPublished: record.resultsPublished,
+  }))
+}
+
+type GovernanceRecordRow = Awaited<ReturnType<typeof prisma.resolution.findFirst>> & {
+  createdBy: { fullName: string }
+  responses: Array<{
+    id: string
+    userId: string
+    vote: 'APPROVE' | 'REJECT'
+    comment: string | null
+    anonymous: boolean
+    createdAt: Date
+    user: { fullName: string }
+  }>
+}
+
+function mapGovernanceRecordDetail(
+  row: NonNullable<GovernanceRecordRow>,
+  actor: { id: string; role: Role },
+  fullDetail: boolean,
+) {
+  const mine = row.responses.find((response) => response.userId === actor.id)
+  const approveCount = row.responses.filter((response) => response.vote === 'APPROVE').length
+  const rejectCount = row.responses.filter((response) => response.vote === 'REJECT').length
+
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    category: row.category,
+    imageUrl: row.imageUrl,
+    documentUrl: row.documentUrl,
+    documentName: row.documentName,
+    createdByName: row.createdBy.fullName,
+    createdAt: row.createdAt.toISOString(),
+    resultsPublished: row.resultsPublished,
+    allowAnonymous: row.allowAnonymous,
+    approveCount,
+    rejectCount,
+    myVote: mine?.vote ?? null,
+    myComment: mine?.comment ?? null,
+    myAnonymous: mine?.anonymous ?? false,
+    responses: row.resultsPublished || fullDetail
+      ? row.responses.map((response) => ({
+          id: response.id,
+          userId: response.userId,
+          displayName:
+            response.userId === actor.id && response.anonymous
+                ? 'You (anonymous)'
+                : response.anonymous
+                  ? 'Anonymous member'
+                  : response.user.fullName,
+          vote: response.vote,
+          comment: response.comment,
+          anonymous: response.anonymous,
+          createdAt: response.createdAt.toISOString(),
+        }))
+      : [],
+  }
+}
+
+export async function getGovernanceRecordsDetailsForViewer(actor: { id: string; role: Role }) {
+  const fullDetail = canViewGovernanceRecords(actor)
   const rows = await prisma.resolution.findMany({
     where: governanceRecordWhere(actor),
     include: {
-      responses: { select: { userId: true, vote: true } },
+      createdBy: { select: { fullName: true } },
+      responses: {
+        include: { user: { select: { fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+      },
     },
     orderBy: { createdAt: 'desc' },
   })
 
-  return rows.map((row) => {
-    const mine = row.responses.find((response) => response.userId === actor.id)
-    return {
-      id: row.id,
-      title: row.title,
-      category: row.category,
-      createdAt: row.createdAt.toISOString(),
-      approveCount: row.responses.filter((response) => response.vote === 'APPROVE').length,
-      rejectCount: row.responses.filter((response) => response.vote === 'REJECT').length,
-      myVote: mine?.vote ?? null,
-      resultsPublished: row.resultsPublished,
-    }
-  })
+  return rows.map((row) => mapGovernanceRecordDetail(row, actor, fullDetail))
 }
 
 export async function getGovernanceRecordForViewer(id: string, actor: { id: string; role: Role }) {
@@ -472,43 +537,7 @@ export async function getGovernanceRecordForViewer(id: string, actor: { id: stri
   })
   if (!row) return null
 
-  const mine = row.responses.find((response) => response.userId === actor.id)
-  const approveCount = row.responses.filter((response) => response.vote === 'APPROVE').length
-  const rejectCount = row.responses.filter((response) => response.vote === 'REJECT').length
-
-  return {
-    id: row.id,
-    title: row.title,
-    body: row.body,
-    category: row.category,
-    imageUrl: row.imageUrl,
-    documentUrl: row.documentUrl,
-    documentName: row.documentName,
-    createdByName: row.createdBy.fullName,
-    createdAt: row.createdAt.toISOString(),
-    resultsPublished: row.resultsPublished,
-    approveCount,
-    rejectCount,
-    myVote: mine?.vote ?? null,
-    myComment: mine?.comment ?? null,
-    myAnonymous: mine?.anonymous ?? false,
-    responses: row.resultsPublished || fullDetail
-      ? row.responses.map((response) => ({
-          id: response.id,
-          userId: response.userId,
-          displayName:
-            response.anonymous && response.userId !== actor.id && !fullDetail
-              ? 'Anonymous member'
-              : response.userId === actor.id && response.anonymous
-                ? 'You (anonymous)'
-                : response.user.fullName,
-          vote: response.vote,
-          comment: response.comment,
-          anonymous: response.anonymous,
-          createdAt: response.createdAt.toISOString(),
-        }))
-      : [],
-  }
+  return mapGovernanceRecordDetail(row, actor, fullDetail)
 }
 
 export const getAnnouncementsForUser = unstable_cache(

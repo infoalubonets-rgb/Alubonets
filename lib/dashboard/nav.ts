@@ -50,7 +50,7 @@ export const ADMIN_NAV: NavItem[] = [
     EVENTS_VIEW_NAV,
     { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
   ] },
-  { icon: 'assessment', label: 'Reports & meetings', href: '/reports/manage', children: [MEETINGS_REPORTS_NAV] },
+  MEETINGS_REPORTS_NAV,
   { icon: 'campaign', label: 'Communications', href: '/admin/announcements' },
   { icon: 'folder_managed', label: 'Documents', href: '/documents/manage', children: [DOCUMENTS_VIEW_NAV] },
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },

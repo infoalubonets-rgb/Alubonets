@@ -1,8 +1,8 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
-import GovernanceRecordsTable from '@/components/governance/GovernanceRecordsTable'
+import GovernanceRecordsClient from '@/components/governance/GovernanceRecordsClient'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
-import { getGovernanceRecordsForViewer } from '@/lib/data/queries'
+import { getGovernanceRecordsDetailsForViewer } from '@/lib/data/queries'
 
 export default async function GovernancePage() {
   const actor = await requireActiveRole([
@@ -13,12 +13,24 @@ export default async function GovernancePage() {
     'ORGANIZER',
     'MEMBER',
   ])
-  const records = await getGovernanceRecordsForViewer(actor)
+  const details = await getGovernanceRecordsDetailsForViewer(actor)
 
   return (
     <DashboardShell role={actor.role} title="Governance" nav={navForRole(actor.role)}>
       <div className="p-4 md:p-6">
-        <GovernanceRecordsTable records={records} />
+        <GovernanceRecordsClient
+          records={details.map((record) => ({
+            id: record.id,
+            title: record.title,
+            category: record.category,
+            createdAt: record.createdAt,
+            approveCount: record.approveCount,
+            rejectCount: record.rejectCount,
+            myVote: record.myVote,
+            resultsPublished: record.resultsPublished,
+          }))}
+          details={details}
+        />
       </div>
     </DashboardShell>
   )

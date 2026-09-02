@@ -3,9 +3,11 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { canReadDocument } from '@/lib/documents'
-import { redirect } from 'next/navigation'
+import { uploadReport } from '@/app/actions/documents'
+import ReportsMeetingsRows from '@/components/reports/ReportsMeetingsRows'
+import AddReportModal from '@/components/reports/AddReportModal'
 
-export const metadata = { title: 'Meetings and reports' }
+export const metadata = { title: 'Meetings & reports' }
 export const dynamic = 'force-dynamic'
 
 export default async function MeetingsReportsPage() {
@@ -17,37 +19,111 @@ export default async function MeetingsReportsPage() {
     'ORGANIZER',
     'MEMBER',
   ])
-  if (actor.role === 'SECRETARY') redirect('/dashboard/secretary/meetings')
-  const staff = actor.role === 'ADMIN'
+  const canManage = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
 
-  const [meetings, reportRows] = await Promise.all([prisma.meeting.findMany({
-    where: {
-      status: 'FINAL',
-      ...(staff
-        ? {}
-        : {
-            OR: [
-              { audienceType: 'ALL_MEMBERS' },
-              { audienceRoles: { has: actor.role } },
-              { invitations: { some: { userId: actor.id } } },
-            ],
-          }),
-    },
-    include: {
-      publishedDocument: { select: { id: true, title: true } },
-      recorder: { select: { fullName: true } },
-    },
-    orderBy: { heldAt: 'desc' },
-  }), prisma.document.findMany({
-    where: { category: 'Reports', status: 'PUBLISHED' },
-    include: { uploader: { select: { fullName: true } } },
-    orderBy: { uploadedAt: 'desc' },
-  })])
+  if (canManage) {
+    const [reports, meetings] = await Promise.all([
+      prisma.document.findMany({
+        where: { category: 'Reports' },
+        include: { uploader: { select: { fullName: true } } },
+        orderBy: { uploadedAt: 'desc' },
+      }),
+      prisma.meeting.findMany({
+        include: {
+          recorder: { select: { fullName: true } },
+          approvedBy: { select: { fullName: true } },
+          publishedDocument: { select: { id: true } },
+          agendaItems: { orderBy: { position: 'asc' } },
+          actionPoints: { include: { owner: { select: { fullName: true } } }, orderBy: { createdAt: 'asc' } },
+          decisions: { orderBy: { createdAt: 'asc' } },
+        },
+        orderBy: { heldAt: 'desc' },
+      }),
+    ])
+
+    return (
+      <DashboardShell
+        role={actor.role}
+        title="Meetings & reports"
+        nav={navForRole(actor.role)}
+        pageAction={<AddReportModal uploadAction={uploadReport} />}
+      >
+        <ReportsMeetingsRows
+          reports={reports.map((report) => ({
+            id: report.id,
+            title: report.title,
+            description: report.description,
+            status: report.status,
+            uploaderName: report.uploader.fullName,
+            uploadedAt: report.uploadedAt.toISOString(),
+          }))}
+          meetings={meetings.map((meeting) => ({
+            id: meeting.id,
+            title: meeting.title,
+            status: meeting.status,
+            heldAt: meeting.heldAt.toISOString(),
+            location: meeting.location,
+            attendance: meeting.attendance,
+            recorderName: meeting.recorder.fullName,
+            approvedByName: meeting.approvedBy?.fullName || null,
+            approvedAt: meeting.approvedAt?.toISOString() || null,
+            agenda: meeting.agenda,
+            minutes: meeting.minutes,
+            opening: meeting.opening,
+            attendees: meeting.attendees,
+            membersAbsent: meeting.membersAbsent,
+            membersApology: meeting.membersApology,
+            resolutions: meeting.resolutions,
+            aob: meeting.aob,
+            nextMeetingAt: meeting.nextMeetingAt?.toISOString() || null,
+            publishedDocumentId: meeting.publishedDocument?.id || null,
+            agendaItems: meeting.agendaItems.map((item) => ({ title: item.title, description: item.description })),
+            actionPoints: meeting.actionPoints.map((point) => ({
+              title: point.title,
+              description: point.description,
+              ownerName: point.owner.fullName,
+              status: point.status,
+              dueAt: point.dueAt?.toISOString() || null,
+            })),
+            decisions: meeting.decisions.map((decision) => ({
+              title: decision.title,
+              decision: decision.decision,
+              reference: decision.reference,
+              decidedAt: decision.decidedAt.toISOString(),
+            })),
+          }))}
+        />
+      </DashboardShell>
+    )
+  }
+
+  const [meetings, reportRows] = await Promise.all([
+    prisma.meeting.findMany({
+      where: {
+        status: 'FINAL',
+        OR: [
+          { audienceType: 'ALL_MEMBERS' },
+          { audienceRoles: { has: actor.role } },
+          { invitations: { some: { userId: actor.id } } },
+        ],
+      },
+      include: {
+        publishedDocument: { select: { id: true, title: true } },
+        recorder: { select: { fullName: true } },
+      },
+      orderBy: { heldAt: 'desc' },
+    }),
+    prisma.document.findMany({
+      where: { category: 'Reports', status: 'PUBLISHED' },
+      include: { uploader: { select: { fullName: true } } },
+      orderBy: { uploadedAt: 'desc' },
+    }),
+  ])
   const reports = reportRows.filter((report) => canReadDocument(report, actor.role))
 
   return (
     <DashboardShell role={actor.role} title="Meetings & reports" nav={navForRole(actor.role)}>
-      <div className="space-y-5 p-4 md:p-6">
+      <div className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2">
           {meetings.map((meeting) => (
             <article key={meeting.id} className="rounded-2xl border border-outline-variant/60 bg-surface p-5 shadow-[0_6px_20px_rgba(0,31,80,0.06)]">
