@@ -8,6 +8,7 @@ import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
 import { sendBroadcastEmail } from '@/lib/email/resend'
+import { assertNotPast } from '@/lib/dates'
 
 function refreshAnnouncements() {
   revalidatePath('/announcements')
@@ -85,6 +86,7 @@ export async function createTargetedAnnouncement(formData: FormData) {
   const recipients = await prisma.user.findMany({ where, select: { id: true } })
   if (!recipients.length) throw new Error('No recipients match the selected audience.')
 
+  assertNotPast(data.scheduledFor, 'Scheduled send time')
   const scheduled = Boolean(data.scheduledFor && data.scheduledFor > new Date())
   const announcement = await prisma.announcement.create({
     data: {

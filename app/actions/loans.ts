@@ -2,6 +2,7 @@
 
 import { after } from 'next/server'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
@@ -12,6 +13,8 @@ import { getOpenPeriod, transactionNumber } from '@/lib/finance'
 import { sendAnnouncement } from '@/lib/data/queries'
 import { sendBroadcastEmail } from '@/lib/email/resend'
 import { createServerClient } from '@/lib/supabase-server'
+import { assertNotFuture } from '@/lib/dates'
+import { loanApplicationBodySchema, parseExternalGuarantorsFromForm } from '@/lib/loan-guarantor-validation'
 
 function refreshLoans(loanId?: string) {
   revalidatePath('/dashboard/member/loans')
@@ -41,39 +44,49 @@ async function uploadEvidence(actorId: string, file: File | null) {
 }
 
 export async function submitLoanApplication(formData: FormData) {
-  await requireLoansEnabled()
-  const actor = await requireActiveRole([
-    'ADMIN',
-    'EXECUTIVE',
-    'TREASURER',
-    'SECRETARY',
-    'ORGANIZER',
-    'MEMBER',
+  const [, actor, policy] = await Promise.all([
+    requireLoansEnabled(),
+    requireActiveRole(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER']),
+    getLoanPolicy(),
   ])
   if (actor.status !== 'ACTIVE') throw new Error('Only active members may apply for loans.')
-  const policy = await getLoanPolicy()
-  const data = z
-    .object({
-      amountKes: z.coerce.number().positive(),
-      purpose: z.string().trim().min(5).max(2000),
-      dueAt: z.coerce.date().optional(),
-      installmentNotes: z.string().trim().max(2000).optional(),
-      notes: z.string().trim().max(2000).optional(),
-    })
-    .parse({
-      amountKes: formData.get('amountKes'),
-      purpose: formData.get('purpose'),
-      dueAt: formData.get('dueAt') || undefined,
-      installmentNotes: formData.get('installmentNotes') || undefined,
-      notes: formData.get('notes') || undefined,
-    })
-  if (data.amountKes > policy.maxAmountKes) {
-    throw new Error(`Amount exceeds maximum loan of KES ${policy.maxAmountKes.toLocaleString()}.`)
+  const data = loanApplicationBodySchema.parse({
+    amountKes: formData.get('amountKes'),
+    purpose: formData.get('purpose'),
+    dueAt: formData.get('dueAt'),
+    installmentNotes: formData.get('installmentNotes'),
+    notes: formData.get('notes') || undefined,
+  })
+  if (data.amountKes < policy.minAmountKes) {
+    throw new Error(`Minimum loan amount is KES ${policy.minAmountKes.toLocaleString()}.`)
+  }
+  const maxLoanAmountKes = Math.min(policy.maxAmountKes, 999_999)
+  if (data.amountKes > maxLoanAmountKes) {
+    throw new Error(`Loan limit is KES ${maxLoanAmountKes.toLocaleString()}.`)
+  }
+  const earliestDueDate = new Date(); earliestDueDate.setHours(0, 0, 0, 0); earliestDueDate.setDate(earliestDueDate.getDate() + 1)
+  const latestDueDate = new Date(); latestDueDate.setHours(23, 59, 59, 999); latestDueDate.setFullYear(latestDueDate.getFullYear() + 5)
+  if (data.dueAt < earliestDueDate || data.dueAt > latestDueDate) {
+    throw new Error('Repayment date must be between tomorrow and five years from today.')
   }
   const guarantorIds = [...new Set(formData.getAll('guarantorIds').map(String).filter(Boolean))]
   if (guarantorIds.includes(actor.id)) throw new Error('You cannot guarantee your own loan.')
-  if (guarantorIds.length < policy.minGuarantors) {
-    throw new Error(`Select at least ${policy.minGuarantors} guarantor(s).`)
+  let externalGuarantors
+  try {
+    externalGuarantors = parseExternalGuarantorsFromForm(formData)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const first = error.issues[0]
+      throw new Error(first?.message || 'Enter valid full details for every external guarantor.')
+    }
+    throw error
+  }
+  if (new Set(externalGuarantors.map((guarantor) => guarantor.idNumber.toLowerCase())).size !== externalGuarantors.length) {
+    throw new Error('Each external guarantor must have a different ID number.')
+  }
+  const requiredGuarantors = 2
+  if (guarantorIds.length + externalGuarantors.length !== requiredGuarantors) {
+    throw new Error(`A loan application must have exactly ${requiredGuarantors} guarantors.`)
   }
   const guarantors = await prisma.user.findMany({
     where: { id: { in: guarantorIds }, status: 'ACTIVE' },
@@ -87,49 +100,92 @@ export async function submitLoanApplication(formData: FormData) {
       amountKes: data.amountKes,
       purpose: data.purpose,
       dueAt: data.dueAt ?? null,
-      installmentNotes: data.installmentNotes ?? null,
+      installmentNotes: data.installmentNotes,
       notes: data.notes ?? null,
       status: 'SUBMITTED',
-      guarantors: { create: guarantors.map((g) => ({ userId: g.id })) },
+      guarantors: { create: [
+        ...guarantors.map((guarantor) => ({ userId: guarantor.id })),
+        ...externalGuarantors.map((guarantor) => ({ fullName: guarantor.fullName, idNumber: guarantor.idNumber, phone: guarantor.phone, residence: guarantor.residence, relationship: guarantor.relationship, kraPin: guarantor.kraPin })),
+      ] },
     },
   })
 
-  await writeAudit({
-    userId: actor.id,
-    action: 'LOAN_SUBMIT',
-    entity: 'LoanApplication',
-    entityId: loan.id,
-    newValue: { amountKes: data.amountKes, guarantors: guarantorIds.length },
-  })
-
-  const treasurers = await prisma.user.findMany({
-    where: { status: 'ACTIVE', OR: [{ role: 'TREASURER' }, { role: 'ADMIN' }, { isSuperAdmin: true }] },
-    select: { id: true },
-  })
-  after(() =>
-    sendAnnouncement({
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
+  after(async () => {
+    const treasurerNotification = prisma.user.findMany({
+      where: { status: 'ACTIVE', OR: [{ role: 'TREASURER' }, { role: 'ADMIN' }, { isSuperAdmin: true }] },
+      select: { id: true },
+    }).then((treasurers) => sendAnnouncement({
       authorId: actor.id,
       title: `Loan application: ${actor.fullName}`,
       content: `${actor.fullName} requested KES ${data.amountKes.toLocaleString()} — ${data.purpose}`,
       broadcast: false,
-      memberIds: treasurers.map((t) => t.id),
-    }).catch(console.error),
-  )
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
-  after(() =>
-    sendBroadcastEmail({
-      subject: `Please guarantee a loan for ${actor.fullName}`,
-      title: 'Loan guarantor request',
-      body: `<p>${actor.fullName} asked you to guarantee a loan of KES ${data.amountKes.toLocaleString()}.</p><p>${data.purpose}</p>`,
-      ctaLabel: 'Respond in dashboard',
-      ctaUrl: `${appUrl}/dashboard/member/loans`,
-      template: 'loan_guarantor_invite',
-      actorId: actor.id,
-      memberIds: guarantors.map((g) => g.id),
-    }).catch(console.error),
-  )
+      memberIds: treasurers.map((treasurer) => treasurer.id),
+    }))
+    await Promise.allSettled([
+      writeAudit({ userId: actor.id, action: 'LOAN_SUBMIT', entity: 'LoanApplication', entityId: loan.id, newValue: { amountKes: data.amountKes, registeredGuarantors: guarantorIds.length, externalGuarantors: externalGuarantors.length } }),
+      treasurerNotification,
+      sendBroadcastEmail({
+        subject: `Please guarantee a loan for ${actor.fullName}`,
+        title: 'Loan guarantor request',
+        body: `<p>${actor.fullName} asked you to guarantee a loan of KES ${data.amountKes.toLocaleString()}.</p><p>${data.purpose}</p>`,
+        ctaLabel: 'Respond in dashboard',
+        ctaUrl: `${appUrl}/dashboard/member/loans`,
+        template: 'loan_guarantor_invite',
+        actorId: actor.id,
+        memberIds: guarantors.map((guarantor) => guarantor.id),
+      }),
+    ])
+  })
 
   refreshLoans(loan.id)
+  redirect('/dashboard/member/loans?submitted=1')
+}
+
+export async function publishFundingRequestToGovernance(formData: FormData) {
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const data = z.object({
+    requestType: z.enum(['LOAN', 'WELFARE']),
+    requestId: z.string().min(1),
+  }).parse({
+    requestType: formData.get('requestType'),
+    requestId: formData.get('requestId'),
+  })
+  const marker = `[FundingRequest:${data.requestType}:${data.requestId}]`
+  const existing = await prisma.resolution.findFirst({ where: { body: { contains: marker } }, select: { id: true } })
+  if (existing) throw new Error('This request has already been published to Governance.')
+
+  if (data.requestType === 'LOAN') {
+    const request = await prisma.loanApplication.findUniqueOrThrow({
+      where: { id: data.requestId },
+      include: { applicant: { select: { fullName: true } }, guarantors: { include: { user: { select: { fullName: true } } } } },
+    })
+    const eligible = request.guarantors.filter((guarantor) => guarantor.status === 'ACCEPTED' || !guarantor.userId).length
+    const guarantorDetails = request.guarantors.map((guarantor) => guarantor.user
+      ? `${guarantor.user.fullName} — registered member — ${guarantor.status}`
+      : `${guarantor.fullName} — ID ${guarantor.idNumber} — ${guarantor.phone} — details supplied`).join('\n')
+    await prisma.resolution.create({
+      data: {
+        title: `Loan funding request — ${request.applicant.fullName}`,
+        body: `${marker}\n\nType: Loan request\nApplicant: ${request.applicant.fullName}\nAmount: KES ${Number(request.amountKes).toLocaleString()}\nPurpose: ${request.purpose}\nStatus: ${request.status.replaceAll('_', ' ')}\nEligible guarantors: ${eligible}/${request.guarantors.length}\n\nGuarantor details:\n${guarantorDetails}${request.treasurerNote ? `\nTreasurer note: ${request.treasurerNote}` : ''}`,
+        createdById: actor.id,
+      },
+    })
+  } else {
+    const request = await prisma.welfareRequest.findUniqueOrThrow({ where: { id: data.requestId }, include: { user: { select: { fullName: true } } } })
+    await prisma.resolution.create({
+      data: {
+        title: `Welfare funding request — ${request.user.fullName}`,
+        body: `${marker}\n\nType: Welfare request\nApplicant: ${request.user.fullName}\nAmount: KES ${Number(request.amount || 0).toLocaleString()}\nNeed: ${request.description}\nStatus: ${request.status}${request.reviewNote ? `\nTreasurer note: ${request.reviewNote}` : ''}`,
+        createdById: actor.id,
+      },
+    })
+  }
+  await writeAudit({ userId: actor.id, action: 'FUNDING_REQUEST_PUBLISH_GOVERNANCE', entity: data.requestType === 'LOAN' ? 'LoanApplication' : 'WelfareRequest', entityId: data.requestId })
+  revalidatePath('/governance')
+  revalidatePath('/governance/manage')
+  revalidatePath('/dashboard/treasurer/loans')
+  revalidatePath('/dashboard/treasurer/welfare')
 }
 
 export async function respondLoanGuarantor(formData: FormData) {
@@ -239,8 +295,8 @@ export async function decideLoanApplication(formData: FormData) {
     // Admin may decide without treasurer note, but prefer under review
   }
   if (data.decision === 'APPROVED' && policy.requireGuarantorAccept) {
-    const accepted = loan.guarantors.filter((g) => g.status === 'ACCEPTED').length
-    if (accepted < policy.minGuarantors) {
+    const eligible = loan.guarantors.filter((guarantor) => guarantor.status === 'ACCEPTED' || !guarantor.userId).length
+    if (eligible < Math.max(2, policy.minGuarantors)) {
       throw new Error('Not enough guarantors have accepted yet.')
     }
   }
@@ -297,6 +353,7 @@ export async function recordLoanDisbursement(formData: FormData) {
   })
   if (loan.status !== 'APPROVED') throw new Error('Only approved loans can be disbursed.')
   if (loan.ledgerLinks.length) throw new Error('Loan already has a disbursement recorded.')
+  assertNotFuture(data.occurredAt, 'Disbursement date')
   const evidence = await uploadEvidence(actor.id, formData.get('evidence') as File)
   const period = await getOpenPeriod(data.occurredAt)
   const category = await prisma.transactionCategory.findUniqueOrThrow({
@@ -398,6 +455,7 @@ export async function recordLoanRepayment(formData: FormData) {
     include: { applicant: true },
   })
   if (loan.status !== 'DISBURSED') throw new Error('Repayments require a disbursed loan.')
+  assertNotFuture(data.occurredAt, 'Repayment date')
 
   const period = await getOpenPeriod(data.occurredAt)
   const category = await prisma.transactionCategory.findUniqueOrThrow({

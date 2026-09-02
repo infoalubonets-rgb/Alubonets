@@ -17,6 +17,7 @@ export type NavItem = {
   href?: string
   badge?: string
   active?: boolean
+  children?: NavItem[]
 }
 
 type Props = {
@@ -84,7 +85,25 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
       : role === 'MEMBER' && user?.isPrincipal
         ? 'Principal Member'
         : ROLE_LABEL[role]
+  const isOverviewPage = pathname === '/admin' || /^\/dashboard\/(member|treasurer|executive|secretary|organizer)$/.test(pathname)
   const notificationTotal = unread + supportBellCount + paymentNotifCount
+  const activeNavGroup = nav.reduce<{ item: NavItem; score: number } | null>((best, item) => {
+    const score = [item, ...(item.children || [])].reduce((longest, candidate) => {
+      const href = candidate.href
+      return href && (pathname === href || pathname.startsWith(`${href}/`))
+        ? Math.max(longest, href.length)
+        : longest
+    }, 0)
+    return score > (best?.score || 0) ? { item, score } : best
+  }, null)?.item
+  const pageLinks = activeNavGroup
+    ? [activeNavGroup, ...(activeNavGroup.children || [])].filter((item) => item.href)
+    : []
+  const selectedPageHref = pageLinks
+    .map((item) => item.href!)
+    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
+    .sort((a, b) => b.length - a.length)[0]
+  const relatedPageLinks = pageLinks.filter((item) => item.href !== selectedPageHref)
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('dashSidebarCollapsed') === '1')
@@ -224,16 +243,33 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   }, [])
 
   useEffect(() => {
-    meRequest().then((u) => {
-      if (!u) {
-        router.replace('/login')
-        return
+    let cancelled = false
+    let retryTimer: number | undefined
+
+    const loadUser = async () => {
+      try {
+        const u = await meRequest()
+        if (cancelled) return
+        if (!u) {
+          router.replace('/login')
+          return
+        }
+        setUser(u)
+        const hour = new Date().getHours()
+        const g = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+        setWelcome(`${g}, ${u.fullName.split(' ')[0]}`)
+      } catch {
+        // A dev-server restart or brief network interruption must not crash the
+        // dashboard. Keep the current shell visible and retry quietly.
+        if (!cancelled) retryTimer = window.setTimeout(loadUser, 2500)
       }
-      setUser(u)
-      const hour = new Date().getHours()
-      const g = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-      setWelcome(`${g}, ${u.fullName.split(' ')[0]}`)
-    })
+    }
+
+    loadUser()
+    return () => {
+      cancelled = true
+      window.clearTimeout(retryTimer)
+    }
   }, [router])
 
   useEffect(() => {
@@ -300,12 +336,13 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
         </div>
 
         <DashboardNav
-          nav={nav.filter(item => item.href !== '/support-chat').map((item) => {
-            if (item.href === '/announcements' && unread > 0)
-              return { ...item, badge: String(unread) }
+          nav={nav.filter(item => item.href !== '/support-chat').map(function addBadges(item): NavItem {
+            const children = item.children?.map(addBadges)
+            if ((item.href === '/announcements' || item.href === '/admin/announcements') && unread > 0)
+              return { ...item, children, badge: String(unread) }
             if (item.href === '/dashboard/treasurer/notifications' && paymentNotifCount > 0)
-              return { ...item, badge: String(paymentNotifCount) }
-            return item
+              return { ...item, children, badge: String(paymentNotifCount) }
+            return children ? { ...item, children } : item
           })}
           collapsed={collapsed}
         />
@@ -472,11 +509,33 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
           </div>
         </header>
 
-        <main ref={pageScrollRef} className="dashboard-page-scroll relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-lg pb-lg pt-1 space-y-lg">
+        <main ref={pageScrollRef} className="dashboard-page-scroll relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-lg pb-lg pt-4 space-y-lg">
           {!hidePageHeading && (
-            <div className="shrink-0 -mt-1">
-              <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
-              <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>
+            <div className="shrink-0 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <div className="min-w-0">
+                  <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
+                  {isOverviewPage && <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>}
+                </div>
+                {relatedPageLinks.length > 0 && (
+                  <nav aria-label={`Related ${activeNavGroup?.label} pages`} className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    {relatedPageLinks.map((item) => {
+                      const href = item.href!
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary px-3.5 text-[12px] font-label-bold text-on-primary shadow-[0_3px_10px_rgba(0,31,80,0.18)] transition hover:border-secondary-container/50 hover:bg-secondary-container active:scale-[0.98] dark:border-primary-container/40 dark:bg-primary-container dark:hover:bg-secondary-container"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">{item.icon}</span>
+                          {item.label}
+                          {item.badge && <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] leading-none text-white">{item.badge}</span>}
+                        </Link>
+                      )
+                    })}
+                  </nav>
+                )}
+              </div>
             </div>
           )}
           {children}

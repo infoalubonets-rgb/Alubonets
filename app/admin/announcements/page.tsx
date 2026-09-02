@@ -1,4 +1,6 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import StatCard from '@/components/dashboard/StatCard'
+import AnnouncementsAdminClient from '@/components/admin/AnnouncementsAdminClient'
 import { requireAdmin } from '@/lib/auth/session'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
@@ -7,8 +9,8 @@ import {
   retryFailedAnnouncementEmails,
   upsertAnnouncementTemplate,
 } from '@/app/actions/announcements'
-
-const ROLES = ['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
+import { nowInputValue } from '@/lib/dates'
+import AssignedContactInbox from '@/components/admin/AssignedContactInbox'
 
 export default async function AdminAnnouncementsPage() {
   const actor = await requireAdmin()
@@ -34,97 +36,38 @@ export default async function AdminAnnouncementsPage() {
     }),
   ])
 
+  const rows = announcements.map((a) => ({
+    id: a.id,
+    title: a.title,
+    status: a.status,
+    author: a.author.fullName,
+    createdAt: a.createdAt.toISOString(),
+    sent: a.receipts.filter((r) => r.emailStatus === 'SENT').length,
+    failed: a.receipts.filter((r) => r.emailStatus === 'FAILED').length,
+  }))
+  const totalSent = rows.reduce((sum, a) => sum + a.sent, 0)
+  const totalFailed = rows.reduce((sum, a) => sum + a.failed, 0)
+
   return (
-    <DashboardShell role="ADMIN" title="Announcements & email" nav={ADMIN_NAV}>
-      <div className="space-y-6 p-4 md:p-6">
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-lg text-primary">Send / schedule announcement</h2>
-          <form action={createTargetedAnnouncement} className="mt-3 grid gap-2 md:grid-cols-2">
-            <input name="title" required placeholder="Title" className="rounded-lg border px-3 py-2" />
-            <select name="templateKey" className="rounded-lg border px-3 py-2">
-              <option value="">No template</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.key}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <textarea name="content" required placeholder="Content" className="rounded-lg border px-3 py-2 md:col-span-2" rows={4} />
-            <input name="scheduledFor" type="datetime-local" className="rounded-lg border px-3 py-2" />
-            <select name="familyBranch" className="rounded-lg border px-3 py-2">
-              <option value="">All branches</option>
-              {branches.map((b) => (
-                <option key={b.familyBranch!} value={b.familyBranch!}>
-                  {b.familyBranch}
-                </option>
-              ))}
-            </select>
-            <fieldset className="flex flex-wrap gap-2 text-xs md:col-span-2">
-              {ROLES.map((role) => (
-                <label key={role}>
-                  <input type="checkbox" name="audienceRoles" value={role} /> {role}
-                </label>
-              ))}
-            </fieldset>
-            <select name="memberIds" multiple className="h-28 rounded-lg border px-2 md:col-span-2">
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.fullName}
-                </option>
-              ))}
-            </select>
-            <label className="text-sm">
-              <input type="checkbox" name="sendEmail" defaultChecked /> Send email
-            </label>
-            <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Publish / schedule</button>
-          </form>
+    <DashboardShell role="ADMIN" title="Communications" nav={ADMIN_NAV}>
+      <div className="space-y-5 p-4 md:p-6">
+        <section className="grid gap-3 sm:grid-cols-3">
+          <StatCard icon="campaign" label="Notifications sent" value={String(rows.length)} accent="orange" />
+          <StatCard icon="mark_email_read" label="Emails delivered" value={String(totalSent)} />
+          <StatCard icon="error" label="Emails failed" value={String(totalFailed)} accent={totalFailed > 0 ? 'red' : 'default'} />
         </section>
 
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-lg text-primary">Templates</h2>
-          <form action={upsertAnnouncementTemplate} className="mt-3 grid gap-2 md:grid-cols-2">
-            <input name="key" required placeholder="key e.g. welcome" className="rounded-lg border px-3 py-2" />
-            <input name="name" required placeholder="Display name" className="rounded-lg border px-3 py-2" />
-            <input name="subject" required placeholder="Email subject" className="rounded-lg border px-3 py-2 md:col-span-2" />
-            <textarea name="bodyHtml" required placeholder="HTML body ({{title}}, {{content}})" className="rounded-lg border px-3 py-2 md:col-span-2" rows={3} />
-            <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Save template</button>
-          </form>
-          <ul className="mt-3 space-y-1 text-sm">
-            {templates.map((t) => (
-              <li key={t.id}>
-                <b>{t.key}</b> — {t.name}
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-lg text-primary">Recent announcements & delivery</h2>
-          <div className="mt-3 space-y-3">
-            {announcements.map((a) => {
-              const failed = a.receipts.filter((r) => r.emailStatus === 'FAILED').length
-              const sent = a.receipts.filter((r) => r.emailStatus === 'SENT').length
-              return (
-                <article key={a.id} className="rounded-xl border p-3 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <b>{a.title}</b> · {a.status}
-                      <p className="text-xs text-on-surface-variant">
-                        {a.author.fullName} · {a.createdAt.toLocaleString()} · email sent {sent} · failed {failed}
-                      </p>
-                    </div>
-                    {failed > 0 && (
-                      <form action={retryFailedAnnouncementEmails}>
-                        <input type="hidden" name="announcementId" value={a.id} />
-                        <button className="text-primary underline">Retry failed emails</button>
-                      </form>
-                    )}
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </section>
+        <AnnouncementsAdminClient
+          createAction={createTargetedAnnouncement}
+          retryAction={retryFailedAnnouncementEmails}
+          templateAction={upsertAnnouncementTemplate}
+          announcements={rows}
+          templates={templates.map((t) => ({ id: t.id, key: t.key, name: t.name }))}
+          members={members}
+          branches={branches.map((b) => b.familyBranch as string)}
+          nowInputValue={nowInputValue()}
+        />
+        {actor.isSuperAdmin && <AssignedContactInbox adminId={actor.id} />}
       </div>
     </DashboardShell>
   )

@@ -326,6 +326,11 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
                       </div>
                     </div>
                   )}
+                  {detail.mapsUrl && (
+                    <a href={detail.mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[13px] font-bold text-primary hover:underline">
+                      <span className="material-symbols-outlined text-[17px]">directions</span>Get directions
+                    </a>
+                  )}
                 </div>
 
                 {detail.description && (

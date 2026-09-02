@@ -43,31 +43,25 @@ const SUPPORT_CHAT_NAV: NavItem = { icon: 'support_agent', label: 'Support chat'
 
 export const ADMIN_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/admin' },
-  { icon: 'group', label: 'Member registry', href: '/admin/members' },
-  { icon: 'assessment', label: 'Reports', href: '/reports/manage' },
+  { icon: 'group', label: 'Members', href: '/admin/members' },
   { icon: 'pending_actions', label: 'Approvals', href: '/admin/approvals' },
-  { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
-  { icon: 'contact_mail', label: 'Contact inbox', href: '/admin/contact-messages' },
-  SUPPORT_CHAT_NAV,
   { icon: 'account_balance', label: 'Finance', href: '/admin/finance' },
-  { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
-  EVENTS_VIEW_NAV,
-  MEETINGS_REPORTS_NAV,
-  { icon: 'folder_managed', label: 'Documents', href: '/documents/manage' },
-  DOCUMENTS_VIEW_NAV,
+  { icon: 'work', label: 'Projects & events', href: '/dashboard/executive/projects', children: [
+    EVENTS_VIEW_NAV,
+    { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
+  ] },
+  { icon: 'assessment', label: 'Reports & meetings', href: '/reports/manage', children: [MEETINGS_REPORTS_NAV] },
+  { icon: 'campaign', label: 'Communications', href: '/admin/announcements' },
+  { icon: 'folder_managed', label: 'Documents', href: '/documents/manage', children: [DOCUMENTS_VIEW_NAV] },
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
-  { icon: 'edit_note', label: 'Public content', href: '/admin/content' },
-  { icon: 'admin_panel_settings', label: 'Roles', href: '/admin/roles' },
-  { icon: 'campaign', label: 'Announcements', href: '/admin/announcements' },
-  { icon: 'settings', label: 'Settings', href: '/admin/settings' },
-  { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
-  FAMILY_NAV,
-  CONTRIBUTIONS_NAV,
+  { icon: 'settings', label: 'Settings', href: '/admin/settings', children: [
+    { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
+  ] },
+  { icon: 'admin_panel_settings', label: 'Roles & access', href: '/admin/roles' },
 ]
 
 export const EXECUTIVE_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/executive' },
-  { icon: 'contact_mail', label: 'Contact inbox', href: '/dashboard/executive/contact-messages' },
   SUPPORT_CHAT_NAV,
   { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
   EVENTS_VIEW_NAV,
@@ -87,7 +81,6 @@ export const TREASURER_NAV: NavItem[] = [
   { icon: 'account_balance', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
   { icon: 'rule', label: 'Reconciliation', href: '/dashboard/treasurer/reconciliation' },
   { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
-  { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/treasurer/welfare' },
   PROJECTS_VIEW_NAV,
   EVENTS_VIEW_NAV,
   MEETINGS_REPORTS_NAV,
@@ -136,7 +129,7 @@ export const MEMBER_NAV: NavItem[] = [
   PROJECTS_VIEW_NAV,
   EVENTS_VIEW_NAV,
   MEETINGS_REPORTS_NAV,
-  { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/member/welfare' },
+  { icon: 'gavel', label: 'Governance', href: '/governance' },
   DOCUMENTS_VIEW_NAV,
 ]
 
@@ -147,11 +140,27 @@ export const LOANS_NAV_ITEMS = {
   executive: { icon: 'account_balance', label: 'Loans', href: '/dashboard/executive/loans' } satisfies NavItem,
 }
 
+export const WELFARE_NAV_ITEMS = {
+  member: { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/member/welfare' } satisfies NavItem,
+  treasurer: { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/treasurer/welfare' } satisfies NavItem,
+}
+
 export function withOptionalNav(nav: NavItem[], item: NavItem | null, afterHref?: string): NavItem[] {
   if (!item) return nav
   if (!afterHref) return [...nav, item]
   const idx = nav.findIndex((n) => n.href === afterHref)
-  if (idx < 0) return [...nav, item]
+  if (idx < 0) {
+    const parentIdx = nav.findIndex((n) => n.children?.some((child) => child.href === afterHref))
+    if (parentIdx < 0) return [...nav, item]
+    return nav.map((entry, entryIdx) => entryIdx === parentIdx
+      ? { ...entry, children: withOptionalNav(entry.children || [], item, afterHref) }
+      : entry)
+  }
+  if (nav[idx].children) {
+    return nav.map((entry, entryIdx) => entryIdx === idx
+      ? { ...entry, children: [...(entry.children || []), item] }
+      : entry)
+  }
   return [...nav.slice(0, idx + 1), item, ...nav.slice(idx + 1)]
 }
 

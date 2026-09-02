@@ -10,7 +10,6 @@ Testing, sign-off, and role cheat-sheets.
 
 Related: [OPERATIONS.md](./OPERATIONS.md) | [IMPLEMENTATION.md](./IMPLEMENTATION.md) | [ARCHITECTURE.md](./ARCHITECTURE.md)
 
----
 
 # 1. Testing report
 ## Automated coverage (Stage 9)

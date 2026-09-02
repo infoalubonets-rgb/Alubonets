@@ -314,6 +314,7 @@ model User {
   memberProfile        MemberProfile?
   consentRecords       ConsentRecord[]
   loginEvents          LoginEvent[]
+  passwordResetTokens  PasswordResetToken[]
   assignedContacts     ContactSubmission[] @relation("ContactAssignee")
   contactReplies       ContactReply[]
   editedContent        PublicContentVersion[]
@@ -329,6 +330,10 @@ model User {
   createdActionPoints MeetingActionPoint[] @relation("ActionPointCreator")
   createdDecisions MeetingDecision[]
   approvedMeetings Meeting[] @relation("MeetingApprover")
+  createdResolutions Resolution[] @relation("ResolutionCreatedBy")
+  decidedResolutions Resolution[] @relation("ResolutionDecidedBy")
+  publishedResolutions Resolution[] @relation("ResolutionPublishedBy")
+  resolutionResponses ResolutionResponse[]
   projectResponsibilities ProjectResponsible[]
   projectComments ProjectComment[] @relation("ProjectCommentAuthor")
   moderatedProjectComments ProjectComment[] @relation("ProjectCommentModerator")
@@ -507,6 +512,20 @@ model RateLimit {
   updatedAt    DateTime @updatedAt
 
   @@map("rate_limits")
+}
+
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model MembershipSequence {
@@ -805,6 +824,7 @@ model Project {
   description           String
   status                ProjectStatus @default(UPCOMING)
   imageUrl              String?
+  isPublic              Boolean       @default(true)
   progress              Int           @default(0)
   startDate             DateTime?
   endDate               DateTime?
@@ -825,6 +845,7 @@ model Project {
   expenses     Expense[]
 
   @@index([categoryId])
+  @@index([isPublic, updatedAt])
   @@map("projects")
 }
 
@@ -998,6 +1019,7 @@ model Event {
   title                String
   description          String?
   location             String?
+  mapsUrl              String?
   startsAt             DateTime
   endsAt               DateTime?
   imageUrl             String?
@@ -1256,6 +1278,60 @@ model MeetingDecision {
   @@map("meeting_decisions")
 }
 
+enum ResolutionStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum ResolutionVoteChoice {
+  APPROVE
+  REJECT
+}
+
+model Resolution {
+  id               String           @id @default(cuid())
+  title            String
+  body             String
+  category         String           @default("RESOLUTION")
+  imageUrl         String?
+  documentUrl      String?
+  documentName     String?
+  status           ResolutionStatus @default(PENDING_APPROVAL)
+  visibleToRoles   Role[]           @default([])
+  createdById      String
+  createdBy        User             @relation("ResolutionCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  decidedById      String?
+  decidedBy        User?            @relation("ResolutionDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt        DateTime?
+  rejectionReason  String?
+  resultsPublished Boolean          @default(false)
+  publishedById    String?
+  publishedBy      User?            @relation("ResolutionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  responses        ResolutionResponse[]
+  @@index([status])
+  @@index([category, createdAt])
+  @@map("resolutions")
+}
+
+model ResolutionResponse {
+  id           String               @id @default(cuid())
+  resolutionId String
+  resolution   Resolution           @relation(fields: [resolutionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vote         ResolutionVoteChoice
+  comment      String?
+  anonymous    Boolean              @default(false)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  @@unique([resolutionId, userId])
+  @@map("resolution_responses")
+}
+
 model MeetingVersion {
   id          String   @id @default(cuid())
   meetingId   String
@@ -1429,14 +1505,21 @@ model LoanGuarantor {
   id          String              @id @default(cuid())
   loanId      String
   loan        LoanApplication     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  userId      String
-  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName    String?
+  idNumber    String?
+  phone       String?
+  residence   String?
+  relationship String?
+  kraPin      String?
   status      LoanGuarantorStatus @default(PENDING)
   note        String?
   respondedAt DateTime?
   createdAt   DateTime            @default(now())
 
   @@unique([loanId, userId])
+  @@index([loanId, idNumber])
   @@index([userId, status])
   @@map("loan_guarantors")
 }

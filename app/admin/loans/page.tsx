@@ -30,14 +30,18 @@ export default async function AdminLoansPage() {
     <DashboardShell role="ADMIN" title="Loan approvals" nav={nav}>
       <div className="space-y-4 p-4 md:p-6">
         <p className="text-sm text-on-surface-variant">
-          Policy: max KES {policy.maxAmountKes.toLocaleString()} · min guarantors {policy.minGuarantors}
+          Policy: KES {policy.minAmountKes.toLocaleString()}–{policy.maxAmountKes.toLocaleString()} · min guarantors {policy.minGuarantors}
           {policy.requireGuarantorAccept ? ' · guarantor accept required' : ''}.{' '}
           <Link href="/admin/settings" className="text-primary underline">
             Settings
           </Link>
+          {' · '}
+          <a href="/api/pdf/loan-policy?download=1" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+            Download loan policy PDF
+          </a>
         </p>
         {loans.map((loan) => {
-          const accepted = loan.guarantors.filter((g) => g.status === 'ACCEPTED').length
+          const accepted = loan.guarantors.filter((g) => g.status === 'ACCEPTED' || !g.userId).length
           const canApprove =
             ['SUBMITTED', 'UNDER_REVIEW'].includes(loan.status) &&
             (!policy.requireGuarantorAccept || accepted >= policy.minGuarantors)
@@ -49,7 +53,7 @@ export default async function AdminLoansPage() {
                   {loan.status}
                   <p>{loan.purpose}</p>
                   <p className="text-xs text-on-surface-variant">
-                    Guarantors accepted {accepted}/{loan.guarantors.length}
+                    Eligible guarantors {accepted}/{loan.guarantors.length}
                     {loan.reviewedBy ? ` · reviewed by ${loan.reviewedBy.fullName}` : ' · not yet treasurer-reviewed'}
                     {loan.treasurerNote ? ` · note: ${loan.treasurerNote}` : ''}
                     {['DISBURSED', 'CLOSED'].includes(loan.status)

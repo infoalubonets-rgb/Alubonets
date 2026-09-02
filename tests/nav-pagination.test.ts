@@ -9,6 +9,7 @@ import {
   TREASURER_NAV,
   withOptionalNav,
   navForRole,
+  type NavItem,
 } from '../lib/dashboard/nav'
 import { isSharedAuthenticatedPath } from '../lib/auth/types'
 import {
@@ -26,10 +27,43 @@ describe('withOptionalNav', () => {
     expect(withOptionalNav(MEMBER_NAV, null)).toEqual(MEMBER_NAV)
   })
 
-  it('inserts loans after contributions href', () => {
+  it('inserts loans after finance href', () => {
     const nav = withOptionalNav(ADMIN_NAV, LOANS_NAV_ITEMS.admin, '/admin/finance')
     const financeIdx = nav.findIndex((n) => n.href === '/admin/finance')
     expect(nav[financeIdx + 1]?.href).toBe('/admin/loans')
+  })
+
+  it('keeps the admin sidebar to 11 top-level sections', () => {
+    expect(ADMIN_NAV).toHaveLength(11)
+  })
+
+  it('keeps every former admin destination in a main section or related page', () => {
+    const adminHrefs = ADMIN_NAV.flatMap((item) => [
+      item.href,
+      ...(item.children?.map((child) => child.href) || []),
+    ])
+    expect(adminHrefs).toEqual(expect.arrayContaining([
+      '/admin',
+      '/admin/members',
+      '/reports/manage',
+      '/admin/approvals',
+      '/admin/gallery-queue',
+      '/admin/contact-messages',
+      '/admin/finance',
+      '/dashboard/executive/projects',
+      '/dashboard/member/events',
+      '/meetings-reports',
+      '/documents/manage',
+      '/documents',
+      '/governance/manage',
+      '/admin/content',
+      '/admin/roles',
+      '/admin/announcements',
+      '/admin/settings',
+      '/admin/audit-logs',
+      '/dashboard/member/family',
+      '/contributions',
+    ]))
   })
 })
 
@@ -89,7 +123,7 @@ describe('dashboard nav hrefs resolve to page files', () => {
     ]
   }
 
-  const hrefs = [
+  const navItems: NavItem[] = [
     ...ADMIN_NAV,
     ...EXECUTIVE_NAV,
     ...TREASURER_NAV,
@@ -101,8 +135,9 @@ describe('dashboard nav hrefs resolve to page files', () => {
     LOANS_NAV_ITEMS.admin,
     LOANS_NAV_ITEMS.executive,
   ]
-    .map((n) => n.href)
-    .filter((h) => h && h !== '#')
+  const hrefs = navItems
+    .flatMap((n) => [n.href, ...(n.children?.map((child) => child.href) || [])])
+    .filter((h): h is string => Boolean(h && h !== '#'))
 
   const publicAuth = [
     '/login',

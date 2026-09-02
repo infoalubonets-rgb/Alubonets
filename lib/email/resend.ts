@@ -56,6 +56,22 @@ export async function sendSupportMessageEmail(input: { memberName: string; membe
   return { skipped: false as const, accepted: !result.error }
 }
 
+export async function sendPasswordResetEmail(input: { userId: string; fullName: string; email: string; resetUrl: string }) {
+  const resend = getResend()
+  if (!resend) throw new Error('Password-reset email is not configured.')
+  const recipient = testEmailOverride() || input.email
+  const subject = 'Reset your Alubonets password'
+  const safeName = input.fullName.replace(/[<>&]/g, '')
+  const html = baseHtml(`<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Reset your password</h2>
+    <p style="color:#374151;">Hello ${safeName},</p>
+    <p style="color:#374151;line-height:1.6;">This secure reset link expires in <strong>10 minutes</strong> and can only be used once.</p>
+    <p><a href="${input.resetUrl}" style="display:inline-block;background:#003d82;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;">Reset password</a></p>
+    <p style="color:#6b7280;font-size:13px;">If you did not request this, ignore this email. Your password will not change.</p>`)
+  const delivery = await resend.emails.send({ from: from(), to: recipient, subject, html })
+  if (delivery.error) throw new Error(delivery.error.message)
+  await prisma.emailLog.create({ data: { userId: input.userId, toEmail: recipient, subject, template: 'password_reset', status: 'accepted', meta: { providerMessageId: delivery.data?.id || null, testMode: Boolean(testEmailOverride()), intendedRecipient: input.email } } })
+}
+
 // Sends an email to active members (all, or a specific subset by ID)
 export async function sendBroadcastEmail({
   subject,

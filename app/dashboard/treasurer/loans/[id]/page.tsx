@@ -11,6 +11,7 @@ import {
   recordLoanRepayment,
   treasurerReviewLoan,
 } from '@/app/actions/loans'
+import { todayInputValue } from '@/lib/dates'
 
 export default async function TreasurerLoanDetailPage({
   params,
@@ -78,8 +79,9 @@ export default async function TreasurerLoanDetailPage({
               )}
               <ul className="mt-3 space-y-1 text-sm">
                 {loan.guarantors.map((g) => (
-                  <li key={g.id}>
-                    {g.user.fullName} — {g.status}
+                  <li key={g.id} className="rounded-xl border border-outline-variant bg-surface-container-low p-3">
+                    <b>{g.user?.fullName || g.fullName}</b> — {g.userId ? g.status : 'EXTERNAL GUARANTOR'}
+                    {g.user ? <span className="block text-xs text-on-surface-variant">Registered member · {g.user.email}</span> : <span className="block text-xs text-on-surface-variant">ID: {g.idNumber} · Phone: {g.phone} · details supplied by applicant</span>}
                   </li>
                 ))}
               </ul>
@@ -131,7 +133,9 @@ export default async function TreasurerLoanDetailPage({
                     name="occurredAt"
                     type="date"
                     required
-                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    max={todayInputValue()}
+                    title="A disbursement cannot be dated in the future."
+                    defaultValue={todayInputValue()}
                     className="rounded-lg border px-3 py-2"
                   />
                   <input name="evidence" type="file" accept=".pdf,image/*" className="rounded-lg border px-3 py-2" />
@@ -165,7 +169,9 @@ export default async function TreasurerLoanDetailPage({
                     name="occurredAt"
                     type="date"
                     required
-                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    max={todayInputValue()}
+                    title="A repayment cannot be dated in the future."
+                    defaultValue={todayInputValue()}
                     className="rounded-lg border px-3 py-2"
                   />
                   <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Record repayment</button>

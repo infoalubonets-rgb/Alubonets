@@ -29,28 +29,33 @@ export default async function MemberEventsPage() {
     },
     orderBy: { startsAt: 'asc' },
   })
+  const creationLogs = await prisma.auditLog.findMany({
+    where: { action: 'EVENT_CREATE', entity: 'Event', entityId: { in: events.map((event) => event.id) } },
+    select: { entityId: true, userId: true },
+    orderBy: { createdAt: 'asc' },
+  })
+  const creatorByEvent = new Map(creationLogs.map((log) => [log.entityId, log.userId]))
+  const canDeleteAnyEvent = actor.isSuperAdmin || actor.role === 'ADMIN'
+  const isOrganizer = actor.role === 'ORGANIZER' || actor.dashboardAccess.includes('ORGANIZER')
+  const now = new Date()
+  const toCard = (event: (typeof events)[number]) => ({
+    id: event.id, title: event.title, description: event.description, location: event.location, mapsUrl: event.mapsUrl,
+    startsAt: event.startsAt.toISOString(), endsAt: event.endsAt?.toISOString() ?? null,
+    imageUrl: event.imageUrl, isPublic: event.isPublic, capacity: event.capacity,
+    rsvpCount: event._count.rsvps,
+    myRsvp: event.rsvps[0] ? { status: event.rsvps[0].status } : undefined,
+    reportPublishedAt: event.reportPublishedAt?.toISOString() ?? null,
+    canDelete: canDeleteAnyEvent || (isOrganizer && creatorByEvent.get(event.id) === actor.id),
+  })
 
   const upcoming = events
-    .filter((e) => e.startsAt >= new Date())
-    .map((e) => ({
-      id: e.id,
-      title: e.title,
-      startsAt: e.startsAt.toISOString(),
-      rsvpCount: e._count.rsvps,
-      myRsvp: e.rsvps[0] ? { status: e.rsvps[0].status } : undefined,
-      reportPublishedAt: e.reportPublishedAt?.toISOString() ?? null,
-    }))
+    .filter((event) => event.startsAt >= now)
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
+    .map(toCard)
   const past = events
-    .filter((e) => e.startsAt < new Date())
-    .reverse()
-    .map((e) => ({
-      id: e.id,
-      title: e.title,
-      startsAt: e.startsAt.toISOString(),
-      rsvpCount: e._count.rsvps,
-      myRsvp: e.rsvps[0] ? { status: e.rsvps[0].status } : undefined,
-      reportPublishedAt: e.reportPublishedAt?.toISOString() ?? null,
-    }))
+    .filter((event) => event.startsAt < now)
+    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
+    .map(toCard)
 
   return (
     <DashboardShell role={actor.role} title="Events" nav={navForRole(actor.role)}>

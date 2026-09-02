@@ -13,6 +13,7 @@ import {
   upsertEventDetails,
 } from '@/app/actions/events'
 import { moneyNumber } from '@/lib/projects'
+import { lowerBoundFor } from '@/lib/dates'
 
 const ROLES = ['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
 
@@ -41,6 +42,16 @@ export default async function OrganizerEventManagePage({
     }),
   ])
   if (!event) notFound()
+  // These fields share the page's existing UTC `toISOString().slice(0, 16)` convention.
+  // An event already in the past keeps its own start time as the floor so it stays editable.
+  const notBeforeNow = new Date().toISOString().slice(0, 16)
+  const minStartsAt = lowerBoundFor(notBeforeNow, event.startsAt.toISOString().slice(0, 16))
+  const minRsvpDeadlineAt = lowerBoundFor(notBeforeNow, event.rsvpDeadlineAt?.toISOString().slice(0, 16))
+  const rsvpAnalytics = {
+    going: event.rsvps.filter((rsvp) => rsvp.status === 'GOING').length,
+    maybe: event.rsvps.filter((rsvp) => rsvp.status === 'MAYBE').length,
+    notGoing: event.rsvps.filter((rsvp) => rsvp.status === 'NOT_GOING').length,
+  }
 
   return (
     <DashboardShell role="ORGANIZER" title="Manage event" nav={ORGANIZER_NAV}>
@@ -53,6 +64,19 @@ export default async function OrganizerEventManagePage({
           {event.startsAt.toLocaleString()} · {event.audienceType} · RSVPs {event.rsvps.length}
           {event.capacity ? ` / ${event.capacity}` : ''}
         </p>
+        <section aria-label="RSVP analytics" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { label: 'Going', value: rsvpAnalytics.going, icon: 'check_circle', tone: 'border-green-200 bg-green-50 text-green-800' },
+            { label: 'Maybe', value: rsvpAnalytics.maybe, icon: 'help', tone: 'border-amber-200 bg-amber-50 text-amber-800' },
+            { label: 'Not going', value: rsvpAnalytics.notGoing, icon: 'cancel', tone: 'border-red-200 bg-red-50 text-red-800' },
+            { label: 'Total responses', value: event.rsvps.length, icon: 'groups', tone: 'border-blue-200 bg-blue-50 text-primary' },
+          ].map((stat) => (
+            <div key={stat.label} className={`flex items-center gap-3 rounded-2xl border p-4 ${stat.tone}`}>
+              <span className="material-symbols-outlined text-[22px]">{stat.icon}</span>
+              <div><p className="text-2xl font-black leading-none">{stat.value}</p><p className="mt-1 text-xs font-bold">{stat.label}</p></div>
+            </div>
+          ))}
+        </section>
 
         <section className="rounded-2xl border bg-surface p-5">
           <h2 className="font-h3 text-lg text-primary">Event details</h2>
@@ -63,10 +87,13 @@ export default async function OrganizerEventManagePage({
               name="startsAt"
               type="datetime-local"
               required
+              min={minStartsAt}
+              title="Choose a date and time that is not in the past."
               defaultValue={event.startsAt.toISOString().slice(0, 16)}
               className="rounded-lg border px-3 py-2"
             />
             <input name="location" defaultValue={event.location || ''} placeholder="Location" className="rounded-lg border px-3 py-2" />
+            <input name="mapsUrl" type="url" defaultValue={event.mapsUrl || ''} placeholder="Maps directions link (optional)" className="rounded-lg border px-3 py-2" />
             <textarea name="description" defaultValue={event.description || ''} className="rounded-lg border px-3 py-2 md:col-span-3" />
             <select name="audienceType" defaultValue={event.audienceType} className="rounded-lg border px-3 py-2">
               <option value="PUBLIC">Public</option>
@@ -78,6 +105,8 @@ export default async function OrganizerEventManagePage({
             <input
               name="rsvpDeadlineAt"
               type="datetime-local"
+              min={minRsvpDeadlineAt}
+              title="Choose an RSVP deadline that is not in the past."
               defaultValue={event.rsvpDeadlineAt?.toISOString().slice(0, 16) || ''}
               className="rounded-lg border px-3 py-2"
             />

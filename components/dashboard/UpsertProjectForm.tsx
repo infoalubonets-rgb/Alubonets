@@ -12,6 +12,7 @@ type ProjectRow = {
   description: string
   status: 'UPCOMING' | 'ONGOING' | 'COMPLETED'
   imageUrl?: string | null
+  isPublic?: boolean
   progress: number
   updatedAt: string
 }
@@ -92,6 +93,7 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
   const [title, setTitle]       = useState(initial?.title ?? '')
   const [description, setDesc]  = useState(initial?.description ?? '')
   const [status, setStatus]     = useState<'UPCOMING' | 'ONGOING' | 'COMPLETED'>(initial?.status ?? 'UPCOMING')
+  const [isPublic, setIsPublic] = useState(initial?.isPublic !== false)
   const [progress, setProgress] = useState(initial?.progress ?? 0)
 
   // image upload state
@@ -155,6 +157,7 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
       description,
       status,
       imageUrl: uploadedUrl || null,
+      isPublic,
       progress,
       updatedAt: new Date().toISOString(),
     })
@@ -165,6 +168,7 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
     fd.set('description', description)
     fd.set('status', status)
     fd.set('progress', String(progress))
+    fd.set('isPublic', isPublic ? 'on' : 'off')
     if (uploadedUrl) fd.set('imageUrl', uploadedUrl)
     fd.set('sendEmail', sendEmail && !existingId ? 'on' : 'off')
     fd.set('emailAudience', emailAudience)
@@ -217,6 +221,25 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
           className="w-full border border-outline-variant rounded-lg px-3 py-2 text-[13px] bg-surface text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
         />
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsPublic((value) => !value)}
+        className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${isPublic ? 'border-primary/40 bg-primary/5 dark:bg-primary/10' : 'border-outline-variant bg-surface-container dark:border-[#1e3461] dark:bg-[#111f36]'}`}
+      >
+        <div className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${isPublic ? 'bg-primary' : 'bg-outline/40 dark:bg-[#2a3f66]'}`}>
+          <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isPublic ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+        </div>
+        <div>
+          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-on-surface">
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{isPublic ? 'public' : 'lock'}</span>
+            {isPublic ? 'Public project' : 'Members only'}
+          </p>
+          <p className="text-[11px] text-on-surface-variant">
+            {isPublic ? 'Shown on the public site and member dashboard' : 'Shown on the member dashboard only'}
+          </p>
+        </div>
+      </button>
 
       {/* Progress */}
       <div className="space-y-2">

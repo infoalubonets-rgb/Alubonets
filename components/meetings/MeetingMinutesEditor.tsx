@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -9,6 +9,7 @@ import {
 } from '@/app/actions/meetings'
 import { submitMinutesForApproval } from '@/app/actions/governance'
 import { SITE_LOGO } from '@/lib/constants'
+import { lowerBoundFor, nowInputValue } from '@/lib/dates'
 
 export type MeetingEditorValues = {
   id?: string
@@ -76,6 +77,14 @@ export default function MeetingMinutesEditor({
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const locked = values.status === 'FINAL' || values.status === 'PENDING_APPROVAL'
+  // Set after mount so the bound comes from the browser's clock and the attribute
+  // matches between the server render and hydration.
+  const [minNextMeetingAt, setMinNextMeetingAt] = useState('')
+  useEffect(() => {
+    setMinNextMeetingAt(lowerBoundFor(nowInputValue(), values.nextMeetingAt || null))
+    // Only the value seeded from the record matters; later edits are already bounded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const set = (key: keyof MeetingEditorValues, value: string | number) =>
     setValues((v) => ({ ...v, [key]: value }))
@@ -315,6 +324,8 @@ export default function MeetingMinutesEditor({
           <Field label="Next Meeting">
             <input
               type="datetime-local"
+              min={minNextMeetingAt || undefined}
+              title="The next meeting cannot be scheduled in the past."
               value={values.nextMeetingAt}
               onChange={(e) => set('nextMeetingAt', e.target.value)}
               className={INPUT}

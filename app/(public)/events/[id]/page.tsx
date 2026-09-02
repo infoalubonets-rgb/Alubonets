@@ -65,6 +65,11 @@ export default async function EventDetailPage({ params }: Props) {
             {event.location ? ` · ${event.location}` : ''}
             {isPast ? ' · Past' : ''}
           </p>
+          {event.mapsUrl && (
+            <a href={event.mapsUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-bold text-on-primary transition hover:opacity-90">
+              <span className="material-symbols-outlined text-[18px]">directions</span>Get directions
+            </a>
+          )}
         </div>
       </div>
 

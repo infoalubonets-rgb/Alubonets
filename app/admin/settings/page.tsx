@@ -13,6 +13,9 @@ import {
   upsertMembershipClass,
   upsertProjectCategory,
   upsertWelfareCategory,
+  updateWelfareAmountLimits,
+  updateLoanAmountLimits,
+  updateLoanPolicy,
 } from '@/app/actions/settings'
 
 export default async function AdminSettingsPage() {
@@ -27,6 +30,7 @@ export default async function AdminSettingsPage() {
     navWithLoans('ADMIN'),
   ])
   const loansOn = Boolean(flags[FEATURE_FLAGS.loansEnabled])
+  const welfareOn = Boolean(flags[FEATURE_FLAGS.welfareEnabled])
 
   return (
     <DashboardShell role="ADMIN" title="Settings" nav={nav}>
@@ -45,11 +49,17 @@ export default async function AdminSettingsPage() {
             <Link href="/admin/announcements" className="text-primary underline">
               Announcements
             </Link>
-            . Social links:{' '}
-            <Link href="/admin/content" className="text-primary underline">
-              Public content
-            </Link>
             .
+          </p>
+          <form action={toggleFeatureFlag} className="mt-4 flex items-center gap-3 border-t pt-4">
+            <input type="hidden" name="key" value={FEATURE_FLAGS.welfareEnabled} />
+            <label className="text-sm">
+              <input type="checkbox" name="enabled" defaultChecked={welfareOn} /> Enable welfare module
+            </label>
+            <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Save</button>
+          </form>
+          <p className="mt-2 text-xs text-on-surface-variant">
+            When off, the Welfare nav item and routes are hidden for members and treasurers.
           </p>
         </section>
 
@@ -120,7 +130,24 @@ export default async function AdminSettingsPage() {
             label="Retention days"
             defaultValue={settings[SETTING_KEYS.auditRetentionDays] || '365'}
           />
+          <p className="mt-3 text-sm">
+            <Link href="/admin/audit-logs" className="text-primary underline">
+              View activity logs
+            </Link>
+          </p>
         </section>
+
+        {welfareOn && (
+          <section className="rounded-2xl border bg-surface p-5">
+            <h2 className="font-h3 text-lg text-primary">Welfare amount limits</h2>
+            <p className="mt-1 text-xs text-on-surface-variant">Members can only submit Welfare requests within this KES range.</p>
+            <form action={updateWelfareAmountLimits} className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="text-sm">Minimum request (KES)<input name="min" type="number" min="0" step="0.01" required defaultValue={settings[SETTING_KEYS.welfareMinAmountKes] || '1000'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+              <label className="text-sm">Maximum request (KES)<input name="max" type="number" min="1" step="0.01" required defaultValue={settings[SETTING_KEYS.welfareMaxAmountKes] || '100000'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+              <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary md:col-span-2">Save welfare limits</button>
+            </form>
+          </section>
+        )}
 
         <section className="rounded-2xl border bg-surface p-5">
           <h2 className="font-h3 text-lg text-primary">Family account transition</h2>
@@ -135,17 +162,16 @@ export default async function AdminSettingsPage() {
         {loansOn && (
           <section className="rounded-2xl border bg-surface p-5">
             <h2 className="font-h3 text-lg text-primary">Loan policy</h2>
+            <form action={updateLoanAmountLimits} className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="text-sm">Min amount (KES)<input name="min" type="number" min="0" max="999999" step="1" required defaultValue={settings[SETTING_KEYS.loanMinAmountKes] || '1300'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+              <label className="text-sm">Max amount (KES)<input name="max" type="number" min="100" max="999999" step="1" required defaultValue={settings[SETTING_KEYS.loanMaxAmountKes] || '50000'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+              <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary md:col-span-2">Save loan amount limits</button>
+            </form>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
-              <SettingForm
-                settingKey={SETTING_KEYS.loanMaxAmountKes}
-                label="Max amount (KES)"
-                defaultValue={settings[SETTING_KEYS.loanMaxAmountKes] || '50000'}
-              />
-              <SettingForm
-                settingKey={SETTING_KEYS.loanMinGuarantors}
-                label="Min guarantors"
-                defaultValue={settings[SETTING_KEYS.loanMinGuarantors] || '1'}
-              />
+              <div className="space-y-2">
+                <p className="text-sm">Required guarantors</p>
+                <p className="rounded-lg border bg-surface-container-low px-3 py-2 text-sm font-semibold">2 (fixed)</p>
+              </div>
               <form action={updateAppSetting} className="space-y-2">
                 <input type="hidden" name="key" value={SETTING_KEYS.loanRequireGuarantorAccept} />
                 <label className="text-sm">Guarantors must accept before approve</label>
@@ -166,6 +192,24 @@ export default async function AdminSettingsPage() {
                 /admin/loans
               </Link>
             </p>
+
+            <div className="mt-5 border-t pt-4">
+              <h3 className="font-h3 text-base text-primary">Loan policy document</h3>
+              <p className="mt-1 text-xs text-on-surface-variant">Shown to applicants as a downloadable PDF, styled with the site letterhead.</p>
+              <form action={updateLoanPolicy} className="mt-3 grid gap-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-sm">Title<input name="title" type="text" required maxLength={200} defaultValue={settings[SETTING_KEYS.loanPolicyTitle] || 'Loan Policy'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+                  <label className="text-sm">Effective date<input name="effectiveDate" type="date" defaultValue={settings[SETTING_KEYS.loanPolicyEffectiveDate] || ''} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+                </div>
+                <label className="text-sm">Content<textarea name="content" rows={10} maxLength={20000} placeholder="Write the loan policy here…" defaultValue={settings[SETTING_KEYS.loanPolicyContent] || ''} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Save loan policy</button>
+                  <a href="/api/pdf/loan-policy?download=1" target="_blank" rel="noopener noreferrer" className="w-fit rounded-full border border-primary px-4 py-2 text-sm text-primary">
+                    Download PDF
+                  </a>
+                </div>
+              </form>
+            </div>
           </section>
         )}
 
@@ -220,6 +264,7 @@ export default async function AdminSettingsPage() {
             <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Add</button>
           </form>
         </CategorySection>
+
       </div>
     </DashboardShell>
   )
@@ -230,11 +275,17 @@ function SettingForm({
   label,
   defaultValue,
   type = 'text',
+  min,
+  max,
+  step,
 }: {
   settingKey: string
   label: string
   defaultValue: string
   type?: string
+  min?: string
+  max?: string
+  step?: string
 }) {
   return (
     <form action={updateAppSetting} className="space-y-2">
@@ -244,6 +295,9 @@ function SettingForm({
         <input
           name="value"
           type={type}
+          min={min}
+          max={max}
+          step={step}
           required
           defaultValue={defaultValue}
           className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"

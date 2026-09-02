@@ -8,6 +8,7 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { TAGS, sendAnnouncement } from '@/lib/data/queries'
 import { canModerateProjectComments, isProjectManager } from '@/lib/projects'
+import { assertNotFuture, assertNotPast } from '@/lib/dates'
 
 function refreshProject(projectId?: string) {
   revalidatePath('/projects')
@@ -237,6 +238,7 @@ export async function recordProjectInvestment(formData: FormData) {
       investedAt: formData.get('investedAt') || undefined,
       notes: formData.get('notes') || undefined,
     })
+  assertNotFuture(data.investedAt, 'Investment date')
   const investment = await prisma.projectInvestment.create({
     data: {
       projectId: data.projectId,
@@ -289,6 +291,7 @@ export async function addProjectMilestone(formData: FormData) {
       description: formData.get('description') || undefined,
       dueAt: formData.get('dueAt') || undefined,
     })
+  assertNotPast(data.dueAt, 'Milestone due date')
   const position =
     (await prisma.projectMilestone.count({ where: { projectId: data.projectId } })) + 1
   const milestone = await prisma.projectMilestone.create({

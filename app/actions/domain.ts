@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath, revalidateTag } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { after } from 'next/server'
 import { z } from 'zod'
 import { requireActiveRole, requireAdmin, requireSessionProfile } from '@/lib/auth/session'
@@ -9,7 +10,6 @@ import {
   approveGalleryPhoto,
   createEvent,
   createGalleryPhoto,
-  createWelfareRequest,
   deleteAnnouncement,
   deleteEvent,
   deleteEvents,
@@ -26,11 +26,31 @@ import {
 import { prisma } from '@/lib/prisma'
 import { sendBroadcastEmail, sendContributionReceiptEmail, sendWelfareStatusEmail } from '@/lib/email/resend'
 import { writeAudit } from '@/lib/audit'
+import { getWelfarePolicy } from '@/lib/settings'
+import { requireWelfareEnabled } from '@/lib/feature-flags'
+import { assertNotPast } from '@/lib/dates'
 
 export async function actionCreateContribution(formData: FormData) {
   void formData
   await requireActiveRole(['TREASURER', 'ADMIN'])
   throw new Error('Direct contribution entry is disabled. Use the immutable financial ledger.')
+}
+
+export async function actionCreateWelfare(formData: FormData) {
+  await requireWelfareEnabled()
+  const actor = await requireActiveRole(['MEMBER', 'ADMIN'])
+  const description = String(formData.get('description') || '').trim()
+  const amount = Number(formData.get('amount'))
+  const policy = await getWelfarePolicy()
+  if (description.length < 3 || !Number.isFinite(amount) || amount < policy.minAmountKes || amount > policy.maxAmountKes) {
+    redirect('/dashboard/member/welfare?error=limits')
+  }
+  await prisma.welfareRequest.create({ data: { userId: actor.id, description, amount } })
+  revalidatePath('/dashboard/member/welfare')
+  revalidatePath('/dashboard/treasurer')
+  revalidatePath('/admin')
+  revalidateTag(TAGS.welfare)
+  redirect('/dashboard/member/welfare?submitted=1')
 }
 
 export async function actionEmailReceipt(formData: FormData) {
@@ -56,20 +76,8 @@ export async function actionEmailReceipt(formData: FormData) {
   revalidatePath('/dashboard/treasurer/contributions')
 }
 
-export async function actionCreateWelfare(formData: FormData) {
-  const actor = await requireActiveRole(['MEMBER', 'ADMIN'])
-  const description = String(formData.get('description') || '')
-  const amountRaw = formData.get('amount')
-  if (!description) throw new Error('Description required')
-  const amount = amountRaw ? Number(amountRaw) : undefined
-  await createWelfareRequest(actor.id, description, amount)
-  revalidatePath('/dashboard/member')
-  revalidatePath('/dashboard/treasurer')
-  revalidatePath('/admin')
-  revalidateTag(TAGS.welfare)
-}
-
 export async function actionReviewWelfare(formData: FormData) {
+  await requireWelfareEnabled()
   const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
   const id = String(formData.get('id') || '')
   const status = String(formData.get('status') || '') as 'APPROVED' | 'REJECTED'
@@ -220,6 +228,7 @@ export async function actionCreateEvent(formData: FormData) {
   const title = String(formData.get('title') || '')
   const startsAt = String(formData.get('startsAt') || '')
   if (!title || !startsAt) throw new Error('Title and start date required')
+  assertNotPast(new Date(startsAt), 'Event date')
 
   const isPublic = formData.get('isPublic') !== 'off'
   const sendEmail = formData.get('sendEmail') !== 'off'
@@ -227,6 +236,7 @@ export async function actionCreateEvent(formData: FormData) {
   const emailMemberIds = formData.getAll('emailMemberId').map(String).filter(Boolean)
   const imageUrl = String(formData.get('imageUrl') || '') || undefined
   const location = String(formData.get('location') || '') || undefined
+  const mapsUrl = parseOptionalMapsUrl(formData.get('mapsUrl'))
   const description = String(formData.get('description') || '') || undefined
 
   const capacityRaw = String(formData.get('capacity') || '').trim()
@@ -241,6 +251,7 @@ export async function actionCreateEvent(formData: FormData) {
     title,
     description,
     location,
+    mapsUrl,
     imageUrl,
     startsAt: new Date(startsAt),
     isPublic,
@@ -437,12 +448,14 @@ export async function actionUpsertProject(formData: FormData) {
   const existingId = String(formData.get('id') || '') || undefined
   const rawProgress = Number(formData.get('progress') ?? 0)
   const progress = Math.min(100, Math.max(0, isNaN(rawProgress) ? 0 : rawProgress))
+  const isPublic = formData.get('isPublic') !== 'off'
   const project = await upsertProject({
     id: existingId,
     title,
     description,
     status,
     imageUrl: String(formData.get('imageUrl') || '') || undefined,
+    isPublic,
     progress,
   })
 
@@ -496,6 +509,7 @@ export async function actionUpsertProject(formData: FormData) {
 
   revalidatePath('/dashboard/executive')
   revalidatePath('/dashboard/organizer')
+  revalidatePath('/dashboard/member/projects')
   revalidatePath('/projects')
   revalidateTag(TAGS.projects)
 }
@@ -505,9 +519,14 @@ export async function actionUpdateEvent(id: string, formData: FormData) {
   const title = String(formData.get('title') || '')
   const startsAt = String(formData.get('startsAt') || '')
   if (!title || !startsAt) throw new Error('Title and start date required')
+  // An event that has already happened stays editable, so only a *changed* date
+  // has to clear the bound.
+  const existing = await prisma.event.findUnique({ where: { id }, select: { startsAt: true } })
+  if (new Date(startsAt).getTime() !== existing?.startsAt.getTime()) assertNotPast(new Date(startsAt), 'Event date')
   const isPublic = formData.get('isPublic') !== 'off'
   const imageUrl = String(formData.get('imageUrl') || '') || null
   const location = String(formData.get('location') || '') || null
+  const mapsUrl = parseOptionalMapsUrl(formData.get('mapsUrl')) ?? null
   const description = String(formData.get('description') || '') || null
   const capacityRaw = String(formData.get('capacity') || '').trim()
   const capacity = capacityRaw ? Number(capacityRaw) : null
@@ -522,6 +541,7 @@ export async function actionUpdateEvent(id: string, formData: FormData) {
     title,
     description,
     location,
+    mapsUrl,
     imageUrl: imageUrl ?? undefined,
     startsAt: new Date(startsAt),
     isPublic,
@@ -530,6 +550,15 @@ export async function actionUpdateEvent(id: string, formData: FormData) {
   })
   EVENT_PATHS.forEach((p) => revalidatePath(p))
   revalidateTag(TAGS.events)
+}
+
+function parseOptionalMapsUrl(value: FormDataEntryValue | null) {
+  const raw = String(value || '').trim()
+  if (!raw) return undefined
+  let url: URL
+  try { url = new URL(raw) } catch { throw new Error('Enter a valid maps directions link') }
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Maps link must start with http:// or https://')
+  return url.toString()
 }
 
 export async function actionUpdateGalleryPhoto(formData: FormData) {

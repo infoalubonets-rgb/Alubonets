@@ -178,16 +178,19 @@ async function main() {
   await prisma.event.createMany({
     data: [
       {
+        id: 'seed-event-quarterly-meeting',
         title: 'Quarterly General Meeting',
         description: 'Review of finances and projects',
         location: 'Alubokho Community Hall',
-        startsAt: new Date(Date.now() + 14 * 86400000),
+        startsAt: new Date(Date.now() + 7 * 86400000),
+        imageUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1200',
       },
       {
-        title: 'Family Day',
-        description: 'Sports and fellowship',
-        location: 'School grounds',
-        startsAt: new Date(Date.now() + 45 * 86400000),
+        id: 'seed-event-family-day',
+        title: 'Community Family Day',
+        description: 'A completed day of sports, fellowship, and family activities.',
+        location: 'Alubokho School Grounds',
+        startsAt: new Date(Date.now() - 7 * 86400000),
       },
     ],
   })

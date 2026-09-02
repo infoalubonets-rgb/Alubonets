@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react'
 import { actionCreateEvent, actionUpdateEvent } from '@/app/actions/domain'
+import { lowerBoundFor, nowInputValue } from '@/lib/dates'
 import { createClient } from '@/utils/supabase/client'
 
 type MemberOption = { id: string; fullName: string; email: string }
@@ -80,7 +81,7 @@ async function uploadWithProgress(
 // ── draft persistence ────────────────────────────────────────────────────────
 
 type Draft = {
-  title: string; startsAt: string; location: string
+  title: string; startsAt: string; location: string; mapsUrl: string
   description: string; uploadedUrl: string; isPublic: boolean
   sendEmail: boolean; emailAudience: 'ALL' | 'SELECTED'
 }
@@ -99,7 +100,7 @@ function clearDraft() {
 
 type OptimisticEvent = {
   id: string; title: string; description?: string | null
-  location?: string | null; startsAt: string; imageUrl?: string | null; isPublic?: boolean
+  location?: string | null; mapsUrl?: string | null; startsAt: string; imageUrl?: string | null; isPublic?: boolean
 }
 
 export default function CreateEventForm({
@@ -117,6 +118,7 @@ export default function CreateEventForm({
   const [title, setTitle]             = useState(initial?.title ?? '')
   const [startsAt, setStartsAt]       = useState(() => initial?.startsAt ? toDateTimeLocal(initial.startsAt) : '')
   const [location, setLocation]       = useState(initial?.location ?? '')
+  const [mapsUrl, setMapsUrl]         = useState(initial?.mapsUrl ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [isPublic, setIsPublic]       = useState(initial?.isPublic !== false)
   const [sendEmail, setSendEmail]     = useState(true)
@@ -135,6 +137,9 @@ export default function CreateEventForm({
 
   const [dateError, setDateError] = useState('')
   const [hasDraft, setHasDraft]   = useState(false)
+  // Set after mount so the browser's clock — not the server's — bounds the picker,
+  // and so the attribute matches between the server render and hydration.
+  const [minStartsAt, setMinStartsAt] = useState('')
 
   const fileRef      = useRef<HTMLInputElement>(null)
   const draftTimer   = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -146,7 +151,9 @@ export default function CreateEventForm({
   useEffect(() => {
     const d = loadDraft()
     if (d && (d.title || d.startsAt || d.uploadedUrl)) setHasDraft(true)
-  }, [])
+    // An event already scheduled in the past stays editable at its own date.
+    setMinStartsAt(lowerBoundFor(nowInputValue(), initial?.startsAt ? toDateTimeLocal(initial.startsAt) : null))
+  }, [initial?.startsAt])
 
   function restoreDraft() {
     const d = loadDraft()
@@ -154,6 +161,7 @@ export default function CreateEventForm({
     setTitle(d.title)
     setStartsAt(d.startsAt)
     setLocation(d.location)
+    setMapsUrl(d.mapsUrl || '')
     setDescription(d.description)
     setUploadedUrl(d.uploadedUrl)
     setIsPublic(d.isPublic)
@@ -166,7 +174,7 @@ export default function CreateEventForm({
     if (draftTimer.current) clearTimeout(draftTimer.current)
     draftTimer.current = setTimeout(() => {
       saveDraft({
-        title, startsAt, location, description,
+        title, startsAt, location, mapsUrl, description,
         uploadedUrl, isPublic, sendEmail, emailAudience,
         ...patch,
       })
@@ -217,10 +225,19 @@ export default function CreateEventForm({
     e.preventDefault()
     if (!title || !startsAt) return
 
+    // Reject a past date in both modes; when editing an event that is already past,
+    // its own start time is the floor so unrelated details stay editable.
+    if (startsAt < lowerBoundFor(nowInputValue(), isEditing && initial?.startsAt ? toDateTimeLocal(initial.startsAt) : null)) {
+      setDateError('Event date cannot be in the past')
+      return
+    }
+    setDateError('')
+
     const fd = new FormData()
     fd.set('title', title)
     fd.set('startsAt', startsAt)
     fd.set('location', location)
+    fd.set('mapsUrl', mapsUrl)
     fd.set('description', description)
     fd.set('imageUrl', effectiveUrl)
     fd.set('isPublic', isPublic ? 'on' : 'off')
@@ -234,6 +251,7 @@ export default function CreateEventForm({
         title,
         description: description || null,
         location: location || null,
+        mapsUrl: mapsUrl || null,
         startsAt: new Date(startsAt).toISOString(),
         imageUrl: effectiveUrl || null,
         isPublic,
@@ -243,17 +261,12 @@ export default function CreateEventForm({
     }
 
     // Create mode
-    if (new Date(startsAt) < new Date()) {
-      setDateError('Event date cannot be in the past')
-      return
-    }
-    setDateError('')
-
     onOptimisticAdd?.({
       id: `opt-${Date.now()}`,
       title,
       description: description || null,
       location: location || null,
+      mapsUrl: mapsUrl || null,
       startsAt,
       imageUrl: effectiveUrl || null,
       isPublic,
@@ -315,6 +328,8 @@ export default function CreateEventForm({
             <span className="material-symbols-outlined text-outline dark:text-blue-200/40" style={{ fontSize: 15 }}>schedule</span>
             <input
               name="startsAt" type="datetime-local" required
+              min={minStartsAt || undefined}
+              title="Choose a date and time that is not in the past."
               value={startsAt} onChange={(e) => { setStartsAt(e.target.value); if (dateError) setDateError(''); scheduleSave({ startsAt: e.target.value }) }}
               className="flex-1 bg-transparent outline-none text-[13px] text-on-surface dark:text-blue-50"
             />
@@ -337,6 +352,15 @@ export default function CreateEventForm({
               value={location} onChange={(e) => { setLocation(e.target.value); scheduleSave({ location: e.target.value }) }}
               className="flex-1 bg-transparent outline-none text-[13px] text-on-surface dark:text-blue-50 placeholder:text-outline dark:placeholder:text-blue-200/30"
             />
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="space-y-1">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant dark:text-blue-200/60">Maps directions link <span className="font-normal normal-case tracking-normal text-outline">(optional)</span></label>
+          <div className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface-container px-3 py-2.5 transition-all focus-within:border-primary focus-within:ring-1 focus-within:ring-primary dark:border-[#1e3461] dark:bg-[#111f36]">
+            <span className="material-symbols-outlined text-[15px] text-outline dark:text-blue-200/40">map</span>
+            <input name="mapsUrl" type="url" placeholder="Paste a Google Maps or directions link" value={mapsUrl} onChange={(e) => { setMapsUrl(e.target.value); scheduleSave({ mapsUrl: e.target.value }) }} className="flex-1 bg-transparent text-[13px] text-on-surface outline-none placeholder:text-outline dark:text-blue-50 dark:placeholder:text-blue-200/30" />
           </div>
         </div>
 

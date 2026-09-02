@@ -10,12 +10,16 @@ import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
 import { sendBroadcastEmail } from '@/lib/email/resend'
 import { sendAnnouncement } from '@/lib/data/queries'
+import { assertNotPast } from '@/lib/dates'
 
 function refreshEvents(eventId?: string) {
   revalidatePath('/events')
   revalidatePath('/dashboard/organizer/events')
   revalidatePath('/dashboard/member/events')
-  if (eventId) revalidatePath(`/events/${eventId}`)
+  if (eventId) {
+    revalidatePath(`/events/${eventId}`)
+    revalidatePath(`/dashboard/organizer/events/${eventId}`)
+  }
   revalidateTag(TAGS.events)
 }
 
@@ -31,6 +35,7 @@ export async function upsertEventDetails(formData: FormData) {
       title: z.string().trim().min(2),
       description: z.string().trim().optional(),
       location: z.string().trim().optional(),
+      mapsUrl: z.string().trim().url().optional(),
       startsAt: z.coerce.date(),
       endsAt: z.coerce.date().optional(),
       imageUrl: z.string().trim().optional(),
@@ -47,6 +52,7 @@ export async function upsertEventDetails(formData: FormData) {
       title: formData.get('title'),
       description: formData.get('description') || undefined,
       location: formData.get('location') || undefined,
+      mapsUrl: formData.get('mapsUrl') || undefined,
       startsAt: formData.get('startsAt'),
       endsAt: formData.get('endsAt') || undefined,
       imageUrl: formData.get('imageUrl') || undefined,
@@ -58,6 +64,11 @@ export async function upsertEventDetails(formData: FormData) {
       actualCostKes: formData.get('actualCostKes') || undefined,
       reminderOffsetsHours: formData.get('reminderOffsetsHours') || undefined,
     })
+  // An event may not be scheduled in the past. An event that has already happened
+  // stays editable, so only a *changed* date has to clear the bound.
+  const existing = data.id ? await prisma.event.findUnique({ where: { id: data.id }, select: { startsAt: true, rsvpDeadlineAt: true } }) : null
+  if (data.startsAt.getTime() !== existing?.startsAt.getTime()) assertNotPast(data.startsAt, 'Event date')
+  if (data.rsvpDeadlineAt && data.rsvpDeadlineAt.getTime() !== existing?.rsvpDeadlineAt?.getTime()) assertNotPast(data.rsvpDeadlineAt, 'RSVP deadline')
   const audienceRoles = formData.getAll('audienceRoles').map(String) as Role[]
   const offsets = (data.reminderOffsetsHours || '')
     .split(',')
@@ -67,6 +78,7 @@ export async function upsertEventDetails(formData: FormData) {
     title: data.title,
     description: data.description ?? null,
     location: data.location ?? null,
+    mapsUrl: data.mapsUrl ?? null,
     startsAt: data.startsAt,
     endsAt: data.endsAt ?? null,
     imageUrl: data.imageUrl ?? null,
@@ -206,6 +218,21 @@ export async function submitEventRsvp(formData: FormData) {
     newValue: { status: data.status },
   })
   refreshEvents(data.eventId)
+}
+
+export async function deleteEventFromMemberView(eventId: string) {
+  const actor = await requireActiveRole(['ADMIN', 'ORGANIZER'])
+  const canDeleteAny = actor.isSuperAdmin || actor.role === 'ADMIN'
+  if (!canDeleteAny) {
+    const creationLog = await prisma.auditLog.findFirst({
+      where: { action: 'EVENT_CREATE', entity: 'Event', entityId: eventId, userId: actor.id },
+      select: { id: true },
+    })
+    if (!creationLog) throw new Error('You can only delete events you created.')
+  }
+  await prisma.event.delete({ where: { id: eventId } })
+  await writeAudit({ userId: actor.id, action: 'EVENT_DELETE', entity: 'Event', entityId: eventId })
+  refreshEvents(eventId)
 }
 
 export async function recordEventAttendance(formData: FormData) {

@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { registerRequest } from '@/lib/auth/client'
+import { todayInputValue } from '@/lib/dates'
 import {
   EDUCATION_LEVELS,
   GENDERS,
@@ -37,7 +38,7 @@ const initial = {
   location: '',
   gender: 'MALE',
   dateOfBirth: '',
-  familyBranch: '',
+  familyBranch: 'Default',
   nextOfKinName: '',
   nextOfKinPhone: '',
   nextOfKinRelationship: '',
@@ -60,6 +61,10 @@ export default function RegistrationForm() {
   const [sameAsKin, setSameAsKin] = useState(true)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // A date of birth can never be in the future. Set after mount so the bound comes
+  // from the browser's clock and the attribute survives hydration unchanged.
+  const [today, setToday] = useState('')
+  useEffect(() => setToday(todayInputValue()), [])
 
   const set = (name: keyof typeof initial, value: string) =>
     setForm((current) => ({ ...current, [name]: value }))
@@ -96,6 +101,8 @@ export default function RegistrationForm() {
         value={form[name]}
         onChange={(event) => set(name, event.target.value)}
         required
+        max={type === 'date' ? today || undefined : undefined}
+        title={type === 'date' ? 'A date of birth cannot be in the future.' : undefined}
         className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2.5"
       />
     </label>

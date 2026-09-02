@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import ErrorDialog from '@/components/ui/ErrorDialog'
 import { friendlyError } from '@/lib/safe-error'
+import { todayInputValue } from '@/lib/dates'
 import {
   createAttachedMember,
   linkExistingFamilyMember,
@@ -68,6 +69,10 @@ export default function FamilyBranchClient({
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [dateOfBirth, setDateOfBirth] = useState('')
+  // A date of birth can never be in the future. Set after mount so the bound comes
+  // from the browser's clock and the attribute survives hydration unchanged.
+  const [today, setToday] = useState('')
+  useEffect(() => setToday(todayInputValue()), [])
   const [lineage, setLineage] = useState(defaultLineage)
   const [detailMember, setDetailMember] = useState<BranchMember | null>(null)
   const [error, setError] = useState('')
@@ -372,7 +377,7 @@ export default function FamilyBranchClient({
                   </label>
                   <label className="block text-sm font-medium">
                     Date of birth <span className="font-normal text-on-surface-variant">(optional)</span>
-                    <input type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm dark:bg-[#111f36]" />
+                    <input type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} max={today || undefined} title="A date of birth cannot be in the future." className="mt-1 h-9 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm dark:bg-[#111f36]" />
                   </label>
                 </div>
               )}

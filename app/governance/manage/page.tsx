@@ -4,22 +4,27 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { syncOverdueActionPoints } from '@/lib/documents'
+import { getResolutionsForViewer } from '@/lib/data/queries'
 import { actionPublishMeetingMinutes } from '@/app/actions/meetings'
+import CreateResolutionForm from '@/components/governance/CreateResolutionForm'
+import ResolutionsFeed from '@/components/governance/ResolutionsFeed'
 import {
   addActionPoint,
   addAgendaItem,
-  addMeetingDecision,
   circulateMeetingNotice,
   createMinutesRevision,
 } from '@/app/actions/governance'
+import { todayInputValue } from '@/lib/dates'
 
 const ROLES = ['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
+const RESOLUTION_CREATOR_ROLES = ['SECRETARY', 'ORGANIZER', 'TREASURER', 'ADMIN']
 
 export default async function ManageGovernancePage() {
   const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE'])
   await syncOverdueActionPoints()
   const canManage = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
-  const [meetings, members] = await Promise.all([
+  const canCreateResolution = RESOLUTION_CREATOR_ROLES.includes(actor.role)
+  const [meetings, members, resolutions] = await Promise.all([
     prisma.meeting.findMany({
       include: {
         agendaItems: { orderBy: { position: 'asc' } },
@@ -35,6 +40,7 @@ export default async function ManageGovernancePage() {
       include: { memberProfile: true },
       orderBy: { fullName: 'asc' },
     }),
+    getResolutionsForViewer(actor),
   ])
   const committee = members.filter(
     (member) => member.role !== 'MEMBER' || member.memberProfile?.memberCategory === 'COMMITTEE_MEMBER',
@@ -62,6 +68,17 @@ export default async function ManageGovernancePage() {
             )}
           </div>
         </section>
+
+        <section className="space-y-4">
+          {canCreateResolution && <CreateResolutionForm />}
+          <ResolutionsFeed
+            pending={resolutions.pending}
+            approved={resolutions.approved}
+            canApprove={resolutions.canApprove}
+            fullDetail={resolutions.fullDetail}
+          />
+        </section>
+
         {!meetings.length && (
           <section className="rounded-2xl border border-dashed bg-surface p-6 text-center">
             <h2 className="font-h3 text-lg text-primary">No meeting records yet</h2>
@@ -205,38 +222,8 @@ export default async function ManageGovernancePage() {
                         </option>
                       ))}
                     </select>
-                    <input name="dueAt" type="date" className="mt-1 rounded-lg border px-2 py-1" />
+                    <input name="dueAt" type="date" min={todayInputValue()} title="An action point cannot be due in the past." className="mt-1 rounded-lg border px-2 py-1" />
                     <button className="ml-2 text-sm text-primary underline">Assign</button>
-                  </form>
-                  <form action={addMeetingDecision} className="rounded-xl bg-surface-container-low p-3">
-                    <b>Add decision</b>
-                    <input type="hidden" name="meetingId" value={meeting.id} />
-                    <input
-                      name="reference"
-                      required
-                      placeholder="e.g. RES-2026-001"
-                      className="mt-2 block w-full rounded-lg border px-2 py-1"
-                    />
-                    <input
-                      name="title"
-                      required
-                      placeholder="Title"
-                      className="mt-1 block w-full rounded-lg border px-2 py-1"
-                    />
-                    <textarea
-                      name="decision"
-                      required
-                      placeholder="Decision"
-                      className="mt-1 block w-full rounded-lg border px-2 py-1"
-                    />
-                    <input
-                      name="decidedAt"
-                      type="date"
-                      required
-                      defaultValue={meeting.heldAt.toISOString().slice(0, 10)}
-                      className="mt-1 rounded-lg border px-2 py-1"
-                    />
-                    <button className="ml-2 text-sm text-primary underline">Register</button>
                   </form>
                 </div>
               </div>

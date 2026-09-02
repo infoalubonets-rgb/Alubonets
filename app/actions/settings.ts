@@ -32,9 +32,111 @@ export async function updateAppSetting(formData: FormData) {
   refreshSettings()
 }
 
+export async function updateWelfareAmountLimits(formData: FormData) {
+  const actor = await requireAdmin()
+  const limits = z.object({
+    min: z.coerce.number().min(0),
+    max: z.coerce.number().positive(),
+  }).refine((value) => value.max >= value.min, {
+    message: 'Maximum welfare amount must be greater than or equal to the minimum.',
+  }).parse({ min: formData.get('min'), max: formData.get('max') })
+  await prisma.$transaction([
+    prisma.appSetting.upsert({
+      where: { key: SETTING_KEYS.welfareMinAmountKes },
+      create: { key: SETTING_KEYS.welfareMinAmountKes, value: String(limits.min), updatedBy: actor.id },
+      update: { value: String(limits.min), updatedBy: actor.id },
+    }),
+    prisma.appSetting.upsert({
+      where: { key: SETTING_KEYS.welfareMaxAmountKes },
+      create: { key: SETTING_KEYS.welfareMaxAmountKes, value: String(limits.max), updatedBy: actor.id },
+      update: { value: String(limits.max), updatedBy: actor.id },
+    }),
+  ])
+  await writeAudit({
+    userId: actor.id,
+    action: 'WELFARE_LIMITS_UPDATE',
+    entity: 'AppSetting',
+    entityId: 'welfare_amount_limits',
+    newValue: limits,
+  })
+  refreshSettings()
+  revalidatePath('/dashboard/member/welfare')
+}
+
+export async function updateLoanAmountLimits(formData: FormData) {
+  const actor = await requireAdmin()
+  const limits = z.object({
+    min: z.coerce.number().min(0),
+    max: z.coerce.number().min(100).max(999_999),
+  }).refine((value) => value.max >= value.min, {
+    message: 'Maximum loan amount must be greater than or equal to the minimum.',
+  }).parse({ min: formData.get('min'), max: formData.get('max') })
+  await prisma.$transaction([
+    prisma.appSetting.upsert({
+      where: { key: SETTING_KEYS.loanMinAmountKes },
+      create: { key: SETTING_KEYS.loanMinAmountKes, value: String(limits.min), updatedBy: actor.id },
+      update: { value: String(limits.min), updatedBy: actor.id },
+    }),
+    prisma.appSetting.upsert({
+      where: { key: SETTING_KEYS.loanMaxAmountKes },
+      create: { key: SETTING_KEYS.loanMaxAmountKes, value: String(limits.max), updatedBy: actor.id },
+      update: { value: String(limits.max), updatedBy: actor.id },
+    }),
+  ])
+  await writeAudit({
+    userId: actor.id,
+    action: 'LOAN_LIMITS_UPDATE',
+    entity: 'AppSetting',
+    entityId: 'loan_amount_limits',
+    newValue: limits,
+  })
+  refreshSettings()
+  revalidatePath('/dashboard/member/loans')
+}
+
+export async function updateLoanPolicy(formData: FormData) {
+  const actor = await requireAdmin()
+  const data = z.object({
+    title: z.string().trim().min(2).max(200),
+    content: z.string().trim().max(20_000),
+    effectiveDate: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')),
+  }).parse({
+    title: formData.get('title'),
+    content: formData.get('content'),
+    effectiveDate: formData.get('effectiveDate') || '',
+  })
+  await prisma.$transaction([
+    prisma.appSetting.upsert({
+      where: { key: SETTING_KEYS.loanPolicyTitle },
+      create: { key: SETTING_KEYS.loanPolicyTitle, value: data.title, updatedBy: actor.id },
+      update: { value: data.title, updatedBy: actor.id },
+    }),
+    prisma.appSetting.upsert({
+      where: { key: SETTING_KEYS.loanPolicyContent },
+      create: { key: SETTING_KEYS.loanPolicyContent, value: data.content, updatedBy: actor.id },
+      update: { value: data.content, updatedBy: actor.id },
+    }),
+    prisma.appSetting.upsert({
+      where: { key: SETTING_KEYS.loanPolicyEffectiveDate },
+      create: { key: SETTING_KEYS.loanPolicyEffectiveDate, value: data.effectiveDate, updatedBy: actor.id },
+      update: { value: data.effectiveDate, updatedBy: actor.id },
+    }),
+  ])
+  await writeAudit({
+    userId: actor.id,
+    action: 'LOAN_POLICY_UPDATE',
+    entity: 'AppSetting',
+    entityId: 'loan_policy',
+    newValue: { title: data.title, effectiveDate: data.effectiveDate },
+  })
+  refreshSettings()
+  revalidatePath('/dashboard/member/loans')
+  revalidatePath('/admin/loans')
+}
+
 export async function toggleFeatureFlag(formData: FormData) {
   const actor = await requireAdmin()
-  const key = z.literal(FEATURE_FLAGS.loansEnabled).parse(formData.get('key'))
+  const key = z.enum([FEATURE_FLAGS.loansEnabled, FEATURE_FLAGS.welfareEnabled]).parse(formData.get('key'))
   const enabled = formData.has('enabled')
   await setFeatureFlag(key, enabled, actor.id)
   await writeAudit({
@@ -45,10 +147,15 @@ export async function toggleFeatureFlag(formData: FormData) {
     newValue: { enabled },
   })
   refreshSettings()
-  revalidatePath('/admin/loans')
-  revalidatePath('/dashboard/member/loans')
-  revalidatePath('/dashboard/treasurer/loans')
-  revalidatePath('/dashboard/executive/loans')
+  if (key === FEATURE_FLAGS.loansEnabled) {
+    revalidatePath('/admin/loans')
+    revalidatePath('/dashboard/member/loans')
+    revalidatePath('/dashboard/treasurer/loans')
+    revalidatePath('/dashboard/executive/loans')
+  } else {
+    revalidatePath('/dashboard/member/welfare')
+    revalidatePath('/dashboard/treasurer/welfare')
+  }
 }
 
 export async function upsertWelfareCategory(formData: FormData) {

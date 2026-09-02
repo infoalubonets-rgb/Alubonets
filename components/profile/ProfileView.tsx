@@ -138,14 +138,23 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mb-3 px-1 gap-2">
-            <Link
-              href="/contributions"
-              className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-low px-3.5 py-2 text-secondary font-label-bold text-[11px] tracking-[0.08em] uppercase shadow-[0_2px_8px_rgba(0,31,80,0.06)] hover:border-secondary-container/50 hover:bg-secondary-container/10 transition-all"
-            >
-              <span className="material-symbols-outlined text-[17px]">payments</span>
-              Contributions
-            </Link>
+          <div className="flex flex-wrap items-center justify-between mb-3 px-1 gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href="/contributions"
+                className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-low px-3.5 py-2 text-secondary font-label-bold text-[11px] tracking-[0.08em] uppercase shadow-[0_2px_8px_rgba(0,31,80,0.06)] hover:border-secondary-container/50 hover:bg-secondary-container/10 transition-all"
+              >
+                <span className="material-symbols-outlined text-[17px]">payments</span>
+                Contributions
+              </Link>
+              <Link
+                href="/dashboard/member/family"
+                className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-low px-3.5 py-2 text-secondary font-label-bold text-[11px] tracking-[0.08em] uppercase shadow-[0_2px_8px_rgba(0,31,80,0.06)] hover:border-secondary-container/50 hover:bg-secondary-container/10 transition-all"
+              >
+                <span className="material-symbols-outlined text-[17px]">family_restroom</span>
+                My Family / Branch
+              </Link>
+            </div>
             <button
               type="button"
               onClick={() => {

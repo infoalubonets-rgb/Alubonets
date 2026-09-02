@@ -28,7 +28,17 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-.codex-dev.*.log
+
+# logs and other local junk — never commit these
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+.codex-*
+Desktop.ini
+ehthumbs.db
 
 # env files
 .env

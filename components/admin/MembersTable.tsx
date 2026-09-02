@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { setMemberStatus } from '@/app/actions/members'
+import { assignMemberBranch, createBranchLineage, setMemberStatus } from '@/app/actions/members'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
 
 export type MembersTableUser = {
@@ -15,6 +15,7 @@ export type MembersTableUser = {
   status: string
   isSuperAdmin: boolean
   isPrincipal?: boolean
+  principalName?: string | null
   phone: string | null
   location: string | null
   membershipNumber: string | null
@@ -24,10 +25,8 @@ export type MembersTableUser = {
 
 type Props = {
   users: MembersTableUser[]
-  categories?: string[]
   branches?: string[]
-  filters?: { q: string; category: string; branch: string }
-  total?: number
+  filters?: { q: string; branch: string }
 }
 
 function statusStyles(status: string) {
@@ -47,10 +46,8 @@ function statusStyles(status: string) {
 
 export default function MembersTable({
   users,
-  categories = [],
   branches = [],
-  filters = { q: '', category: '', branch: '' },
-  total,
+  filters = { q: '', branch: '' },
 }: Props) {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
@@ -58,6 +55,8 @@ export default function MembersTable({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
+  const [branchFilter, setBranchFilter] = useState(filters.branch)
+  const [newBranch, setNewBranch] = useState('')
 
   useEffect(() => {
     setMounted(true)
@@ -75,6 +74,7 @@ export default function MembersTable({
   }, [selected])
 
   const close = () => setSelectedId(null)
+  const visibleUsers = branchFilter ? users.filter((user) => (user.familyBranch || 'Default') === branchFilter) : users
 
   const setStatus = (status: 'ACTIVE' | 'SUSPENDED') => {
     if (!selected) return
@@ -93,51 +93,44 @@ export default function MembersTable({
 
   return (
     <div className="space-y-4 pb-8 px-4 md:px-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <p className="text-sm text-on-surface-variant max-w-xl">
-          Directory of all members
-          {typeof total === 'number' ? ` (${total} matching)` : ''}. Open a row for details, or
-          suspend / restore an account.
-        </p>
-        <form method="get" className="flex w-full flex-wrap gap-2 sm:w-auto">
-          <select
-            name="category"
-            defaultValue={filters.category}
-            className="rounded-xl border px-3 py-2 text-sm"
-          >
-            <option value="">All categories</option>
-            {categories.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-          <select
-            name="branch"
-            defaultValue={filters.branch}
-            className="rounded-xl border px-3 py-2 text-sm"
-          >
-            <option value="">All branches</option>
-            {branches.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-          <div className="relative w-full sm:w-64">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[18px]">
-              search
-            </span>
-            <input
-              name="q"
-              defaultValue={filters.q}
-              placeholder="Search members…"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-sm focus:outline-none focus:ring-2 focus:ring-secondary-container/40 focus:border-secondary-container"
-            />
-          </div>
-          <button type="submit" className="rounded-xl bg-primary px-4 py-2 text-sm text-on-primary">
-            Filter
+      <div className="flex flex-wrap items-center justify-between gap-3 xl:flex-nowrap">
+        <div className="min-w-[220px] shrink-0">
+          <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">Member registry</h1>
+          <p className="text-xs text-on-surface-variant dark:text-blue-200/60">Super Administrator</p>
+        </div>
+        <form method="get" className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
+        <select
+          name="branch"
+          value={branchFilter}
+          onChange={(event) => setBranchFilter(event.target.value)}
+          aria-label="Branch or lineage"
+          className="h-9 w-[150px] rounded-xl border border-outline-variant bg-surface-container-lowest px-2 text-xs"
+        >
+          <option value="">All branches / lineages</option>
+          {branches.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+        <div className="relative w-full sm:w-48 lg:w-52">
+          <button type="submit" aria-label="Search members" title="Search" className="absolute left-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-outline transition hover:bg-primary hover:text-on-primary">
+            <span className="material-symbols-outlined text-[18px]">search</span>
           </button>
+          <input
+            name="q"
+            defaultValue={filters.q}
+            placeholder="Search members…"
+            className="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-lowest pl-8 pr-2 text-xs focus:border-secondary-container focus:outline-none focus:ring-2 focus:ring-secondary-container/40"
+          />
+        </div>
+          <Link
+          href="/api/export/members"
+          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl bg-primary px-3 text-xs font-bold text-on-primary"
+        >
+          <span className="material-symbols-outlined text-[17px]">download</span>
+          Export
+          </Link>
         </form>
       </div>
 
@@ -156,6 +149,9 @@ export default function MembersTable({
                   Role
                 </th>
                 <th className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
+                  Principal
+                </th>
+                <th className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
                   Status
                 </th>
                 <th className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant text-right w-16">
@@ -166,12 +162,12 @@ export default function MembersTable({
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-on-surface-variant">
+                  <td colSpan={6} className="py-10 text-center text-on-surface-variant">
                     No members found
                   </td>
                 </tr>
               ) : (
-                users.map((u, i) => (
+                visibleUsers.map((u, i) => (
                   <tr
                     key={u.id}
                     className={`border-t border-outline-variant/50 hover:bg-primary/[0.03] transition-colors ${
@@ -188,6 +184,15 @@ export default function MembersTable({
                     </td>
                     <td className="py-3.5 px-4 text-on-surface-variant">{u.email}</td>
                     <td className="py-3.5 px-4 text-on-surface">{ROLE_LABEL[u.role]}</td>
+                    <td className="py-3.5 px-4 text-on-surface-variant">
+                      {u.isPrincipal ? (
+                        <span className="inline-flex px-2.5 py-1 rounded-full text-[11px] font-label-bold uppercase tracking-wide bg-primary/10 text-primary">
+                          Principal
+                        </span>
+                      ) : (
+                        u.principalName || '—'
+                      )}
+                    </td>
                     <td className="py-3.5 px-4">
                       <span
                         className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-label-bold uppercase tracking-wide ${statusStyles(u.status)}`}
@@ -258,7 +263,7 @@ export default function MembersTable({
                   <DetailChip label="Location" value={selected.location?.trim() || '—'} />
                   <DetailChip
                     label="Principal"
-                    value={selected.isPrincipal ? 'Yes' : 'No'}
+                    value={selected.isPrincipal ? 'Yes (this member)' : selected.principalName || 'Unassigned'}
                   />
                 </div>
 
@@ -271,13 +276,17 @@ export default function MembersTable({
                 <p className="text-xs text-on-surface-variant">
                   Role and dashboard access are managed on the Roles page.
                 </p>
-                <Link
-                  href={`/admin/members/${selected.id}`}
-                  className="inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
-                >
-                  Open full application and history
-                </Link>
-
+                <section className="space-y-2 border-t border-outline-variant pt-3">
+                  <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary">Branch / lineage</p>
+                  <form action={async (formData) => { await assignMemberBranch(selected.id, String(formData.get('branch') || 'Default')); router.refresh() }} className="flex gap-2">
+                    <select name="branch" defaultValue={selected.familyBranch || 'Default'} className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm">{branches.map((branch) => <option key={branch}>{branch}</option>)}</select>
+                    <button className="rounded-lg bg-primary px-3 text-sm text-on-primary">Assign</button>
+                  </form>
+                  <form action={async () => { if (!newBranch.trim()) return; await createBranchLineage(newBranch); setNewBranch(''); router.refresh() }} className="flex gap-2">
+                    <input value={newBranch} onChange={(event) => setNewBranch(event.target.value)} placeholder="New branch / lineage" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm" />
+                    <button className="rounded-lg border px-3 text-sm">Add</button>
+                  </form>
+                </section>
                 <section className="pt-1 border-t border-outline-variant">
                   <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary mb-2">
                     Account actions

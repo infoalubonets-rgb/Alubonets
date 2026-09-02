@@ -12,6 +12,7 @@ type EventRow = {
   title: string
   description?: string | null
   location?: string | null
+  mapsUrl?: string | null
   startsAt: string
   imageUrl?: string | null
 }
@@ -82,6 +83,7 @@ function EventCard({ event, past = false }: { event: EventRow; past?: boolean })
                 <span className="truncate">{event.location}</span>
               </div>
             )}
+            {event.mapsUrl && <a href={event.mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"><span className="material-symbols-outlined text-[15px]">directions</span>Get directions</a>}
           </div>
 
           {event.description && !past && (

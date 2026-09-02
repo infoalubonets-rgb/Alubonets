@@ -7,6 +7,7 @@ export type EventRow = {
   title: string
   description?: string | null
   location?: string | null
+  mapsUrl?: string | null
   startsAt: string
   imageUrl?: string | null
   isPublic?: boolean

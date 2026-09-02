@@ -11,6 +11,7 @@ import {
   POLICY_VERSION,
   registrationSchema,
 } from '@/lib/membership'
+import { todayInputValue } from '@/lib/dates'
 
 const STORAGE_KEY = 'alubonets-registration-draft-v1'
 const steps = ['Verify email', 'Account', 'Personal', 'Family', 'Portfolio', 'Review']
@@ -22,7 +23,7 @@ const initial = {
   location: '',
   gender: 'MALE',
   dateOfBirth: '',
-  familyBranch: '',
+  familyBranch: 'Default',
   nextOfKinName: '',
   nextOfKinPhone: '',
   nextOfKinRelationship: '',
@@ -73,11 +74,22 @@ export default function RegistrationWizard({
   const [sameAsKin, setSameAsKin] = useState(true)
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [error, setError] = useState('')
+  const [branchOptions, setBranchOptions] = useState<string[]>(['Default'])
+
+  useEffect(() => {
+    fetch('/api/branches').then((response) => response.ok ? response.json() : null).then((data) => {
+      if (data?.branches?.length) setBranchOptions(data.branches)
+    }).catch(() => {})
+  }, [])
   const [loading, setLoading] = useState(false)
   const [resumed, setResumed] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [draftLoaded, setDraftLoaded] = useState(false)
+  // A date of birth can never be in the future. Set after mount so the bound comes
+  // from the browser's clock and the attribute survives hydration unchanged.
+  const [today, setToday] = useState('')
+  useEffect(() => setToday(todayInputValue()), [])
 
   useEffect(() => {
     if (invite) {
@@ -248,6 +260,8 @@ export default function RegistrationWizard({
         value={form[name]}
         onChange={(e) => set(name, e.target.value)}
         readOnly={locked}
+        max={type === 'date' ? today || undefined : undefined}
+        title={type === 'date' ? 'A date of birth cannot be in the future.' : undefined}
         className="mt-1 w-full rounded-lg border border-outline-variant px-3 py-2.5 disabled:bg-surface-container"
         disabled={locked}
       />
@@ -410,7 +424,7 @@ export default function RegistrationWizard({
         {step === 3 && (
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              {input('familyBranch', 'Family branch/lineage')}
+              {select('familyBranch', 'Family branch/lineage', branchOptions)}
               {input('nextOfKinRelationship', 'Next-of-kin relationship')}
               {input('nextOfKinName', 'Next of kin name')}
               {input('nextOfKinPhone', 'Next of kin phone', 'tel')}

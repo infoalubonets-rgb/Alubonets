@@ -22,7 +22,7 @@ Percentages are planning estimates and must be confirmed through acceptance test
 | System feature | Completed | Missing / not yet implemented |
 |---|---:|---|
 | **Public website:** Home, About, public project summaries, approved gallery items, contact form, registration and login are available without exposing private member information. | 95% | Complete final public-content review, confirm the production domain, and run a privacy check for accidental member-data exposure. |
-| **Secure member portal:** Approved members sign in to view dashboards, contributions, events, projects, welfare, governance documents and announcements. Pending or inactive accounts are restricted. | 90% | Add the dedicated Today’s Activities experience, finish member navigation changes, and complete end-to-end access testing for every account state. |
+| **Secure member portal:** Approved members sign in to view dashboards, contriVbutions, events, projects, welfare, governance documents and announcements. Pending or inactive accounts are restricted. | 90% | Add the dedicated Today’s Activities experience, finish member navigation changes, and complete end-to-end access testing for every account state. |
 | **Role workspaces:** Admin, Treasurer, Secretary, Organizer and Executive users receive role-specific dashboards and server-enforced permissions. | 90% | Confirm the final office-bearer permission matrix, decide whether an Auditor role is required, and test least-privilege rules across all APIs. |
 
 ## 2. Membership, family branches and privacy

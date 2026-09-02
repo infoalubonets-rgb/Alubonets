@@ -1,6 +1,6 @@
 import { unstable_cache } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import type { PaymentMethod, ProjectStatus, WelfareStatus } from '@prisma/client'
+import type { PaymentMethod, ProjectStatus, Role, WelfareStatus } from '@prisma/client'
 
 // ─── Cache tags ────────────────────────────────────────────────────────────────
 export const TAGS = {
@@ -166,7 +166,7 @@ export const getOrganizerEvents = unstable_cache(
     const events = await prisma.event.findMany({
       orderBy: { startsAt: 'asc' },
       select: {
-        id: true, title: true, startsAt: true, location: true,
+        id: true, title: true, startsAt: true, location: true, mapsUrl: true,
         description: true, imageUrl: true, isPublic: true,
       },
     })
@@ -175,6 +175,7 @@ export const getOrganizerEvents = unstable_cache(
       id: e.id,
       title: e.title,
       location: e.location ?? null,
+      mapsUrl: e.mapsUrl ?? null,
       description: e.description ?? null,
       imageUrl: e.imageUrl ?? null,
       isPublic: e.isPublic ?? true,
@@ -265,7 +266,7 @@ export const getPublicGallery = unstable_cache(
 )
 
 export const getPublicProjects = unstable_cache(
-  async () => prisma.project.findMany({ orderBy: { updatedAt: 'desc' } }),
+  async () => prisma.project.findMany({ where: { isPublic: true }, orderBy: { updatedAt: 'desc' } }),
   ['public-projects'],
   { tags: [TAGS.projects], revalidate: 300 },
 )
@@ -277,7 +278,7 @@ export const getPublicEvents = unstable_cache(
       where: { isPublic: true },
       orderBy: { startsAt: 'asc' },
       select: {
-        id: true, title: true, description: true, location: true,
+        id: true, title: true, description: true, location: true, mapsUrl: true,
         startsAt: true, imageUrl: true,
       },
     })
@@ -287,6 +288,7 @@ export const getPublicEvents = unstable_cache(
       title: e.title,
       description: e.description ?? null,
       location: e.location ?? null,
+      mapsUrl: e.mapsUrl ?? null,
       imageUrl: e.imageUrl ?? null,
       startsAt: e.startsAt.toISOString(),
     }))
@@ -347,6 +349,167 @@ export const getContributionAnalytics = unstable_cache(
   ['contribution-analytics'],
   { tags: [TAGS.contributions, TAGS.members], revalidate: 120 },
 )
+
+export async function getResolutionsForViewer(actor: { id: string; role: Role }) {
+  const canApprove = actor.role === 'ADMIN'
+  const fullDetail = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
+
+  const [pendingRaw, approvedRaw] = await Promise.all([
+    canApprove
+      ? prisma.resolution.findMany({
+          where: { status: 'PENDING_APPROVAL' },
+          include: { createdBy: { select: { fullName: true } } },
+          orderBy: { createdAt: 'desc' },
+        })
+      : Promise.resolve([]),
+    prisma.resolution.findMany({
+      where: {
+        status: 'APPROVED',
+        ...(fullDetail ? {} : { visibleToRoles: { has: actor.role } }),
+      },
+      include: {
+        createdBy: { select: { fullName: true } },
+        responses: {
+          include: { user: { select: { fullName: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ])
+
+  const pending = pendingRaw.map((r) => ({
+    id: r.id,
+    title: r.title,
+    body: r.body,
+    category: r.category,
+    imageUrl: r.imageUrl,
+    documentUrl: r.documentUrl,
+    documentName: r.documentName,
+    createdByName: r.createdBy.fullName,
+    createdAt: r.createdAt.toISOString(),
+  }))
+
+  const approved = approvedRaw.map((r) => {
+    const approveCount = r.responses.filter((x) => x.vote === 'APPROVE').length
+    const rejectCount = r.responses.filter((x) => x.vote === 'REJECT').length
+    const mine = r.responses.find((x) => x.userId === actor.id)
+    return {
+      id: r.id,
+      title: r.title,
+      body: r.body,
+      category: r.category,
+      imageUrl: r.imageUrl,
+      documentUrl: r.documentUrl,
+      documentName: r.documentName,
+      createdByName: r.createdBy.fullName,
+      createdAt: r.createdAt.toISOString(),
+      resultsPublished: r.resultsPublished,
+      approveCount,
+      rejectCount,
+      myVote: mine?.vote ?? null,
+      myComment: mine?.comment ?? null,
+      responses: fullDetail
+        ? r.responses.map((x) => ({
+            userName: x.anonymous ? 'Anonymous member' : x.user.fullName,
+            vote: x.vote,
+            comment: x.comment,
+            createdAt: x.createdAt.toISOString(),
+          }))
+        : undefined,
+    }
+  })
+
+  return { pending, approved, canApprove, fullDetail }
+}
+
+function canViewGovernanceRecords(actor: { role: Role }) {
+  return actor.role === 'ADMIN' || actor.role === 'SECRETARY'
+}
+
+function governanceRecordWhere(actor: { role: Role }) {
+  return {
+    status: 'APPROVED' as const,
+    ...(canViewGovernanceRecords(actor) ? {} : { visibleToRoles: { has: actor.role } }),
+  }
+}
+
+export async function getGovernanceRecordsForViewer(actor: { id: string; role: Role }) {
+  const rows = await prisma.resolution.findMany({
+    where: governanceRecordWhere(actor),
+    include: {
+      responses: { select: { userId: true, vote: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  return rows.map((row) => {
+    const mine = row.responses.find((response) => response.userId === actor.id)
+    return {
+      id: row.id,
+      title: row.title,
+      category: row.category,
+      createdAt: row.createdAt.toISOString(),
+      approveCount: row.responses.filter((response) => response.vote === 'APPROVE').length,
+      rejectCount: row.responses.filter((response) => response.vote === 'REJECT').length,
+      myVote: mine?.vote ?? null,
+      resultsPublished: row.resultsPublished,
+    }
+  })
+}
+
+export async function getGovernanceRecordForViewer(id: string, actor: { id: string; role: Role }) {
+  const fullDetail = canViewGovernanceRecords(actor)
+  const row = await prisma.resolution.findFirst({
+    where: { id, ...governanceRecordWhere(actor) },
+    include: {
+      createdBy: { select: { fullName: true } },
+      responses: {
+        include: { user: { select: { fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+  })
+  if (!row) return null
+
+  const mine = row.responses.find((response) => response.userId === actor.id)
+  const approveCount = row.responses.filter((response) => response.vote === 'APPROVE').length
+  const rejectCount = row.responses.filter((response) => response.vote === 'REJECT').length
+
+  return {
+    id: row.id,
+    title: row.title,
+    body: row.body,
+    category: row.category,
+    imageUrl: row.imageUrl,
+    documentUrl: row.documentUrl,
+    documentName: row.documentName,
+    createdByName: row.createdBy.fullName,
+    createdAt: row.createdAt.toISOString(),
+    resultsPublished: row.resultsPublished,
+    approveCount,
+    rejectCount,
+    myVote: mine?.vote ?? null,
+    myComment: mine?.comment ?? null,
+    myAnonymous: mine?.anonymous ?? false,
+    responses: row.resultsPublished || fullDetail
+      ? row.responses.map((response) => ({
+          id: response.id,
+          userId: response.userId,
+          displayName:
+            response.anonymous && response.userId !== actor.id && !fullDetail
+              ? 'Anonymous member'
+              : response.userId === actor.id && response.anonymous
+                ? 'You (anonymous)'
+                : response.user.fullName,
+          vote: response.vote,
+          comment: response.comment,
+          anonymous: response.anonymous,
+          createdAt: response.createdAt.toISOString(),
+        }))
+      : [],
+  }
+}
 
 export const getAnnouncementsForUser = unstable_cache(
   async (userId: string) =>
@@ -455,6 +618,7 @@ export const getOrganizerProjects = unstable_cache(
       description: p.description,
       status: p.status as 'UPCOMING' | 'ONGOING' | 'COMPLETED',
       imageUrl: p.imageUrl ?? null,
+      isPublic: p.isPublic,
       progress: p.progress,
       updatedAt: p.updatedAt.toISOString(),
     }))
@@ -485,10 +649,6 @@ export async function updateWelfareStatus(id: string, status: WelfareStatus, rev
   return prisma.welfareRequest.update({
     where: { id }, data: { status, reviewNote }, include: { user: true },
   })
-}
-
-export async function createWelfareRequest(userId: string, description: string, amount?: number) {
-  return prisma.welfareRequest.create({ data: { userId, description, amount } })
 }
 
 export async function createAnnouncement(authorId: string, title: string, content: string) {
@@ -545,6 +705,7 @@ export async function createEvent(data: {
   title: string
   description?: string
   location?: string
+  mapsUrl?: string
   startsAt: Date
   endsAt?: Date
   imageUrl?: string
@@ -558,6 +719,7 @@ export async function createEvent(data: {
       title: data.title,
       description: data.description,
       location: data.location,
+      mapsUrl: data.mapsUrl,
       startsAt: data.startsAt,
       endsAt: data.endsAt,
       imageUrl: data.imageUrl,
@@ -575,6 +737,7 @@ export async function updateEvent(id: string, data: {
   title?: string
   description?: string | null
   location?: string | null
+  mapsUrl?: string | null
   startsAt?: Date
   imageUrl?: string | null
   isPublic?: boolean
@@ -690,6 +853,7 @@ export async function upsertProject(data: {
   description: string
   status: ProjectStatus
   imageUrl?: string
+  isPublic?: boolean
   progress?: number
   startDate?: Date
   endDate?: Date
@@ -699,7 +863,7 @@ export async function upsertProject(data: {
       where: { id: data.id },
       data: {
         title: data.title, description: data.description, status: data.status,
-        imageUrl: data.imageUrl, progress: data.progress ?? 0,
+        imageUrl: data.imageUrl, isPublic: data.isPublic ?? true, progress: data.progress ?? 0,
         startDate: data.startDate, endDate: data.endDate,
       },
     })
@@ -707,7 +871,7 @@ export async function upsertProject(data: {
   return prisma.project.create({
     data: {
       title: data.title, description: data.description, status: data.status,
-      imageUrl: data.imageUrl, progress: data.progress ?? 0,
+      imageUrl: data.imageUrl, isPublic: data.isPublic ?? true, progress: data.progress ?? 0,
       startDate: data.startDate, endDate: data.endDate,
     },
   })

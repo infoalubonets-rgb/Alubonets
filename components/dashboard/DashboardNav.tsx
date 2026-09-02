@@ -2,17 +2,23 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { NavItem } from './DashboardShell'
 
 function isNavActive(pathname: string, href: string, allHrefs: string[]) {
   if (!href || href === '#') return false
   const matches = allHrefs.filter(
-    (h) => h && h !== '#' && (pathname === h || pathname.startsWith(`${h}/`))
+    (h) => h && h !== '#' && (pathname === h || pathname.startsWith(`${h}/`)),
   )
   if (matches.length === 0) return false
   const best = matches.reduce((a, b) => (a.length >= b.length ? a : b))
   return best === href
+}
+
+function sectionActive(pathname: string, link: NavItem, hrefs: string[]) {
+  const href = link.href || '#'
+  if (isNavActive(pathname, href, hrefs)) return true
+  return Boolean(link.children?.some((child) => isNavActive(pathname, child.href || '#', hrefs)))
 }
 
 export default function DashboardNav({
@@ -23,7 +29,10 @@ export default function DashboardNav({
   collapsed?: boolean
 }) {
   const pathname = usePathname()
-  const hrefs = nav.map((n) => n.href || '#')
+  const hrefs = useMemo(
+    () => nav.flatMap((n) => [n.href || '#', ...(n.children?.map((child) => child.href || '#') || [])]),
+    [nav],
+  )
   const scrollRef = useRef<HTMLElement>(null)
   const [scrollbar, setScrollbar] = useState({ visible: false, top: 0, height: 0 })
 
@@ -35,7 +44,14 @@ export default function DashboardNav({
       const height = visible ? Math.max(20, (element.clientHeight / element.scrollHeight) * element.clientHeight) : 0
       const travel = Math.max(0, element.clientHeight - height)
       const maxScroll = Math.max(1, element.scrollHeight - element.clientHeight)
-      setScrollbar({ visible, height, top: (element.scrollTop / maxScroll) * travel })
+      const top = (element.scrollTop / maxScroll) * travel
+      setScrollbar((current) =>
+        current.visible === visible &&
+        Math.abs(current.height - height) < 0.5 &&
+        Math.abs(current.top - top) < 0.5
+          ? current
+          : { visible, height, top },
+      )
     }
     update()
     element.addEventListener('scroll', update, { passive: true })
@@ -49,52 +65,48 @@ export default function DashboardNav({
 
   return (
     <div className="relative min-h-0 flex-1">
-    <nav ref={scrollRef} className="dashboard-nav-scroll h-full overflow-y-auto py-sm px-sm space-y-0.5">
-      {nav.map((link) => {
-        const href = link.href || '#'
-        const active = isNavActive(pathname, href, hrefs)
-        const className = active
-          ? `flex items-center gap-sm px-sm py-[7px] rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
-          : `sidebar-link ${collapsed ? 'justify-center' : ''}`
+      <nav ref={scrollRef} className="dashboard-nav-scroll h-full overflow-y-auto py-sm px-sm space-y-0.5">
+        {nav.map((link) => {
+          const href = link.href || '#'
+          const active = isNavActive(pathname, href, hrefs)
+          const inSection = sectionActive(pathname, link, hrefs)
+          const className = active || inSection
+            ? `flex items-center gap-sm px-sm py-[7px] rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
+            : `sidebar-link ${collapsed ? 'justify-center' : ''}`
 
-        return (
-          <Link
-            key={link.label}
-            href={href}
-            className={className}
-            title={collapsed ? link.label : undefined}
-          >
-            <span
-              className={`relative material-symbols-outlined ${active ? 'text-[17px] text-secondary-container flex-shrink-0' : ''}`}
+          return (
+            <Link
+              key={link.label}
+              href={href}
+              className={className}
+              title={collapsed ? link.label : undefined}
+              aria-current={active || inSection ? 'page' : undefined}
             >
-              {link.icon}
-              {collapsed && link.badge ? (
-                <span className="absolute -top-1 -right-2 bg-secondary text-white text-[9px] font-bold px-1 rounded-full leading-[13px] font-sans">
-                  {link.badge}
-                </span>
-              ) : null}
-            </span>
-            {collapsed ? null : link.badge ? (
-              <>
-                <span className="flex-1">{link.label}</span>
+              <span className={`relative material-symbols-outlined ${active || inSection ? 'text-[17px] text-secondary-container flex-shrink-0' : ''}`}>
+                {link.icon}
+                {collapsed && link.badge ? (
+                  <span className="absolute -top-1 -right-2 bg-secondary text-white text-[9px] font-bold px-1 rounded-full leading-[13px] font-sans">
+                    {link.badge}
+                  </span>
+                ) : null}
+              </span>
+              {!collapsed && <span className="min-w-0 flex-1 truncate">{link.label}</span>}
+              {!collapsed && link.badge ? (
                 <span className="bg-secondary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                   {link.badge}
                 </span>
-              </>
-            ) : (
-              link.label
-            )}
-          </Link>
-        )
-      })}
-    </nav>
-    {scrollbar.visible && (
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute right-px top-0 w-px rounded-full bg-[#ffc400]"
-        style={{ height: scrollbar.height, transform: `translateY(${scrollbar.top}px)` }}
-      />
-    )}
+              ) : null}
+            </Link>
+          )
+        })}
+      </nav>
+      {scrollbar.visible && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-px top-0 w-px rounded-full bg-[#ffc400]"
+          style={{ height: scrollbar.height, transform: `translateY(${scrollbar.top}px)` }}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, syncUserMetadata } from '@/lib/auth/session'
@@ -17,7 +18,27 @@ const approveSchema = z.object({
   approve: z.boolean(),
   note: z.string().trim().min(3).max(1000),
   identityVerified: z.boolean(),
+  principalMemberId: z.string().min(1).optional(),
+  familyRelationship: z.enum(['SPOUSE', 'CHILD', 'DEPENDENT', 'OTHER']).optional(),
 })
+
+export async function createBranchLineage(name: string) {
+  const actor = await requireAdmin()
+  const clean = z.string().trim().min(2).max(80).parse(name)
+  const current = await prisma.appSetting.findUnique({ where: { key: 'branch_lineages' } })
+  const list: string[] = current ? JSON.parse(current.value) : []
+  const next = Array.from(new Set(['Default', ...list, clean])).sort((a, b) => a === 'Default' ? -1 : b === 'Default' ? 1 : a.localeCompare(b))
+  await prisma.appSetting.upsert({ where: { key: 'branch_lineages' }, create: { key: 'branch_lineages', value: JSON.stringify(next), updatedBy: actor.id }, update: { value: JSON.stringify(next), updatedBy: actor.id } })
+  revalidatePath('/admin/members')
+}
+
+export async function assignMemberBranch(userId: string, branch: string) {
+  const actor = await requireAdmin()
+  const clean = z.string().trim().min(1).max(80).parse(branch)
+  await prisma.memberProfile.upsert({ where: { userId }, create: { userId, familyBranch: clean }, update: { familyBranch: clean } })
+  await writeAudit({ userId: actor.id, action: 'MEMBER_BRANCH_ASSIGN', entity: 'User', entityId: userId, meta: { branch: clean } })
+  revalidatePath('/admin/members')
+}
 
 const roleSchema = z.object({
   userId: z.string().min(1),
@@ -52,29 +73,51 @@ function revalidateAdmin() {
 
 export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
   const actor = await requireAdmin()
-  const { userId, approve, note, identityVerified } = approveSchema.parse(input)
+  const { userId, approve, note, identityVerified, principalMemberId, familyRelationship } = approveSchema.parse(input)
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new Error('User not found')
   if (user.rejectedAt) throw new Error('This application was permanently rejected and cannot be reopened.')
   if (approve && !identityVerified) throw new Error('Confirm identity verification before approval.')
 
-  if (!approve) {
-    await writeAudit({
-      userId: actor.id,
-      action: 'MEMBER_REJECT',
-      entity: 'User',
-      entityId: userId,
-      reason: note,
-      oldValue: { status: user.status, email: user.email },
-      newValue: { deleted: true },
-      meta: { rejectedApplicant: user.fullName, rejectedEmail: user.email },
-    })
-    await prisma.user.delete({ where: { id: userId } })
-    if (user.authUserId) {
-      const { error } = await createServerClient().auth.admin.deleteUser(user.authUserId)
-      if (error) console.error('Could not delete rejected Supabase user', error)
+  let selectedPrincipal = null
+  if (approve && !user.principalMemberId && !user.isPrincipal) {
+    if (!principalMemberId || !familyRelationship) {
+      throw new Error('Link this applicant to a Principal Member before approval.')
     }
+    selectedPrincipal = await prisma.user.findUnique({ where: { id: principalMemberId } })
+    if (!selectedPrincipal) throw new Error('Principal Member not found')
+    validateFamilyAttachment(user, selectedPrincipal)
+  }
+
+  if (!approve) {
+    await prisma.$transaction(async (tx) => {
+      // Family history and transition records intentionally use restrictive
+      // foreign keys. A pending applicant may already have these records when
+      // a Principal Member invited or linked them before admin review.
+      await tx.familyBranchHistory.deleteMany({ where: { memberId: userId } })
+      await tx.familyAccountTransition.deleteMany({ where: { memberId: userId } })
+      await tx.user.delete({ where: { id: userId } })
+    })
+    // The application is already gone from the primary database. Audit and
+    // external Auth cleanup can finish after the response instead of keeping
+    // the approvals modal blocked on network latency.
+    after(async () => {
+      await writeAudit({
+        userId: actor.id,
+        action: 'MEMBER_REJECT',
+        entity: 'User',
+        entityId: userId,
+        reason: note,
+        oldValue: { status: user.status, email: user.email },
+        newValue: { deleted: true },
+        meta: { rejectedApplicant: user.fullName, rejectedEmail: user.email },
+      })
+      if (user.authUserId) {
+        const { error } = await createServerClient().auth.admin.deleteUser(user.authUserId)
+        if (error) console.error('Could not delete rejected Supabase user', error)
+      }
+    })
     revalidateAdmin()
     return null
   }
@@ -93,10 +136,24 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
         approvedAt: approve ? new Date() : null,
         rejectedAt: approve ? null : new Date(),
         identityVerificationStatus: identityVerified ? 'VERIFIED' : approve ? 'VERIFIED' : 'REJECTED',
-        familyRegistrationState: user.principalMemberId
+        principalMemberId: selectedPrincipal?.id ?? user.principalMemberId,
+        familyRelationship: selectedPrincipal ? familyRelationship : user.familyRelationship,
+        familyRegistrationState: selectedPrincipal || user.principalMemberId
           ? 'ACTIVE_ATTACHED'
           : user.familyRegistrationState,
       },
+    })
+    .then(async (approvedUser) => {
+      if (selectedPrincipal && familyRelationship) {
+        await tx.familyBranchHistory.create({ data: branchHistoryData({
+          memberId: user.id,
+          toPrincipalId: selectedPrincipal.id,
+          relationship: familyRelationship as FamilyRelationship,
+          approvedById: actor.id,
+          reason: 'Linked to Principal Member during account approval',
+        }) })
+      }
+      return approvedUser
     })
   })
 
@@ -113,6 +170,7 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
       status,
       membershipNumber: updated.membershipNumber,
       identityVerificationStatus: updated.identityVerificationStatus,
+      principalMemberId: updated.principalMemberId,
     },
     meta: {
       oldStatus: user.status,

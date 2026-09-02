@@ -38,6 +38,7 @@ export default async function ProjectDetailPage({ params }: Props) {
     },
   })
   if (!project) notFound()
+  if (!project.isPublic && profile?.status !== 'ACTIVE') notFound()
 
   const status = STATUS_STYLES[project.status] ?? STATUS_STYLES.UPCOMING
   const visibility = projectFinanceVisibility(profile?.role)

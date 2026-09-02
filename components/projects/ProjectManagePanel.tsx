@@ -13,6 +13,7 @@ import {
   updateProjectFinance,
 } from '@/app/actions/projects'
 import { moneyNumber } from '@/lib/projects'
+import { todayInputValue } from '@/lib/dates'
 
 type Member = { id: string; fullName: string; email: string }
 type Doc = { id: string; title: string }
@@ -146,7 +147,7 @@ export default function ProjectManagePanel({
               ))}
             </select>
             <input name="amount" type="number" min={1} step="0.01" required placeholder="Amount KES" className="w-full rounded-lg border px-3 py-2" />
-            <input name="investedAt" type="date" className="w-full rounded-lg border px-3 py-2" />
+            <input name="investedAt" type="date" max={todayInputValue()} title="An investment cannot be recorded with a future date." className="w-full rounded-lg border px-3 py-2" />
             <input name="notes" placeholder="Notes" className="w-full rounded-lg border px-3 py-2" />
             <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Add investment</button>
           </form>
@@ -205,7 +206,7 @@ export default function ProjectManagePanel({
             <input type="hidden" name="projectId" value={project.id} />
             <input name="title" required placeholder="Milestone title" className="w-full rounded-lg border px-3 py-2" />
             <input name="description" placeholder="Description" className="w-full rounded-lg border px-3 py-2" />
-            <input name="dueAt" type="date" className="rounded-lg border px-3 py-2" />
+            <input name="dueAt" type="date" min={todayInputValue()} title="A milestone cannot be due in the past." className="rounded-lg border px-3 py-2" />
             <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Add milestone</button>
           </form>
           <ul className="mt-3 space-y-2 text-sm">

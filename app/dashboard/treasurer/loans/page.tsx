@@ -6,6 +6,7 @@ import { TREASURER_NAV, LOANS_NAV_ITEMS, withOptionalNav } from '@/lib/dashboard
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
 import { loanBalancesForIds, moneyNumber } from '@/lib/loans'
 import { prisma } from '@/lib/prisma'
+import { publishFundingRequestToGovernance } from '@/app/actions/loans'
 
 export default async function TreasurerLoansPage() {
   if (!(await isFeatureEnabled(FEATURE_FLAGS.loansEnabled))) notFound()
@@ -31,7 +32,7 @@ export default async function TreasurerLoansPage() {
                 <b>{loan.applicant.fullName}</b> · KES {moneyNumber(loan.amountKes).toLocaleString()} · {loan.status}
                 <p className="text-on-surface-variant">{loan.purpose}</p>
                 <p className="text-xs">
-                  Guarantors accepted: {loan.guarantors.filter((g) => g.status === 'ACCEPTED').length}/
+                  Eligible guarantors: {loan.guarantors.filter((g) => g.status === 'ACCEPTED' || !g.userId).length}/
                   {loan.guarantors.length}
                   {['DISBURSED', 'CLOSED'].includes(loan.status)
                     ? ` · outstanding ${(balances.get(loan.id) || 0).toLocaleString()}`
@@ -41,6 +42,11 @@ export default async function TreasurerLoansPage() {
               <Link href={`/dashboard/treasurer/loans/${loan.id}`} className="text-primary underline">
                 Review
               </Link>
+              <form action={publishFundingRequestToGovernance}>
+                <input type="hidden" name="requestType" value="LOAN" />
+                <input type="hidden" name="requestId" value={loan.id} />
+                <button className="rounded-full border border-primary px-3 py-1.5 text-xs font-bold text-primary">Publish to Governance</button>
+              </form>
             </div>
           </article>
         ))}

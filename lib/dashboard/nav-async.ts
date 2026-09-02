@@ -5,6 +5,7 @@ import {
   MEMBER_NAV,
   TREASURER_NAV,
   LOANS_NAV_ITEMS,
+  WELFARE_NAV_ITEMS,
   withOptionalNav,
   navForRole,
   type NavItem,
@@ -12,14 +13,35 @@ import {
 import type { Role } from '@/lib/auth/types'
 
 export async function navWithLoans(role: Role): Promise<NavItem[]> {
-  const loansOn = await isFeatureEnabled(FEATURE_FLAGS.loansEnabled)
-  const base = navForRole(role)
+  const [loansOn, welfareOn] = await Promise.all([
+    isFeatureEnabled(FEATURE_FLAGS.loansEnabled),
+    isFeatureEnabled(FEATURE_FLAGS.welfareEnabled),
+  ])
+  let base = navForRole(role)
+  if (welfareOn) {
+    switch (role) {
+      case 'ADMIN':
+        break
+      case 'TREASURER':
+        base = withOptionalNav(base, WELFARE_NAV_ITEMS.treasurer, '/financial-reports')
+        break
+      case 'EXECUTIVE':
+        break
+      case 'MEMBER':
+      case 'SECRETARY':
+      case 'ORGANIZER':
+        base = withOptionalNav(base, WELFARE_NAV_ITEMS.member, '/meetings-reports')
+        break
+      default:
+        base = withOptionalNav(base, WELFARE_NAV_ITEMS.member, '/meetings-reports')
+    }
+  }
   if (!loansOn) return base
   switch (role) {
     case 'ADMIN':
       return withOptionalNav(ADMIN_NAV, LOANS_NAV_ITEMS.admin, '/admin/finance')
     case 'TREASURER':
-      return withOptionalNav(TREASURER_NAV, LOANS_NAV_ITEMS.treasurer, '/dashboard/treasurer/welfare')
+      return withOptionalNav(base, LOANS_NAV_ITEMS.treasurer, '/financial-reports')
     case 'EXECUTIVE':
       return withOptionalNav(EXECUTIVE_NAV, LOANS_NAV_ITEMS.executive, '/financial-reports')
     case 'MEMBER':

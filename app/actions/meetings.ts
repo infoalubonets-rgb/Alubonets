@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { buildMeetingMinutesPdf, minutesFilename } from '@/lib/pdf/minutes'
 import { createServerClient } from '@/lib/supabase-server'
 import { writeAudit } from '@/lib/audit'
+import { assertNotPast } from '@/lib/dates'
 
 function revalidateMeetings() {
   revalidatePath('/dashboard/secretary')
@@ -57,6 +58,8 @@ export async function actionCreateMeeting(formData: FormData) {
     minutes: formData.get('minutes'),
     nextMeetingAt: formData.get('nextMeetingAt'),
   })
+
+  assertNotPast(parseNextMeeting(parsed.nextMeetingAt), 'Next meeting date')
 
   const meeting = await createMeeting({
     title: parsed.title.trim(),
@@ -108,6 +111,11 @@ export async function actionUpdateMeeting(formData: FormData) {
     nextMeetingAt: formData.get('nextMeetingAt'),
   })
 
+  // A next-meeting date already stored in the past stays as-is, so only a *changed*
+  // value has to clear the bound.
+  const nextMeetingAt = parseNextMeeting(parsed.nextMeetingAt)
+  if (nextMeetingAt?.getTime() !== existing.nextMeetingAt?.getTime()) assertNotPast(nextMeetingAt, 'Next meeting date')
+
   const updated = await updateMeeting(id, {
     title: parsed.title.trim(),
     heldAt: new Date(parsed.heldAt),
@@ -119,7 +127,7 @@ export async function actionUpdateMeeting(formData: FormData) {
     aob: emptyToNull(parsed.aob),
     agenda: emptyToNull(parsed.agenda),
     minutes: emptyToNull(parsed.minutes),
-    nextMeetingAt: parseNextMeeting(parsed.nextMeetingAt),
+    nextMeetingAt,
   })
 
   await writeAudit({

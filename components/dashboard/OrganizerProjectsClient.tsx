@@ -13,6 +13,7 @@ export type ProjectRow = {
   description: string
   status: 'UPCOMING' | 'ONGOING' | 'COMPLETED'
   imageUrl?: string | null
+  isPublic?: boolean
   progress: number
   updatedAt: string
 }
@@ -268,9 +269,17 @@ function ProjectCard({
             <p className="font-semibold text-[14px] text-on-surface dark:text-blue-50 truncate">{project.title}</p>
             <p className="text-[12px] text-on-surface-variant dark:text-blue-200/50 mt-0.5 line-clamp-2">{project.description}</p>
           </div>
-          <span className={`flex-shrink-0 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_COLORS[project.status]}`}>
-            {project.status}
-          </span>
+          <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
+            {project.isPublic === false && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary">
+                <span className="material-symbols-outlined text-[11px]">lock</span>
+                Members only
+              </span>
+            )}
+            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_COLORS[project.status]}`}>
+              {project.status}
+            </span>
+          </div>
         </div>
 
         {/* Progress bar */}
