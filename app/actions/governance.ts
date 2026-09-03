@@ -226,6 +226,7 @@ export async function decideResolution(formData: FormData) {
   const decision = z.enum(['approve', 'reject']).parse(formData.get('decision'))
   const visibleToRoles = formData.getAll('visibleToRoles').map(String) as Role[]
   const allowAnonymous = formData.get('allowAnonymous') === 'true'
+  const allowComments = formData.get('allowComments') === 'true'
   const reason = String(formData.get('reason') || '').trim()
 
   const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id } })
@@ -243,6 +244,7 @@ export async function decideResolution(formData: FormData) {
       status: decision === 'approve' ? 'APPROVED' : 'REJECTED',
       visibleToRoles: decision === 'approve' ? visibleToRoles : [],
       allowAnonymous: decision === 'approve' ? allowAnonymous : true,
+      allowComments: decision === 'approve' ? allowComments : true,
       decidedById: actor.id,
       decidedAt: new Date(),
       rejectionReason: decision === 'reject' ? reason : null,
@@ -254,7 +256,7 @@ export async function decideResolution(formData: FormData) {
     entity: 'Resolution',
     entityId: id,
     reason: reason || undefined,
-    newValue: { status: updated.status, visibleToRoles: updated.visibleToRoles, allowAnonymous: updated.allowAnonymous },
+    newValue: { status: updated.status, visibleToRoles: updated.visibleToRoles, allowAnonymous: updated.allowAnonymous, allowComments: updated.allowComments },
   })
   refreshResolutions()
 }
@@ -272,11 +274,13 @@ export async function voteResolution(formData: FormData) {
   const canSee = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || resolution.visibleToRoles.includes(actor.role)
   if (!canSee) throw new Error('This resolution is not visible to your role.')
   if (anonymous && !resolution.allowAnonymous) throw new Error('Anonymous responses are not allowed for this proposal.')
+  if (comment && !resolution.allowComments) throw new Error('Comments are not allowed for this proposal.')
+  const savedComment = resolution.allowComments ? comment : null
 
   await prisma.resolutionResponse.upsert({
     where: { resolutionId_userId: { resolutionId, userId: actor.id } },
-    create: { resolutionId, userId: actor.id, vote, comment, anonymous },
-    update: { vote, comment, anonymous },
+    create: { resolutionId, userId: actor.id, vote, comment: savedComment, anonymous },
+    update: { vote, comment: savedComment, anonymous },
   })
   await writeAudit({ userId: actor.id, action: 'RESOLUTION_VOTE', entity: 'Resolution', entityId: resolutionId, newValue: { vote, anonymous } })
   revalidatePath('/governance')

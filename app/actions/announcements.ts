@@ -8,28 +8,15 @@ import { prisma } from '@/lib/prisma'
 import { getSessionProfile, requireActiveRole, requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
-import { sendBroadcastEmail } from '@/lib/email/resend'
-import { assertNotPast } from '@/lib/dates'
+import { sendBroadcastEmail, sendDirectEmails } from '@/lib/email/resend'
 import { createServerClient } from '@/lib/supabase-server'
 import {
-  MAX_ANNOUNCEMENT_ATTACHMENTS,
-  MAX_ANNOUNCEMENT_ATTACHMENT_BYTES,
-  MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES,
-  formatMb,
+  validateAnnouncementAttachmentFiles,
 } from '@/lib/announcement-attachments'
 
 function validateAnnouncementAttachments(files: File[]) {
-  if (files.length > MAX_ANNOUNCEMENT_ATTACHMENTS) {
-    throw new Error(`Attach at most ${MAX_ANNOUNCEMENT_ATTACHMENTS} files.`)
-  }
-  const tooBig = files.find((f) => f.size > MAX_ANNOUNCEMENT_ATTACHMENT_BYTES)
-  if (tooBig) {
-    throw new Error(`"${tooBig.name}" is larger than ${formatMb(MAX_ANNOUNCEMENT_ATTACHMENT_BYTES)}MB.`)
-  }
-  const total = files.reduce((sum, f) => sum + f.size, 0)
-  if (total > MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES) {
-    throw new Error(`Attachments total ${formatMb(total)}MB — keep the combined size under ${formatMb(MAX_ANNOUNCEMENT_ATTACHMENTS_TOTAL_BYTES)}MB.`)
-  }
+  const error = validateAnnouncementAttachmentFiles(files)
+  if (error) throw new Error(error)
 }
 
 async function uploadAnnouncementAttachments(announcementId: string, files: File[]) {
@@ -116,61 +103,66 @@ export async function createTargetedAnnouncement(formData: FormData) {
     .object({
       title: z.string().trim().min(2),
       content: z.string().trim().min(2),
-      imageUrl: z.string().trim().optional(),
-      familyBranch: z.string().trim().optional(),
-      scheduledFor: z.coerce.date().optional(),
-      sendEmail: z.enum(['on', 'off']).optional(),
-      templateKey: z.string().trim().optional(),
     })
     .parse({
       title: formData.get('title'),
       content: formData.get('content'),
-      imageUrl: formData.get('imageUrl') || undefined,
-      familyBranch: formData.get('familyBranch') || undefined,
-      scheduledFor: formData.get('scheduledFor') || undefined,
-      sendEmail: formData.has('sendEmail') ? 'on' : 'off',
-      templateKey: formData.get('templateKey') || undefined,
     })
-  const audienceRoles = formData.getAll('audienceRoles').map(String) as Role[]
+
+  const audienceCategory = z
+    .enum(['', 'ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'])
+    .parse(String(formData.get('audienceCategory') || ''))
+  const selectAll = formData.get('selectAll') === 'true'
   const memberIds = formData.getAll('memberIds').map(String).filter(Boolean)
-  const where = {
-    status: 'ACTIVE' as const,
-    ...(memberIds.length
-      ? { id: { in: memberIds } }
-      : audienceRoles.length
-        ? { role: { in: audienceRoles } }
-        : data.familyBranch
-          ? { memberProfile: { familyBranch: data.familyBranch } }
-          : {}),
+  const externalEmails = [
+    ...new Set(
+      formData
+        .getAll('externalEmails')
+        .map((value) => String(value).trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  ]
+  z.array(z.string().email()).max(20).parse(externalEmails)
+
+  const categoryFilter = audienceCategory ? { role: audienceCategory as Role } : {}
+  let recipients: { id: string }[] = []
+  if (selectAll) {
+    recipients = await prisma.user.findMany({
+      where: { status: 'ACTIVE', ...categoryFilter },
+      select: { id: true },
+    })
+  } else if (memberIds.length) {
+    recipients = await prisma.user.findMany({
+      where: { id: { in: memberIds }, status: 'ACTIVE' },
+      select: { id: true },
+    })
   }
-  const recipients = await prisma.user.findMany({ where, select: { id: true } })
-  if (!recipients.length) throw new Error('No recipients match the selected audience.')
+
+  if (!recipients.length && !externalEmails.length) {
+    throw new Error('Select at least one member or add an external email.')
+  }
 
   const attachmentFiles = formData.getAll('attachments').filter((f): f is File => f instanceof File && f.size > 0)
   validateAnnouncementAttachments(attachmentFiles)
 
-  assertNotPast(data.scheduledFor, 'Scheduled send time')
-  const scheduled = Boolean(data.scheduledFor && data.scheduledFor > new Date())
-  const willDeliverNow = !scheduled && data.sendEmail !== 'off'
+  const willDeliverNow = recipients.length > 0 || externalEmails.length > 0
   const announcement = await prisma.announcement.create({
     data: {
       title: data.title,
       content: data.content,
-      imageUrl: data.imageUrl ?? null,
       authorId: actor.id,
-      broadcast: !memberIds.length && !audienceRoles.length && !data.familyBranch,
-      status: scheduled ? 'SCHEDULED' : willDeliverNow ? 'SENDING' : 'SENT',
-      scheduledFor: scheduled ? data.scheduledFor : null,
-      publishedAt: scheduled ? data.scheduledFor! : new Date(),
-      audienceRoles,
-      familyBranch: data.familyBranch ?? null,
-      templateKey: data.templateKey ?? null,
-      receipts: {
-        create: recipients.map((r) => ({
-          userId: r.id,
-          emailStatus: data.sendEmail === 'off' ? 'SKIPPED' : 'PENDING',
-        })),
-      },
+      broadcast: selectAll && !audienceCategory,
+      status: willDeliverNow ? 'SENDING' : 'SENT',
+      publishedAt: new Date(),
+      audienceRoles: audienceCategory ? [audienceCategory as Role] : [],
+      receipts: recipients.length
+        ? {
+            create: recipients.map((r) => ({
+              userId: r.id,
+              emailStatus: 'PENDING',
+            })),
+          }
+        : undefined,
     },
   })
 
@@ -178,19 +170,39 @@ export async function createTargetedAnnouncement(formData: FormData) {
 
   await writeAudit({
     userId: actor.id,
-    action: scheduled ? 'ANNOUNCEMENT_SCHEDULE' : 'ANNOUNCEMENT_CREATE',
+    action: 'ANNOUNCEMENT_CREATE',
     entity: 'Announcement',
     entityId: announcement.id,
-    newValue: { recipients: recipients.length, scheduled },
+    newValue: { recipients: recipients.length, externalEmails: externalEmails.length },
   })
   refreshAnnouncements()
 
   if (willDeliverNow) {
-    // Runs after the response is sent, so the compose modal closes and the admin
-    // can navigate away immediately — sending continues server-side regardless,
-    // and the sending banner (polling getActiveEmailSends) tracks its progress.
     after(async () => {
-      await deliverAnnouncementEmails(announcement.id, actor.id)
+      if (recipients.length) {
+        await deliverAnnouncementEmails(announcement.id, actor.id)
+      } else {
+        await prisma.announcement.update({ where: { id: announcement.id }, data: { status: 'SENT' } })
+      }
+      if (externalEmails.length) {
+        const stored = await prisma.announcement.findUniqueOrThrow({
+          where: { id: announcement.id },
+          include: { attachments: true },
+        })
+        const attachments = await downloadAnnouncementAttachments(stored.attachments)
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
+        await sendDirectEmails({
+          emails: externalEmails,
+          subject: stored.title,
+          title: stored.title,
+          body: `<p>${stored.content}</p>`,
+          ctaLabel: 'Open announcements',
+          ctaUrl: `${appUrl}/announcements`,
+          attachments,
+          actorId: actor.id,
+          template: 'announcement_external',
+        })
+      }
       refreshAnnouncements()
     })
   }

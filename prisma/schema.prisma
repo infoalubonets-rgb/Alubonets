@@ -1323,6 +1323,7 @@ model Resolution {
   rejectionReason  String?
   resultsPublished Boolean          @default(false)
   allowAnonymous   Boolean          @default(true)
+  allowComments    Boolean          @default(true)
   publishedById    String?
   publishedBy      User?            @relation("ResolutionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
   publishedAt      DateTime?

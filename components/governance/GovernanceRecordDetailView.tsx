@@ -21,6 +21,7 @@ export type GovernanceRecordDetail = {
   createdAt: string
   resultsPublished: boolean
   allowAnonymous: boolean
+  allowComments: boolean
   approveCount: number
   rejectCount: number
   myVote: 'APPROVE' | 'REJECT' | null
@@ -121,15 +122,24 @@ export default function GovernanceRecordDetailView({
           <img src={record.imageUrl} alt="" className="mt-4 max-h-64 rounded-xl object-cover" />
         )}
         {record.documentUrl && (
-          <a
-            href={record.documentUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-secondary-container/15 px-4 py-2 text-sm font-semibold text-primary"
-          >
-            <span className="material-symbols-outlined text-[18px]">description</span>
-            {record.documentName || 'View attachment'}
-          </a>
+          <div className="mt-4 rounded-xl border border-secondary-container/25 bg-secondary-container/10 p-4">
+            <p className="text-sm font-semibold text-on-surface">
+              Please read the attached document before you vote.
+            </p>
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Tap the button below to open the PDF in a new tab.
+            </p>
+            <a
+              href={record.documentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-2 rounded-full bg-secondary-container px-5 py-2.5 text-sm font-bold text-on-primary shadow-[0_3px_10px_rgba(254,128,21,0.28)] transition hover:opacity-90 active:scale-[0.98]"
+            >
+              <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+              {record.documentName || 'Open attached PDF'}
+              <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+            </a>
+          </div>
         )}
       </article>
 
@@ -145,11 +155,8 @@ export default function GovernanceRecordDetailView({
           )}
           <div className={`relative ${voteLocked ? 'pointer-events-none select-none opacity-50 blur-[1px]' : ''}`}>
             <h3 className="font-semibold text-on-surface">Your response</h3>
-            <p className="mt-1 text-xs text-on-surface-variant">
-              Vote to approve or oppose. Add an optional comment before you confirm — votes cannot be changed later.
-            </p>
-            <GovernanceCommentField value={comment} onChange={setComment} />
-            {record.allowAnonymous && (
+            {record.allowComments && <GovernanceCommentField value={comment} onChange={setComment} />}
+            {record.allowComments && record.allowAnonymous && (
               <label className="mt-3 flex items-start gap-2 text-sm text-on-surface">
                 <input
                   type="checkbox"
@@ -226,6 +233,7 @@ export default function GovernanceRecordDetailView({
         choice={confirmChoice}
         pending={pending}
         hasComment={Boolean(comment.trim())}
+        allowComments={record.allowComments}
         onCancel={() => setConfirmChoice(null)}
         onConfirm={() => confirmChoice && submitVote(confirmChoice)}
       />

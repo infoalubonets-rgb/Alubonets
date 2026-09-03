@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import FullScreenModal from '@/components/ui/FullScreenModal'
 import { setSelectedDocumentStatus } from '@/app/actions/documents'
+import { useReportsFilter } from './ReportsFilterContext'
 
 type Report = {
   id: string
@@ -53,7 +54,7 @@ function Detail({ label, value }: { label: string; value: string | number | null
 }
 
 export default function ReportsMeetingsRows({ reports, meetings }: { reports: Report[]; meetings: Meeting[] }) {
-  const [filter, setFilter] = useState<'ALL' | 'MEETING' | 'REPORT'>('ALL')
+  const { filter } = useReportsFilter()
   const [selected, setSelected] = useState<Row | null>(null)
   const rows = useMemo<Row[]>(() => [
     ...meetings.map((meeting): Row => ({ type: 'MEETING', date: meeting.heldAt, meeting })),
@@ -63,20 +64,6 @@ export default function ReportsMeetingsRows({ reports, meetings }: { reports: Re
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs text-on-surface-variant">Review meeting records and uploaded reports in one place.</p>
-        </div>
-        <label className="flex items-center gap-2 text-sm font-semibold text-on-surface">
-          Filter
-          <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} className="rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm">
-            <option value="ALL">All</option>
-            <option value="MEETING">Meetings</option>
-            <option value="REPORT">Reports</option>
-          </select>
-        </label>
-      </div>
-
       <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface">
         {visible.map((row) => {
           const item = row.type === 'MEETING' ? row.meeting : row.report

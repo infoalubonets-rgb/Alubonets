@@ -4,7 +4,8 @@ import AdminFinanceClient from '@/components/admin/AdminFinanceClient'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
-import { ContributionTrendChart } from '@/components/dashboard/Charts'
+import { ContributionTrendChart, ChartEmpty } from '@/components/dashboard/Charts'
+import { formatMonthKeys, hasChartData, monthKeyFromDate } from '@/lib/chart-labels'
 import { todayInputValue } from '@/lib/dates'
 import { withDatabaseRetry } from '@/lib/database-retry'
 
@@ -57,11 +58,12 @@ export default async function AdminFinancePage({
 
   const monthlyMap = new Map<string, number>()
   for (const row of monthlyRows) {
-    const key = `${row.paidAt.getFullYear()}-${String(row.paidAt.getMonth() + 1).padStart(2, '0')}`
+    const key = monthKeyFromDate(row.paidAt)
     monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + row.amount)
   }
-  const chartLabels = [...monthlyMap.keys()]
-  const chartValues = [...monthlyMap.values()]
+  const chartKeys = [...monthlyMap.keys()]
+  const chartLabels = formatMonthKeys(chartKeys)
+  const chartValues = chartKeys.map((k) => monthlyMap.get(k) ?? 0)
 
   const byUserMap = new Map(byUser.map((u) => [u.userId, u]))
   const memberRows = members
@@ -149,10 +151,11 @@ export default async function AdminFinancePage({
 
           <div className="mt-4 rounded-xl border bg-surface-container-low p-4">
             <h3 className="mb-3 text-sm font-semibold text-on-surface-variant">Monthly trend</h3>
-            <ContributionTrendChart
-              labels={chartLabels.length ? chartLabels : ['—']}
-              values={chartValues.length ? chartValues : [0]}
-            />
+            {hasChartData(chartValues) ? (
+              <ContributionTrendChart labels={chartLabels} values={chartValues} />
+            ) : (
+              <ChartEmpty message="No contributions in the selected period." />
+            )}
           </div>
 
           <div className="mt-4 overflow-x-auto rounded-xl border">

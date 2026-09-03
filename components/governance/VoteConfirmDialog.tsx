@@ -7,6 +7,7 @@ type Props = {
   choice: 'APPROVE' | 'REJECT' | null
   pending: boolean
   hasComment: boolean
+  allowComments: boolean
   onCancel: () => void
   onConfirm: () => void
 }
@@ -16,6 +17,7 @@ export default function VoteConfirmDialog({
   choice,
   pending,
   hasComment,
+  allowComments,
   onCancel,
   onConfirm,
 }: Props) {
@@ -48,7 +50,11 @@ export default function VoteConfirmDialog({
         </h3>
         <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
           Once submitted, your vote is <strong className="text-on-surface">final and cannot be changed</strong>.
-          {hasComment ? ' Your comment will be saved with this vote.' : ' You can still add an optional comment before confirming.'}
+          {allowComments
+            ? hasComment
+              ? ' Your comment will be saved with this vote.'
+              : ' You can still add an optional comment before confirming.'
+            : ''}
         </p>
         <div className="mt-6 flex flex-wrap justify-end gap-2">
           <button

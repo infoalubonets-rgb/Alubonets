@@ -1,5 +1,6 @@
 'use client'
 
+import { formatKes } from '@/lib/chart-labels'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -36,6 +37,32 @@ type SeriesProps = {
   values: number[]
 }
 
+function chartValue(ctx: { parsed: number | { y?: number; x?: number }; raw?: number }) {
+  return typeof ctx.parsed === 'number' ? ctx.parsed : (ctx.parsed.y ?? ctx.parsed.x ?? ctx.raw ?? 0)
+}
+
+const kesTooltip = {
+  callbacks: {
+    label: (ctx: { label?: string; parsed: number | { y?: number; x?: number }; raw?: number }) =>
+      `${ctx.label ? `${ctx.label}: ` : ''}${formatKes(Number(chartValue(ctx)))}`,
+  },
+}
+
+const countTooltip = {
+  callbacks: {
+    label: (ctx: { label?: string; parsed: number | { y?: number; x?: number }; raw?: number }) =>
+      `${ctx.label ? `${ctx.label}: ` : ''}${Number(chartValue(ctx)).toLocaleString()}`,
+  },
+}
+
+export function ChartEmpty({ message = 'No data yet' }: { message?: string }) {
+  return (
+    <div className="flex min-h-[200px] items-center justify-center rounded-xl border border-dashed border-outline-variant/60 bg-surface-container-low/40 px-4 text-center text-sm text-on-surface-variant">
+      {message}
+    </div>
+  )
+}
+
 export function MemberGrowthChart({ labels, values }: SeriesProps) {
   return (
     <Line
@@ -54,8 +81,8 @@ export function MemberGrowthChart({ labels, values }: SeriesProps) {
       }}
       options={{
         responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { display: false }, tooltip: countTooltip },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
       }}
     />
   )
@@ -73,7 +100,7 @@ export function FamilyBranchChart({ labels, values }: SeriesProps) {
           },
         ],
       }}
-      options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+      options={{ responsive: true, plugins: { legend: { position: 'bottom' }, tooltip: countTooltip } }}
     />
   )
 }
@@ -85,7 +112,7 @@ export function ApprovalStatusChart({ labels, values }: SeriesProps) {
         labels,
         datasets: [
           {
-            label: 'Registrations',
+            label: 'Members',
             data: values,
             backgroundColor: [green, orange, '#ba1a1a', navy],
           },
@@ -93,7 +120,7 @@ export function ApprovalStatusChart({ labels, values }: SeriesProps) {
       }}
       options={{
         responsive: true,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false }, tooltip: countTooltip },
       }}
     />
   )
@@ -117,8 +144,8 @@ export function ContributionTrendChart({ labels, values }: SeriesProps) {
       }}
       options={{
         responsive: true,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { display: false }, tooltip: kesTooltip },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
       }}
     />
   )
@@ -136,7 +163,7 @@ export function PaymentMethodChart({ labels, values }: SeriesProps) {
           },
         ],
       }}
-      options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+      options={{ responsive: true, plugins: { legend: { position: 'bottom' }, tooltip: kesTooltip } }}
     />
   )
 }
@@ -158,7 +185,7 @@ export function TopContributorsChart({ labels, values }: SeriesProps) {
       options={{
         indexAxis: 'y' as const,
         responsive: true,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false }, tooltip: kesTooltip },
         scales: { x: { beginAtZero: true } },
       }}
     />
@@ -179,7 +206,7 @@ export function IncomeExpenseChart({ labels, income, expense }: {
           { label: 'Expense', data: expense, backgroundColor: orange },
         ],
       }}
-      options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+      options={{ responsive: true, plugins: { legend: { position: 'bottom' }, tooltip: kesTooltip } }}
     />
   )
 }
@@ -196,7 +223,7 @@ export function BudgetDoughnutChart({ labels, values }: SeriesProps) {
           },
         ],
       }}
-      options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
+      options={{ responsive: true, plugins: { legend: { position: 'bottom' }, tooltip: kesTooltip } }}
     />
   )
 }

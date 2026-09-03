@@ -1,7 +1,8 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navWithLoans } from '@/lib/dashboard/nav-async'
 import { getExecutiveDashboardData, getContributionChartSeries } from '@/lib/data/queries'
-import { ContributionTrendChart } from '@/components/dashboard/Charts'
+import { ContributionTrendChart, ChartEmpty } from '@/components/dashboard/Charts'
+import { hasChartData } from '@/lib/chart-labels'
 import Link from 'next/link'
 
 export default async function ExecutivePage() {
@@ -54,10 +55,11 @@ export default async function ExecutivePage() {
               Contribution trend
             </h2>
           </div>
-          <ContributionTrendChart
-            labels={chart.labels.length ? chart.labels : ['—']}
-            values={chart.values.length ? chart.values : [0]}
-          />
+          {hasChartData(chart.values) ? (
+            <ContributionTrendChart labels={chart.labels} values={chart.values} />
+          ) : (
+            <ChartEmpty message="No confirmed contributions recorded yet." />
+          )}
         </section>
 
         {/* Quick links */}

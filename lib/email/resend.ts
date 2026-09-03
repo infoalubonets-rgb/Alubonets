@@ -218,6 +218,84 @@ ${ctaBlock}`)
   return { sent, failed, results }
 }
 
+export async function sendDirectEmails({
+  emails,
+  subject,
+  title,
+  body,
+  ctaLabel,
+  ctaUrl,
+  attachments,
+  actorId,
+  template,
+}: {
+  emails: string[]
+  subject: string
+  title: string
+  body: string
+  ctaLabel?: string
+  ctaUrl?: string
+  attachments?: BroadcastAttachment[]
+  actorId?: string
+  template: string
+}) {
+  const unique = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))]
+  if (!unique.length) return { sent: 0, failed: 0 }
+
+  const resend = getResend()
+  if (!resend) {
+    await prisma.emailLog.create({
+      data: {
+        userId: actorId ?? '',
+        toEmail: 'DIRECT',
+        subject,
+        template,
+        status: 'skipped',
+        meta: { reason: 'RESEND_API_KEY not configured', recipients: unique.length },
+      },
+    })
+    return { sent: 0, failed: unique.length }
+  }
+
+  const override = testEmailOverride()
+  const ctaBlock =
+    ctaLabel && ctaUrl
+      ? `<p style="margin-top:24px;"><a href="${ctaUrl}" style="display:inline-block;background:#003d82;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">${ctaLabel}</a></p>`
+      : ''
+  const html = (name: string) =>
+    baseHtml(`<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">${title}</h2>
+<p style="margin:0 0 8px;color:#374151;">Hello ${name},</p>
+<div style="color:#374151;line-height:1.7;">${body}</div>
+${ctaBlock}`)
+
+  let sent = 0
+  let failed = 0
+  for (const email of unique) {
+    const to = override || email
+    const { error } = await resend.emails.send({
+      from: from(),
+      to,
+      subject: override ? `[TEST — for ${email}] ${subject}` : subject,
+      html: html('there'),
+      attachments,
+    })
+    if (error) failed += 1
+    else sent += 1
+  }
+
+  await prisma.emailLog.create({
+    data: {
+      userId: actorId ?? '',
+      toEmail: 'DIRECT',
+      subject,
+      template,
+      status: failed === 0 ? 'sent' : sent === 0 ? 'failed' : 'partial',
+      meta: { sent, failed, external: true },
+    },
+  })
+  return { sent, failed }
+}
+
 // Specific helper for gallery photo notifications
 export async function sendGalleryNotificationEmail({
   caption,

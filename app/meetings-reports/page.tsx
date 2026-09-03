@@ -6,6 +6,8 @@ import { canReadDocument } from '@/lib/documents'
 import { uploadReport } from '@/app/actions/documents'
 import ReportsMeetingsRows from '@/components/reports/ReportsMeetingsRows'
 import AddReportModal from '@/components/reports/AddReportModal'
+import ReportsFilterControl from '@/components/reports/ReportsFilterControl'
+import { ReportsFilterProvider } from '@/components/reports/ReportsFilterContext'
 
 export const metadata = { title: 'Meetings & reports' }
 export const dynamic = 'force-dynamic'
@@ -42,11 +44,17 @@ export default async function MeetingsReportsPage() {
     ])
 
     return (
+      <ReportsFilterProvider>
       <DashboardShell
         role={actor.role}
         title="Meetings & reports"
         nav={navForRole(actor.role)}
-        pageAction={<AddReportModal uploadAction={uploadReport} />}
+        pageAction={
+          <div className="flex flex-wrap items-center gap-3">
+            <ReportsFilterControl />
+            <AddReportModal uploadAction={uploadReport} />
+          </div>
+        }
       >
         <ReportsMeetingsRows
           reports={reports.map((report) => ({
@@ -94,6 +102,7 @@ export default async function MeetingsReportsPage() {
           }))}
         />
       </DashboardShell>
+      </ReportsFilterProvider>
     )
   }
 

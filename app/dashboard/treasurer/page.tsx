@@ -1,7 +1,8 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navWithLoans } from '@/lib/dashboard/nav-async'
 import { getTreasurerDashboardData, getContributionChartSeries, getContributionAnalytics } from '@/lib/data/queries'
-import { BudgetDoughnutChart, ContributionTrendChart, TopContributorsChart } from '@/components/dashboard/Charts'
+import { BudgetDoughnutChart, ChartEmpty, ContributionTrendChart, TopContributorsChart } from '@/components/dashboard/Charts'
+import { hasChartData } from '@/lib/chart-labels'
 import Link from 'next/link'
 
 export default async function TreasurerPage() {
@@ -56,10 +57,11 @@ export default async function TreasurerPage() {
             <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>trending_up</span>
             <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Monthly contribution trend</h2>
           </div>
-          <ContributionTrendChart
-            labels={chart.labels.length ? chart.labels : ['—']}
-            values={chart.values.length ? chart.values : [0]}
-          />
+          {hasChartData(chart.values) ? (
+            <ContributionTrendChart labels={chart.labels} values={chart.values} />
+          ) : (
+            <ChartEmpty message="No confirmed contributions recorded yet." />
+          )}
         </section>
 
         {/* Bar + Donut side by side */}
@@ -69,10 +71,11 @@ export default async function TreasurerPage() {
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>leaderboard</span>
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Top contributors</h2>
             </div>
-            <TopContributorsChart
-              labels={topLabels.length ? topLabels : ['None']}
-              values={topValues.length ? topValues : [0]}
-            />
+            {hasChartData(topValues) ? (
+              <TopContributorsChart labels={topLabels} values={topValues} />
+            ) : (
+              <ChartEmpty message="No contributor data yet." />
+            )}
           </section>
 
           <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5 lg:col-span-2">
@@ -80,10 +83,11 @@ export default async function TreasurerPage() {
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>donut_large</span>
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">By category</h2>
             </div>
-            <BudgetDoughnutChart
-              labels={catLabels.length ? catLabels : ['None']}
-              values={catValues.length ? catValues : [0]}
-            />
+            {hasChartData(catValues) ? (
+              <BudgetDoughnutChart labels={catLabels} values={catValues} />
+            ) : (
+              <ChartEmpty message="No contributions by category yet." />
+            )}
           </section>
         </div>
 

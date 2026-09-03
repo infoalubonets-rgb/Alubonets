@@ -1,16 +1,13 @@
 import { prisma } from '@/lib/prisma'
-import { replyToContact, updateContactDestination, updateContactWorkflow } from '@/app/actions/contact'
+import { replyToContact, updateContactWorkflow } from '@/app/actions/contact'
 
 export default async function AssignedContactInbox({ adminId }: { adminId: string }) {
-  const [messages, setting] = await Promise.all([
-    prisma.contactSubmission.findMany({
+  const messages = await prisma.contactSubmission.findMany({
       where: { assignedToId: adminId },
       orderBy: { createdAt: 'desc' },
       take: 100,
       include: { replies: { orderBy: { sentAt: 'desc' } } },
-    }),
-    prisma.appSetting.findUnique({ where: { key: 'contact_destination_email' } }),
-  ])
+    })
   const unread = messages.filter((message) => message.status === 'UNREAD').length
 
   return (
@@ -19,11 +16,6 @@ export default async function AssignedContactInbox({ adminId }: { adminId: strin
         <h2 className="font-h3 text-lg text-primary">Contact inbox</h2>
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{unread} unread</span>
       </header>
-
-      <form action={updateContactDestination} className="flex flex-wrap items-end gap-2 rounded-xl bg-surface-container-low p-3">
-        <label className="text-sm">Destination email<input name="email" type="email" required defaultValue={setting?.value || 'infoalubonets@gmail.com'} className="mt-1 block rounded-lg border px-3 py-2" /></label>
-        <button className="rounded-full bg-primary px-4 py-2 text-on-primary">Save</button>
-      </form>
 
       {messages.length === 0 ? (
         <p className="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">No enquiries assigned to you.</p>

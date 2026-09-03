@@ -1,20 +1,13 @@
-import DashboardShell from '@/components/dashboard/DashboardShell'
-import StatCard from '@/components/dashboard/StatCard'
-import AnnouncementsAdminClient from '@/components/admin/AnnouncementsAdminClient'
 import { requireAdmin } from '@/lib/auth/session'
-import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
-import {
-  createTargetedAnnouncement,
-  retryFailedAnnouncementEmails,
-  upsertAnnouncementTemplate,
-} from '@/app/actions/announcements'
-import { nowInputValue } from '@/lib/dates'
-import AssignedContactInbox from '@/components/admin/AssignedContactInbox'
+import { createTargetedAnnouncement, retryFailedAnnouncementEmails } from '@/app/actions/announcements'
+import { updateContactDestination } from '@/app/actions/contact'
+import CommunicationsAdminRoot from '@/components/admin/CommunicationsAdminRoot'
+import { CONTACT_EMAIL } from '@/lib/constants'
 
 export default async function AdminAnnouncementsPage() {
   const actor = await requireAdmin()
-  const [announcements, templates, members, branches] = await Promise.all([
+  const [announcements, members, contactSetting] = await Promise.all([
     prisma.announcement.findMany({
       orderBy: { createdAt: 'desc' },
       take: 40,
@@ -23,17 +16,12 @@ export default async function AdminAnnouncementsPage() {
         author: { select: { fullName: true } },
       },
     }),
-    prisma.announcementTemplate.findMany({ orderBy: { name: 'asc' } }),
     prisma.user.findMany({
       where: { status: 'ACTIVE' },
-      select: { id: true, fullName: true },
+      select: { id: true, fullName: true, role: true },
       orderBy: { fullName: 'asc' },
     }),
-    prisma.memberProfile.findMany({
-      where: { familyBranch: { not: null } },
-      select: { familyBranch: true },
-      distinct: ['familyBranch'],
-    }),
+    prisma.appSetting.findUnique({ where: { key: 'contact_destination_email' } }),
   ])
 
   const rows = announcements.map((a) => ({
@@ -49,26 +37,16 @@ export default async function AdminAnnouncementsPage() {
   const totalFailed = rows.reduce((sum, a) => sum + a.failed, 0)
 
   return (
-    <DashboardShell role="ADMIN" title="Communications" nav={ADMIN_NAV}>
-      <div className="space-y-5 p-4 md:p-6">
-        <section className="grid gap-3 sm:grid-cols-3">
-          <StatCard icon="campaign" label="Notifications sent" value={String(rows.length)} accent="orange" />
-          <StatCard icon="mark_email_read" label="Emails delivered" value={String(totalSent)} />
-          <StatCard icon="error" label="Emails failed" value={String(totalFailed)} accent={totalFailed > 0 ? 'red' : 'default'} />
-        </section>
-
-        <AnnouncementsAdminClient
-          createAction={createTargetedAnnouncement}
-          retryAction={retryFailedAnnouncementEmails}
-          templateAction={upsertAnnouncementTemplate}
-          announcements={rows}
-          templates={templates.map((t) => ({ id: t.id, key: t.key, name: t.name }))}
-          members={members}
-          branches={branches.map((b) => b.familyBranch as string)}
-          nowInputValue={nowInputValue()}
-        />
-        {actor.isSuperAdmin && <AssignedContactInbox adminId={actor.id} />}
-      </div>
-    </DashboardShell>
+    <CommunicationsAdminRoot
+      isSuperAdmin={actor.isSuperAdmin}
+      contactDestinationEmail={contactSetting?.value || CONTACT_EMAIL}
+      updateContactDestination={updateContactDestination}
+      createAction={createTargetedAnnouncement}
+      retryAction={retryFailedAnnouncementEmails}
+      announcements={rows}
+      members={members}
+      totalSent={totalSent}
+      totalFailed={totalFailed}
+    />
   )
 }

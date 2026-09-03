@@ -9,10 +9,12 @@ import {
 } from '@/lib/data/queries'
 import {
   BudgetDoughnutChart,
+  ChartEmpty,
   ContributionTrendChart,
   PaymentMethodChart,
   TopContributorsChart,
 } from '@/components/dashboard/Charts'
+import { hasChartData } from '@/lib/chart-labels'
 import MpesaStkForm from '@/components/dashboard/MpesaStkForm'
 import PaymentsModal from '@/components/dashboard/PaymentsModal'
 import PaginationBar from '@/components/ui/PaginationBar'
@@ -77,7 +79,7 @@ export default async function TreasurerContributionsPage({
 
   const catLabels = data.byCategory.map((c) => c.category || 'Uncategorized')
   const catValues = data.byCategory.map((c) => c._sum.amount ?? 0)
-  const methodLabels = analytics.byMethod.map((m) => m.method)
+  const methodLabels = analytics.byMethod.map((m) => m.label)
   const methodValues = analytics.byMethod.map((m) => m.total)
   const topLabels = analytics.topContributors.map((t) => t.name)
   const topValues = analytics.topContributors.map((t) => t.total)
@@ -131,34 +133,38 @@ export default async function TreasurerContributionsPage({
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="rounded-xl border bg-surface p-4 lg:col-span-2">
             <h2 className="font-semibold mb-3">Monthly contribution trend</h2>
-            <ContributionTrendChart
-              labels={chart.labels.length ? chart.labels : ['—']}
-              values={chart.values.length ? chart.values : [0]}
-            />
+            {hasChartData(chart.values) ? (
+              <ContributionTrendChart labels={chart.labels} values={chart.values} />
+            ) : (
+              <ChartEmpty message="No confirmed contributions recorded yet." />
+            )}
           </div>
           <div className="rounded-xl border bg-surface p-4">
             <h2 className="font-semibold mb-3">By category</h2>
-            <BudgetDoughnutChart
-              labels={catLabels.length ? catLabels : ['None']}
-              values={catValues.length ? catValues : [0]}
-            />
+            {hasChartData(catValues) ? (
+              <BudgetDoughnutChart labels={catLabels} values={catValues} />
+            ) : (
+              <ChartEmpty message="No contributions by category yet." />
+            )}
           </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="rounded-xl border bg-surface p-4">
             <h2 className="font-semibold mb-3">Payment methods</h2>
-            <PaymentMethodChart
-              labels={methodLabels.length ? methodLabels : ['None']}
-              values={methodValues.length ? methodValues : [0]}
-            />
+            {hasChartData(methodValues) ? (
+              <PaymentMethodChart labels={methodLabels} values={methodValues} />
+            ) : (
+              <ChartEmpty message="No payment method data yet." />
+            )}
           </div>
           <div className="rounded-xl border bg-surface p-4 lg:col-span-2">
             <h2 className="font-semibold mb-3">Top contributors</h2>
-            <TopContributorsChart
-              labels={topLabels.length ? topLabels : ['None']}
-              values={topValues.length ? topValues : [0]}
-            />
+            {hasChartData(topValues) ? (
+              <TopContributorsChart labels={topLabels} values={topValues} />
+            ) : (
+              <ChartEmpty message="No contributor data yet." />
+            )}
           </div>
         </div>
 

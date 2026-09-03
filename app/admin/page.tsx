@@ -1,17 +1,25 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navWithLoans } from '@/lib/dashboard/nav-async'
-import { getAdminDashboardData, getContributionChartSeries } from '@/lib/data/queries'
+import { getAdminDashboardData, getContributionChartSeries, getMemberGrowthSeries, getFamilyBranchDistribution } from '@/lib/data/queries'
 import {
   ApprovalStatusChart,
+  ChartEmpty,
   ContributionTrendChart,
+  FamilyBranchChart,
+  MemberGrowthChart,
 } from '@/components/dashboard/Charts'
+import { hasChartData, formatMemberStatus } from '@/lib/chart-labels'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { formatAuditAction } from '@/lib/audit-labels'
 
 export default async function AdminPage() {
   const data = await getAdminDashboardData()
-  const chart = await getContributionChartSeries()
+  const [chart, memberGrowth, familyBranches] = await Promise.all([
+    getContributionChartSeries(),
+    getMemberGrowthSeries(),
+    getFamilyBranchDistribution(),
+  ])
   const statusCounts = await prisma.user.groupBy({ by: ['status'], _count: true })
   const statusMap = Object.fromEntries(statusCounts.map((s) => [s.status, s._count]))
   const nav = await navWithLoans('ADMIN')
@@ -68,10 +76,11 @@ export default async function AdminPage() {
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>trending_up</span>
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Contribution trend</h2>
             </div>
-            <ContributionTrendChart
-              labels={chart.labels.length ? chart.labels : ['—']}
-              values={chart.values.length ? chart.values : [0]}
-            />
+            {hasChartData(chart.values) ? (
+              <ContributionTrendChart labels={chart.labels} values={chart.values} />
+            ) : (
+              <ChartEmpty message="No confirmed contributions recorded yet." />
+            )}
           </section>
           <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
             <div className="flex items-center gap-2 mb-4">
@@ -79,9 +88,34 @@ export default async function AdminPage() {
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Membership status</h2>
             </div>
             <ApprovalStatusChart
-              labels={['ACTIVE', 'PENDING', 'INACTIVE', 'SUSPENDED']}
+              labels={['ACTIVE', 'PENDING', 'INACTIVE', 'SUSPENDED'].map(formatMemberStatus)}
               values={[statusMap.ACTIVE ?? 0, statusMap.PENDING ?? 0, statusMap.INACTIVE ?? 0, statusMap.SUSPENDED ?? 0]}
             />
+          </section>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-4">
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>groups</span>
+              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Member growth</h2>
+            </div>
+            {hasChartData(memberGrowth.values) ? (
+              <MemberGrowthChart labels={memberGrowth.labels} values={memberGrowth.values} />
+            ) : (
+              <ChartEmpty message="No member registrations yet." />
+            )}
+          </section>
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>family_history</span>
+              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Family branches</h2>
+            </div>
+            {hasChartData(familyBranches.values) ? (
+              <FamilyBranchChart labels={familyBranches.labels} values={familyBranches.values} />
+            ) : (
+              <ChartEmpty message="No family branch data recorded yet." />
+            )}
           </section>
         </div>
 

@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { formatMonthKey, formatMonthKeys, formatPaymentMethod } from '@/lib/chart-labels'
 import type { PaymentMethod, ProjectStatus, Role, WelfareStatus } from '@prisma/client'
 
 // ─── Cache tags ────────────────────────────────────────────────────────────────
@@ -313,10 +314,48 @@ export const getContributionChartSeries = unstable_cache(
       const key = `${row.paidAt.getFullYear()}-${String(row.paidAt.getMonth() + 1).padStart(2, '0')}`
       byMonth.set(key, (byMonth.get(key) ?? 0) + row.amount)
     }
-    return { labels: [...byMonth.keys()], values: [...byMonth.values()] }
+    const keys = [...byMonth.keys()]
+    return { labels: formatMonthKeys(keys), values: keys.map((k) => byMonth.get(k) ?? 0) }
   },
   ['contribution-chart'],
   { tags: [TAGS.contributions], revalidate: 120 },
+)
+
+export const getMemberGrowthSeries = unstable_cache(
+  async () => {
+    const users = await prisma.user.findMany({
+      select: { createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    })
+    const byMonth = new Map<string, number>()
+    let cumulative = 0
+    for (const user of users) {
+      const key = `${user.createdAt.getFullYear()}-${String(user.createdAt.getMonth() + 1).padStart(2, '0')}`
+      cumulative += 1
+      byMonth.set(key, cumulative)
+    }
+    const keys = [...byMonth.keys()]
+    return { labels: formatMonthKeys(keys), values: keys.map((k) => byMonth.get(k) ?? 0) }
+  },
+  ['member-growth-chart'],
+  { tags: [TAGS.members], revalidate: 120 },
+)
+
+export const getFamilyBranchDistribution = unstable_cache(
+  async () => {
+    const rows = await prisma.memberProfile.groupBy({
+      by: ['familyBranch'],
+      _count: true,
+      where: { familyBranch: { not: null } },
+    })
+    const sorted = [...rows].sort((a, b) => b._count - a._count)
+    return {
+      labels: sorted.map((r) => r.familyBranch || 'Unassigned'),
+      values: sorted.map((r) => r._count),
+    }
+  },
+  ['family-branch-chart'],
+  { tags: [TAGS.members], revalidate: 120 },
 )
 
 export const getContributionAnalytics = unstable_cache(
@@ -337,6 +376,7 @@ export const getContributionAnalytics = unstable_cache(
       contributorCount: byUser.length,
       byMethod: byMethod.map((m) => ({
         method: m.paymentMethod,
+        label: formatPaymentMethod(m.paymentMethod),
         total: m._sum.amount ?? 0,
         count: m._count,
       })),
@@ -482,6 +522,7 @@ function mapGovernanceRecordDetail(
     createdAt: row.createdAt.toISOString(),
     resultsPublished: row.resultsPublished,
     allowAnonymous: row.allowAnonymous,
+    allowComments: row.allowComments,
     approveCount,
     rejectCount,
     myVote: mine?.vote ?? null,

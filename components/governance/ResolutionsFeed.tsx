@@ -78,6 +78,7 @@ export default function ResolutionsFeed({
 function PendingCard({ resolution, onDone }: { resolution: PendingResolution; onDone: () => void }) {
   const [selectedRoles, setSelectedRoles] = useState<Role[]>([...ROLES])
   const [allowAnonymous, setAllowAnonymous] = useState(true)
+  const [allowComments, setAllowComments] = useState(true)
   const [reason, setReason] = useState('')
   const [rejecting, setRejecting] = useState(false)
   const [error, setError] = useState('')
@@ -97,6 +98,7 @@ function PendingCard({ resolution, onDone }: { resolution: PendingResolution; on
     formData.set('decision', 'approve')
     selectedRoles.forEach((role) => formData.append('visibleToRoles', role))
     formData.set('allowAnonymous', allowAnonymous ? 'true' : 'false')
+    formData.set('allowComments', allowComments ? 'true' : 'false')
     startTransition(async () => {
       try {
         await decideResolution(formData)
@@ -159,17 +161,34 @@ function PendingCard({ resolution, onDone }: { resolution: PendingResolution; on
       <label className="mt-3 flex items-start gap-2 rounded-xl bg-surface-container-low p-3 text-sm">
         <input
           type="checkbox"
-          checked={allowAnonymous}
-          onChange={(event) => setAllowAnonymous(event.target.checked)}
+          checked={allowComments}
+          onChange={(event) => setAllowComments(event.target.checked)}
           className="mt-1"
         />
         <span>
-          Allow anonymous responses
+          Allow comments
           <span className="block text-xs text-on-surface-variant">
-            When enabled, a responder can hide their name from everyone, including Admin and Secretary.
+            When off, voters only choose Approve/Oppose — the comment box is hidden.
           </span>
         </span>
       </label>
+
+      {allowComments && (
+        <label className="mt-3 flex items-start gap-2 rounded-xl bg-surface-container-low p-3 text-sm">
+          <input
+            type="checkbox"
+            checked={allowAnonymous}
+            onChange={(event) => setAllowAnonymous(event.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            Allow anonymous responses
+            <span className="block text-xs text-on-surface-variant">
+              When enabled, a responder can hide their name from everyone, including Admin and Secretary.
+            </span>
+          </span>
+        </label>
+      )}
 
       {error && <p className="mt-2 text-sm text-error">{error}</p>}
 
