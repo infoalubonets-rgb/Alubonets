@@ -196,12 +196,56 @@ export async function setSelectedDocumentStatus(formData: FormData) {
 }
 
 export async function deleteRepositoryDocument(formData: FormData) {
-  const actor = await requireAdmin()
+  // Staff who manage documents may delete; members never reach this page/action.
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
   const id = z.string().min(1).parse(formData.get('id'))
-  const reason = z.string().trim().min(5).max(1000).parse(formData.get('reason'))
+  const reasonRaw = String(formData.get('reason') || '').trim()
+  const reason = reasonRaw.length >= 5 ? reasonRaw.slice(0, 1000) : 'Deleted from the document repository'
   const document = await prisma.document.findUniqueOrThrow({ where: { id } })
-  if (document.storagePath) await createServerClient().storage.from('documents').remove([document.storagePath])
+  if (document.storagePath) {
+    await createServerClient().storage.from('documents').remove([document.storagePath])
+  }
   await prisma.document.delete({ where: { id } })
-  await writeAudit({ userId: actor.id, action: 'DOCUMENT_DELETE', entity: 'Document', entityId: id, reason, oldValue: { title: document.title, version: document.version, storagePath: document.storagePath } })
+  await writeAudit({
+    userId: actor.id,
+    action: 'DOCUMENT_DELETE',
+    entity: 'Document',
+    entityId: id,
+    reason,
+    oldValue: { title: document.title, version: document.version, storagePath: document.storagePath },
+  })
+  refresh()
+}
+
+export async function deleteSelectedRepositoryDocuments(formData: FormData) {
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
+  const ids = formData.getAll('documentIds').map(String).filter(Boolean)
+  if (!ids.length) throw new Error('Select at least one document.')
+  const reasonRaw = String(formData.get('reason') || '').trim()
+  const reason = reasonRaw.length >= 5 ? reasonRaw.slice(0, 1000) : 'Bulk deleted from the document repository'
+
+  const documents = await prisma.document.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, title: true, version: true, storagePath: true },
+  })
+  if (!documents.length) throw new Error('No matching documents to delete.')
+
+  const storagePaths = documents.map((doc) => doc.storagePath).filter((path): path is string => Boolean(path))
+  if (storagePaths.length) {
+    await createServerClient().storage.from('documents').remove(storagePaths)
+  }
+  await prisma.document.deleteMany({ where: { id: { in: documents.map((doc) => doc.id) } } })
+  await Promise.all(
+    documents.map((document) =>
+      writeAudit({
+        userId: actor.id,
+        action: 'DOCUMENT_DELETE',
+        entity: 'Document',
+        entityId: document.id,
+        reason,
+        oldValue: { title: document.title, version: document.version, storagePath: document.storagePath, bulk: true },
+      }),
+    ),
+  )
   refresh()
 }

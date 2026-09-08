@@ -57,10 +57,11 @@ export default function GovernanceRecordsClient({ records, details, canPublish =
               <button
                 type="button"
                 onClick={() => setSelectedId(record.id)}
-                className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary px-3.5 text-[12px] font-label-bold text-on-primary transition hover:bg-secondary-container"
+                title="View details"
+                aria-label={`View details for ${record.title}`}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-primary transition hover:border-primary hover:bg-primary hover:text-on-primary"
               >
-                View & respond
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                <span className="material-symbols-outlined text-[18px]">visibility</span>
               </button>
             </li>
           ))}

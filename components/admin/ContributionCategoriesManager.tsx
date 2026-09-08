@@ -20,17 +20,33 @@ export default function ContributionCategoriesManager({ categories }: { categori
 
   function addCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const trimmed = name.trim()
+    if (trimmed.length < 2) return
     setMessage('')
     setError('')
+
+    const tempId = `temp-${Date.now()}`
+    const optimistic: Category = { id: tempId, name: trimmed, type: 'BOTH', system: false }
+    setItems((current) =>
+      [...current, optimistic].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    )
+    setName('')
+
     startAdding(async () => {
       try {
         const formData = new FormData()
-        formData.set('name', name)
-        await addContributionCategory(formData)
-        setName('')
-        setMessage('Category added.')
+        formData.set('name', trimmed)
+        const created = await addContributionCategory(formData)
+        setItems((current) =>
+          current
+            .map((item) => (item.id === tempId ? created : item))
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+        )
+        setMessage(`“${created.name}” added.`)
         router.refresh()
       } catch (err) {
+        setItems((current) => current.filter((item) => item.id !== tempId))
+        setName(trimmed)
         setError(err instanceof Error ? err.message : 'Could not add category. Try again.')
       }
     })

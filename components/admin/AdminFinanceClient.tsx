@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, type ReactNode } from 'react'
+import { useState, useTransition, type ReactNode } from 'react'
 import FullScreenModal from '@/components/ui/FullScreenModal'
 import ContributionCategoriesManager from '@/components/admin/ContributionCategoriesManager'
 import {
@@ -84,6 +84,60 @@ function FieldHint({ children }: { children: ReactNode }) {
   return <p className="mt-1 text-[11px] text-on-surface-variant">{children}</p>
 }
 
+function SavableForm({
+  action,
+  submitLabel,
+  className,
+  children,
+}: {
+  action: (formData: FormData) => Promise<void>
+  submitLabel: string
+  className?: string
+  children: ReactNode
+}) {
+  const router = useRouter()
+  const [pending, startTransition] = useTransition()
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+
+  function handleSubmit(formData: FormData) {
+    setError('')
+    setSaved(false)
+    startTransition(async () => {
+      try {
+        await action(formData)
+        router.refresh()
+        setSaved(true)
+        window.setTimeout(() => setSaved(false), 2000)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not save. Try again.')
+      }
+    })
+  }
+
+  return (
+    <form action={handleSubmit} className={className}>
+      {children}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={pending}
+          className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-on-primary disabled:cursor-wait disabled:opacity-60"
+        >
+          {pending && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
+          {pending ? 'Saving…' : submitLabel}
+        </button>
+        {saved && !pending && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+            <span className="material-symbols-outlined text-[15px]">check_circle</span>Saved
+          </span>
+        )}
+        {error && <span className="text-xs font-medium text-red-600">{error}</span>}
+      </div>
+    </form>
+  )
+}
+
 export default function AdminFinanceClient({ approvalThreshold, loanApplicationLimit, categories, pending, periods, currentMonth, currentYear, today }: Props) {
   const router = useRouter()
   const [modal, setModal] = useState<ModalId>(null)
@@ -141,24 +195,30 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
         </div>
       </section>
 
-      <FullScreenModal open={modal === 'threshold'} title={titles.threshold} onClose={closeModal}>
-        <div className="grid gap-5 md:grid-cols-2">
-          <form action={(formData) => afterActionKeepOpen(updateApprovalThreshold, formData)} className="rounded-xl border bg-surface-container-low p-4">
+      <FullScreenModal open={modal === 'threshold'} title={titles.threshold} onClose={closeModal} size="compact">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <SavableForm
+            action={updateApprovalThreshold}
+            submitLabel="Save approval threshold"
+            className="rounded-xl border bg-surface-container-low p-4"
+          >
             <label className="text-sm font-semibold text-on-surface">
               Large transaction approval threshold (KES)
               <input name="amount" type="number" min="1" defaultValue={approvalThreshold} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
               <FieldHint>Expenses or disbursements at this amount require Admin approval. Contributions are not limited.</FieldHint>
             </label>
-            <button className="mt-3 rounded-full bg-primary px-4 py-2 text-on-primary">Save approval threshold</button>
-          </form>
-          <form action={(formData) => afterActionKeepOpen(updateLoanApplicationLimit, formData)} className="rounded-xl border bg-surface-container-low p-4">
+          </SavableForm>
+          <SavableForm
+            action={updateLoanApplicationLimit}
+            submitLabel="Save loan limit"
+            className="rounded-xl border bg-surface-container-low p-4"
+          >
             <label className="text-sm font-semibold text-on-surface">
               Maximum loan application amount (KES)
               <input name="amount" type="number" min="100" max="999999" defaultValue={loanApplicationLimit} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
               <FieldHint>Members cannot request a loan above this amount.</FieldHint>
             </label>
-            <button className="mt-3 rounded-full bg-primary px-4 py-2 text-on-primary">Save loan limit</button>
-          </form>
+          </SavableForm>
         </div>
       </FullScreenModal>
 

@@ -346,7 +346,7 @@ export async function actionCreateDocument(_formData: FormData) {
 }
 
 export async function actionDeleteDocument(id: string) {
-  const actor = await requireAdmin()
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
   const reason = 'Deleted from legacy dashboard widget; prefer repository manage page.'
   const document = await prisma.document.findUniqueOrThrow({ where: { id } })
   if (document.storagePath) {

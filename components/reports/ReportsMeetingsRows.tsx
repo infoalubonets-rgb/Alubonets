@@ -78,8 +78,8 @@ function NameList({ value }: { value: string | null | undefined }) {
   if (!names.length) return null
   return (
     <ul className="mt-1 list-disc space-y-0.5 pl-5">
-      {names.map((name) => (
-        <li key={name}>{name}</li>
+      {names.map((name, index) => (
+        <li key={`${index}-${name}`}>{name}</li>
       ))}
     </ul>
   )

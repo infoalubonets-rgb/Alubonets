@@ -9,18 +9,9 @@ import { writeAudit } from '@/lib/audit'
 import { CONTACT_EMAIL } from '@/lib/constants'
 import { getPublicContact } from '@/lib/settings'
 import { logError } from '@/lib/logger'
-import { baseHtml } from '@/lib/email/resend'
+import { renderEmailTemplate } from '@/lib/email/templates'
 import { headers } from 'next/headers'
 import { enforceRateLimit } from '@/lib/rate-limit'
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;')
-}
 
 const contactSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -103,20 +94,19 @@ async function createContactSubmissionAndNotify({
       const to = process.env.RESEND_TEST_EMAIL
         ? Array.from(new Set([destination, process.env.RESEND_TEST_EMAIL].filter(Boolean)))
         : [destination]
+      const rendered = renderEmailTemplate('contact_enquiry', {
+        name,
+        email,
+        phone: phone || '—',
+        category: category || 'General',
+        message,
+      })
       const { error } = await resend.emails.send({
         from,
         to,
         replyTo: email,
-        subject: `Contact: ${category || 'General'} — ${name}`,
-        html: baseHtml(`
-          <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">New contact form submission</h2>
-          <p style="margin:0 0 6px;color:#374151;"><strong>Name:</strong> ${escapeHtml(name)}</p>
-          <p style="margin:0 0 6px;color:#374151;"><strong>Email:</strong> <a href="mailto:${escapeHtml(email)}" style="color:#003d82;">${escapeHtml(email)}</a></p>
-          <p style="margin:0 0 6px;color:#374151;"><strong>Phone:</strong> ${escapeHtml(phone || '—')}</p>
-          <p style="margin:0 0 16px;color:#374151;"><strong>Category:</strong> ${escapeHtml(category || '—')}</p>
-          <hr style="margin:0 0 16px;border:none;border-top:1px solid #e5e7eb;"/>
-          <p style="white-space:pre-line;color:#374151;line-height:1.6;">${escapeHtml(message)}</p>
-        `),
+        subject: rendered.subject,
+        html: rendered.html,
       })
       await prisma.contactSubmission.update({
         where: { id: submission.id },
@@ -203,19 +193,64 @@ export async function markContactMessageRead(formData: FormData) {
   revalidatePath('/admin/announcements')
 }
 
-export async function deleteContactMessage(formData: FormData) {
-  const id = String(formData.get('id') || '')
-  if (!id) throw new Error('Message id required')
-  const { actor } = await requireAssignedSuperAdmin(id)
+export async function deleteContactMessage(
+  formData: FormData,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const id = String(formData.get('id') || '')
+    if (!id) return { ok: false, error: 'Message id required' }
+    const { actor } = await requireAssignedSuperAdmin(id)
 
-  await prisma.contactSubmission.delete({ where: { id } })
-  await writeAudit({
-    userId: actor.id,
-    action: 'CONTACT_MESSAGE_DELETE',
-    entity: 'ContactSubmission',
-    entityId: id,
-  })
-  revalidatePath('/admin/announcements')
+    await prisma.contactSubmission.delete({ where: { id } })
+    await writeAudit({
+      userId: actor.id,
+      action: 'CONTACT_MESSAGE_DELETE',
+      entity: 'ContactSubmission',
+      entityId: id,
+    })
+    revalidatePath('/admin/announcements')
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not delete message.' }
+  }
+}
+
+export async function deleteSelectedContactMessages(
+  formData: FormData,
+): Promise<{ ok: true; deleted: number } | { ok: false; error: string }> {
+  try {
+    const actor = await requireAdmin()
+    if (!actor.isSuperAdmin) return { ok: false, error: 'Only the Super Admin can bulk-delete enquiries.' }
+    const ids = formData.getAll('ids').map(String).filter(Boolean)
+    if (!ids.length) return { ok: false, error: 'Select at least one enquiry.' }
+
+    const allowed = await prisma.contactSubmission.findMany({
+      where: {
+        id: { in: ids },
+        OR: [{ assignedToId: actor.id }, { assignedToId: null }],
+      },
+      select: { id: true },
+    })
+    if (!allowed.length) return { ok: false, error: 'No matching enquiries to delete.' }
+
+    const deleteIds = allowed.map((row) => row.id)
+    await prisma.contactSubmission.deleteMany({ where: { id: { in: deleteIds } } })
+    await Promise.all(
+      deleteIds.map((id) =>
+        writeAudit({
+          userId: actor.id,
+          action: 'CONTACT_MESSAGE_DELETE',
+          entity: 'ContactSubmission',
+          entityId: id,
+          meta: { bulk: true },
+        }),
+      ),
+    )
+    revalidatePath('/admin/announcements')
+    return { ok: true, deleted: deleteIds.length }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not delete enquiries.' }
+  }
 }
 
 export async function updateContactWorkflow(formData: FormData): Promise<{ ok: true; status: string } | { ok: false; error: string }> {
@@ -271,12 +306,18 @@ export async function replyToContact(
       const to = process.env.RESEND_TEST_EMAIL
         ? Array.from(new Set([submission.email, process.env.RESEND_TEST_EMAIL].filter(Boolean)))
         : [submission.email]
+      const rendered = renderEmailTemplate('contact_reply', {
+        name: submission.name,
+        subject,
+        heading: subject,
+        body,
+      })
       const { error } = await resend.emails.send({
         from,
         to,
         replyTo: CONTACT_EMAIL,
-        subject,
-        html: `<p style="white-space:pre-line">${escapeHtml(body)}</p>`,
+        subject: rendered.subject,
+        html: rendered.html,
       })
       deliveryStatus = error ? 'failed' : 'sent'
     }

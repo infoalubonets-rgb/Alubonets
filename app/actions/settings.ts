@@ -393,6 +393,12 @@ export async function addContributionCategory(formData: FormData) {
     newValue: { code: row.code, name: row.name },
   })
   refreshCategories()
+  return {
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    system: isSystemCategoryCode(row.code),
+  }
 }
 
 export async function deleteContributionCategory(formData: FormData) {

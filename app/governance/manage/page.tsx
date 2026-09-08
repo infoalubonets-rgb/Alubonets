@@ -52,45 +52,27 @@ export default async function ManageGovernancePage() {
   return (
     <DashboardShell role={actor.role} title="Governance management" nav={navForRole(actor.role)}>
       <div className="space-y-5 p-4 md:p-6">
-        <section className="rounded-2xl border bg-surface p-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-3xl">
-              <h2 className="font-h3 text-xl text-primary">Meeting governance workflow</h2>
-              <p className="mt-2 text-sm text-on-surface-variant">
-                Circulate notices, structure agendas, register decisions, assign action points,
-                approve minutes, and preserve revisions for accountability.
-              </p>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {canManage && (
-                <Link
-                  href="/dashboard/secretary/meetings/new"
-                  className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
-                >
-                  Create meeting record
-                </Link>
-              )}
-              {resolutions.canApprove && (
-                <IconModalButton icon="settings" label="Pending approvals" title="Pending approvals">
-                  <PendingApprovalsPanel pending={resolutions.pending} />
-                </IconModalButton>
-              )}
-              {canCreateResolution && (
-                <IconModalButton icon="add" label="Share a proposal" title="Share a proposal for approval">
-                  <CreateResolutionForm />
-                </IconModalButton>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {canManage && proposals.length > 0 && (
-          <section className="space-y-3 rounded-2xl border border-outline-variant bg-surface p-5">
-            <div>
-              <h2 className="font-h3 text-xl text-primary">Proposals</h2>
-              <p className="mt-1 text-sm text-on-surface-variant">
-                Review proposals, vote, and add optional comments for the group.
-              </p>
+        {canManage && (
+          <section className="space-y-3 rounded-2xl border bg-surface p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="max-w-3xl">
+                <h2 className="font-h3 text-xl text-primary">Proposals</h2>
+                <p className="mt-1 text-sm text-on-surface-variant">
+                  Review proposals, vote, and add optional comments for the group.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {resolutions.canApprove && (
+                  <IconModalButton icon="settings" label="Pending approvals" title="Pending approvals">
+                    <PendingApprovalsPanel pending={resolutions.pending} />
+                  </IconModalButton>
+                )}
+                {canCreateResolution && (
+                  <IconModalButton icon="add" label="Share a proposal" title="Share a proposal for approval">
+                    <CreateResolutionForm />
+                  </IconModalButton>
+                )}
+              </div>
             </div>
             <GovernanceRecordsClient
               records={proposals.map((record) => ({
@@ -108,6 +90,26 @@ export default async function ManageGovernancePage() {
             />
           </section>
         )}
+
+        <section className="rounded-2xl border bg-surface p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <h2 className="font-h3 text-xl text-primary">Meeting governance workflow</h2>
+              <p className="mt-2 text-sm text-on-surface-variant">
+                Circulate notices, structure agendas, register decisions, assign action points,
+                approve minutes, and preserve revisions for accountability.
+              </p>
+            </div>
+            {canManage && (
+              <Link
+                href="/dashboard/secretary/meetings/new"
+                className="shrink-0 rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
+              >
+                Create meeting record
+              </Link>
+            )}
+          </div>
+        </section>
 
         {!meetings.length && (
           <section className="rounded-2xl border border-dashed bg-surface p-6 text-center">
