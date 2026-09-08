@@ -193,16 +193,16 @@ export default function GovernanceRecordDetailView({
               Please read the attached document before you vote.
             </p>
             <p className="mt-1 text-xs text-on-surface-variant">
-              Tap the button below to open the PDF in a new tab.
+              Tap the button below to open the attachment in a new tab.
             </p>
             <a
-              href={record.documentUrl}
+              href={`/api/governance/resolutions/${record.id}/document`}
               target="_blank"
               rel="noreferrer"
               className="mt-3 inline-flex items-center gap-2 rounded-full bg-secondary-container px-5 py-2.5 text-sm font-bold text-on-primary shadow-[0_3px_10px_rgba(254,128,21,0.28)] transition hover:opacity-90 active:scale-[0.98]"
             >
-              <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
-              {record.documentName || 'Open attached PDF'}
+              <span className="material-symbols-outlined text-[20px]">description</span>
+              {record.documentName || 'Open attached document'}
               <span className="material-symbols-outlined text-[18px]">open_in_new</span>
             </a>
           </div>

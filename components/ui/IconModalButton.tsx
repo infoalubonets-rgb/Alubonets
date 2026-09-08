@@ -3,6 +3,8 @@
 import { useState, type ReactNode } from 'react'
 import FullScreenModal from '@/components/ui/FullScreenModal'
 
+type CloseApi = { close: () => void; reopen: () => void }
+
 type Props = {
   icon: string
   label: string
@@ -10,11 +12,13 @@ type Props = {
   size?: 'full' | 'compact'
   /** Show the label as visible text next to the icon, instead of an icon-only circular button. */
   showText?: boolean
-  children: ReactNode
+  children: ReactNode | ((api: CloseApi) => ReactNode)
 }
 
 export default function IconModalButton({ icon, label, title, size = 'compact', showText = false, children }: Props) {
   const [open, setOpen] = useState(false)
+  const close = () => setOpen(false)
+  const reopen = () => setOpen(true)
 
   return (
     <>
@@ -33,8 +37,8 @@ export default function IconModalButton({ icon, label, title, size = 'compact', 
         {showText && label}
       </button>
 
-      <FullScreenModal open={open} title={title} onClose={() => setOpen(false)} size={size}>
-        {children}
+      <FullScreenModal open={open} title={title} onClose={close} size={size}>
+        {typeof children === 'function' ? children({ close, reopen }) : children}
       </FullScreenModal>
     </>
   )

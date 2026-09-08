@@ -19,11 +19,14 @@ values
     'documents',
     'documents',
     false,
-    5242880,
+    15728640,
     array[
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
       'image/jpeg',
       'image/png'
     ]

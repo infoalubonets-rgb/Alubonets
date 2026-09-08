@@ -8,6 +8,9 @@ import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
 import { createServerClient } from '@/lib/supabase-server'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
+import { createSignedUpload } from '@/lib/upload-signed'
+
+const DOC_EXTS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'] as const
 
 const refresh = () => {
   revalidatePath('/documents')
@@ -17,12 +20,12 @@ const refresh = () => {
   revalidateTag(TAGS.documents)
 }
 
-async function upload(actorId: string, file: File, groupId: string, version: number) {
+async function upload(_actorId: string, file: File, groupId: string, version: number) {
   if (!file?.size) throw new Error('Choose a document file.')
-  if (file.size > 10 * 1024 * 1024) throw new Error('Document must be 10 MB or smaller.')
+  if (file.size > 15 * 1024 * 1024) throw new Error('Document must be 15 MB or smaller.')
   const extension = file.name.split('.').pop()?.toLowerCase()
-  if (!extension || !['pdf', 'doc', 'docx'].includes(extension)) {
-    throw new Error('Only PDF and Word documents (.pdf, .doc, .docx) are allowed.')
+  if (!extension || !(DOC_EXTS as readonly string[]).includes(extension)) {
+    throw new Error('Only PDF, Word, Excel, or CSV files are allowed.')
   }
   const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `repository/${groupId}/v${version}-${crypto.randomUUID()}-${safe}`
@@ -41,6 +44,21 @@ export async function createDocumentCategory(formData: FormData) {
   const category = await prisma.documentCategory.create({ data: { name } })
   await writeAudit({ userId: actor.id, action: 'DOCUMENT_CATEGORY_CREATE', entity: 'DocumentCategory', entityId: category.id, newValue: { name } })
   refresh()
+}
+
+/** Browser uploads straight to Storage; call before uploadRepositoryDocument with storagePath. */
+export async function requestRepositoryDocumentUploadUrl(formData: FormData) {
+  await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
+  const fileName = z.string().min(1).parse(formData.get('fileName'))
+  const extension = fileName.split('.').pop()?.toLowerCase()
+  if (!extension || !(DOC_EXTS as readonly string[]).includes(extension)) {
+    throw new Error('Only PDF, Word, Excel, or CSV files are allowed.')
+  }
+  const groupId = crypto.randomUUID()
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `repository/${groupId}/v1-${crypto.randomUUID()}-${safe}`
+  const signed = await createSignedUpload('documents', path)
+  return { ...signed, groupId }
 }
 
 export async function uploadRepositoryDocument(formData: FormData) {
@@ -67,14 +85,35 @@ export async function uploadRepositoryDocument(formData: FormData) {
     expiresAt: formData.get('expiresAt') || undefined,
   })
   const category = await prisma.documentCategory.findUniqueOrThrow({ where: { id: data.categoryId } })
-  const groupId = crypto.randomUUID()
-  const file = await upload(actor.id, formData.get('file') as File, groupId, 1)
+
+  const storagePath = z.string().min(1).optional().parse(formData.get('storagePath') || undefined)
+  const versionGroupId = z.string().min(1).optional().parse(formData.get('versionGroupId') || undefined)
+  const mimeType = z.string().optional().parse(formData.get('mimeType') || undefined)
+
+  let file: { path: string; mimeType: string }
+  let groupId: string
+
+  if (storagePath && versionGroupId) {
+    groupId = versionGroupId
+    file = { path: storagePath, mimeType: mimeType || 'application/octet-stream' }
+  } else {
+    groupId = crypto.randomUUID()
+    file = await upload(actor.id, formData.get('file') as File, groupId, 1)
+  }
+
   const document = await prisma.document.create({ data: {
     ...data, category: category.name, allowedRoles: roles(formData), storagePath: file.path, fileUrl: `storage://documents/${file.path}`,
     mimeType: file.mimeType, uploadedBy: actor.id, versionGroupId: groupId,
   } })
   await writeAudit({ userId: actor.id, action: data.status === 'PUBLISHED' ? 'DOCUMENT_PUBLISH' : 'DOCUMENT_UPLOAD', entity: 'Document', entityId: document.id, newValue: { ...data, category: category.name, version: 1 } })
   refresh()
+  return {
+    id: document.id,
+    title: document.title,
+    status: document.status,
+    categoryName: category.name,
+    uploadedAt: document.uploadedAt.toISOString(),
+  }
 }
 
 export async function uploadReport(formData: FormData) {
@@ -92,7 +131,7 @@ export async function uploadReport(formData: FormData) {
   if (!source?.size) throw new Error('Choose a report file.')
   if (source.size > 15 * 1024 * 1024) throw new Error('Report must be 15 MB or smaller.')
   const extension = source.name.split('.').pop()?.toLowerCase()
-  if (!extension || !['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'].includes(extension)) {
+  if (!extension || !(DOC_EXTS as readonly string[]).includes(extension)) {
     throw new Error('Reports must be PDF, Word, Excel, or CSV files.')
   }
   const groupId = crypto.randomUUID()

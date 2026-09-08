@@ -67,7 +67,7 @@ export const EXECUTIVE_NAV: NavItem[] = [
   EVENTS_VIEW_NAV,
   MEETINGS_REPORTS_NAV,
   { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
-  { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
+  { icon: 'gavel', label: 'Governance', href: '/governance' },
   DOCUMENTS_VIEW_NAV,
   ANNOUNCEMENTS_NAV,
   FAMILY_NAV,

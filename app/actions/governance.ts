@@ -179,11 +179,14 @@ const refreshResolutions = () => {
   revalidatePath('/governance/manage')
 }
 
-const RESOLUTION_CREATOR_ROLES = ['SECRETARY', 'ORGANIZER', 'TREASURER', 'ADMIN'] as const
+const RESOLUTION_CREATOR_ROLES = ['ADMIN', 'SECRETARY'] as const
+
+const RESOLUTION_DOC_EXTS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'] as const
 
 /**
  * Step 1 of a fast upload: validate + authorize, then hand back a signed URL the
  * browser can upload straight to Supabase Storage with (no file bytes touch this server).
+ * Images → public `gallery`; documents (PDF/Word/Excel) → private `documents`.
  */
 export async function requestResolutionUploadUrl(formData: FormData) {
   await requireActiveRole([...RESOLUTION_CREATOR_ROLES])
@@ -197,10 +200,12 @@ export async function requestResolutionUploadUrl(formData: FormData) {
   }
 
   const ext = (fileName.split('.').pop() ?? '').toLowerCase()
-  if (!['pdf', 'doc', 'docx'].includes(ext)) throw new Error('Document must be a PDF or Word file.')
+  if (!RESOLUTION_DOC_EXTS.includes(ext as (typeof RESOLUTION_DOC_EXTS)[number])) {
+    throw new Error('Document must be a PDF, Word, Excel, or CSV file.')
+  }
   const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `resolutions/${Date.now()}-${Math.random().toString(36).slice(2)}-${safe}`
-  return createSignedUpload('gallery', path)
+  return createSignedUpload('documents', path)
 }
 
 export async function createResolution(formData: FormData) {
@@ -216,13 +221,15 @@ export async function createResolution(formData: FormData) {
 
   const supabase = createServerClient()
   const imageUrl = imagePath ? supabase.storage.from('gallery').getPublicUrl(imagePath).data.publicUrl : undefined
-  const documentUrl = documentPath ? supabase.storage.from('gallery').getPublicUrl(documentPath).data.publicUrl : undefined
+  // Private documents bucket — download via /api/governance/resolutions/[id]/document
+  const documentUrl = documentPath ? `storage://documents/${documentPath}` : undefined
 
   const resolution = await prisma.resolution.create({
     data: { title, body, category, imageUrl, documentUrl, documentName, createdById: actor.id },
   })
   await writeAudit({ userId: actor.id, action: 'RESOLUTION_CREATE', entity: 'Resolution', entityId: resolution.id, newValue: { title } })
   refreshResolutions()
+  return { id: resolution.id, title: resolution.title }
 }
 
 export async function decideResolution(formData: FormData) {

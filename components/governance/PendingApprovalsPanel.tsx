@@ -100,7 +100,12 @@ function PendingCard({ resolution, onDone }: { resolution: PendingResolution; on
         <img src={resolution.imageUrl} alt="" className="mt-2 max-h-48 rounded-lg object-cover" />
       )}
       {resolution.documentUrl && (
-        <a href={resolution.documentUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm text-primary underline">
+        <a
+          href={`/api/governance/resolutions/${resolution.id}/document`}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-block text-sm text-primary underline"
+        >
           {resolution.documentName || 'View document'}
         </a>
       )}

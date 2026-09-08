@@ -1,5 +1,4 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
-import AddDocumentModal from '@/components/documents/AddDocumentModal'
 import ManageDocumentsList from '@/components/documents/ManageDocumentsList'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
@@ -24,10 +23,16 @@ export default async function ManageDocumentsPage() {
   ])
 
   return (
-    <DashboardShell role={actor.role} title="Documents" nav={navForRole(actor.role)} hideRelatedLinks>
-      <div className="p-4 md:p-6">
+    <DashboardShell
+      role={actor.role}
+      title="Documents"
+      nav={navForRole(actor.role)}
+      hideRelatedLinks
+      hidePageHeading
+    >
+      <div className="pt-1 sm:pt-2">
         <ManageDocumentsList
-          addAction={<AddDocumentModal categories={categories} />}
+          categories={categories}
           documents={documents.map((document) => ({
             id: document.id,
             title: document.title,

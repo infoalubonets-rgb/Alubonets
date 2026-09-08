@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
+import AddDocumentModal, { type OptimisticDocRow } from '@/components/documents/AddDocumentModal'
 import {
   deleteRepositoryDocument,
   deleteSelectedRepositoryDocuments,
@@ -22,9 +23,12 @@ type DocRow = {
 
 export default function ManageDocumentsList({
   documents,
+  categories,
   addAction,
 }: {
   documents: DocRow[]
+  categories?: { id: string; name: string }[]
+  /** @deprecated Prefer `categories` so uploads can update the list optimistically. */
   addAction?: ReactNode
 }) {
   const router = useRouter()
@@ -61,16 +65,21 @@ export default function ManageDocumentsList({
     formData.set('status', status)
     if (singleId) formData.set('singleId', singleId)
     else Array.from(selected).forEach((id) => formData.append('documentIds', id))
+
+    // Optimistic status flip
+    const previous = rows
+    if (singleId) {
+      setRows((current) => current.map((row) => (row.id === singleId ? { ...row, status } : row)))
+    } else {
+      setRows((current) => current.map((row) => (selected.has(row.id) ? { ...row, status } : row)))
+    }
+
     startTransition(async () => {
       try {
         await setSelectedDocumentStatus(formData)
-        if (singleId) {
-          setRows((current) => current.map((row) => (row.id === singleId ? { ...row, status } : row)))
-        } else {
-          setRows((current) => current.map((row) => (selected.has(row.id) ? { ...row, status } : row)))
-        }
         router.refresh()
       } catch (err) {
+        setRows(previous)
         setError(err instanceof Error ? err.message : 'Could not update documents.')
       }
     })
@@ -79,50 +88,95 @@ export default function ManageDocumentsList({
   function confirmDeleteOne() {
     if (!pendingDeleteId) return
     const id = pendingDeleteId
+    const removed = rows.find((row) => row.id === id)
+    if (!removed) return
+
     setError('')
+    setPendingDeleteId(null)
+    setRows((current) => current.filter((row) => row.id !== id))
+    setSelected((current) => {
+      const next = new Set(current)
+      next.delete(id)
+      return next
+    })
+
     const formData = new FormData()
     formData.set('id', id)
     startTransition(async () => {
       try {
         await deleteRepositoryDocument(formData)
-        setRows((current) => current.filter((row) => row.id !== id))
-        setSelected((current) => {
-          const next = new Set(current)
-          next.delete(id)
-          return next
-        })
-        setPendingDeleteId(null)
         router.refresh()
       } catch (err) {
+        setRows((current) => {
+          if (current.some((row) => row.id === id)) return current
+          return [removed, ...current]
+        })
         setError(err instanceof Error ? err.message : 'Could not delete document.')
-        setPendingDeleteId(null)
       }
     })
   }
 
   function deleteSelected() {
     if (!selected.size) return
+    const ids = Array.from(selected)
+    const removed = rows.filter((row) => selected.has(row.id))
+
     setError('')
+    setConfirmBulk(false)
+    setRows((current) => current.filter((row) => !selected.has(row.id)))
+    setSelected(new Set())
+
     const formData = new FormData()
-    Array.from(selected).forEach((id) => formData.append('documentIds', id))
+    ids.forEach((id) => formData.append('documentIds', id))
     startTransition(async () => {
       try {
         await deleteSelectedRepositoryDocuments(formData)
-        setRows((current) => current.filter((row) => !selected.has(row.id)))
-        setSelected(new Set())
-        setConfirmBulk(false)
         router.refresh()
       } catch (err) {
+        setRows((current) => {
+          const missing = removed.filter((row) => !current.some((r) => r.id === row.id))
+          return missing.length ? [...missing, ...current] : current
+        })
         setError(err instanceof Error ? err.message : 'Could not delete documents.')
       }
     })
   }
 
+  const addControl = categories ? (
+    <AddDocumentModal
+      categories={categories}
+      onOptimisticAdd={(row: OptimisticDocRow) => setRows((current) => [row, ...current])}
+      onOptimisticFail={(tempId) => setRows((current) => current.filter((row) => row.id !== tempId))}
+      onOptimisticConfirm={(tempId, real) =>
+        setRows((current) =>
+          current.map((row) =>
+            row.id === tempId
+              ? {
+                  ...row,
+                  id: real.id,
+                  title: real.title,
+                  status: real.status,
+                  categoryName: real.categoryName,
+                  uploadedAt: real.uploadedAt,
+                  canView: true,
+                }
+              : row,
+          ),
+        )
+      }
+    />
+  ) : (
+    addAction
+  )
+
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {addAction}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h1 className="font-h2 text-[22px] leading-tight text-primary sm:text-[26px] md:text-[28px] dark:text-primary-fixed-dim">
+          Documents
+        </h1>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {addControl}
           <button
             type="button"
             disabled={pending || !selected.size}
@@ -171,6 +225,7 @@ export default function ManageDocumentsList({
               onChange={() => toggle(document.id)}
               aria-label={`Select ${document.title}`}
               className="h-4 w-4 accent-primary"
+              disabled={document.id.startsWith('temp-')}
             />
             <div className="min-w-0 flex-1">
               <p className="truncate font-semibold text-on-surface">{document.title}</p>
@@ -181,6 +236,7 @@ export default function ManageDocumentsList({
                 {' · '}
                 {new Date(document.uploadedAt).toLocaleDateString('en-KE')}
                 {document.isDemo ? ' · Demo' : ''}
+                {document.id.startsWith('temp-') ? ' · Uploading…' : ''}
               </p>
             </div>
             <span
@@ -206,7 +262,7 @@ export default function ManageDocumentsList({
             )}
             <button
               type="button"
-              disabled={pending}
+              disabled={pending || document.id.startsWith('temp-')}
               onClick={() =>
                 runStatus(document.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED', document.id)
               }
@@ -216,7 +272,7 @@ export default function ManageDocumentsList({
             </button>
             <button
               type="button"
-              disabled={pending}
+              disabled={pending || document.id.startsWith('temp-')}
               onClick={() => setPendingDeleteId(document.id)}
               aria-label={`Delete ${document.title}`}
               title="Delete"
@@ -236,10 +292,8 @@ export default function ManageDocumentsList({
         open={Boolean(pendingDeleteId)}
         title="Delete this document?"
         description="This permanently removes the document from the repository."
-        pending={pending}
-        onCancel={() => {
-          if (!pending) setPendingDeleteId(null)
-        }}
+        pending={false}
+        onCancel={() => setPendingDeleteId(null)}
         onConfirm={confirmDeleteOne}
       />
 
@@ -251,10 +305,8 @@ export default function ManageDocumentsList({
             Permanently delete <strong>{selected.size}</strong> document{selected.size === 1 ? '' : 's'}?
           </>
         }
-        pending={pending}
-        onCancel={() => {
-          if (!pending) setConfirmBulk(false)
-        }}
+        pending={false}
+        onCancel={() => setConfirmBulk(false)}
         onConfirm={deleteSelected}
       />
     </section>
