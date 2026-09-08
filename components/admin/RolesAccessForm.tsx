@@ -36,7 +36,7 @@ const ROLE_ICON: Record<Role, string> = {
   MEMBER: 'person',
 }
 
-export default function RolesAccessForm({ users, actorIsSuperAdmin, actorId }: Props) {
+export default function RolesAccessForm({ users, actorIsSuperAdmin }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [modal, setModal] = useState<ModalKind>(null)
@@ -115,6 +115,10 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, actorId }: P
       setError('Select an account and a role first')
       return
     }
+    if (selected.isSuperAdmin) {
+      setError('Super Admin accounts cannot be changed by other members')
+      return
+    }
     setError('')
     setOk('')
     startTransition(async () => {
@@ -136,15 +140,20 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, actorId }: P
 
   const toggleSuper = () => {
     if (!selected || !actorIsSuperAdmin) return
+    // Existing Super Admins cannot be revoked — only grant to others.
+    if (selected.isSuperAdmin) {
+      setError('Super Admin cannot be removed by any other member')
+      return
+    }
     setError('')
     setOk('')
     startTransition(async () => {
       try {
         await setSuperAdminFlag({
           userId: selected.id,
-          isSuperAdmin: !selected.isSuperAdmin,
+          isSuperAdmin: true,
         })
-        setOk(selected.isSuperAdmin ? 'Super Admin revoked' : 'Super Admin granted')
+        setOk('Super Admin granted')
         router.refresh()
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not update Super Admin')
@@ -189,18 +198,18 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, actorId }: P
           icon="badge"
           filled={!!role}
           open={modal === 'role'}
-          disabled={!selected}
-          onClick={() => selected && setModal('role')}
+          disabled={!selected || selected.isSuperAdmin}
+          onClick={() => selected && !selected.isSuperAdmin && setModal('role')}
         />
         <SelectorBubble
           label="Access"
-          summary={accessSummary}
+          summary={selected?.isSuperAdmin ? 'All dashboards' : accessSummary}
           description="Choose dashboards"
           icon="dashboard"
           filled={!!role && accessCount > 0}
           open={modal === 'access'}
-          disabled={!selected || !role}
-          onClick={() => selected && role && setModal('access')}
+          disabled={!selected || !role || selected.isSuperAdmin}
+          onClick={() => selected && role && !selected.isSuperAdmin && setModal('access')}
         />
       </div>
 
@@ -209,13 +218,16 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, actorId }: P
           <div>
             <p className="font-label-bold text-sm text-on-surface">Super Admin</p>
             <p className="text-[11px] text-on-surface-variant">
-              Full access across every workspace
+              {selected.isSuperAdmin
+                ? 'Highest authority — cannot be removed by other members'
+                : 'Grant full access across every workspace'}
             </p>
           </div>
           <button
             type="button"
-            disabled={pending || (selected.id === actorId && selected.isSuperAdmin)}
+            disabled={pending || selected.isSuperAdmin}
             onClick={toggleSuper}
+            title={selected.isSuperAdmin ? 'Super Admin cannot be removed' : 'Grant Super Admin'}
             className={`relative h-7 w-12 rounded-full transition-colors disabled:opacity-50 ${
               selected.isSuperAdmin ? 'bg-secondary-container' : 'bg-outline-variant'
             }`}
@@ -243,11 +255,11 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, actorId }: P
 
       <button
         type="button"
-        disabled={!selected || !role || pending}
+        disabled={!selected || !role || pending || selected.isSuperAdmin}
         onClick={save}
         className="w-full h-12 rounded-full bg-secondary-container text-on-primary font-label-bold text-[15px] hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-45 disabled:cursor-not-allowed shadow-md"
       >
-        {pending ? 'Saving…' : 'Save changes'}
+        {pending ? 'Saving…' : selected?.isSuperAdmin ? 'Protected Super Admin' : 'Save changes'}
       </button>
 
       {/* Portal so overlay covers sidebar + top nav (not clipped by main overflow) */}

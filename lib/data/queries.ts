@@ -390,9 +390,9 @@ export const getContributionAnalytics = unstable_cache(
   { tags: [TAGS.contributions, TAGS.members], revalidate: 120 },
 )
 
-export async function getResolutionsForViewer(actor: { id: string; role: Role }) {
-  const canApprove = actor.role === 'ADMIN'
-  const fullDetail = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
+export async function getResolutionsForViewer(actor: { id: string; role: Role; isSuperAdmin?: boolean }) {
+  const canApprove = actor.role === 'ADMIN' || Boolean(actor.isSuperAdmin)
+  const fullDetail = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || Boolean(actor.isSuperAdmin)
 
   const [pendingRaw, approvedRaw] = await Promise.all([
     canApprove

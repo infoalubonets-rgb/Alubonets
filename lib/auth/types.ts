@@ -61,17 +61,15 @@ export const ROLE_LABEL: Record<Role, string> = {
   MEMBER: 'Member',
 }
 
-/** Primary role + extras; Super Admin gets every dashboard. */
+/** Primary role + extras; Admin and Super Admin get every dashboard. */
 export function allowedDashboards(user: {
   role: Role
   isSuperAdmin?: boolean
   dashboardAccess?: Role[] | null
 }): Role[] {
+  // Admin and Super Admin are top-level operators with access to every workspace.
   if (user.isSuperAdmin || user.role === 'ADMIN') {
-    // Super Admin: all. Regular Admin: admin home + any granted extras (still can open admin).
-    if (user.isSuperAdmin) return [...DASHBOARD_ROLES]
-    const extras = user.dashboardAccess ?? []
-    return Array.from(new Set<Role>(['ADMIN', ...extras]))
+    return [...DASHBOARD_ROLES]
   }
   const extras = user.dashboardAccess ?? []
   return Array.from(new Set<Role>([user.role, ...extras]))

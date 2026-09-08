@@ -12,8 +12,10 @@ import { hasChartData, formatMemberStatus } from '@/lib/chart-labels'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { formatAuditAction } from '@/lib/audit-labels'
+import { requireAdmin } from '@/lib/auth/session'
 
 export default async function AdminPage() {
+  await requireAdmin()
   const data = await getAdminDashboardData()
   const [chart, memberGrowth, familyBranches] = await Promise.all([
     getContributionChartSeries(),

@@ -8,6 +8,7 @@ import { ContributionTrendChart, ChartEmpty } from '@/components/dashboard/Chart
 import { formatMonthKeys, hasChartData, monthKeyFromDate } from '@/lib/chart-labels'
 import { todayInputValue } from '@/lib/dates'
 import { withDatabaseRetry } from '@/lib/database-retry'
+import { requireAdmin } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,7 @@ export default async function AdminFinancePage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>
 }) {
+  await requireAdmin()
   const sp = await searchParams
   const from = sp.from ? new Date(sp.from) : undefined
   const to = sp.to ? new Date(sp.to) : undefined

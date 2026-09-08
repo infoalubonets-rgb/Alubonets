@@ -2,8 +2,10 @@ import DashboardShell from '@/components/dashboard/DashboardShell'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { actionApproveGallery } from '@/app/actions/domain'
 import { prisma } from '@/lib/prisma'
+import { requireAdmin } from '@/lib/auth/session'
 
 export default async function AdminGalleryQueuePage() {
+  await requireAdmin()
   const queue = await prisma.galleryPhoto.findMany({
     where: { isPublic: false },
     orderBy: { uploadedAt: 'desc' },

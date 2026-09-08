@@ -196,16 +196,12 @@ export async function setMemberRole(input: z.infer<typeof roleSchema>) {
   const target = await prisma.user.findUnique({ where: { id: userId } })
   if (!target) throw new Error('User not found')
 
+  if (target.isSuperAdmin) {
+    throw new Error('Super Admin accounts cannot be changed by other members')
+  }
+
   if (role === 'ADMIN' && !actor.isSuperAdmin) {
     throw new Error('Only a Super Admin can assign the Admin role')
-  }
-
-  if (target.isSuperAdmin && !actor.isSuperAdmin) {
-    throw new Error('Cannot change a Super Admin account')
-  }
-
-  if (target.isSuperAdmin && role !== 'ADMIN') {
-    throw new Error('Demote Super Admin flag before changing primary role away from Admin')
   }
 
   const updated = await prisma.user.update({
@@ -236,8 +232,8 @@ export async function setMemberDashboardAccess(input: z.infer<typeof accessSchem
 
   const target = await prisma.user.findUnique({ where: { id: userId } })
   if (!target) throw new Error('User not found')
-  if (target.isSuperAdmin && !actor.isSuperAdmin) {
-    throw new Error('Cannot change Super Admin dashboard access')
+  if (target.isSuperAdmin) {
+    throw new Error('Super Admin already has access to every workspace')
   }
 
   const updated = await prisma.user.update({
@@ -270,7 +266,7 @@ export async function setMemberStatus(input: z.infer<typeof statusSchema>) {
     throw new Error('Cannot suspend or deactivate a Super Admin')
   }
 
-  if ((target.role === 'ADMIN' || target.isSuperAdmin) && !actor.isSuperAdmin) {
+  if (target.role === 'ADMIN' && !actor.isSuperAdmin) {
     throw new Error('Only a Super Admin can suspend Admin accounts')
   }
 
@@ -310,19 +306,21 @@ export async function setSuperAdminFlag(input: z.infer<typeof superSchema>) {
   const target = await prisma.user.findUnique({ where: { id: userId } })
   if (!target) throw new Error('User not found')
 
-  if (!isSuperAdmin) {
-    const supers = await prisma.user.count({ where: { isSuperAdmin: true } })
-    if (supers <= 1 && target.isSuperAdmin) {
-      throw new Error('Cannot remove the last Super Admin')
-    }
+  // Super Admin is the highest authority — no other member can remove it.
+  if (target.isSuperAdmin && !isSuperAdmin) {
+    throw new Error('Super Admin cannot be removed by any other member')
+  }
+
+  if (target.isSuperAdmin && isSuperAdmin) {
+    return target
   }
 
   const updated = await prisma.user.update({
     where: { id: userId },
     data: {
-      isSuperAdmin,
-      role: isSuperAdmin ? 'ADMIN' : target.role,
-      dashboardAccess: isSuperAdmin ? (ALL_ROLES as Role[]) : target.dashboardAccess,
+      isSuperAdmin: true,
+      role: 'ADMIN',
+      dashboardAccess: ALL_ROLES as Role[],
     },
   })
 
@@ -333,7 +331,7 @@ export async function setSuperAdminFlag(input: z.infer<typeof superSchema>) {
     action: 'SUPER_ADMIN_FLAG',
     entity: 'User',
     entityId: userId,
-    meta: { isSuperAdmin },
+    meta: { isSuperAdmin: true },
   })
 
   revalidateAdmin()
