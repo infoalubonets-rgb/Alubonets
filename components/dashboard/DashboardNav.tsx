@@ -67,14 +67,14 @@ export default function DashboardNav({
 
   return (
     <div className="relative min-h-0 flex-1">
-      <nav ref={scrollRef} className="dashboard-nav-scroll h-full overflow-y-auto py-sm px-sm space-y-0.5">
+      <nav ref={scrollRef} className="dashboard-nav-scroll h-full overflow-y-auto py-1 px-sm space-y-0">
         {nav.map((link) => {
           const href = link.href || '#'
           const active = isNavActive(pathname, href, hrefs)
           const inSection = sectionActive(pathname, link, hrefs)
           const className = active || inSection
-            ? `flex min-h-10 items-center gap-sm px-sm py-2 rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
-            : `sidebar-link min-h-10 py-2 ${collapsed ? 'justify-center' : ''}`
+            ? `flex min-h-[34px] items-center gap-sm px-sm py-1.5 rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
+            : `sidebar-link ${collapsed ? 'justify-center' : ''}`
 
           return (
             <Link

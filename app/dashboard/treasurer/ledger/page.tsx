@@ -1,9 +1,10 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { TREASURER_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
-import { recordExpense, recordLedgerContribution, proposeReversal } from '@/app/actions/finance'
+import { recordLedgerContribution, proposeReversal } from '@/app/actions/finance'
 import { accountBalances } from '@/lib/finance'
 import PaymentCategoryFields from '@/components/finance/PaymentCategoryFields'
+import RecordExpenseForm from '@/components/finance/RecordExpenseForm'
 import { filterSelectableCategories } from '@/lib/payment-categories'
 
 export default async function LedgerPage() {
@@ -36,16 +37,7 @@ export default async function LedgerPage() {
     </section>
     <section className="rounded-2xl border bg-surface p-5">
       <h2 className="font-h3 text-xl text-primary">Record expense</h2>
-      <form action={recordExpense} className="mt-3 grid gap-2 md:grid-cols-3">
-        <input name="amount" type="number" min="1" required placeholder="Amount KES" className="rounded-lg border px-3 py-2"/>
-        <input name="payee" required placeholder="Payee" className="rounded-lg border px-3 py-2"/>
-        <input name="purpose" required placeholder="Purpose" className="rounded-lg border px-3 py-2"/>
-        <PaymentCategoryFields categories={expenseCategories} kind="expense" descriptionPlaceholder="Short note about this expense" />
-        <select name="sourceAccountId" required className="rounded-lg border px-3 py-2">{accounts.map((a)=><option key={a.id} value={a.id}>{a.name}</option>)}</select>
-        <input name="occurredAt" type="date" required defaultValue={new Date().toISOString().slice(0,10)} className="rounded-lg border px-3 py-2"/>
-        <label className="text-sm md:col-span-3">Supporting document<input name="evidence" type="file" required accept=".pdf,image/*" className="mt-1 block"/></label>
-        <button className="w-fit rounded-full bg-primary px-4 py-2 text-on-primary md:col-span-3">Record expense</button>
-      </form>
+      <RecordExpenseForm categories={expenseCategories} accounts={accounts} />
     </section>
     <section className="rounded-2xl border bg-surface p-5"><h2 className="font-h3 text-xl text-primary">Immutable transaction history</h2><div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead><tr><th>Number</th><th>Date</th><th>Type</th><th>Status</th><th>Category</th><th>Amount</th><th>Correction</th></tr></thead><tbody>{transactions.map((tx)=><tr key={tx.id} className="border-t"><td>{tx.transactionNumber}</td><td>{tx.occurredAt.toLocaleDateString()}</td><td>{tx.type}</td><td>{tx.status}</td><td>{tx.category?.name||'—'}</td><td>KES {Number(tx.amount).toLocaleString()}</td><td>{['CONFIRMED','RECONCILED'].includes(tx.status)&&<form action={proposeReversal} className="flex gap-1"><input type="hidden" name="id" value={tx.id}/><input name="reason" required minLength={5} placeholder="Correction reason" className="w-36 rounded border px-2"/><button className="text-error underline">Propose reversal</button></form>}</td></tr>)}</tbody></table></div></section>
   </div></DashboardShell>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition, type ReactNode } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import FullScreenModal from '@/components/ui/FullScreenModal'
 import ContributionCategoriesManager from '@/components/admin/ContributionCategoriesManager'
 import {
@@ -90,33 +90,44 @@ function SavableForm({
   className,
   children,
 }: {
-  action: (formData: FormData) => Promise<void>
+  action: (formData: FormData) => Promise<unknown>
   submitLabel: string
   className?: string
   children: ReactNode
 }) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const [pending, setPending] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
 
-  function handleSubmit(formData: FormData) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (pending) return
+    const formData = new FormData(event.currentTarget)
     setError('')
     setSaved(false)
-    startTransition(async () => {
-      try {
-        await action(formData)
-        router.refresh()
-        setSaved(true)
-        window.setTimeout(() => setSaved(false), 2000)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not save. Try again.')
-      }
-    })
+    setPending(true)
+    try {
+      const result = await Promise.race([
+        action(formData),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error('Save is taking too long. Check your connection and try again.')), 20000)
+        }),
+      ])
+      void result
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2500)
+      // Refresh in the background — never block the Saved state on it.
+      void router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save. Try again.')
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
-    <form action={handleSubmit} className={className}>
+    <form onSubmit={handleSubmit} className={className}>
       {children}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button

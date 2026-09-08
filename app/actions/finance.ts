@@ -7,7 +7,7 @@ import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
 import { createLedgerContribution, getOpenPeriod, refreshObligation, transactionNumber } from '@/lib/finance'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
-import { createServerClient } from '@/lib/supabase-server'
+import { createSignedUpload } from '@/lib/upload-signed'
 import { requireWelfareEnabled } from '@/lib/feature-flags'
 import { assertNotFuture, assertNotPast } from '@/lib/dates'
 import {
@@ -98,14 +98,13 @@ export async function recordLedgerContribution(formData: FormData) {
   refreshFinance()
 }
 
-async function uploadEvidence(actorId: string, file: File) {
-  if (!file || !file.size) throw new Error('A supporting document is required for every expense.')
-  if (file.size > 5 * 1024 * 1024) throw new Error('Supporting document must be 5 MB or smaller.')
-  const path = `${actorId}/${Date.now()}-${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`
-  const admin = createServerClient()
-  const { error } = await admin.storage.from('financial-documents').upload(path, await file.arrayBuffer(), { contentType: file.type, upsert: false })
-  if (error) throw new Error(`Evidence upload failed: ${error.message}`)
-  return { path, mimeType: file.type || 'application/octet-stream', title: file.name }
+/** Step 1 of a fast upload: authorize, then hand back a signed URL for a direct browser→Supabase upload. */
+export async function requestEvidenceUploadUrl(formData: FormData) {
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const fileName = z.string().min(1).parse(formData.get('fileName'))
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${actor.id}/${Date.now()}-${crypto.randomUUID()}-${safe}`
+  return createSignedUpload('financial-documents', path)
 }
 
 export async function recordExpense(formData: FormData) {
@@ -132,7 +131,15 @@ export async function recordExpense(formData: FormData) {
   }
   const description = paymentDescription(data.description?.trim() || `Expense — ${data.payee}`, otherLabel)
   assertNotFuture(data.occurredAt, 'Expense date')
-  const evidence = await uploadEvidence(actor.id, formData.get('evidence') as File)
+  const evidence = z.object({
+    evidencePath: z.string().min(1, 'A supporting document is required for every expense.'),
+    evidenceMimeType: z.string().min(1),
+    evidenceTitle: z.string().min(1),
+  }).parse({
+    evidencePath: formData.get('evidencePath'),
+    evidenceMimeType: formData.get('evidenceMimeType'),
+    evidenceTitle: formData.get('evidenceTitle'),
+  })
   const threshold = Number((await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value || 50000)
   const approvalRequired = data.amount >= threshold && actor.role !== 'ADMIN'
   const period = await getOpenPeriod(data.occurredAt)
@@ -141,7 +148,7 @@ export async function recordExpense(formData: FormData) {
       transactionNumber: transactionNumber(), type: 'EXPENSE', status: approvalRequired ? 'PENDING' : 'CONFIRMED', amount: data.amount, description, occurredAt: data.occurredAt, categoryId, periodId: period.id, createdById: actor.id, approvedById: approvalRequired ? null : actor.id, confirmedAt: approvalRequired ? null : new Date(),
       entries: { create: [{ accountId: 'acct-expense', debit: data.amount, credit: 0, memo: data.purpose }, { accountId: data.sourceAccountId, debit: 0, credit: data.amount, memo: `Paid to ${data.payee}` }] },
       expense: { create: { payee: data.payee, purpose: data.purpose, approvalRequired } },
-      supportingDocuments: { create: { title: evidence.title, fileUrl: evidence.path, mimeType: evidence.mimeType, uploadedById: actor.id } },
+      supportingDocuments: { create: { title: evidence.evidenceTitle, fileUrl: evidence.evidencePath, mimeType: evidence.evidenceMimeType, uploadedById: actor.id } },
     },
   })
   await writeAudit({ userId: actor.id, action: 'EXPENSE_CREATE', entity: 'FinancialTransaction', entityId: transaction.id, meta: { ...data, approvalRequired } })
@@ -163,7 +170,15 @@ export async function recordWelfareDisbursement(formData: FormData) {
     include: { user: true },
   })
   if (request.status !== 'APPROVED') throw new Error('Only approved welfare requests can be paid.')
-  const evidence = await uploadEvidence(actor.id, formData.get('evidence') as File)
+  const evidence = z.object({
+    evidencePath: z.string().min(1, 'A supporting document is required for every disbursement.'),
+    evidenceMimeType: z.string().min(1),
+    evidenceTitle: z.string().min(1),
+  }).parse({
+    evidencePath: formData.get('evidencePath'),
+    evidenceMimeType: formData.get('evidenceMimeType'),
+    evidenceTitle: formData.get('evidenceTitle'),
+  })
   const period = await getOpenPeriod(data.occurredAt)
   const category = await prisma.transactionCategory.findUniqueOrThrow({ where: { id: 'cat-welfare-disbursement' } })
   const threshold = Number((await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value || 50000)
@@ -187,7 +202,7 @@ export async function recordWelfareDisbursement(formData: FormData) {
           { accountId: data.sourceAccountId, debit: 0, credit: data.amount, memo: `Welfare payment to ${request.user.fullName}` },
         ] },
         disbursement: { create: { beneficiary: request.user.fullName, purpose: request.description, welfareRequestId: request.id } },
-        supportingDocuments: { create: { title: evidence.title, fileUrl: evidence.path, mimeType: evidence.mimeType, uploadedById: actor.id } },
+        supportingDocuments: { create: { title: evidence.evidenceTitle, fileUrl: evidence.evidencePath, mimeType: evidence.evidenceMimeType, uploadedById: actor.id } },
       },
     })
     if (!approvalRequired) await tx.welfareRequest.update({ where: { id: request.id }, data: { status: 'PAID' } })
@@ -324,28 +339,48 @@ export async function reopenAccountingPeriod(formData: FormData) {
   refreshFinance()
 }
 
-export async function updateApprovalThreshold(formData: FormData) {
-  const actor = await requireAdmin()
-  const amount = z.coerce.number().positive().parse(formData.get('amount'))
-  await prisma.appSetting.upsert({ where: { key: 'financial_approval_threshold_kes' }, create: { key: 'financial_approval_threshold_kes', value: String(amount), updatedBy: actor.id }, update: { value: String(amount), updatedBy: actor.id } })
-  await writeAudit({ userId: actor.id, action: 'FINANCE_THRESHOLD_UPDATE', entity: 'AppSetting', entityId: 'financial_approval_threshold_kes', meta: { amount } })
-  refreshFinance()
+export async function updateApprovalThreshold(formData: FormData): Promise<{ ok: true; amount: number }> {
+  try {
+    const actor = await requireAdmin()
+    const amount = z.coerce.number().positive().parse(formData.get('amount'))
+    await prisma.appSetting.upsert({
+      where: { key: 'financial_approval_threshold_kes' },
+      create: { key: 'financial_approval_threshold_kes', value: String(amount), updatedBy: actor.id },
+      update: { value: String(amount), updatedBy: actor.id },
+    })
+    await writeAudit({
+      userId: actor.id,
+      action: 'FINANCE_THRESHOLD_UPDATE',
+      entity: 'AppSetting',
+      entityId: 'financial_approval_threshold_kes',
+      meta: { amount },
+    })
+    refreshFinance()
+    return { ok: true, amount }
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Could not save approval threshold.')
+  }
 }
 
-export async function updateLoanApplicationLimit(formData: FormData) {
-  const actor = await requireAdmin()
-  const amount = z.coerce.number().int().min(100).max(999_999).parse(formData.get('amount'))
-  await prisma.appSetting.upsert({
-    where: { key: 'loan_max_amount_kes' },
-    create: { key: 'loan_max_amount_kes', value: String(amount), updatedBy: actor.id },
-    update: { value: String(amount), updatedBy: actor.id },
-  })
-  await writeAudit({
-    userId: actor.id,
-    action: 'LOAN_LIMIT_UPDATE',
-    entity: 'AppSetting',
-    entityId: 'loan_max_amount_kes',
-    meta: { amount },
-  })
-  refreshFinance()
+export async function updateLoanApplicationLimit(formData: FormData): Promise<{ ok: true; amount: number }> {
+  try {
+    const actor = await requireAdmin()
+    const amount = z.coerce.number().int().min(100).max(999_999).parse(formData.get('amount'))
+    await prisma.appSetting.upsert({
+      where: { key: 'loan_max_amount_kes' },
+      create: { key: 'loan_max_amount_kes', value: String(amount), updatedBy: actor.id },
+      update: { value: String(amount), updatedBy: actor.id },
+    })
+    await writeAudit({
+      userId: actor.id,
+      action: 'LOAN_LIMIT_UPDATE',
+      entity: 'AppSetting',
+      entityId: 'loan_max_amount_kes',
+      meta: { amount },
+    })
+    refreshFinance()
+    return { ok: true, amount }
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Could not save loan limit.')
+  }
 }

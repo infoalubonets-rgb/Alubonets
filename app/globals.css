@@ -715,12 +715,12 @@ textarea.contact-field-modern {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 10px 8px;
+  min-height: 34px;
+  padding: 5px 8px;
   border-radius: 0.5rem;
   color: #b0c6ff;
   font-size: 13.5px;
-  line-height: 1.25;
+  line-height: 1.2;
   transition: background-color 0.15s ease;
   font-family: var(--font-inter), system-ui, sans-serif;
 }

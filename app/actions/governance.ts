@@ -12,6 +12,7 @@ import { GOVERNANCE_CATEGORIES } from '@/lib/governance-categories'
 import { governanceCommentSchema } from '@/lib/governance-comment'
 import { assertNotPast } from '@/lib/dates'
 import { createServerClient } from '@/lib/supabase-server'
+import { createSignedUpload } from '@/lib/upload-signed'
 
 const refresh = (id?: string) => {
   revalidatePath('/governance')
@@ -178,40 +179,44 @@ const refreshResolutions = () => {
   revalidatePath('/governance/manage')
 }
 
+const RESOLUTION_CREATOR_ROLES = ['SECRETARY', 'ORGANIZER', 'TREASURER', 'ADMIN'] as const
+
+/**
+ * Step 1 of a fast upload: validate + authorize, then hand back a signed URL the
+ * browser can upload straight to Supabase Storage with (no file bytes touch this server).
+ */
+export async function requestResolutionUploadUrl(formData: FormData) {
+  await requireActiveRole([...RESOLUTION_CREATOR_ROLES])
+  const kind = z.enum(['image', 'document']).parse(formData.get('kind'))
+  const fileName = z.string().min(1).parse(formData.get('fileName'))
+
+  if (kind === 'image') {
+    const ext = (fileName.split('.').pop() ?? 'jpg').toLowerCase()
+    const path = `resolutions/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    return createSignedUpload('gallery', path)
+  }
+
+  const ext = (fileName.split('.').pop() ?? '').toLowerCase()
+  if (!['pdf', 'doc', 'docx'].includes(ext)) throw new Error('Document must be a PDF or Word file.')
+  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `resolutions/${Date.now()}-${Math.random().toString(36).slice(2)}-${safe}`
+  return createSignedUpload('gallery', path)
+}
+
 export async function createResolution(formData: FormData) {
-  const actor = await requireActiveRole(['SECRETARY', 'ORGANIZER', 'TREASURER', 'ADMIN'])
+  const actor = await requireActiveRole([...RESOLUTION_CREATOR_ROLES])
   const title = z.string().trim().min(3).max(200).parse(formData.get('title'))
   const body = z.string().trim().min(5).max(6000).parse(formData.get('body'))
   const category = z.enum(GOVERNANCE_CATEGORIES.map((item) => item.value) as [string, ...string[]]).parse(
     formData.get('category') || 'RESOLUTION',
   )
+  const imagePath = z.string().optional().parse(formData.get('imagePath') || undefined)
+  const documentPath = z.string().optional().parse(formData.get('documentPath') || undefined)
+  const documentName = z.string().optional().parse(formData.get('documentName') || undefined)
 
   const supabase = createServerClient()
-  const imageFile = formData.get('image') as File | null
-  const documentFile = formData.get('document') as File | null
-
-  let imageUrl: string | undefined
-  if (imageFile && imageFile.size > 0) {
-    if (!imageFile.type.startsWith('image/')) throw new Error('Attachment must be an image file.')
-    const ext = (imageFile.name.split('.').pop() ?? 'jpg').toLowerCase()
-    const path = `resolutions/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const { error } = await supabase.storage.from('gallery').upload(path, await imageFile.arrayBuffer(), { contentType: imageFile.type, upsert: false })
-    if (error) throw new Error(`Image upload failed: ${error.message}`)
-    imageUrl = supabase.storage.from('gallery').getPublicUrl(path).data.publicUrl
-  }
-
-  let documentUrl: string | undefined
-  let documentName: string | undefined
-  if (documentFile && documentFile.size > 0) {
-    const ext = (documentFile.name.split('.').pop() ?? '').toLowerCase()
-    if (!['pdf', 'doc', 'docx'].includes(ext)) throw new Error('Document must be a PDF or Word file.')
-    const safe = documentFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const path = `resolutions/${Date.now()}-${Math.random().toString(36).slice(2)}-${safe}`
-    const { error } = await supabase.storage.from('gallery').upload(path, await documentFile.arrayBuffer(), { contentType: documentFile.type || 'application/octet-stream', upsert: false })
-    if (error) throw new Error(`Document upload failed: ${error.message}`)
-    documentUrl = supabase.storage.from('gallery').getPublicUrl(path).data.publicUrl
-    documentName = documentFile.name
-  }
+  const imageUrl = imagePath ? supabase.storage.from('gallery').getPublicUrl(imagePath).data.publicUrl : undefined
+  const documentUrl = documentPath ? supabase.storage.from('gallery').getPublicUrl(documentPath).data.publicUrl : undefined
 
   const resolution = await prisma.resolution.create({
     data: { title, body, category, imageUrl, documentUrl, documentName, createdById: actor.id },

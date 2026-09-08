@@ -2,12 +2,11 @@ import { notFound } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { TREASURER_NAV, WELFARE_NAV_ITEMS, withOptionalNav } from '@/lib/dashboard/nav'
 import { actionReviewWelfare } from '@/app/actions/domain'
-import { recordWelfareDisbursement } from '@/app/actions/finance'
 import { getTreasurerDashboardData } from '@/lib/data/queries'
 import { prisma } from '@/lib/prisma'
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
 import { publishFundingRequestToGovernance } from '@/app/actions/loans'
-import { todayInputValue } from '@/lib/dates'
+import RecordWelfareDisbursementForm from '@/components/finance/RecordWelfareDisbursementForm'
 
 export default async function TreasurerWelfarePage() {
   const welfareOn = await isFeatureEnabled(FEATURE_FLAGS.welfareEnabled)
@@ -48,14 +47,7 @@ export default async function TreasurerWelfarePage() {
                   <button className="px-3 py-1.5 border rounded-lg text-xs">{status}</button>
                 </form>
               ))}
-            </div> : <form action={recordWelfareDisbursement} className="mt-3 grid gap-2 md:grid-cols-4">
-              <input type="hidden" name="welfareRequestId" value={w.id} />
-              <input name="amount" type="number" min="1" step="0.01" required defaultValue={w.amount ?? undefined} placeholder="KES amount" className="rounded-lg border px-3 py-2" />
-              <select name="sourceAccountId" required className="rounded-lg border px-3 py-2">{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select>
-              <input name="occurredAt" type="date" required max={todayInputValue()} title="A payment cannot be dated in the future." defaultValue={todayInputValue()} className="rounded-lg border px-3 py-2" />
-              <input name="evidence" type="file" required accept=".pdf,image/*" className="rounded-lg border px-3 py-2" />
-              <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Record payment</button>
-            </form>}
+            </div> : <RecordWelfareDisbursementForm welfareRequestId={w.id} defaultAmount={w.amount} accounts={accounts} />}
           </div>
         ))}
       </div>
