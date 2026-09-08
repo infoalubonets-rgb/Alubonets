@@ -17,10 +17,4 @@ describe('validateSettingValue', () => {
   it('accepts loan max amount', () => {
     expect(validateSettingValue(SETTING_KEYS.loanMaxAmountKes, '50000')).toBe('50000')
   })
-
-  it('validates the configurable adulthood age', () => {
-    expect(validateSettingValue(SETTING_KEYS.familyAdulthoodAge, '18')).toBe('18')
-    expect(() => validateSettingValue(SETTING_KEYS.familyAdulthoodAge, '12')).toThrow()
-    expect(() => validateSettingValue(SETTING_KEYS.familyAdulthoodAge, '26')).toThrow()
-  })
 })

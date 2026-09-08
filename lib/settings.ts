@@ -18,7 +18,6 @@ export const SETTING_KEYS = {
   loanPolicyTitle: 'loan_policy_title',
   loanPolicyContent: 'loan_policy_content',
   loanPolicyEffectiveDate: 'loan_policy_effective_date',
-  familyAdulthoodAge: 'family_adulthood_age',
   welfareMinAmountKes: 'welfare_min_amount_kes',
   welfareMaxAmountKes: 'welfare_max_amount_kes',
 } as const
@@ -46,7 +45,6 @@ const validators: Record<SettingKey, z.ZodType<string>> = {
   [SETTING_KEYS.loanPolicyTitle]: z.string().trim().max(200),
   [SETTING_KEYS.loanPolicyContent]: z.string().trim().max(20_000),
   [SETTING_KEYS.loanPolicyEffectiveDate]: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')),
-  [SETTING_KEYS.familyAdulthoodAge]: z.string().regex(/^\d+$/).refine((v) => Number(v) >= 13 && Number(v) <= 25),
   [SETTING_KEYS.welfareMinAmountKes]: z.string().regex(/^\d+(\.\d{1,2})?$/).refine((v) => Number(v) >= 0),
   [SETTING_KEYS.welfareMaxAmountKes]: z.string().regex(/^\d+(\.\d{1,2})?$/).refine((v) => Number(v) > 0),
 }
@@ -63,7 +61,6 @@ const defaults: Partial<Record<SettingKey, string>> = {
   [SETTING_KEYS.loanMinGuarantors]: '2',
   [SETTING_KEYS.loanRequireGuarantorAccept]: 'true',
   [SETTING_KEYS.loanPolicyTitle]: 'Loan Policy',
-  [SETTING_KEYS.familyAdulthoodAge]: '18',
   [SETTING_KEYS.welfareMinAmountKes]: '1000',
   [SETTING_KEYS.welfareMaxAmountKes]: '100000',
 }

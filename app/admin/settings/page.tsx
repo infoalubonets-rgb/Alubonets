@@ -81,19 +81,6 @@ export default async function AdminSettingsPage() {
           </SettingsSectionButton>
         )}
 
-        <SettingsSectionButton
-          title="Family account transition"
-          description="Age at which a record-only child may be invited"
-          icon="family_restroom"
-        >
-          <AppSettingForm
-            settingKey={SETTING_KEYS.familyAdulthoodAge}
-            label="Age at which a record-only child may be invited"
-            defaultValue={settings[SETTING_KEYS.familyAdulthoodAge] || '18'}
-            type="number"
-          />
-        </SettingsSectionButton>
-
         {loansOn && (
           <SettingsSectionButton
             title="Loan management"

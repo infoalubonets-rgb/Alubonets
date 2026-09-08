@@ -9,8 +9,6 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { sendFamilyInviteEmail, sendFamilyLinkedNoticeEmail } from '@/lib/email/resend'
 import { branchHistoryData, validateFamilyAttachment } from '@/lib/family-rules'
-import { assertEligibleForAdultInvite } from '@/lib/family-transition'
-import { getSetting, SETTING_KEYS } from '@/lib/settings'
 
 const relationshipEnum = z.enum(['SPOUSE', 'CHILD', 'DEPENDENT', 'OTHER'])
 
@@ -349,38 +347,4 @@ export async function revokeFamilyInvite(inviteId: string) {
 
   revalidateFamily()
   return { ok: true as const }
-}
-
-export async function inviteRecordOnlyAdult(input: { memberId: string; email: string }) {
-  const principal = await requirePrincipal()
-  const email = z.string().email().parse(input.email.trim().toLowerCase())
-  const member = await prisma.user.findFirst({
-    where: { id: input.memberId, principalMemberId: principal.id },
-    include: { memberProfile: { select: { dateOfBirth: true } } },
-  })
-  if (!member || member.familyRegistrationState !== 'RECORD_ONLY') throw new Error('Record-only family member not found')
-  const adulthoodAge = Number(await getSetting(SETTING_KEYS.familyAdulthoodAge))
-  assertEligibleForAdultInvite(member.memberProfile?.dateOfBirth || null, adulthoodAge)
-  const emailOwner = await prisma.user.findUnique({ where: { email } })
-  if (emailOwner && emailOwner.id !== member.id) throw new Error('That email is already used by another member')
-  const token = inviteToken()
-  const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
-  const invite = await prisma.$transaction(async (tx) => {
-    await tx.familyInvite.updateMany({
-      where: { userId: member.id, acceptedAt: null, revokedAt: null }, data: { revokedAt: new Date() },
-    })
-    await tx.user.update({ where: { id: member.id }, data: { email, status: 'PENDING', familyRegistrationState: 'INVITED' } })
-    const created = await tx.familyInvite.create({ data: { token, userId: member.id, invitedById: principal.id, email, expiresAt } })
-    await tx.familyAccountTransition.create({ data: {
-      memberId: member.id, actorId: principal.id, inviteId: created.id, type: 'INVITED',
-      fromState: 'RECORD_ONLY', toState: 'INVITED', adulthoodAge,
-      dateOfBirth: member.memberProfile?.dateOfBirth, reason: `Record-only child reached the configured adulthood threshold (${adulthoodAge})`,
-    } })
-    return created
-  })
-  const inviteUrl = `${appUrl()}/register?invite=${invite.token}`
-  const mail = await sendFamilyInviteEmail({ toEmail: email, fullName: member.fullName, principalName: principal.fullName, inviteUrl, userId: member.id })
-  await writeAudit({ userId: principal.id, action: 'FAMILY_ADULT_TRANSITION_INVITE', entity: 'FamilyInvite', entityId: invite.id, newValue: { memberId: member.id, adulthoodAge, email } })
-  revalidateFamily()
-  return { ok: true as const, inviteUrl: mail.skipped ? inviteUrl : undefined }
 }

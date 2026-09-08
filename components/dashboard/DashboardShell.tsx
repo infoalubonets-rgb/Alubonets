@@ -18,6 +18,7 @@ import ThemeLoader from '@/components/ui/ThemeLoader'
 import DashboardNav from './DashboardNav'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import DashboardNotifications from './DashboardNotifications'
+import UploadProgressToast from '@/components/ui/UploadProgressToast'
 
 const EmailSendProgressBanner = dynamic(() => import('./EmailSendProgressBanner'), { ssr: false })
 
@@ -651,6 +652,7 @@ export default function DashboardShell({
         <span className="pointer-events-none absolute right-16 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100 hidden sm:block">Chat with support</span>
       </Link>
       <DashboardNotifications />
+      <UploadProgressToast />
     </div>
   )
 }

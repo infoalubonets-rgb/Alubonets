@@ -16,8 +16,6 @@ export default async function AdminAuditLogsPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    action?: string
-    entity?: string
     from?: string
     to?: string
     page?: string
@@ -29,7 +27,7 @@ export default async function AdminAuditLogsPage({
     redirect('/admin')
   }
 
-  const { action = '', entity = '', from = '', to = '', page: pageRaw } = await searchParams
+  const { from = '', to = '', page: pageRaw } = await searchParams
   const page = parsePage(pageRaw)
   const pageSize = 50
   const createdAt =
@@ -41,8 +39,6 @@ export default async function AdminAuditLogsPage({
       : undefined
 
   const where = {
-    ...(action ? { action: { contains: action, mode: 'insensitive' as const } } : {}),
-    ...(entity ? { entity: { contains: entity, mode: 'insensitive' as const } } : {}),
     ...(createdAt ? { createdAt } : {}),
   }
 
@@ -64,8 +60,6 @@ export default async function AdminAuditLogsPage({
 
   const targets = await resolveAuditTargets(logs)
   const exportQs = new URLSearchParams()
-  if (action) exportQs.set('action', action)
-  if (entity) exportQs.set('entity', entity)
   if (from) exportQs.set('from', from)
   if (to) exportQs.set('to', to)
   const exportHref = `/api/export/audit${exportQs.toString() ? `?${exportQs}` : ''}`
@@ -74,19 +68,7 @@ export default async function AdminAuditLogsPage({
   return (
     <DashboardShell role="ADMIN" title="Activity logs" nav={ADMIN_NAV}>
       <div className="mb-4 space-y-3">
-        <form className="grid gap-2 rounded-2xl border bg-surface p-4 md:grid-cols-5">
-          <input
-            name="action"
-            defaultValue={action}
-            placeholder="Action contains…"
-            className="rounded-lg border px-3 py-2 text-sm"
-          />
-          <input
-            name="entity"
-            defaultValue={entity}
-            placeholder="Entity contains…"
-            className="rounded-lg border px-3 py-2 text-sm"
-          />
+        <form className="grid gap-2 rounded-2xl border bg-surface p-4 md:grid-cols-3">
           <input
             name="from"
             type="date"
@@ -138,7 +120,7 @@ export default async function AdminAuditLogsPage({
         pathname="/admin/audit-logs"
         page={page}
         totalPages={pages}
-        params={{ action, entity, from, to }}
+        params={{ from, to }}
       />
 
       <section className="mt-8 rounded-2xl border bg-surface p-5">

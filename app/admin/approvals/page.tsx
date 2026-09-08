@@ -2,8 +2,11 @@ import DashboardShell from '@/components/dashboard/DashboardShell'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import ApprovalsTable, { type ApprovalApplicant } from '@/components/admin/ApprovalsTable'
+import { requireAdmin } from '@/lib/auth/session'
 
 export default async function AdminApprovalsPage() {
+  // Only Admin / Super Admin may view applicant PII or approve/assign a Principal Member.
+  await requireAdmin()
   const [pending, principals] = await Promise.all([prisma.user.findMany({
     where: { status: 'PENDING', rejectedAt: null },
     orderBy: { createdAt: 'desc' },

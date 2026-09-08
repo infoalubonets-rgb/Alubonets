@@ -4,8 +4,6 @@ import FamilyAdministrationClient from '@/components/admin/FamilyAdministrationC
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
-import { getSetting, SETTING_KEYS } from '@/lib/settings'
-import { ageOn } from '@/lib/family-transition'
 
 const RELATIONSHIP_LABEL: Record<string, string> = {
   SPOUSE: 'Spouse',
@@ -61,7 +59,6 @@ export default async function MemberFamilyPage() {
   }
 
   const branchRootId = me.isPrincipal ? me.id : me.principalMemberId
-  const adulthoodAge = Number(await getSetting(SETTING_KEYS.familyAdulthoodAge))
   // A dev server can briefly retain the previous generated Prisma client during hot reload.
   // Keep the family page usable until the server has reloaded the newly generated delegate.
   const transitionDelegate = prisma.familyAccountTransition
@@ -105,12 +102,10 @@ export default async function MemberFamilyPage() {
           registrationState: m.familyRegistrationState,
           phone: m.phone,
           lineage: m.memberProfile?.familyBranch || null,
-          adultInviteEligible: m.familyRegistrationState === 'RECORD_ONLY' && Boolean(m.memberProfile?.dateOfBirth) && ageOn(m.memberProfile!.dateOfBirth!) >= adulthoodAge,
         })),
       ]
     : branchRootId
       ? await (async () => {
-          const principal = me.principal
           const siblings = await prisma.user.findMany({
             where: {
               OR: [{ id: branchRootId }, { principalMemberId: branchRootId }],
@@ -180,7 +175,6 @@ export default async function MemberFamilyPage() {
           expiresAt: i.expiresAt.toISOString(),
           acceptedAt: i.acceptedAt?.toISOString() || null,
         }))}
-        adulthoodAge={adulthoodAge}
         transitionHistory={transitionHistory.map((item) => ({ ...item, memberName: item.member.fullName, member: undefined, occurredAt: item.occurredAt.toISOString() }))}
       />}
     </DashboardShell>

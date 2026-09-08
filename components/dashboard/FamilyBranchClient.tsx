@@ -9,7 +9,6 @@ import {
   createAttachedMember,
   linkExistingFamilyMember,
   revokeFamilyInvite,
-  inviteRecordOnlyAdult,
 } from '@/app/actions/family'
 
 const RELATIONSHIPS = [
@@ -37,7 +36,6 @@ type BranchMember = {
   status: string
   registrationState: string
   isYou?: boolean
-  adultInviteEligible?: boolean
   phone?: string | null
   lineage?: string | null
 }
@@ -49,7 +47,6 @@ export default function FamilyBranchClient({
   relationshipLabel,
   members,
   pendingInvites,
-  adulthoodAge,
   transitionHistory,
 }: {
   isPrincipal: boolean
@@ -58,7 +55,6 @@ export default function FamilyBranchClient({
   relationshipLabel: string | null
   members: BranchMember[]
   pendingInvites: InviteRow[]
-  adulthoodAge: number
   transitionHistory: Array<{ id: string; type: string; reason: string; fromState: string; toState: string; occurredAt: string; memberName: string }>
 }) {
   const router = useRouter()
@@ -222,23 +218,6 @@ export default function FamilyBranchClient({
                 <button type="button" onClick={() => setDetailMember(member)} aria-label={`View details for ${member.fullName}`} title="View member details" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant text-primary transition hover:bg-primary/5">
                   <span className="material-symbols-outlined text-[18px]">visibility</span>
                 </button>
-                {isPrincipal && member.registrationState === 'RECORD_ONLY' && (
-                  <button type="button" disabled={!member.adultInviteEligible || pending}
-                    title={member.adultInviteEligible ? 'Invite this adult to activate a login' : `Available at age ${adulthoodAge}`}
-                    className="rounded-full border px-2.5 py-1 text-[10px] font-semibold disabled:opacity-40"
-                    onClick={() => {
-                      const address = window.prompt('Email address for the login invitation')
-                      if (!address) return
-                      startTransition(async () => {
-                        try {
-                          const result = await inviteRecordOnlyAdult({ memberId: member.id, email: address })
-                          setOk('Adult login invitation sent.')
-                          if (result.inviteUrl) setInviteUrl(result.inviteUrl)
-                          router.refresh()
-                        } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not invite member') }
-                      })
-                    }}>Activate login</button>
-                )}
               </div>
             ))}
             {attached.length === 0 && (

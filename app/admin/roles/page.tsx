@@ -3,10 +3,12 @@ import RolesAccessForm from '@/components/admin/RolesAccessForm'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import type { Role } from '@/lib/auth/types'
-import { getSessionProfile } from '@/lib/auth/session'
+import { requireAdmin } from '@/lib/auth/session'
 
 export default async function AdminRolesPage() {
-  const actor = await getSessionProfile()
+  // Only Admin and Super Admin may manage roles & dashboard access.
+  const actor = await requireAdmin()
+
   const users = await prisma.user.findMany({
     where: { status: { in: ['ACTIVE', 'PENDING', 'SUSPENDED'] } },
     orderBy: { fullName: 'asc' },
@@ -15,8 +17,8 @@ export default async function AdminRolesPage() {
   return (
     <DashboardShell role="ADMIN" title="Roles & access" nav={ADMIN_NAV}>
       <RolesAccessForm
-        actorIsSuperAdmin={!!actor?.isSuperAdmin}
-        actorId={actor?.id ?? ''}
+        actorIsSuperAdmin={!!actor.isSuperAdmin}
+        actorId={actor.id}
         users={users.map((u) => ({
           id: u.id,
           fullName: u.fullName,

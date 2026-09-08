@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createResolution, requestResolutionUploadUrl } from '@/app/actions/governance'
 import { GOVERNANCE_CATEGORIES } from '@/lib/governance-categories'
 import { uploadToSignedUrlWithProgress } from '@/lib/upload-client'
+import { emitUploadProgress } from '@/lib/upload-progress-events'
 
 const DOC_ACCEPT =
   '.pdf,.doc,.docx,.xls,.xlsx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv'
@@ -61,25 +62,60 @@ export default function CreateResolutionForm({ onClose, onReopen }: Props) {
   const [banner, setBanner] = useState<'ok' | 'fail' | ''>('')
 
   async function uploadImage(file: File): Promise<string> {
-    const { file: compressed } = await compressImage(file)
-    const requestFd = new FormData()
-    requestFd.set('kind', 'image')
-    requestFd.set('fileName', compressed.name)
-    const { bucket, path, token } = await requestResolutionUploadUrl(requestFd)
-    await uploadToSignedUrlWithProgress(bucket, path, token, compressed)
-    return path
+    const id = `resolution-image-${Date.now()}`
+    try {
+      emitUploadProgress({ id, label: 'Proposal image', percent: 0, status: 'uploading', message: 'Compressing…' })
+      const { file: compressed, originalBytes, finalBytes } = await compressImage(file)
+      const compressedNote =
+        finalBytes < originalBytes ? `Compressed ${formatMb(originalBytes)} → ${formatMb(finalBytes)}` : formatMb(finalBytes)
+
+      const requestFd = new FormData()
+      requestFd.set('kind', 'image')
+      requestFd.set('fileName', compressed.name)
+      const { bucket, path, token } = await requestResolutionUploadUrl(requestFd)
+      await uploadToSignedUrlWithProgress(bucket, path, token, compressed, (percent) =>
+        emitUploadProgress({ id, label: 'Proposal image', percent, status: 'uploading', message: `${compressedNote} — ${percent}%` }),
+      )
+      emitUploadProgress({ id, label: 'Proposal image', percent: 100, status: 'done', message: compressedNote })
+      return path
+    } catch (cause) {
+      emitUploadProgress({
+        id,
+        label: 'Proposal image',
+        percent: 0,
+        status: 'error',
+        message: cause instanceof Error ? cause.message : 'Upload failed.',
+      })
+      throw cause
+    }
   }
 
   async function uploadDocument(file: File): Promise<{ path: string; name: string }> {
     if (file.size > DOCUMENT_MAX_BYTES) {
       throw new Error(`"${file.name}" is ${formatMb(file.size)} — documents must be ${formatMb(DOCUMENT_MAX_BYTES)} or smaller.`)
     }
-    const requestFd = new FormData()
-    requestFd.set('kind', 'document')
-    requestFd.set('fileName', file.name)
-    const { bucket, path, token } = await requestResolutionUploadUrl(requestFd)
-    await uploadToSignedUrlWithProgress(bucket, path, token, file)
-    return { path, name: file.name }
+    const id = `resolution-document-${Date.now()}`
+    try {
+      emitUploadProgress({ id, label: 'Proposal document', percent: 0, status: 'uploading', message: formatMb(file.size) })
+      const requestFd = new FormData()
+      requestFd.set('kind', 'document')
+      requestFd.set('fileName', file.name)
+      const { bucket, path, token } = await requestResolutionUploadUrl(requestFd)
+      await uploadToSignedUrlWithProgress(bucket, path, token, file, (percent) =>
+        emitUploadProgress({ id, label: 'Proposal document', percent, status: 'uploading', message: `${formatMb(file.size)} — ${percent}%` }),
+      )
+      emitUploadProgress({ id, label: 'Proposal document', percent: 100, status: 'done', message: formatMb(file.size) })
+      return { path, name: file.name }
+    } catch (cause) {
+      emitUploadProgress({
+        id,
+        label: 'Proposal document',
+        percent: 0,
+        status: 'error',
+        message: cause instanceof Error ? cause.message : 'Upload failed.',
+      })
+      throw cause
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
