@@ -94,6 +94,9 @@ export default function SiteScripts() {
     enhanceNavyCurve()
     triggerPageReveal()
     observeReveals()
+    const onRefresh = () => observeReveals()
+    window.addEventListener('public-reveal-refresh', onRefresh)
+    return () => window.removeEventListener('public-reveal-refresh', onRefresh)
   }, [pathname])
 
   return null

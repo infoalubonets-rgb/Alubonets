@@ -50,7 +50,8 @@ Fill `.env.local` (never commit secrets):
 | `FROM_EMAIL` | Verified sender | From address |
 | `NEXT_PUBLIC_APP_URL` | Your URL | e.g. `http://localhost:3001` |
 | `MPESA_*` | Daraja portal | STK Push (when ready) |
-| `SEED_AUTH_PASSWORD` | Optional | Override seed password for non-super roles |
+| `SUPER_ADMIN_EMAIL` | Ops bootstrap | Real Super Admin email for `db:seed` / `db:bootstrap-auth` |
+| `SUPER_ADMIN_PASSWORD` | Ops bootstrap | Auth password for that Super Admin only (never commit) |
 
 Example shapes:
 
@@ -93,7 +94,7 @@ npm run db:bootstrap-auth
 npm run db:test
 ```
 
-Seed emails/passwords (dev only): **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
+Seed / bootstrap Super Admin (real email only): **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
 
 ---
 

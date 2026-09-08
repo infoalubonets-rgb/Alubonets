@@ -35,6 +35,10 @@ export default function GalleryClient({ photos }: { photos: Photo[] }) {
     }
   }, [lightbox, close, prev, next])
 
+  useEffect(() => {
+    window.dispatchEvent(new Event('public-reveal-refresh'))
+  }, [activeCategory, filtered.length])
+
   return (
     <>
       {/* Category filter */}
@@ -64,11 +68,12 @@ export default function GalleryClient({ photos }: { photos: Photo[] }) {
             <h3 className="font-h3 text-h3 text-on-surface">No Photos Yet</h3>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((p, i) => (
               <figure
                 key={p.id}
-                className="rounded-2xl overflow-hidden border border-outline-variant/40 group cursor-zoom-in relative shadow-sm hover:shadow-md transition-shadow"
+                className="reveal group relative cursor-zoom-in overflow-hidden rounded-2xl border border-outline-variant/40 shadow-sm transition-shadow hover:shadow-md"
+                style={{ ['--reveal-delay' as string]: `${(i % 6) * 70}ms` }}
                 onClick={() => setLightbox(i)}
               >
                 <div className="relative overflow-hidden">

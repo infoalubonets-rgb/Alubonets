@@ -30,7 +30,7 @@ npm run dev
 ```
 
 Full setup: **[docs/OPERATIONS.md](docs/OPERATIONS.md)**.  
-Local seed emails/passwords (dev only): **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#seeded-dev-accounts)**.
+Super Admin (real email): **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#authentication-production)**.
 
 ---
 
@@ -220,7 +220,7 @@ SQL for buckets: `supabase/storage.sql`.
 | `npm run db:push` | Sync schema to Supabase |
 | `npm run db:migrate` | Versioned migrations |
 | `npm run db:seed` | Seed Prisma data |
-| `npm run db:bootstrap-auth` | Create/link Supabase Auth users |
+| `npm run db:bootstrap-auth` | Create/link Super Admin Supabase Auth user |
 | `npm run db:test` | Connection smoke test |
 | `npm run db:studio` | Prisma Studio |
 

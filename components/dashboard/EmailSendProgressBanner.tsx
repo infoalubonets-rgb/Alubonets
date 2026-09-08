@@ -21,7 +21,7 @@ export default function EmailSendProgressBanner({ onActiveChange }: { onActiveCh
       }
     }
     poll()
-    const interval = window.setInterval(poll, 2500)
+    const interval = window.setInterval(poll, 10_000)
     return () => {
       cancelled = true
       window.clearInterval(interval)

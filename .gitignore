@@ -40,10 +40,18 @@ yarn-error.log*
 Desktop.ini
 ehthumbs.db
 
-# env files
+# env files & local secrets — never commit
 .env
-.env*.local
+.env.*
 !.env.local.example
+!.env.example
+dev-accounts.local.json
+**/secrets/**
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
 
 # vercel
 .vercel

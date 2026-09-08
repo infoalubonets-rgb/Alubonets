@@ -103,7 +103,7 @@ export default async function AboutPage() {
               To unite members of the Alubokho family, strengthen family relationships, provide mutual welfare support, and empower members through education, health, economic opportunities, and transparent governance.
             </p>
           </div>
-          <div className="bg-surface-container-lowest rounded-2xl p-lg border border-primary/10 border-t-4 border-t-secondary-container">
+          <div className="reveal rounded-2xl border border-primary/10 border-t-4 border-t-secondary-container bg-surface-container-lowest p-lg" style={{ ['--reveal-delay' as string]: '120ms' }}>
             <p className="font-label-bold text-label-bold text-primary uppercase tracking-[0.12em] text-[11px] mb-sm">
               Vision
             </p>
@@ -112,7 +112,7 @@ export default async function AboutPage() {
             </p>
           </div>
         </div>
-        <div>
+        <div className="reveal">
           <p className="font-label-bold text-label-bold text-primary uppercase tracking-[0.12em] text-[11px] mb-md text-center">
             Core Values
           </p>
@@ -129,7 +129,7 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <section className="relative py-xxl px-lg overflow-hidden bg-primary">
+      <section className="relative overflow-hidden bg-primary px-md py-xl sm:py-xxl md:px-lg">
         <div
           className="absolute inset-0 pointer-events-none opacity-[0.06]"
           style={{
@@ -140,32 +140,38 @@ export default async function AboutPage() {
           }}
         />
         <div className="max-w-container-max mx-auto relative">
-          <div className="text-center mb-xl max-w-2xl mx-auto story-reveal">
+          <div className="reveal text-center mb-xl max-w-2xl mx-auto">
             <p className="font-label-bold text-label-bold text-secondary-container uppercase tracking-[0.14em] mb-sm">
               What guides Us
             </p>
           </div>
-          <ValuesCarousel />
+          <div className="reveal-scale">
+            <ValuesCarousel />
+          </div>
         </div>
       </section>
 
-      <section className="py-lg md:py-xl px-lg max-w-container-max mx-auto">
-        <div className="text-center mb-lg max-w-2xl mx-auto">
-          <h2 className="font-h2 text-h2-mobile md:text-h2 text-primary mb-sm">Executive Committee</h2>
+      <section className="mx-auto max-w-container-max px-md py-lg md:px-lg md:py-xl">
+        <div className="reveal mx-auto mb-lg max-w-2xl text-center">
+          <h2 className="mb-sm font-h2 text-h2-mobile text-primary md:text-h2">Executive Committee</h2>
           <p className="font-body-md text-[15px] leading-relaxed text-on-surface">
             The Alubonets Self-Help Group is guided by an executive committee that provides leadership, coordination, and oversight. Official names, ranks, and photographs will be added once leadership confirms them.
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-md md:gap-lg">
-          {committee.map(member => (
-            <div key={member.name} className="flex flex-col items-center w-36">
+          {committee.map((member, index) => (
+            <div
+              key={member.name}
+              className="reveal flex w-36 flex-col items-center"
+              style={{ ['--reveal-delay' as string]: `${index * 70}ms` }}
+            >
               <img
                 alt={member.alt}
-                className="w-28 h-28 rounded-full object-cover border border-primary/15 mb-sm"
+                className="mb-sm h-28 w-28 rounded-full border border-primary/15 object-cover"
                 src={member.photoUrl || COMMITTEE_HEADSHOT}
               />
-              <h4 className="font-label-bold text-[15px] text-primary text-center">{member.name}</h4>
-              <span className="font-body-md text-[13px] text-primary/70 text-center mt-xs">
+              <h4 className="text-center font-label-bold text-[15px] text-primary">{member.name}</h4>
+              <span className="mt-xs text-center font-body-md text-[13px] text-primary/70">
                 {member.role}
               </span>
             </div>

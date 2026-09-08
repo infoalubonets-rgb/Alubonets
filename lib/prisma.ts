@@ -28,7 +28,7 @@ export const prisma =
   globalForPrisma.prismaNative ??
   new PrismaClient({
     datasources: databaseUrl() ? { db: { url: databaseUrl() } } : undefined,
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    log: process.env.PRISMA_LOG_QUERIES === 'true' ? ['query', 'error', 'warn'] : ['error'],
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prismaNative = prisma

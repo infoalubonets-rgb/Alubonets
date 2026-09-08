@@ -99,7 +99,7 @@ export default function DashboardNotifications() {
   useEffect(() => {
     fetchNotifications()
     // Poll every 30 s to pick up items added while the user is already on the dashboard
-    const interval = window.setInterval(fetchNotifications, 30_000)
+    const interval = window.setInterval(fetchNotifications, 120_000)
     // Event dispatched by dashboard components after creating a project/event
     window.addEventListener('check-notifications', fetchNotifications)
     return () => {

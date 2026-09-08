@@ -295,6 +295,10 @@ html[data-pr] .dashboard-shell main > *,
   padding-top: 0 !important;
 }
 
+.site-motto-band > div:last-child {
+  padding-top: clamp(96px, 16vw, 160px);
+}
+
 .site-motto-band + .site-footer {
   margin-top: 0;
   border: 0;

@@ -90,6 +90,11 @@ export async function middleware(req: NextRequest) {
     normalizeSupabaseUrl(supabaseUrl),
     supabaseKey,
     {
+      cookieOptions: {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 400,
+      },
       cookies: {
         getAll() {
           return req.cookies.getAll()
@@ -98,11 +103,16 @@ export async function middleware(req: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request: req })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              path: '/',
+              sameSite: 'lax',
+              maxAge: 60 * 60 * 24 * 400,
+              ...options,
+            }),
           )
         },
       },
-    }
+    },
   )
 
   const {
@@ -115,8 +125,16 @@ export async function middleware(req: NextRequest) {
 
   const redirectWithCookies = (url: URL) => {
     const redirect = NextResponse.redirect(url)
-    supabaseResponse.cookies.getAll().forEach(({ name, value }) => {
-      redirect.cookies.set(name, value)
+    // Copy refreshed Auth cookies onto the redirect response (keep path/sameSite/maxAge)
+    supabaseResponse.cookies.getAll().forEach((cookie) => {
+      redirect.cookies.set(cookie.name, cookie.value, {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 400,
+        httpOnly: cookie.httpOnly,
+        secure: cookie.secure,
+        expires: cookie.expires,
+      })
     })
     return redirect
   }
@@ -139,10 +157,12 @@ export async function middleware(req: NextRequest) {
   if (
     process.env.BYPASS_LOGIN_VERIFICATION !== 'true' &&
     status === 'ACTIVE' &&
-    isProtectedPath(pathname)
+    isProtectedPath(pathname) &&
+    pathname !== '/verify-login'
   ) {
     const verificationToken = req.cookies.get('alubonets-verified')?.value
-    const verificationHours = role && ['ADMIN', 'EXECUTIVE'].includes(role) ? 6 : 24
+    // Keep verification aligned with cookie lifetime so a new tab does not feel like a logout
+    const verificationHours = 24
     let recentlyVerified = false
     if (verificationToken && process.env.JWT_SECRET) {
       try {

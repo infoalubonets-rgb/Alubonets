@@ -9,6 +9,7 @@ export const PRESCRIBED_DOCUMENT_CATEGORIES = [
   'Project',
   'Correspondence',
   'Reports',
+  'Other',
 ] as const
 
 export async function ensureDocumentCategories() {

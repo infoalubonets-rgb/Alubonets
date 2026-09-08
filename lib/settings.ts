@@ -1,3 +1,4 @@
+import { unstable_cache, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { CONTACT_EMAIL } from '@/lib/constants'
@@ -71,29 +72,41 @@ export function validateSettingValue(key: SettingKey, value: string): string {
   return validators[key].parse(value.trim())
 }
 
+const getCachedSettings = unstable_cache(
+  async () => {
+    const rows = await prisma.appSetting.findMany({
+      where: { key: { in: Object.values(SETTING_KEYS) } },
+      select: { key: true, value: true },
+    })
+    return Object.fromEntries(rows.map((row) => [row.key, row.value]))
+  },
+  ['app-settings'],
+  { revalidate: 300, tags: ['app-settings'] },
+)
+
 export async function getSetting(key: SettingKey): Promise<string> {
-  const row = await prisma.appSetting.findUnique({ where: { key } })
-  return row?.value ?? defaults[key] ?? ''
+  const settings = await getCachedSettings()
+  return settings[key] ?? defaults[key] ?? ''
 }
 
 export async function getSettings(keys: SettingKey[]): Promise<Record<string, string>> {
-  const rows = await prisma.appSetting.findMany({ where: { key: { in: keys } } })
+  const settings = await getCachedSettings()
   const map: Record<string, string> = {}
   for (const key of keys) {
-    map[key] = rows.find((r) => r.key === key)?.value ?? defaults[key] ?? ''
+    map[key] = settings[key] ?? defaults[key] ?? ''
   }
   return map
 }
-
 export async function setSetting(key: SettingKey, value: string, updatedBy?: string) {
   const parsed = validateSettingValue(key, value)
-  return prisma.appSetting.upsert({
+  const setting = await prisma.appSetting.upsert({
     where: { key },
     create: { key, value: parsed, updatedBy },
     update: { value: parsed, updatedBy },
   })
+  revalidateTag('app-settings')
+  return setting
 }
-
 export async function getLoanPolicy() {
   const s = await getSettings([
     SETTING_KEYS.loanMinAmountKes,

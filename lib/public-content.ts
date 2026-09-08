@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import type { ContentGroup } from '@prisma/client'
 
@@ -9,7 +10,15 @@ export const CONTENT_DEFAULTS: Record<ContentGroup, Record<string, string>> = {
   ACTIVITIES: { welfare: 'Supporting members through collective welfare.', development: 'Creating social and economic opportunities.', community: 'Strengthening family and community connections.' },
   SOCIAL_LINKS: { whatsappUrl: '', facebookUrl: '', instagramUrl: '', youtubeUrl: '' },
 }
+const getCachedPublicContent = unstable_cache(
+  async (group: ContentGroup) => {
+    const content = await prisma.publicContent.findUnique({ where: { group } })
+    return (content?.publishedData as Record<string, string> | null) || CONTENT_DEFAULTS[group]
+  },
+  ['public-content'],
+  { revalidate: 300, tags: ['public-content'] },
+)
+
 export async function getPublicContent(group: ContentGroup) {
-  const content = await prisma.publicContent.findUnique({ where: { group } })
-  return (content?.publishedData as Record<string, string> | null) || CONTENT_DEFAULTS[group]
+  return getCachedPublicContent(group)
 }

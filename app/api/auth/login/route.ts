@@ -104,17 +104,32 @@ export async function POST(req: Request) {
       })
     }
 
-    await syncUserMetadata(profile)
-    await clearRateLimit(rateKey)
-    await prisma.loginEvent.create({
-      data: {
-        userId: profile.id,
-        email,
-        success: true,
-        ipAddress,
-        userAgent: req.headers.get('user-agent'),
-      },
-    })
+    // Don't block sign-in on a slow Supabase metadata sync
+    try {
+      await Promise.race([
+        syncUserMetadata(profile),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('metadata sync timeout')), 6_000),
+        ),
+      ])
+    } catch (cause) {
+      logError('auth.login.metadata_sync', cause, { userId: profile.id })
+    }
+
+    void clearRateLimit(rateKey).catch((cause) =>
+      logError('auth.login.clear_rate_limit', cause, { email }),
+    )
+    void prisma.loginEvent
+      .create({
+        data: {
+          userId: profile.id,
+          email,
+          success: true,
+          ipAddress,
+          userAgent: req.headers.get('user-agent'),
+        },
+      })
+      .catch((cause) => logError('auth.login.event', cause, { email }))
 
     if (profile.status === 'PENDING') {
       return NextResponse.json({
@@ -142,12 +157,22 @@ export async function POST(req: Request) {
         { status: 403 }
       )
     }
+
     if (process.env.BYPASS_LOGIN_VERIFICATION !== 'true') {
       const cookieStoreForVerification = await cookies()
-      const verificationHours = ['ADMIN', 'EXECUTIVE'].includes(profile.role) ? 6 : 24
-      const verified = await verificationStillValid(cookieStoreForVerification.get('alubonets-verified')?.value, profile.id, verificationHours)
+      const verificationHours = 24
+      const verified = await verificationStillValid(
+        cookieStoreForVerification.get('alubonets-verified')?.value,
+        profile.id,
+        verificationHours,
+      )
       if (!verified) {
-        return NextResponse.json({ user: toAuthUser(profile), redirectTo: '/verify-login', status: profile.status, requiresVerification: true })
+        return NextResponse.json({
+          user: toAuthUser(profile),
+          redirectTo: '/verify-login',
+          status: profile.status,
+          requiresVerification: true,
+        })
       }
     }
 

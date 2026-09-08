@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -13,6 +13,7 @@ import { isSystemCategoryCode, uniqueCategoryCode } from '@/lib/payment-categori
 const CATEGORY_NAME_PATTERN = /^[A-Za-z0-9 ()&/,.'-]+$/
 
 function refreshSettings() {
+  revalidateTag('app-settings')
   revalidatePath('/admin/settings')
   revalidatePath('/admin')
   revalidatePath('/admin/announcements')
@@ -21,6 +22,15 @@ function refreshSettings() {
   revalidatePath('/dashboard/member')
   revalidatePath('/dashboard/treasurer')
   revalidatePath('/dashboard/executive')
+}
+
+/** Narrower than refreshSettings(): only the pages that actually read transaction categories. */
+function refreshCategories() {
+  revalidatePath('/admin/settings')
+  revalidatePath('/admin/finance')
+  revalidatePath('/financial-reports')
+  revalidatePath('/dashboard/treasurer/ledger')
+  revalidatePath('/dashboard/treasurer/reconciliation')
 }
 
 const LOCKED_SETTING_KEYS: SettingKey[] = [SETTING_KEYS.brandingSiteName, SETTING_KEYS.brandingPrimaryHex]
@@ -377,7 +387,7 @@ export async function addContributionCategory(formData: FormData) {
     entityId: row.id,
     newValue: { code: row.code, name: row.name },
   })
-  refreshSettings()
+  refreshCategories()
 }
 
 export async function deleteContributionCategory(formData: FormData) {
@@ -406,5 +416,5 @@ export async function deleteContributionCategory(formData: FormData) {
     entityId: id,
     oldValue: { code: category.code, name: category.name, archived },
   })
-  refreshSettings()
+  refreshCategories()
 }

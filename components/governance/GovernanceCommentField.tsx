@@ -10,6 +10,7 @@ type Props = {
   onValidationChange?: (message: string | null) => void
   id?: string
   placeholder?: string
+  disabled?: boolean
 }
 
 export default function GovernanceCommentField({
@@ -18,6 +19,7 @@ export default function GovernanceCommentField({
   onValidationChange,
   id = 'governance-comment',
   placeholder = 'Optional comment for the group…',
+  disabled = false,
 }: Props) {
   const [focused, setFocused] = useState(false)
   const remaining = governanceCommentRemaining(value.length)
@@ -26,6 +28,7 @@ export default function GovernanceCommentField({
   const validationError = validateGovernanceCommentText(value)
 
   function handleChange(next: string) {
+    if (disabled) return
     onChange(next.slice(0, GOVERNANCE_COMMENT_MAX))
     onValidationChange?.(validateGovernanceCommentText(next.slice(0, GOVERNANCE_COMMENT_MAX)))
   }
@@ -43,6 +46,7 @@ export default function GovernanceCommentField({
       <textarea
         id={id}
         value={value}
+        disabled={disabled}
         onChange={(event) => handleChange(event.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => {
@@ -54,7 +58,7 @@ export default function GovernanceCommentField({
         placeholder={placeholder}
         aria-invalid={atLimit || Boolean(validationError)}
         aria-describedby={`${id}-counter`}
-        className={`w-full rounded-xl border bg-surface-container-lowest px-3 py-2.5 text-sm outline-none transition focus:ring-2 ${
+        className={`w-full rounded-xl border bg-surface-container-lowest px-3 py-2.5 text-sm outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70 ${
           atLimit
             ? 'border-error text-on-surface focus:ring-error/20'
             : validationError

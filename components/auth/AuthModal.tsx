@@ -108,9 +108,15 @@ export default function AuthModal() {
     } catch { localStorage.removeItem('alubonets-registration-draft-v1') }
     setLoading(true)
     try {
-      const { user, redirectTo, status } = await loginRequest(email, password)
+      const { user, redirectTo, status, requiresVerification } = await loginRequest(email, password)
       setOpen(false)
-      router.push(status === 'PENDING' ? '/pending' : redirectTo || homeForRole(user.role))
+      if (status === 'PENDING') {
+        router.push('/pending')
+      } else if (requiresVerification || redirectTo === '/verify-login') {
+        router.push('/verify-login')
+      } else {
+        router.push(redirectTo || homeForRole(user.role))
+      }
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid credentials')
@@ -195,7 +201,10 @@ export default function AuthModal() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onFocus={() => setDevOpen(true)}
-                    onBlur={() => setDevOpen(false)}
+                    onBlur={() => {
+                      window.setTimeout(() => setDevOpen(false), 180)
+                    }}
+                    autoComplete="off"
                     required
                   />
                   {process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS !== 'false' && (

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
-import { logoutRequest, meRequest, type AuthUser, type Role } from '@/lib/auth/client'
+import { logoutRequest, meLookup, type AuthUser, type Role } from '@/lib/auth/client'
 import { ROLE_LABEL } from '@/lib/auth/types'
 import ThemeLoader from '@/components/ui/ThemeLoader'
 import DashboardNav from './DashboardNav'
@@ -27,6 +27,8 @@ type Props = {
   nav: NavItem[]
   children: ReactNode
   hidePageHeading?: boolean
+  /** Hide sibling page pills in the header (e.g. Document repository). */
+  hideRelatedLinks?: boolean
   pageAction?: ReactNode
 }
 
@@ -61,8 +63,17 @@ const SIDEBAR_MIN_WIDTH = 200
 const SIDEBAR_MAX_WIDTH = 380
 const SIDEBAR_DEFAULT_WIDTH = 224
 const SIDEBAR_COLLAPSED_WIDTH = 68
+const MOBILE_DRAWER_WIDTH = 308
 
-export default function DashboardShell({ role, title, nav, children, hidePageHeading = false, pageAction }: Props) {
+export default function DashboardShell({
+  role,
+  title,
+  nav,
+  children,
+  hidePageHeading = false,
+  hideRelatedLinks = false,
+  pageAction,
+}: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -182,6 +193,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
     let cancelled = false
 
     const fetchPaymentCount = async () => {
+      if (document.visibilityState !== 'visible') return
       try {
         // Check localStorage for when the user last viewed notifications
         const lastSeen = Number(localStorage.getItem('treasurer-notif-seen-ts') || '0')
@@ -208,7 +220,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   useEffect(() => {
     let cancelled = false
     let toastTimer: number | undefined
-    const check = () => fetch('/api/support-chat/unread').then(r => r.ok ? r.json() : null).then(data => {
+    const check = () => document.visibilityState === 'visible' ? fetch('/api/support-chat/unread').then(r => r.ok ? r.json() : null).then(data => {
       if (cancelled || !data) return
       const next = Number(data.count || 0)
       if (next > 0 && (previousSupportUnread.current === null || next > previousSupportUnread.current)) {
@@ -223,7 +235,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
       }
       previousSupportUnread.current = next
       setSupportUnread(next)
-    }).catch(() => {})
+    }).catch(() => {}) : Promise.resolve()
     const onRead = () => { previousSupportUnread.current = 0; setSupportUnread(0); setSupportToast(false) }
     window.addEventListener('support-chat-read', onRead)
     check(); const id = window.setInterval(check, 15_000)
@@ -233,6 +245,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   useEffect(() => {
     let cancelled = false
     const fetchUnread = async () => {
+      if (document.visibilityState !== 'visible') return
       try {
         const res = await fetch('/api/announcements/unread')
         if (!res.ok) return
@@ -265,24 +278,31 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   useEffect(() => {
     let cancelled = false
     let retryTimer: number | undefined
+    let attempts = 0
 
     const loadUser = async () => {
-      try {
-        const u = await meRequest()
-        if (cancelled) return
-        if (!u) {
-          router.replace('/login')
-          return
-        }
-        setUser(u)
+      const result = await meLookup()
+      if (cancelled) return
+
+      if (result.status === 'authenticated') {
+        setUser(result.user)
         const hour = new Date().getHours()
         const g = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-        setWelcome(`${g}, ${u.fullName.split(' ')[0]}`)
-      } catch {
-        // A dev-server restart or brief network interruption must not crash the
-        // dashboard. Keep the current shell visible and retry quietly.
-        if (!cancelled) retryTimer = window.setTimeout(loadUser, 2500)
+        setWelcome(`${g}, ${result.user.fullName.split(' ')[0]}`)
+        return
       }
+
+      if (result.status === 'unavailable') {
+        // Keep the shell up across tab switches / brief server blips; retry quietly.
+        attempts += 1
+        if (attempts < 8) {
+          retryTimer = window.setTimeout(loadUser, 1500 * Math.min(attempts, 4))
+        }
+        return
+      }
+
+      // Confirmed unauthenticated — only then send to login
+      router.replace('/login')
     }
 
     loadUser()
@@ -314,7 +334,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
 
   const sidebarCollapsed = isDesktop && collapsed
   const desktopSidebarWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth
-  const drawerWidth = Math.min(sidebarWidth, 300)
+  const drawerWidth = MOBILE_DRAWER_WIDTH
   const asideWidth = isDesktop ? desktopSidebarWidth : drawerWidth
   const contentMargin = isDesktop ? desktopSidebarWidth : 0
   const menuOpen = isDesktop ? !collapsed : mobileNavOpen
@@ -344,7 +364,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
 
   return (
     <div className="dashboard-shell h-[100dvh] flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50">
-      {(role === 'ADMIN' || user?.isSuperAdmin) && <EmailSendProgressBanner onActiveChange={setEmailsSending} />}
+      {(role === 'ADMIN' || user?.isSuperAdmin) && pathname.startsWith('/admin/announcements') && <EmailSendProgressBanner onActiveChange={setEmailsSending} />}
 
       {!isDesktop && mobileNavOpen && (
         <button
@@ -565,7 +585,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
                   {isOverviewPage && <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>}
                 </div>
                 {pageAction && <div className="w-full sm:w-auto shrink-0">{pageAction}</div>}
-                {relatedPageLinks.length > 0 && (
+                {!hideRelatedLinks && relatedPageLinks.length > 0 && (
                   <nav aria-label={`Related ${activeNavGroup?.label} pages`} className="flex w-full sm:w-auto shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                     {relatedPageLinks.map((item) => {
                       const href = item.href!

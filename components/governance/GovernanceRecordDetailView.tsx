@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { voteResolution, publishResolutionResults } from '@/app/actions/governance'
 import GovernanceCommentField from '@/components/governance/GovernanceCommentField'
 import VoteConfirmDialog from '@/components/governance/VoteConfirmDialog'
+import VoteSuccessDialog from '@/components/governance/VoteSuccessDialog'
 import { governanceCategoryLabel } from '@/lib/governance-categories'
 import { validateGovernanceCommentText, governanceCommentRemaining } from '@/lib/governance-comment'
 
@@ -54,30 +55,31 @@ export default function GovernanceRecordDetailView({
   const [comment, setComment] = useState(record.myComment || '')
   const [anonymous, setAnonymous] = useState(record.myAnonymous)
   const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const [voteLocked, setVoteLocked] = useState(Boolean(record.myVote))
   const [confirmChoice, setConfirmChoice] = useState<'APPROVE' | 'REJECT' | null>(null)
-  const [pending, startTransition] = useTransition()
-  const [publishPending, startPublish] = useTransition()
+  const [successChoice, setSuccessChoice] = useState<'APPROVE' | 'REJECT' | null>(null)
+  const [pending, setPending] = useState(false)
+  const [publishPending, setPublishPending] = useState(false)
   const [publishError, setPublishError] = useState('')
   const commentAtLimit = governanceCommentRemaining(comment.length) === 0 && comment.length > 0
 
-  const publish = () => {
+  const publish = async () => {
     setPublishError('')
+    setPublishPending(true)
     const formData = new FormData()
     formData.set('id', record.id)
-    startPublish(async () => {
-      try {
-        await publishResolutionResults(formData)
-        router.refresh()
-      } catch (e) {
-        setPublishError(e instanceof Error ? e.message : 'Could not publish results')
-      }
-    })
+    try {
+      await publishResolutionResults(formData)
+      router.refresh()
+    } catch (e) {
+      setPublishError(e instanceof Error ? e.message : 'Could not publish results')
+    } finally {
+      setPublishPending(false)
+    }
   }
 
   const requestVote = (choice: 'APPROVE' | 'REJECT') => {
-    if (voteLocked) return
+    if (voteLocked || pending) return
     setError('')
     const commentError = validateGovernanceCommentText(comment)
     if (commentError) {
@@ -87,32 +89,30 @@ export default function GovernanceRecordDetailView({
     setConfirmChoice(choice)
   }
 
-  const submitVote = (choice: 'APPROVE' | 'REJECT') => {
+  const submitVote = async (choice: 'APPROVE' | 'REJECT') => {
     setError('')
-    setSuccessMessage('')
+    setPending(true)
+    // Close confirm immediately so the UI does not stick on “Submitting…”
+    setConfirmChoice(null)
+
     const trimmed = comment.trim()
     const formData = new FormData()
     formData.set('resolutionId', record.id)
     formData.set('vote', choice)
     formData.set('comment', trimmed)
     formData.set('anonymous', anonymous ? 'true' : 'false')
-    startTransition(async () => {
-      try {
-        await voteResolution(formData)
-        setVote(choice)
-        setVoteLocked(true)
-        setConfirmChoice(null)
-        setSuccessMessage(
-          choice === 'APPROVE'
-            ? 'Your approval has been recorded. Thank you for participating.'
-            : 'Your opposition has been recorded. Thank you for participating.',
-        )
-        router.refresh()
-      } catch (e) {
-        setConfirmChoice(null)
-        setError(e instanceof Error ? e.message : 'Could not record your response')
-      }
-    })
+
+    try {
+      await voteResolution(formData)
+      setVote(choice)
+      setVoteLocked(true)
+      setSuccessChoice(choice)
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not record your response')
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -161,24 +161,55 @@ export default function GovernanceRecordDetailView({
         )}
       </article>
 
-      <section className={`relative rounded-2xl border bg-surface p-5 ${commentAtLimit ? 'border-error' : 'border-outline-variant'}`}>
-          {successMessage && (
-            <div
-              role="status"
-              className="relative z-20 mb-4 flex items-start gap-2 rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm font-medium text-primary"
-            >
-              <span className="material-symbols-outlined shrink-0 text-[20px]">check_circle</span>
-              <span>{successMessage}</span>
+      <section
+        className={`rounded-2xl border bg-surface p-5 ${
+          commentAtLimit && !voteLocked ? 'border-error' : 'border-outline-variant'
+        }`}
+      >
+        <h3 className="font-semibold text-on-surface">Your response</h3>
+
+        {voteLocked && vote ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                  vote === 'APPROVE' ? 'bg-primary/10 text-primary' : 'bg-error/10 text-error'
+                }`}
+              >
+                {vote === 'APPROVE' ? 'Approved' : 'Opposed'}
+              </span>
+              <span className="text-xs text-on-surface-variant">Final — cannot be edited</span>
             </div>
-          )}
-          <div className={`relative ${voteLocked ? 'pointer-events-none select-none opacity-50 blur-[1px]' : ''}`}>
-            <h3 className="font-semibold text-on-surface">Your response</h3>
-            {record.allowComments && <GovernanceCommentField value={comment} onChange={setComment} />}
+            {record.allowComments && (
+              <div className="rounded-xl border border-outline-variant/70 bg-surface-container-low px-3 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-on-surface-variant">
+                  Your comment
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-on-surface">
+                  {comment.trim() ? comment : 'No comment added.'}
+                </p>
+                {anonymous && comment.trim() ? (
+                  <p className="mt-2 text-xs text-on-surface-variant">Posted anonymously</p>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {pending && (
+              <p className="mt-2 text-sm text-on-surface-variant" role="status">
+                Recording your vote…
+              </p>
+            )}
+            {record.allowComments && (
+              <GovernanceCommentField value={comment} onChange={setComment} disabled={pending} />
+            )}
             {record.allowComments && record.allowAnonymous && (
               <label className="mt-3 flex items-start gap-2 text-sm text-on-surface">
                 <input
                   type="checkbox"
                   checked={anonymous}
+                  disabled={pending}
                   onChange={(event) => setAnonymous(event.target.checked)}
                   className="mt-1"
                 />
@@ -193,34 +224,25 @@ export default function GovernanceRecordDetailView({
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={pending || voteLocked}
+                disabled={pending}
                 onClick={() => requestVote('APPROVE')}
-                className={`rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50 ${
-                  vote === 'APPROVE' ? 'bg-primary text-on-primary' : 'border border-primary text-primary'
-                }`}
+                className="rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary disabled:opacity-50"
               >
                 Approve
               </button>
               <button
                 type="button"
-                disabled={pending || voteLocked}
+                disabled={pending}
                 onClick={() => requestVote('REJECT')}
-                className={`rounded-full px-4 py-2 text-sm font-semibold disabled:opacity-50 ${
-                  vote === 'REJECT' ? 'bg-error text-on-error' : 'border border-error text-error'
-                }`}
+                className="rounded-full border border-error px-4 py-2 text-sm font-semibold text-error disabled:opacity-50"
               >
                 Oppose
               </button>
             </div>
-            {vote && !successMessage && (
-              <p className="mt-2 text-xs text-on-surface-variant">
-                Your vote: {vote === 'APPROVE' ? 'Approve' : 'Oppose'}
-                {anonymous && comment.trim() ? ' · Comment will show as anonymous' : ''}
-              </p>
-            )}
             {error && <p className="mt-2 text-sm text-error">{error}</p>}
-          </div>
-        </section>
+          </>
+        )}
+      </section>
 
       {mode !== 'respond' && (record.resultsPublished || record.responses.length > 0 || canPublish) && (
         <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-5">
@@ -265,11 +287,17 @@ export default function GovernanceRecordDetailView({
       <VoteConfirmDialog
         open={Boolean(confirmChoice)}
         choice={confirmChoice}
-        pending={pending}
+        pending={false}
         hasComment={Boolean(comment.trim())}
         allowComments={record.allowComments}
         onCancel={() => setConfirmChoice(null)}
-        onConfirm={() => confirmChoice && submitVote(confirmChoice)}
+        onConfirm={() => confirmChoice && void submitVote(confirmChoice)}
+      />
+
+      <VoteSuccessDialog
+        open={Boolean(successChoice)}
+        choice={successChoice}
+        onClose={() => setSuccessChoice(null)}
       />
     </div>
   )

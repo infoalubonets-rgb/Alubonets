@@ -21,8 +21,8 @@ export default async function ContactPage({
   const displayPhone = contact.phone || content.phone || 'Coming soon'
   return (
     <main className="relative z-10 mx-auto w-full max-w-container-max flex-grow px-md py-lg pb-24 md:px-lg md:py-xl">
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-lg md:gap-xl items-start relative z-10">
-        <div className="lg:col-span-2 flex flex-col gap-lg">
+      <div className="relative z-10 grid grid-cols-1 items-start gap-lg md:gap-xl lg:grid-cols-5">
+        <div className="reveal-left flex flex-col gap-lg lg:col-span-2">
           <div>
             <p className="font-label-bold text-label-bold text-primary uppercase tracking-[0.14em] text-[12px] mb-sm">
               Contact
@@ -70,8 +70,8 @@ export default async function ContactPage({
           </div>
         </div>
 
-        <div className="lg:col-span-3">
-          <div className="contact-form-panel bg-white rounded-2xl p-md border border-primary/10">
+        <div className="reveal-right lg:col-span-3">
+          <div className="contact-form-panel rounded-2xl border border-primary/10 bg-white p-md">
             <div className="mb-md">
               <h2 className="font-h3 text-[22px] leading-snug text-primary">Send a Message</h2>
             </div>

@@ -4,7 +4,7 @@ Data model, UI design system, product decisions, and security status.
 
 | Section | Contents |
 |---------|----------|
-| [1. Data model](#1-data-model) | Tables, ERD, seed accounts |
+| [1. Data model](#1-data-model) | Tables, ERD, auth |
 | [2. Design system](#2-design-system) | Tokens, brand, components |
 | [3. Decisions](#3-decisions) | Confirmed / open committee decisions |
 | [4. Security status](#4-security-status) | Controls and outstanding items |
@@ -433,23 +433,37 @@ Linking: register / OAuth / bootstrap sets `users.authUserId = auth.users.id`.
 
 ---
 
-## Seeded dev accounts
+## Authentication (production + local testing)
 
-> **Dev / local only.** Do not use these passwords in production. Change them before any shared environment.  
-> Created by: `npm run db:seed` + `npm run db:bootstrap-auth`.  
-> Override non-super password with env `SEED_AUTH_PASSWORD` before bootstrap if needed.
+Login uses **Supabase Auth** with real email/password (or Google OAuth).
 
-| Email | Password | Role | Status | Sign in | Lands on |
-|-------|----------|------|--------|---------|----------|
-| `superadmin@alubonets.com` | `SuperAdmin@2026!` | ADMIN (Super Admin) | ACTIVE | `/admin/login` | `/admin` |
-| `admin@alubonets.com` | `ChangeMe123!` | ADMIN | ACTIVE | `/admin/login` | `/admin` |
-| `executive@alubonets.com` | `ChangeMe123!` | EXECUTIVE | ACTIVE | `/login` | `/dashboard/executive` |
-| `treasurer@alubonets.com` | `ChangeMe123!` | TREASURER | ACTIVE | `/login` | `/dashboard/treasurer` |
-| `secretary@alubonets.com` | `ChangeMe123!` | SECRETARY | ACTIVE | `/login` | `/dashboard/secretary` |
-| `organizer@alubonets.com` | `ChangeMe123!` | ORGANIZER | ACTIVE | `/login` | `/dashboard/organizer` |
-| `principal@alubonets.com` | `ChangeMe123!` | MEMBER (Principal) | ACTIVE | `/login` | `/dashboard/member` (+ My Family) |
-| `member@alubonets.com` | `ChangeMe123!` | MEMBER | ACTIVE | `/login` | `/dashboard/member` |
-| `pending@alubonets.com` | `ChangeMe123!` | MEMBER | PENDING | `/login` | `/pending` |
+| Flow | Path |
+|------|------|
+| Member / officer sign-in | `/login` or homepage Auth modal |
+| Admin / Super Admin | `/admin/login` |
+| After password | Email verification (`/verify-login`) unless `BYPASS_LOGIN_VERIFICATION=true` locally |
+| New members | Public registration → pending approval |
+
+### Local role autofill (testing only)
+
+When `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` is not `false`, focusing the email field shows all roles. Passwords come from `.env.local` (`SUPER_ADMIN_PASSWORD`, `SEED_AUTH_PASSWORD`) — never committed.
+
+1. Set those env vars (+ optional `SUPER_ADMIN_EMAIL` for your real admin)
+2. `npm run db:seed`
+3. `npm run db:bootstrap-auth`
+4. Set `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS=false` and `BYPASS_LOGIN_VERIFICATION=false` before production
+
+| Email | Role | Sign in |
+|-------|------|---------|
+| `superadmin@alubonets.com` (or `SUPER_ADMIN_EMAIL`) | Super Admin | `/admin/login` |
+| `admin@alubonets.com` | ADMIN | `/admin/login` |
+| `executive@alubonets.com` | EXECUTIVE | `/login` |
+| `treasurer@alubonets.com` | TREASURER | `/login` |
+| `secretary@alubonets.com` | SECRETARY | `/login` |
+| `organizer@alubonets.com` | ORGANIZER | `/login` |
+| `principal@alubonets.com` | MEMBER (Principal) | `/login` |
+| `member@alubonets.com` | MEMBER | `/login` |
+| `pending@alubonets.com` | MEMBER (pending) | `/login` |
 
 Also after login: shared profile at `/profile`. Super Admin can switch workspaces from the dashboard header.
 

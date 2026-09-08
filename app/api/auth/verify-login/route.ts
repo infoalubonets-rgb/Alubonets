@@ -13,7 +13,13 @@ export async function POST(req: Request) {
   const token = await verifyEmailChallenge(profile.id, parsed.data.code)
   if (!token) return NextResponse.json({ error: 'Invalid or expired code.' }, { status: 400 })
   const store = await cookies()
-  store.set('alubonets-verified', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 86400 })
+  store.set('alubonets-verified', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60 * 24,
+  })
   return NextResponse.json({ redirectTo: ROLE_HOME[profile.role] })
 }
 export async function PUT() {

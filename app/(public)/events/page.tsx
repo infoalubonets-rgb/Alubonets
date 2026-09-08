@@ -119,44 +119,52 @@ export default async function PublicEventsPage() {
       <div className="max-w-container-max mx-auto px-md md:px-lg py-xl space-y-xxl">
 
         <section>
-          <div className="flex items-center gap-2.5 mb-lg">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary/10">
+          <div className="reveal mb-lg flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 20 }}>event_upcoming</span>
             </div>
             <div>
-              <h2 className="font-h3 text-[20px] text-on-surface leading-none">Upcoming events</h2>
-              <p className="text-[12px] text-on-surface-variant mt-0.5">{upcoming.length} event{upcoming.length !== 1 ? 's' : ''} scheduled</p>
+              <h2 className="font-h3 text-[20px] leading-none text-on-surface">Upcoming events</h2>
+              <p className="mt-0.5 text-[12px] text-on-surface-variant">{upcoming.length} event{upcoming.length !== 1 ? 's' : ''} scheduled</p>
             </div>
           </div>
 
           {upcoming.length === 0 ? (
-            <div className="rounded-2xl border border-outline-variant bg-surface-container-low p-xl text-center">
-              <div className="w-14 h-14 rounded-2xl bg-primary/8 flex items-center justify-center mx-auto mb-4">
+            <div className="reveal rounded-2xl border border-outline-variant bg-surface-container-low p-xl text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/8">
                 <span className="material-symbols-outlined icon-fill text-primary/50" style={{ fontSize: 32 }}>calendar_month</span>
               </div>
-              <p className="text-on-surface font-semibold">No upcoming events at the moment.</p>
-              <p className="text-on-surface-variant text-[13px] mt-1">Check back soon — events are added regularly.</p>
+              <p className="font-semibold text-on-surface">No upcoming events at the moment.</p>
+              <p className="mt-1 text-[13px] text-on-surface-variant">Check back soon — events are added regularly.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md">
-              {upcoming.map((e) => <EventCard key={e.id} event={e} />)}
+            <div className="grid grid-cols-1 gap-md sm:grid-cols-2 lg:grid-cols-3">
+              {upcoming.map((e, index) => (
+                <div key={e.id} className="reveal" style={{ ['--reveal-delay' as string]: `${index * 80}ms` }}>
+                  <EventCard event={e} />
+                </div>
+              ))}
             </div>
           )}
         </section>
 
         {past.length > 0 && (
           <section>
-            <div className="flex items-center gap-2.5 mb-lg">
-              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-surface-container">
+            <div className="reveal mb-lg flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-container">
                 <span className="material-symbols-outlined text-outline" style={{ fontSize: 20 }}>history</span>
               </div>
               <div>
-                <h2 className="font-h3 text-[18px] text-on-surface-variant leading-none">Recent past events</h2>
-                <p className="text-[12px] text-outline mt-0.5">{past.length} past event{past.length !== 1 ? 's' : ''}</p>
+                <h2 className="font-h3 text-[18px] leading-none text-on-surface-variant">Recent past events</h2>
+                <p className="mt-0.5 text-[12px] text-outline">{past.length} past event{past.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-md">
-              {past.map((e) => <EventCard key={e.id} event={e} past />)}
+            <div className="grid grid-cols-1 gap-md sm:grid-cols-2 lg:grid-cols-3">
+              {past.map((e, index) => (
+                <div key={e.id} className="reveal" style={{ ['--reveal-delay' as string]: `${index * 70}ms` }}>
+                  <EventCard event={e} past />
+                </div>
+              ))}
             </div>
           </section>
         )}

@@ -48,7 +48,7 @@ export async function GET() {
         description: e.location ?? 'New upcoming event',
         imageUrl: e.imageUrl ?? null,
         href: `/events/${e.id}`,
-        createdAt: e.createdAt.toISOString(),
+        createdAt: new Date(e.createdAt).toISOString(),
       })),
       ...projects.map((p) => ({
         id: `project-${p.id}`,
@@ -57,7 +57,7 @@ export async function GET() {
         description: p.status.charAt(0) + p.status.slice(1).toLowerCase(),
         imageUrl: p.imageUrl ?? null,
         href: `/projects/${p.id}`,
-        createdAt: p.createdAt.toISOString(),
+        createdAt: new Date(p.createdAt).toISOString(),
       })),
       ...photos.map((p) => ({
         id: `gallery-${p.id}`,
@@ -66,7 +66,7 @@ export async function GET() {
         description: p.category ?? 'Gallery',
         imageUrl: p.url,
         href: '/gallery',
-        createdAt: p.uploadedAt.toISOString(),
+        createdAt: new Date(p.uploadedAt).toISOString(),
       })),
       ...recentPayments.map((a) => {
         const meta = (a.meta ?? {}) as StkMeta
@@ -78,7 +78,7 @@ export async function GET() {
           description: meta.receipt || meta.phone || 'M-Pesa payment received',
           imageUrl: null,
           href: '/dashboard/treasurer/notifications',
-          createdAt: a.createdAt.toISOString(),
+          createdAt: new Date(a.createdAt).toISOString(),
         }
       }),
     ].sort((a, b) => b.createdAt.localeCompare(a.createdAt))

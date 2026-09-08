@@ -26,7 +26,7 @@ export default function SupportChatClient({ isAdmin, actorId, conversations }: {
 
   useEffect(() => { if (selected?.id) markSupportConversationRead(selected.id).then(() => window.dispatchEvent(new Event('support-chat-read'))).catch(() => {}) }, [selected?.id])
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [selected?.messages.length])
-  useEffect(() => { const id = window.setInterval(() => router.refresh(), 15_000); return () => window.clearInterval(id) }, [router])
+  useEffect(() => { const id = window.setInterval(() => { if (document.visibilityState === 'visible') router.refresh() }, 30_000); return () => window.clearInterval(id) }, [router])
 
   const submit = () => {
     if (!body.trim()) return

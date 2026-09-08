@@ -17,22 +17,23 @@ export default async function ProjectsPage() {
           </div>
         ) : (
           <div className="grid gap-md md:grid-cols-2">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={{
-                  id: project.id,
-                  title: project.title,
-                  description: project.description,
-                  status: project.status,
-                  imageUrl: project.imageUrl,
-                  startDate: project.startDate,
-                  endDate: project.endDate,
-                  isPublic: true,
-                }}
-                href={`/projects/${project.id}`}
-                showMembersOnlyBadge={false}
-              />
+            {projects.map((project, index) => (
+              <div key={project.id} className="reveal" style={{ ['--reveal-delay' as string]: `${index * 80}ms` }}>
+                <ProjectCard
+                  project={{
+                    id: project.id,
+                    title: project.title,
+                    description: project.description,
+                    status: project.status,
+                    imageUrl: project.imageUrl,
+                    startDate: project.startDate,
+                    endDate: project.endDate,
+                    isPublic: true,
+                  }}
+                  href={`/projects/${project.id}`}
+                  showMembersOnlyBadge={false}
+                />
+              </div>
             ))}
           </div>
         )}

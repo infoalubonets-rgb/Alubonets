@@ -277,14 +277,27 @@ export async function voteResolution(formData: FormData) {
   if (comment && !resolution.allowComments) throw new Error('Comments are not allowed for this proposal.')
   const savedComment = resolution.allowComments ? comment : null
 
-  await prisma.resolutionResponse.upsert({
+  const existing = await prisma.resolutionResponse.findUnique({
     where: { resolutionId_userId: { resolutionId, userId: actor.id } },
-    create: { resolutionId, userId: actor.id, vote, comment: savedComment, anonymous },
-    update: { vote, comment: savedComment, anonymous },
+    select: { id: true },
   })
-  await writeAudit({ userId: actor.id, action: 'RESOLUTION_VOTE', entity: 'Resolution', entityId: resolutionId, newValue: { vote, anonymous } })
-  revalidatePath('/governance')
+  if (existing) {
+    throw new Error('You have already submitted a response. Votes cannot be changed.')
+  }
+
+  await prisma.resolutionResponse.create({
+    data: { resolutionId, userId: actor.id, vote, comment: savedComment, anonymous },
+  })
+  // Audit + cache refresh should not block the voter’s success UI longer than necessary
+  void writeAudit({
+    userId: actor.id,
+    action: 'RESOLUTION_VOTE',
+    entity: 'Resolution',
+    entityId: resolutionId,
+    newValue: { vote, anonymous },
+  }).catch(() => undefined)
   revalidatePath(`/governance/${resolutionId}`)
+  revalidatePath('/governance')
 }
 
 export async function publishResolutionResults(formData: FormData) {

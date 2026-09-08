@@ -47,7 +47,14 @@ export async function uploadRepositoryDocument(formData: FormData) {
   const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
   const data = z.object({
     title: z.string().trim().min(2).max(180),
-    description: z.string().trim().max(2000).optional(),
+    description: z
+      .string()
+      .trim()
+      .max(280, 'Description must be 280 characters or fewer.')
+      .optional()
+      .refine((value) => !value || value.length >= 5, {
+        message: 'Description must be at least 5 characters, or leave it empty.',
+      }),
     categoryId: z.string().min(1),
     accessLevel: z.enum(['PUBLIC','MEMBERS','SELECTED_ROLES','ADMIN_SECRETARY']),
     status: z.enum(['DRAFT','PUBLISHED']),
