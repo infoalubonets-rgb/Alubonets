@@ -43,26 +43,6 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json({ error: 'Verify your email before submitting the application.' }, { status: 403 })
     }
-    const [minLenSetting, mixedSetting] = await Promise.all([
-      prisma.appSetting.findUnique({ where: { key: 'password_min_length' } }),
-      prisma.appSetting.findUnique({ where: { key: 'password_require_mixed' } }),
-    ])
-    const minLen = Number(minLenSetting?.value || 8)
-    if (password.length < minLen) {
-      return NextResponse.json(
-        { error: `Password must be at least ${minLen} characters.` },
-        { status: 400 },
-      )
-    }
-    if (mixedSetting?.value === 'true') {
-      const ok = /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password)
-      if (!ok) {
-        return NextResponse.json(
-          { error: 'Password must include upper, lower, and a number.' },
-          { status: 400 },
-        )
-      }
-    }
     const ipAddress = requestIp(req)
     await enforceRateLimit(`register:${ipAddress || email}`, 5, 30)
     const existing = await prisma.user.findUnique({ where: { email }, include: { memberProfile: true } })

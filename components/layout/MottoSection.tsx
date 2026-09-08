@@ -1,6 +1,6 @@
 export default function MottoSection() {
   return (
-    <section className="site-motto-band bg-primary text-on-primary py-xxl px-lg relative overflow-visible">
+    <section className="site-motto-band bg-primary text-on-primary py-xl sm:py-xxl px-md md:px-lg relative overflow-visible">
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.05]"
         style={{

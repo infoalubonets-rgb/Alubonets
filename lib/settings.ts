@@ -1,11 +1,12 @@
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { CONTACT_EMAIL } from '@/lib/constants'
 
 export const SETTING_KEYS = {
   contactDestinationEmail: 'contact_destination_email',
+  contactPublicEmail: 'contact_public_email',
+  contactPublicPhone: 'contact_public_phone',
   financialApprovalThresholdKes: 'financial_approval_threshold_kes',
-  passwordMinLength: 'password_min_length',
-  passwordRequireMixed: 'password_require_mixed',
   auditRetentionDays: 'audit_retention_days',
   brandingSiteName: 'branding_site_name',
   brandingPrimaryHex: 'branding_primary_hex',
@@ -25,9 +26,15 @@ export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS]
 
 const validators: Record<SettingKey, z.ZodType<string>> = {
   [SETTING_KEYS.contactDestinationEmail]: z.string().email().or(z.literal('')),
+  [SETTING_KEYS.contactPublicEmail]: z.string().email().or(z.literal('')),
+  [SETTING_KEYS.contactPublicPhone]: z
+    .string()
+    .trim()
+    .max(40)
+    .refine((v) => v === '' || /^[+0-9()\-\s]{7,40}$/.test(v), {
+      message: 'Enter a valid phone number.',
+    }),
   [SETTING_KEYS.financialApprovalThresholdKes]: z.string().regex(/^\d+(\.\d{1,2})?$/),
-  [SETTING_KEYS.passwordMinLength]: z.string().regex(/^\d+$/).refine((v) => Number(v) >= 6 && Number(v) <= 128),
-  [SETTING_KEYS.passwordRequireMixed]: z.enum(['true', 'false']),
   [SETTING_KEYS.auditRetentionDays]: z.string().regex(/^\d+$/).refine((v) => Number(v) >= 30 && Number(v) <= 3650),
   [SETTING_KEYS.brandingSiteName]: z.string().trim().min(2).max(80),
   [SETTING_KEYS.brandingPrimaryHex]: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
@@ -44,9 +51,9 @@ const validators: Record<SettingKey, z.ZodType<string>> = {
 }
 
 const defaults: Partial<Record<SettingKey, string>> = {
+  [SETTING_KEYS.contactPublicEmail]: CONTACT_EMAIL,
+  [SETTING_KEYS.contactPublicPhone]: '',
   [SETTING_KEYS.financialApprovalThresholdKes]: '50000',
-  [SETTING_KEYS.passwordMinLength]: '8',
-  [SETTING_KEYS.passwordRequireMixed]: 'false',
   [SETTING_KEYS.auditRetentionDays]: '365',
   [SETTING_KEYS.brandingSiteName]: 'Alubonets',
   [SETTING_KEYS.brandingPrimaryHex]: '#003366',
@@ -123,6 +130,18 @@ export async function getBranding() {
     siteName: s[SETTING_KEYS.brandingSiteName] || 'Alubonets',
     primaryHex: s[SETTING_KEYS.brandingPrimaryHex] || '#003366',
   }
+}
+
+export async function getPublicContact() {
+  const s = await getSettings([
+    SETTING_KEYS.contactPublicEmail,
+    SETTING_KEYS.contactPublicPhone,
+    SETTING_KEYS.contactDestinationEmail,
+  ])
+  const email = s[SETTING_KEYS.contactPublicEmail] || CONTACT_EMAIL
+  const phone = s[SETTING_KEYS.contactPublicPhone] || ''
+  const enquiryEmail = s[SETTING_KEYS.contactDestinationEmail] || email || CONTACT_EMAIL
+  return { email, phone, enquiryEmail }
 }
 
 export async function getWelfarePolicy() {

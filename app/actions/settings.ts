@@ -2,34 +2,129 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { FEATURE_FLAGS, setFeatureFlag } from '@/lib/feature-flags'
 import { SETTING_KEYS, setSetting, type SettingKey } from '@/lib/settings'
+import { isSystemCategoryCode, uniqueCategoryCode } from '@/lib/payment-categories'
+
+const CATEGORY_NAME_PATTERN = /^[A-Za-z0-9 ()&/,.'-]+$/
 
 function refreshSettings() {
   revalidatePath('/admin/settings')
   revalidatePath('/admin')
+  revalidatePath('/admin/announcements')
+  revalidatePath('/contact')
+  revalidatePath('/')
   revalidatePath('/dashboard/member')
   revalidatePath('/dashboard/treasurer')
   revalidatePath('/dashboard/executive')
 }
 
+const LOCKED_SETTING_KEYS: SettingKey[] = [SETTING_KEYS.brandingSiteName, SETTING_KEYS.brandingPrimaryHex]
+
 export async function updateAppSetting(formData: FormData) {
   const actor = await requireAdmin()
   const key = z.string().min(1).parse(formData.get('key')) as SettingKey
   if (!Object.values(SETTING_KEYS).includes(key)) throw new Error('Unknown setting key.')
+  if (LOCKED_SETTING_KEYS.includes(key)) throw new Error('Branding settings cannot be changed.')
   const value = String(formData.get('value') ?? '')
-  const row = await setSetting(key, value, actor.id)
-  await writeAudit({
-    userId: actor.id,
-    action: 'APP_SETTING_UPDATE',
-    entity: 'AppSetting',
-    entityId: key,
-    newValue: { value: row.value },
-  })
-  refreshSettings()
+  try {
+    const row = await setSetting(key, value, actor.id)
+    await writeAudit({
+      userId: actor.id,
+      action: 'APP_SETTING_UPDATE',
+      entity: 'AppSetting',
+      entityId: key,
+      newValue: { value: row.value },
+    })
+    refreshSettings()
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(error.issues[0]?.message || 'Invalid setting value.')
+    }
+    throw error
+  }
+}
+
+export async function updateContactFinanceSettings(input: {
+  publicEmail: string
+  publicPhone: string
+  enquiryEmail: string
+  approvalThreshold: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const actor = await requireAdmin()
+    const data = z
+      .object({
+        publicEmail: z.string().trim().email('Enter a valid footer contact email.'),
+        publicPhone: z
+          .string()
+          .trim()
+          .max(40)
+          .refine((v) => v === '' || /^[+0-9()\-\s]{7,40}$/.test(v), {
+            message: 'Enter a valid phone number, or leave it blank.',
+          }),
+        enquiryEmail: z.string().trim().email('Enter a valid enquiry forwarding email.'),
+        approvalThreshold: z
+          .string()
+          .trim()
+          .regex(/^\d+(\.\d{1,2})?$/, 'Approval threshold must be a number in KES.'),
+      })
+      .parse(input)
+
+    await prisma.$transaction([
+      prisma.appSetting.upsert({
+        where: { key: SETTING_KEYS.contactPublicEmail },
+        create: { key: SETTING_KEYS.contactPublicEmail, value: data.publicEmail, updatedBy: actor.id },
+        update: { value: data.publicEmail, updatedBy: actor.id },
+      }),
+      prisma.appSetting.upsert({
+        where: { key: SETTING_KEYS.contactPublicPhone },
+        create: { key: SETTING_KEYS.contactPublicPhone, value: data.publicPhone, updatedBy: actor.id },
+        update: { value: data.publicPhone, updatedBy: actor.id },
+      }),
+      prisma.appSetting.upsert({
+        where: { key: SETTING_KEYS.contactDestinationEmail },
+        create: { key: SETTING_KEYS.contactDestinationEmail, value: data.enquiryEmail, updatedBy: actor.id },
+        update: { value: data.enquiryEmail, updatedBy: actor.id },
+      }),
+      prisma.appSetting.upsert({
+        where: { key: SETTING_KEYS.financialApprovalThresholdKes },
+        create: {
+          key: SETTING_KEYS.financialApprovalThresholdKes,
+          value: data.approvalThreshold,
+          updatedBy: actor.id,
+        },
+        update: { value: data.approvalThreshold, updatedBy: actor.id },
+      }),
+    ])
+
+    await writeAudit({
+      userId: actor.id,
+      action: 'CONTACT_FINANCE_SETTINGS_UPDATE',
+      entity: 'AppSetting',
+      entityId: 'contact_finance',
+      newValue: data,
+    })
+
+    // Avoid revalidating /admin/settings here — it remounts the modal and can strand the Save UI.
+    revalidatePath('/admin/announcements')
+    revalidatePath('/contact')
+    revalidatePath('/')
+
+    return { ok: true }
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { ok: false, error: error.issues[0]?.message || 'Invalid setting value.' }
+    }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Could not save settings. Try again.',
+    }
+  }
 }
 
 export async function updateWelfareAmountLimits(formData: FormData) {
@@ -137,7 +232,12 @@ export async function updateLoanPolicy(formData: FormData) {
 export async function toggleFeatureFlag(formData: FormData) {
   const actor = await requireAdmin()
   const key = z.enum([FEATURE_FLAGS.loansEnabled, FEATURE_FLAGS.welfareEnabled]).parse(formData.get('key'))
-  const enabled = formData.has('enabled')
+  const raw = formData.get('enabled')
+  // Accept explicit true/false from toggles, or legacy checkbox presence.
+  const enabled =
+    typeof raw === 'string'
+      ? raw === 'true' || raw === 'on' || raw === '1'
+      : formData.has('enabled')
   await setFeatureFlag(key, enabled, actor.id)
   await writeAudit({
     userId: actor.id,
@@ -257,37 +357,54 @@ export async function upsertMembershipClass(formData: FormData) {
   refreshSettings()
 }
 
-export async function upsertContributionCategorySetting(formData: FormData) {
+export async function addContributionCategory(formData: FormData) {
   const actor = await requireAdmin()
-  const data = z
-    .object({
-      id: z.string().optional(),
-      code: z.string().trim().min(2).max(40),
-      name: z.string().trim().min(2).max(80),
-      type: z.enum(['INCOME', 'EXPENSE', 'BOTH']),
-      active: z.enum(['on', 'off']).optional(),
-    })
-    .parse({
-      id: formData.get('id') || undefined,
-      code: formData.get('code'),
-      name: formData.get('name'),
-      type: formData.get('type') || 'INCOME',
-      active: formData.has('active') ? 'on' : 'off',
-    })
-  const row = data.id
-    ? await prisma.transactionCategory.update({
-        where: { id: data.id },
-        data: { code: data.code, name: data.name, type: data.type, active: data.active === 'on' },
-      })
-    : await prisma.transactionCategory.create({
-        data: { code: data.code, name: data.name, type: data.type, active: data.active !== 'off' },
-      })
+  const name = z
+    .string()
+    .trim()
+    .min(2, 'Category name must be at least 2 characters.')
+    .max(60, 'Category name must be 60 characters or fewer.')
+    .regex(CATEGORY_NAME_PATTERN, 'Use letters, numbers, spaces and basic punctuation only.')
+    .parse(formData.get('name'))
+  const code = await uniqueCategoryCode(name)
+  const row = await prisma.transactionCategory.create({
+    data: { code, name, type: 'BOTH', active: true },
+  })
   await writeAudit({
     userId: actor.id,
     action: 'CONTRIBUTION_CATEGORY_UPSERT',
     entity: 'TransactionCategory',
     entityId: row.id,
     newValue: { code: row.code, name: row.name },
+  })
+  refreshSettings()
+}
+
+export async function deleteContributionCategory(formData: FormData) {
+  const actor = await requireAdmin()
+  const id = z.string().min(1).parse(formData.get('id'))
+  const category = await prisma.transactionCategory.findUniqueOrThrow({ where: { id } })
+  if (isSystemCategoryCode(category.code)) throw new Error('System categories cannot be deleted.')
+  let archived = false
+  try {
+    await prisma.transactionCategory.delete({ where: { id } })
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      await prisma.transactionCategory.update({
+        where: { id },
+        data: { active: false },
+      })
+      archived = true
+    } else {
+      throw error
+    }
+  }
+  await writeAudit({
+    userId: actor.id,
+    action: 'CONTRIBUTION_CATEGORY_DELETE',
+    entity: 'TransactionCategory',
+    entityId: id,
+    oldValue: { code: category.code, name: category.name, archived },
   })
   refreshSettings()
 }

@@ -79,6 +79,8 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   const [signingOut, setSigningOut] = useState(false)
   const [emailsSending, setEmailsSending] = useState(false)
   const [welcome, setWelcome] = useState('')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [isDesktop, setIsDesktop] = useState(false)
   const pageScrollRef = useRef<HTMLElement>(null)
   const [pageScrollbar, setPageScrollbar] = useState({ visible: false, top: 0, height: 0 })
   const displayRole = user?.isSuperAdmin
@@ -116,6 +118,21 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
       setSidebarWidth(savedWidth)
     }
   }, [])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const sync = () => {
+      setIsDesktop(mq.matches)
+      if (mq.matches) setMobileNavOpen(false)
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [pathname])
 
   useEffect(() => {
     if (!resizing) return
@@ -285,11 +302,22 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   }, [])
 
   const toggleSidebar = () => {
+    if (!isDesktop) {
+      setMobileNavOpen((open) => !open)
+      return
+    }
     setCollapsed((c) => {
       localStorage.setItem('dashSidebarCollapsed', c ? '0' : '1')
       return !c
     })
   }
+
+  const sidebarCollapsed = isDesktop && collapsed
+  const desktopSidebarWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth
+  const drawerWidth = Math.min(sidebarWidth, 300)
+  const asideWidth = isDesktop ? desktopSidebarWidth : drawerWidth
+  const contentMargin = isDesktop ? desktopSidebarWidth : 0
+  const menuOpen = isDesktop ? !collapsed : mobileNavOpen
 
   const toggleTheme = () => {
     document.documentElement.classList.add('theme-transitioning')
@@ -315,14 +343,26 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
   }
 
   return (
-    <div className="dashboard-shell h-screen flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50">
+    <div className="dashboard-shell h-[100dvh] flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50">
       {(role === 'ADMIN' || user?.isSuperAdmin) && <EmailSendProgressBanner onActiveChange={setEmailsSending} />}
+
+      {!isDesktop && mobileNavOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation menu"
+          className="fixed inset-0 z-[45] bg-[#001f50]/50 backdrop-blur-[2px] md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
       <aside
-        style={{ width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth }}
-        className={`bg-primary dark:bg-[#03112b] text-on-primary fixed left-0 top-0 h-screen flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] ${resizing ? '' : 'transition-[width] duration-300'}`}
+        style={{ width: asideWidth }}
+        className={`bg-primary dark:bg-[#03112b] text-on-primary fixed left-0 top-0 h-[100dvh] flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] ${
+          resizing ? '' : 'transition-[width,transform] duration-300'
+        } ${isDesktop || mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         <div
-          className={`pt-lg pb-md flex items-center gap-sm border-b border-white/10 ${collapsed ? 'justify-center px-sm' : 'px-md'}`}
+          className={`pt-lg pb-md flex items-center gap-sm border-b border-white/10 ${sidebarCollapsed ? 'justify-center px-sm' : 'px-md'}`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -330,13 +370,23 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
             alt="Alubonets"
             className="h-11 w-11 rounded-full bg-white/10 p-1 flex-shrink-0"
           />
-          {!collapsed && (
-            <div>
+          {!sidebarCollapsed && (
+            <div className="min-w-0 flex-1">
               <p className="font-h3 text-[19px] font-bold text-on-primary leading-none">Alubonets</p>
-              <p className="text-[11px] text-primary-fixed-dim/60 mt-0.5 font-caption">
+              <p className="text-[11px] text-primary-fixed-dim/60 mt-0.5 font-caption truncate">
                 {displayRole}
               </p>
             </div>
+          )}
+          {!isDesktop && (
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(false)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-on-primary/80 hover:bg-white/10"
+              aria-label="Close menu"
+            >
+              <span className="material-symbols-outlined text-[22px]">close</span>
+            </button>
           )}
         </div>
 
@@ -349,41 +399,44 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
               return { ...item, children, badge: String(paymentNotifCount) }
             return children ? { ...item, children } : item
           })}
-          collapsed={collapsed}
+          collapsed={sidebarCollapsed}
+          onNavigate={() => setMobileNavOpen(false)}
         />
 
-        <div className={`py-md border-t border-white/10 space-y-sm ${collapsed ? 'px-sm' : 'px-md'}`}>
+        <div className={`py-md border-t border-white/10 space-y-sm ${sidebarCollapsed ? 'px-sm' : 'px-md'}`}>
           <Link
             href="/profile"
-            title={collapsed ? 'My profile' : undefined}
-            className={`flex items-center gap-sm text-on-primary bg-white/10 hover:bg-white/15 text-[13px] font-label-bold transition-colors w-full rounded-lg px-sm py-[7px] ${collapsed ? 'justify-center' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+            title={sidebarCollapsed ? 'My profile' : undefined}
+            className={`flex min-h-11 items-center gap-sm text-on-primary bg-white/10 hover:bg-white/15 text-[13px] font-label-bold transition-colors w-full rounded-lg px-sm py-2.5 ${sidebarCollapsed ? 'justify-center' : ''}`}
           >
             <span className="material-symbols-outlined text-[17px]">account_circle</span>
-            {!collapsed && 'My profile'}
+            {!sidebarCollapsed && 'My profile'}
           </Link>
           <Link
             href="/"
-            title={collapsed ? 'Public site' : undefined}
-            className={`flex items-center gap-sm text-primary-fixed-dim/60 hover:text-on-primary text-[13px] font-body-md transition-colors w-full ${collapsed ? 'justify-center' : ''}`}
+            onClick={() => setMobileNavOpen(false)}
+            title={sidebarCollapsed ? 'Public site' : undefined}
+            className={`flex min-h-11 items-center gap-sm text-primary-fixed-dim/60 hover:text-on-primary text-[13px] font-body-md transition-colors w-full ${sidebarCollapsed ? 'justify-center' : ''}`}
           >
             <span className="material-symbols-outlined text-[17px]">public</span>
-            {!collapsed && 'Public site'}
+            {!sidebarCollapsed && 'Public site'}
           </Link>
           <button
             type="button"
             onClick={onLogout}
             disabled={emailsSending}
-            title={emailsSending ? 'Finish sending notification emails before signing out' : collapsed ? 'Sign Out' : undefined}
-            className={`flex items-center gap-sm text-primary-fixed-dim/60 hover:text-on-primary text-[13px] font-body-md transition-colors w-full group disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-primary-fixed-dim/60 ${collapsed ? 'justify-center' : ''}`}
+            title={emailsSending ? 'Finish sending notification emails before signing out' : sidebarCollapsed ? 'Sign Out' : undefined}
+            className={`flex min-h-11 items-center gap-sm text-primary-fixed-dim/60 hover:text-on-primary text-[13px] font-body-md transition-colors w-full group disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-primary-fixed-dim/60 ${sidebarCollapsed ? 'justify-center' : ''}`}
           >
             <span className="material-symbols-outlined text-[17px] group-hover:text-secondary-container transition-colors">
               logout
             </span>
-            {!collapsed && (emailsSending ? 'Sending emails…' : 'Sign Out')}
+            {!sidebarCollapsed && (emailsSending ? 'Sending emails…' : 'Sign Out')}
           </button>
         </div>
 
-        {!collapsed && (
+        {isDesktop && !sidebarCollapsed && (
           <div
             role="separator"
             aria-orientation="vertical"
@@ -404,51 +457,43 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
       </aside>
 
       <div
-        style={{ marginLeft: collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth }}
-        className={`relative flex-1 flex flex-col h-screen min-h-0 min-w-0 ${resizing ? '' : 'transition-[margin] duration-300'}`}
+        style={{ marginLeft: contentMargin }}
+        className={`relative flex-1 flex flex-col h-[100dvh] min-h-0 min-w-0 ${resizing ? '' : 'transition-[margin] duration-300'}`}
       >
         <header
-          className="relative bg-surface-container-lowest dark:bg-[#091a30] border-b border-outline-variant/70 dark:border-[#173056] shrink-0 z-40 flex items-center justify-between gap-4 px-5 md:px-lg shadow-[0_2px_10px_rgba(0,31,80,0.035)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary dark:before:bg-primary-container"
+          className="relative bg-surface-container-lowest dark:bg-[#091a30] border-b border-outline-variant/70 dark:border-[#173056] shrink-0 z-40 flex items-center justify-between gap-2 px-3 sm:px-5 md:px-lg shadow-[0_2px_10px_rgba(0,31,80,0.035)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary dark:before:bg-primary-container"
           style={{ height: 66 }}
         >
-          <div className="flex min-w-0 items-center gap-3 md:gap-md">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3 md:gap-md">
             <button
               type="button"
               onClick={toggleSidebar}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-secondary-container transition-colors hover:bg-secondary-container/10"
-              title={collapsed ? 'Expand menu' : 'Collapse menu'}
-              aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-secondary-container transition-colors hover:bg-secondary-container/10"
+              title={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
-                {collapsed ? 'menu' : 'menu_open'}
+                {menuOpen ? 'menu_open' : 'menu'}
               </span>
             </button>
-            <div className="min-w-0">
+            <div className="min-w-0 hidden sm:block">
               <p className="truncate text-[13px] font-label-bold leading-tight text-on-surface dark:text-blue-50">
                 {welcome}
               </p>
             </div>
-            <div className="hidden">
-              <span
-                className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline"
-                style={{ fontSize: 17 }}
-              >
-                search
-              </span>
-              <input
-                type="text"
-                placeholder="Search…"
-                className="w-full pl-9 pr-md py-1.5 bg-surface-container dark:bg-[#111f36] dark:text-blue-50 rounded-lg border border-outline-variant/60 dark:border-[#1e3461] focus:outline-none focus:ring-1 focus:ring-primary text-[13px] font-body-md"
-              />
-            </div>
           </div>
-          <div className="flex items-center gap-2.5 md:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-4">
             <div className="hidden lg:block"><LiveDateBadge /></div>
-            {user && <WorkspaceSwitcher user={user} />}
+            {user && (
+              <div className="hidden md:block">
+                <WorkspaceSwitcher user={user} />
+              </div>
+            )}
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant dark:text-blue-200/60 hover:bg-surface-container dark:hover:bg-[#111f36] hover:text-primary transition-colors"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant dark:text-blue-200/60 hover:bg-surface-container dark:hover:bg-[#111f36] hover:text-primary transition-colors"
               title="Toggle theme"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
@@ -458,13 +503,13 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
             <Link
               href={supportBellCount > 0 ? '/support-chat' : '/announcements'}
               onClick={() => { setSupportBellCount(0); localStorage.removeItem('supportBellCount') }}
-              className="relative flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant dark:text-blue-200/60 hover:bg-surface-container dark:hover:bg-[#111f36] hover:text-primary transition-colors"
+              className="relative flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant dark:text-blue-200/60 hover:bg-surface-container dark:hover:bg-[#111f36] hover:text-primary transition-colors"
               title="Notifications"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
                 notifications
               </span>
-              {notificationTotal > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-secondary px-1 text-center text-[9px] font-bold leading-[18px] text-white shadow-sm">+{notificationTotal}</span>}
+              {notificationTotal > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-secondary px-1 text-center text-[9px] font-bold leading-[18px] text-white shadow-sm">+{notificationTotal}</span>}
             </Link>
 
             {user ? (
@@ -474,7 +519,7 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
                   className="flex items-center gap-sm hover:opacity-90 transition-opacity"
                   title="My profile"
                 >
-                  <div className="text-right hidden sm:block">
+                  <div className="text-right hidden lg:block">
                     <p className="font-label-bold text-[12px] text-on-surface dark:text-blue-50 leading-tight">
                       {user?.fullName}
                     </p>
@@ -496,44 +541,39 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
                   type="button"
                   onClick={onLogout}
                   disabled={emailsSending}
-                  className="inline-flex h-10 items-center gap-1.5 rounded-full border border-secondary-container/40 bg-secondary-container text-on-primary px-4 font-label-bold text-[12px] hover:opacity-90 active:scale-95 transition-all shadow-[0_3px_10px_rgba(254,128,21,0.22)] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+                  className="hidden sm:inline-flex h-10 items-center gap-1.5 rounded-full border border-secondary-container/40 bg-secondary-container text-on-primary px-3 md:px-4 font-label-bold text-[12px] hover:opacity-90 active:scale-95 transition-all shadow-[0_3px_10px_rgba(254,128,21,0.22)] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
                   title={emailsSending ? 'Finish sending notification emails before signing out' : 'Sign out'}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 18 }}>logout</span>
-                  <span className="hidden sm:inline">{emailsSending ? 'Sending…' : 'Sign out'}</span>
+                  <span className="hidden md:inline">{emailsSending ? 'Sending…' : 'Sign out'}</span>
                 </button>
               </>
             ) : (
               <div className="flex items-center gap-sm animate-pulse">
-                <div className="hidden sm:block space-y-1.5">
-                  <div className="h-3 w-20 rounded bg-on-surface/10" />
-                  <div className="h-2.5 w-14 rounded bg-on-surface/10" />
-                </div>
                 <div className="h-8 w-8 rounded-full bg-on-surface/10" />
-                <div className="h-8 w-20 rounded-lg bg-on-surface/10 hidden sm:block" />
               </div>
             )}
           </div>
         </header>
 
-        <main ref={pageScrollRef} className="dashboard-page-scroll relative flex-1 min-h-0 overflow-y-auto overscroll-contain px-lg pb-lg pt-4 space-y-lg">
+        <main ref={pageScrollRef} className="dashboard-page-scroll relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-3 sm:px-4 md:px-6 lg:px-lg pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:pt-4 space-y-4 sm:space-y-lg">
           {!hidePageHeading && (
-            <div className="shrink-0 pt-2">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="shrink-0 pt-1 sm:pt-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2">
                 <div className="min-w-0">
-                  <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
+                  <h1 className="font-h2 text-[22px] sm:text-[26px] md:text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
                   {isOverviewPage && <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>}
                 </div>
-                {pageAction}
+                {pageAction && <div className="w-full sm:w-auto shrink-0">{pageAction}</div>}
                 {relatedPageLinks.length > 0 && (
-                  <nav aria-label={`Related ${activeNavGroup?.label} pages`} className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <nav aria-label={`Related ${activeNavGroup?.label} pages`} className="flex w-full sm:w-auto shrink-0 flex-wrap items-center gap-2 sm:justify-end">
                     {relatedPageLinks.map((item) => {
                       const href = item.href!
                       return (
                         <Link
                           key={href}
                           href={href}
-                          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary px-3.5 text-[12px] font-label-bold text-on-primary shadow-[0_3px_10px_rgba(0,31,80,0.18)] transition hover:border-secondary-container/50 hover:bg-secondary-container active:scale-[0.98] dark:border-primary-container/40 dark:bg-primary-container dark:hover:bg-secondary-container"
+                          className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-primary/30 bg-primary px-3.5 text-[12px] font-label-bold text-on-primary shadow-[0_3px_10px_rgba(0,31,80,0.18)] transition hover:border-secondary-container/50 hover:bg-secondary-container active:scale-[0.98] dark:border-primary-container/40 dark:bg-primary-container dark:hover:bg-secondary-container"
                         >
                           <span className="material-symbols-outlined text-[16px]">{item.icon}</span>
                           {item.label}
@@ -548,18 +588,23 @@ export default function DashboardShell({ role, title, nav, children, hidePageHea
           )}
           {children}
         </main>
-        {pageScrollbar.visible && <span aria-hidden="true" className="pointer-events-none absolute bottom-0 right-px top-[66px] z-50 w-px overflow-hidden"><span className="absolute right-0 top-0 w-px rounded-full bg-[#ffc400]" style={{ height: pageScrollbar.height, transform: `translateY(${pageScrollbar.top}px)` }} /></span>}
+        {pageScrollbar.visible && <span aria-hidden="true" className="pointer-events-none absolute bottom-0 right-px top-[66px] z-50 hidden w-px overflow-hidden md:block"><span className="absolute right-0 top-0 w-px rounded-full bg-[#ffc400]" style={{ height: pageScrollbar.height, transform: `translateY(${pageScrollbar.top}px)` }} /></span>}
       </div>
       {supportToast && (
-        <Link href="/support-chat" onClick={() => setSupportToast(false)} className="fixed bottom-24 right-5 z-[90] flex w-[310px] items-start gap-3 rounded-2xl border border-orange-200 bg-white p-4 text-slate-900 shadow-[0_18px_55px_rgba(0,31,80,.22)] transition hover:-translate-y-0.5 dark:border-orange-500/30 dark:bg-[#102039] dark:text-white">
+        <Link href="/support-chat" onClick={() => setSupportToast(false)} className="fixed bottom-24 left-4 right-4 z-[90] flex max-w-sm items-start gap-3 rounded-2xl border border-orange-200 bg-white p-4 text-slate-900 shadow-[0_18px_55px_rgba(0,31,80,.22)] transition hover:-translate-y-0.5 sm:left-auto sm:right-5 sm:w-[310px] dark:border-orange-500/30 dark:bg-[#102039] dark:text-white">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-white"><span className="material-symbols-outlined text-[21px]">mark_chat_unread</span></span>
           <span className="min-w-0"><span className="flex items-center justify-between"><b className="text-sm">New support message</b><span className="ml-2 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-white">+{supportUnread}</span></span><span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-blue-100/60">You have a new reply. Click to open the conversation.</span></span>
         </Link>
       )}
-      <Link href="/support-chat" aria-label="Open support chat" title="Support chat" className="group fixed bottom-5 right-5 z-[85] flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff8b24] to-[#f56b00] text-white shadow-[0_12px_30px_rgba(245,107,0,.38)] transition hover:-translate-y-1 hover:shadow-[0_16px_38px_rgba(245,107,0,.48)]">
+      <Link
+        href="/support-chat"
+        aria-label="Open support chat"
+        title="Support chat"
+        className="group fixed z-[85] flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff8b24] to-[#f56b00] text-white shadow-[0_12px_30px_rgba(245,107,0,.38)] transition hover:-translate-y-1 hover:shadow-[0_16px_38px_rgba(245,107,0,.48)] right-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] sm:right-5"
+      >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg>
         {supportUnread > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-6 min-w-6 place-items-center rounded-full border-2 border-white bg-primary px-1 text-[10px] font-bold text-white">+{supportUnread}</span>}
-        <span className="pointer-events-none absolute right-16 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100">Chat with support</span>
+        <span className="pointer-events-none absolute right-16 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100 hidden sm:block">Chat with support</span>
       </Link>
       <DashboardNotifications />
     </div>

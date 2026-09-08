@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { CONTACT_EMAIL } from '@/lib/constants'
+import { getPublicContact } from '@/lib/settings'
 import { logError } from '@/lib/logger'
 import { headers } from 'next/headers'
 import { enforceRateLimit } from '@/lib/rate-limit'
@@ -62,9 +63,8 @@ async function createContactSubmissionAndNotify({
       assignedToId: assignedAdmin?.id || null,
     },
   })
-  const configuredDestination =
-    (await prisma.appSetting.findUnique({ where: { key: 'contact_destination_email' } }))?.value || CONTACT_EMAIL
-  const destination = process.env.RESEND_TEST_EMAIL || configuredDestination
+  const { enquiryEmail } = await getPublicContact()
+  const destination = process.env.RESEND_TEST_EMAIL || enquiryEmail
 
   const key = process.env.RESEND_API_KEY
   if (key && !key.startsWith('re_your-')) {

@@ -29,19 +29,19 @@ export function isSystemCategoryCode(code: string) {
   return SYSTEM_CATEGORY_CODES.has(code)
 }
 
-export function filterSelectableCategories<T extends { code: string; type: string }>(
+export function filterSelectableCategories<T extends { code: string; type: string; active?: boolean }>(
   categories: T[],
   kind: 'income' | 'expense',
 ): T[] {
   return categories.filter((category) => {
-    if (isSystemCategoryCode(category.code)) return false
+    if (category.active === false || isSystemCategoryCode(category.code)) return false
     if (kind === 'income') return category.type !== 'EXPENSE'
     return category.type !== 'INCOME'
   })
 }
 
 export function filterAdminManagedCategories<T extends { code: string; active?: boolean }>(categories: T[]) {
-  return categories.filter((category) => !isSystemCategoryCode(category.code))
+  return categories.filter((category) => category.active !== false && !isSystemCategoryCode(category.code))
 }
 
 function slugCode(name: string) {

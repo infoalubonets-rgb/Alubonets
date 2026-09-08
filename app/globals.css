@@ -72,24 +72,41 @@ html.theme-transitioning *::after {
 /* —— Scroll / load reveals —— */
 .reveal,
 .reveal-left,
+.reveal-right,
 .reveal-scale {
   opacity: 0;
   will-change: opacity, transform;
   transition:
-    opacity 0.85s cubic-bezier(0.33, 1, 0.68, 1),
-    transform 0.85s cubic-bezier(0.33, 1, 0.68, 1);
+    opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
   transition-delay: var(--reveal-delay, 0ms);
 }
-.reveal { transform: translate3d(0, 18px, 0); }
-.reveal-left { transform: translate3d(-16px, 0, 0); }
-.reveal-scale { transform: translate3d(0, 10px, 0) scale(0.985); }
+.reveal { transform: translate3d(0, 28px, 0); }
+.reveal-left { transform: translate3d(-28px, 0, 0); }
+.reveal-right { transform: translate3d(28px, 0, 0); }
+.reveal-scale { transform: translate3d(0, 16px, 0) scale(0.96); }
 
 .reveal.is-visible,
 .reveal-left.is-visible,
+.reveal-right.is-visible,
 .reveal-scale.is-visible {
   opacity: 1;
   transform: none;
 }
+
+.story-reveal {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  transition:
+    opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.story-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+.story-reveal-delay-1 { transition-delay: 120ms; }
+.story-reveal-delay-2 { transition-delay: 220ms; }
 
 /* —— Dashboard notification slide-in —— */
 @keyframes notif-slide {
@@ -275,7 +292,7 @@ html[data-pr] .dashboard-shell main > *,
 }
 
 .site-motto-band {
-  padding-top: clamp(5.5rem, 10vw, 7.5rem) !important;
+  padding-top: 0 !important;
 }
 
 .site-motto-band + .site-footer {
@@ -437,10 +454,13 @@ textarea.contact-field-modern {
   box-shadow: 0 24px 60px rgba(0, 31, 80, 0.22);
   width: 100%;
   max-width: 22rem !important;
+  max-height: min(92dvh, 920px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   transition: max-width 0.2s ease;
 }
 .auth-modal-panel.auth-modal-wide {
-  max-width: 46rem !important;
+  max-width: min(46rem, calc(100vw - 1.5rem)) !important;
 }
 .auth-modal-close {
   position: absolute;
@@ -474,8 +494,8 @@ textarea.contact-field-modern {
   appearance: none !important;
   border: 1.5px solid rgba(0, 31, 80, 0.22) !important;
   border-radius: 9999px !important;
-  padding: 8px 16px !important;
-  font-size: 13.5px;
+  padding: 10px 16px !important;
+  font-size: 16px;
   background: #fff !important;
   width: 100%;
   margin-top: 3px;
@@ -677,7 +697,8 @@ textarea.contact-field-modern {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 8px;
+  min-height: 44px;
+  padding: 10px 8px;
   border-radius: 0.5rem;
   color: #b0c6ff;
   font-size: 13.5px;
@@ -751,13 +772,28 @@ textarea.contact-field-modern {
   }
 }
 
+/* Mobile-first dashboard polish */
+.dashboard-shell .overflow-x-auto,
+.dashboard-shell [class*="overflow-x-auto"] {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 767px) {
+  .dashboard-shell main img,
+  .dashboard-shell main video,
+  .dashboard-shell main canvas,
+  .dashboard-shell main svg {
+    max-width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .theme-loader-dot {
     animation: none;
     opacity: 0.85;
     transform: none;
   }
-  .reveal, .reveal-left, .reveal-scale {
+  .reveal, .reveal-left, .reveal-right, .reveal-scale, .story-reveal {
     opacity: 1;
     transform: none;
     transition: none;

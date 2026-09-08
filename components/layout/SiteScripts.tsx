@@ -57,7 +57,7 @@ function triggerPageReveal() {
 }
 
 function observeReveals() {
-  const nodes = document.querySelectorAll('.reveal, .reveal-left, .reveal-scale')
+  const nodes = document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale, .story-reveal')
   if (!nodes.length) return
   if (
     window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
@@ -79,7 +79,7 @@ function observeReveals() {
   nodes.forEach(n => {
     if (n.classList.contains('is-visible')) return
     const rect = n.getBoundingClientRect()
-    if (rect.top < window.innerHeight * 0.9 && rect.bottom > 40) {
+    if (rect.top < window.innerHeight * 0.92 && rect.bottom > 40) {
       n.classList.add('is-visible')
     } else {
       io.observe(n)

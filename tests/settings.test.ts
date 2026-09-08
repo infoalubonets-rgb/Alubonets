@@ -10,14 +10,10 @@ describe('validateSettingValue', () => {
     expect(() => validateSettingValue(SETTING_KEYS.brandingPrimaryHex, 'blue')).toThrow()
   })
 
-  it('accepts password min length in range', () => {
-    expect(validateSettingValue(SETTING_KEYS.passwordMinLength, '10')).toBe('10')
+  it.each(['password_min_length', 'password_require_mixed'])('rejects removed setting %s', (key) => {
+    expect(Object.values(SETTING_KEYS)).not.toContain(key)
+    expect(() => validateSettingValue(key as Parameters<typeof validateSettingValue>[0], '8')).toThrow()
   })
-
-  it('rejects password min length below 6', () => {
-    expect(() => validateSettingValue(SETTING_KEYS.passwordMinLength, '3')).toThrow()
-  })
-
   it('accepts loan max amount', () => {
     expect(validateSettingValue(SETTING_KEYS.loanMaxAmountKes, '50000')).toBe('50000')
   })

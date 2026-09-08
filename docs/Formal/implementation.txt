@@ -604,11 +604,11 @@ Separate Notification / NotificationRecipient / NotificationTemplate / DeliveryA
 - Typed `AppSetting` helpers in [`lib/settings.ts`](lib/settings.ts) (validated keys; no secrets in DB)
 - `FeatureFlag` model + Admin toggle (`loans_enabled`)
 - Category master data: contribution/`TransactionCategory` UI, `WelfareCategory`, `ProjectCategory`, `MembershipClass`
-- Admin hub: `/admin/settings` — flags, branding, contact, password policy, audit retention, categories, loan policy
+- Admin hub: `/admin/settings` — flags, branding, contact, audit retention, categories, loan policy
 - Notification templates: reuse Stage 6 `AnnouncementTemplate` at `/admin/announcements` (no parallel system)
 - Public social links: reuse `/admin/content` (`SOCIAL_LINKS`)
 - Branding site name drives root metadata preview
-- Password policy enforced on registration
+- Fixed password policy enforced on registration and reset: 8–128 characters with uppercase, lowercase, a number, and a special character
 - Audit retention days read by `/api/cron/purge-audit`
 
 ### Stage 8 completion criteria

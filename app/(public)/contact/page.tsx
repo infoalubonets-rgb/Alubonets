@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
-import { CONTACT_EMAIL } from '@/lib/constants'
 import { sendContactMessage } from '@/app/actions/contact'
 import Script from 'next/script'
 import { TURNSTILE_TEST_SITE_KEY } from '@/lib/turnstile'
 import { getPublicContent } from '@/lib/public-content'
+import { getPublicContact } from '@/lib/settings'
 
 export const metadata: Metadata = {
   title: 'Contact Us',
@@ -15,17 +15,19 @@ export default async function ContactPage({
   searchParams: Promise<{ sent?: string; error?: string }>
 }) {
   const { sent, error } = await searchParams
-  const content = await getPublicContent('CONTACT')
+  const [content, contact] = await Promise.all([getPublicContent('CONTACT'), getPublicContact()])
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || (process.env.NODE_ENV === 'development' ? TURNSTILE_TEST_SITE_KEY : '')
+  const displayEmail = contact.email
+  const displayPhone = contact.phone || content.phone || 'Coming soon'
   return (
-    <main className="flex-grow max-w-container-max mx-auto w-full px-md md:px-lg py-lg md:py-xl relative">
+    <main className="relative z-10 mx-auto w-full max-w-container-max flex-grow px-md py-lg pb-24 md:px-lg md:py-xl">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-lg md:gap-xl items-start relative z-10">
         <div className="lg:col-span-2 flex flex-col gap-lg">
           <div>
             <p className="font-label-bold text-label-bold text-primary uppercase tracking-[0.14em] text-[12px] mb-sm">
               Contact
             </p>
-            <h1 className="font-h1 text-h1 text-primary mb-sm">Get in Touch</h1>
+            <h1 className="font-h1 text-h1-mobile md:text-h1 text-primary mb-sm">Get in Touch</h1>
             <p className="font-body-lg text-[16px] leading-relaxed text-on-surface">
               {content.introduction}
             </p>
@@ -38,10 +40,10 @@ export default async function ContactPage({
               <div>
                 <p className="font-label-bold text-[15px] text-primary mb-xs">Email</p>
                 <a
-                  href={`mailto:${content.email || CONTACT_EMAIL}`}
-                  className="font-body-md text-[15px] text-on-surface-variant hover:text-primary transition-colors"
+                  href={`mailto:${displayEmail}`}
+                  className="font-body-md text-[15px] text-on-surface-variant hover:text-primary transition-colors break-all"
                 >
-                  {content.email || CONTACT_EMAIL}
+                  {displayEmail}
                 </a>
               </div>
             </div>
@@ -51,7 +53,7 @@ export default async function ContactPage({
               </div>
               <div>
                 <p className="font-label-bold text-[15px] text-primary mb-xs">Phone</p>
-                <p className="font-body-md text-[15px] text-on-surface-variant">{content.phone}</p>
+                <p className="font-body-md text-[15px] text-on-surface-variant">{displayPhone}</p>
               </div>
             </div>
             <div className="contact-info-row flex items-start gap-md">

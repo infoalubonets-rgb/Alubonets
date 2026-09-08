@@ -29,7 +29,7 @@ export default async function AboutPage() {
   const committee = managedCommittee.length ? managedCommittee.map((member) => ({ name: member.name, role: member.position, alt: member.position, photoUrl: member.photoUrl })) : COMMITTEE.map((member) => ({ ...member, photoUrl: null }))
   return (
     <main className="flex-grow">
-      <section className="relative py-xxl px-lg overflow-hidden">
+      <section className="relative overflow-hidden px-md py-xl sm:py-xxl md:px-lg">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -45,12 +45,12 @@ export default async function AboutPage() {
         />
         <div className="max-w-container-max mx-auto relative">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-xl items-center">
-            <div className="md:col-span-5 relative story-reveal">
+            <div className="reveal-left md:col-span-5 relative story-reveal">
               <div className="absolute -inset-3 rounded-2xl bg-primary/5 -rotate-2 pointer-events-none" />
               <div className="relative group rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,31,80,0.12)]">
                 <img
                   alt="Community gathering"
-                  className="w-full h-[420px] object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  className="h-[min(420px,55vh)] w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 sm:h-[420px]"
                   src={HERO_IMAGE}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-primary/50 via-transparent to-transparent opacity-80" />
@@ -62,7 +62,7 @@ export default async function AboutPage() {
                 </div>
               </div>
             </div>
-            <div className="md:col-span-7 space-y-lg">
+            <div className="reveal-right md:col-span-7 space-y-lg">
               <div className="story-reveal story-reveal-delay-1">
                 <h2 className="font-h2 text-h2-mobile md:text-h2 text-primary mb-md">Our Story</h2>
                 <div className="h-1 w-16 bg-secondary-container rounded-full story-accent-line mb-md" />
@@ -90,12 +90,12 @@ export default async function AboutPage() {
         </div>
       </section>
 
-      <section className="py-xxl px-lg max-w-container-max mx-auto">
-        <div className="text-center mb-xl max-w-2xl mx-auto">
-          <h2 className="font-h2 text-h2-mobile md:text-h2 text-primary mb-sm">Mission, Vision &amp; Values</h2>
+      <section className="mx-auto max-w-container-max px-md py-xl sm:py-xxl md:px-lg">
+        <div className="reveal mx-auto mb-xl max-w-2xl text-center">
+          <h2 className="mb-sm font-h2 text-h2-mobile text-primary md:text-h2">Mission, Vision &amp; Values</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-xl">
-          <div className="bg-surface-container-lowest rounded-2xl p-lg border border-primary/10 border-t-4 border-t-primary">
+        <div className="mb-xl grid grid-cols-1 gap-lg md:grid-cols-2">
+          <div className="reveal rounded-2xl border border-primary/10 border-t-4 border-t-primary bg-surface-container-lowest p-lg">
             <p className="font-label-bold text-label-bold text-primary uppercase tracking-[0.12em] text-[11px] mb-sm">
               Mission
             </p>

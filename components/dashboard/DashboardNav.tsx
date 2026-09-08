@@ -24,9 +24,11 @@ function sectionActive(pathname: string, link: NavItem, hrefs: string[]) {
 export default function DashboardNav({
   nav,
   collapsed = false,
+  onNavigate,
 }: {
   nav: NavItem[]
   collapsed?: boolean
+  onNavigate?: () => void
 }) {
   const pathname = usePathname()
   const hrefs = useMemo(
@@ -71,13 +73,14 @@ export default function DashboardNav({
           const active = isNavActive(pathname, href, hrefs)
           const inSection = sectionActive(pathname, link, hrefs)
           const className = active || inSection
-            ? `flex items-center gap-sm px-sm py-[7px] rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
-            : `sidebar-link ${collapsed ? 'justify-center' : ''}`
+            ? `flex min-h-11 items-center gap-sm px-sm py-2.5 rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
+            : `sidebar-link min-h-11 py-2.5 ${collapsed ? 'justify-center' : ''}`
 
           return (
             <Link
               key={link.label}
               href={href}
+              onClick={onNavigate}
               className={className}
               title={collapsed ? link.label : undefined}
               aria-current={active || inSection ? 'page' : undefined}

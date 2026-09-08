@@ -14,9 +14,9 @@ export default async function HomePage() {
   const content = await getPublicContent('HOME')
   return (
     <main className="flex-grow">
-      <section className="bg-primary text-on-primary py-xxl px-md md:px-lg relative overflow-hidden">
+      <section className="relative overflow-hidden bg-primary px-md py-xl text-on-primary sm:py-xxl md:px-lg">
         <div
-          className="absolute inset-0 opacity-10 pointer-events-none"
+          className="pointer-events-none absolute inset-0 opacity-10"
           style={{
             backgroundImage: `url("${HERO_IMAGE}")`,
             backgroundSize: 'cover',
@@ -24,19 +24,19 @@ export default async function HomePage() {
             backgroundRepeat: 'no-repeat',
           }}
         />
-        <div className="max-w-container-max mx-auto flex flex-col md:flex-row items-center gap-xl relative z-10">
-          <div className="w-full md:w-1/2 flex flex-col gap-lg">
-            <h1 className="font-h1-mobile text-h1-mobile md:font-h1 md:text-h1 text-on-primary">
+        <div className="relative z-10 mx-auto flex max-w-container-max flex-col items-stretch gap-lg md:flex-row md:items-center md:gap-xl">
+          <div className="reveal-left flex w-full min-w-0 flex-col gap-md sm:gap-lg md:w-1/2">
+            <h1 className="font-h1-mobile text-h1-mobile text-on-primary md:font-h1 md:text-h1">
               {content.headline}
             </h1>
-            <p className="font-body-lg text-body-lg text-on-primary/90 max-w-lg">
+            <p className="max-w-lg font-body-lg text-[15px] leading-relaxed text-on-primary/90 sm:text-body-lg">
               {content.introduction}
             </p>
             <HeroActions />
           </div>
-          <div className="w-full md:w-1/2 rounded-xl overflow-hidden shadow-sm">
+          <div className="reveal-right hidden w-full min-w-0 overflow-hidden rounded-xl shadow-sm md:block md:w-1/2">
             <img
-              className="w-full h-auto object-cover aspect-video md:aspect-[4/3] rounded-xl border border-outline-variant/20"
+              className="aspect-[4/3] h-auto w-full rounded-xl border border-outline-variant/20 object-cover"
               src={HERO_IMAGE}
               alt="A vibrant community self-help group meeting"
             />
@@ -44,40 +44,49 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section className="py-xxl px-md md:px-lg bg-surface-container-low">
-        <div className="max-w-container-max mx-auto">
-          <div className="text-center mb-lg max-w-2xl mx-auto">
-            <p className="font-label-bold text-label-bold text-secondary-container uppercase tracking-[0.14em] mb-xs">
+      <section className="bg-surface-container-low px-md py-xl sm:py-xxl md:px-lg">
+        <div className="mx-auto max-w-container-max">
+          <div className="reveal mx-auto mb-lg max-w-2xl text-center">
+            <p className="mb-xs font-label-bold text-label-bold uppercase tracking-[0.14em] text-secondary-container">
               Who we are
             </p>
-            <h2 className="font-h2 text-h2-mobile md:text-h2 text-primary">Mission, Vision &amp; Values</h2>
+            <h2 className="font-h2 text-h2-mobile text-primary md:text-h2">Mission, Vision &amp; Values</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-            <article className="mvv-card mvv-card-navy bg-white p-md md:p-lg rounded-2xl border border-primary/10 flex flex-col text-left group">
-              <h3 className="mvv-title font-h3 text-[20px] leading-snug text-primary mb-sm">Mission</h3>
-              <span className="mvv-rule block w-8 h-0.5 bg-primary mb-md" aria-hidden="true" />
+          <div className="grid grid-cols-1 gap-md md:grid-cols-3">
+            <article
+              className="reveal mvv-card mvv-card-navy group flex flex-col rounded-2xl border border-primary/10 bg-white p-md text-left md:p-lg"
+              style={{ ['--reveal-delay' as string]: '60ms' }}
+            >
+              <h3 className="mvv-title mb-sm font-h3 text-[20px] leading-snug text-primary">Mission</h3>
+              <span className="mvv-rule mb-md block h-0.5 w-8 bg-primary" aria-hidden="true" />
               <p className="mvv-body font-body-md text-[15px] leading-relaxed text-on-surface">
                 {content.mission}
               </p>
             </article>
-            <article className="mvv-card mvv-card-orange bg-primary p-md md:p-lg rounded-2xl border border-transparent flex flex-col text-left group">
-              <h3 className="mvv-title font-h3 text-[20px] leading-snug text-on-primary mb-sm">Vision</h3>
-              <span className="mvv-rule block w-8 h-0.5 bg-secondary-container mb-md" aria-hidden="true" />
+            <article
+              className="reveal-scale mvv-card mvv-card-orange group flex flex-col rounded-2xl border border-transparent bg-primary p-md text-left md:p-lg"
+              style={{ ['--reveal-delay' as string]: '140ms' }}
+            >
+              <h3 className="mvv-title mb-sm font-h3 text-[20px] leading-snug text-on-primary">Vision</h3>
+              <span className="mvv-rule mb-md block h-0.5 w-8 bg-secondary-container" aria-hidden="true" />
               <p className="mvv-body font-body-md text-[15px] leading-relaxed text-on-primary/90">
                 {content.vision}
               </p>
             </article>
-            <article className="mvv-card mvv-card-navy bg-white p-md md:p-lg rounded-2xl border border-primary/10 flex flex-col text-left group">
-              <h3 className="mvv-title font-h3 text-[20px] leading-snug text-primary mb-sm">Values</h3>
-              <span className="mvv-rule block w-8 h-0.5 bg-primary mb-md" aria-hidden="true" />
+            <article
+              className="reveal mvv-card mvv-card-navy group flex flex-col rounded-2xl border border-primary/10 bg-white p-md text-left md:p-lg"
+              style={{ ['--reveal-delay' as string]: '220ms' }}
+            >
+              <h3 className="mvv-title mb-sm font-h3 text-[20px] leading-snug text-primary">Values</h3>
+              <span className="mvv-rule mb-md block h-0.5 w-8 bg-primary" aria-hidden="true" />
               <p className="mvv-body font-body-md text-[15px] leading-relaxed text-on-surface">
                 Unity, Mutual Support, Inclusivity, Accountability, Empowerment, and Respect.
               </p>
             </article>
           </div>
-          <p className="text-center mt-lg font-body-md text-[15px] text-on-surface-variant">
+          <p className="reveal mt-lg text-center font-body-md text-[15px] text-on-surface-variant">
             Want the full story behind the group?{' '}
-            <Link href="/about" className="text-secondary-container font-semibold hover:underline">
+            <Link href="/about" className="font-semibold text-secondary-container hover:underline">
               Read about us
             </Link>
             .

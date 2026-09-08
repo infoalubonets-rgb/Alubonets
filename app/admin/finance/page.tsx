@@ -41,7 +41,7 @@ export default async function AdminFinancePage({
     byUser,
     members,
   ] = await withDatabaseRetry(() => Promise.all([
-    prisma.transactionCategory.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, type: true, code: true } }),
+    prisma.transactionCategory.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, type: true, code: true, active: true } }),
     prisma.financialTransaction.findMany({
       where: { status: 'PENDING' },
       include: { createdBy: true },

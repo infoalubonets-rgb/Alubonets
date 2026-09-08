@@ -8,7 +8,8 @@ import { syncOverdueActionPoints } from '@/lib/documents'
 import { getGovernanceRecordsDetailsForViewer, getResolutionsForViewer } from '@/lib/data/queries'
 import { actionPublishMeetingMinutes } from '@/app/actions/meetings'
 import CreateResolutionForm from '@/components/governance/CreateResolutionForm'
-import ResolutionsFeed from '@/components/governance/ResolutionsFeed'
+import PendingApprovalsPanel from '@/components/governance/PendingApprovalsPanel'
+import IconModalButton from '@/components/ui/IconModalButton'
 import {
   addActionPoint,
   addAgendaItem,
@@ -60,31 +61,33 @@ export default async function ManageGovernancePage() {
                 approve minutes, and preserve revisions for accountability.
               </p>
             </div>
-            {canManage && (
-              <Link
-                href="/dashboard/secretary/meetings/new"
-                className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
-              >
-                Create meeting record
-              </Link>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {canManage && (
+                <Link
+                  href="/dashboard/secretary/meetings/new"
+                  className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
+                >
+                  Create meeting record
+                </Link>
+              )}
+              {resolutions.canApprove && (
+                <IconModalButton icon="settings" label="Pending approvals" title="Pending approvals">
+                  <PendingApprovalsPanel pending={resolutions.pending} />
+                </IconModalButton>
+              )}
+              {canCreateResolution && (
+                <IconModalButton icon="add" label="Share a proposal" title="Share a proposal for approval">
+                  <CreateResolutionForm />
+                </IconModalButton>
+              )}
+            </div>
           </div>
-        </section>
-
-        <section className="space-y-4">
-          {canCreateResolution && <CreateResolutionForm />}
-          <ResolutionsFeed
-            pending={resolutions.pending}
-            approved={resolutions.approved}
-            canApprove={resolutions.canApprove}
-            fullDetail={resolutions.fullDetail}
-          />
         </section>
 
         {canManage && proposals.length > 0 && (
           <section className="space-y-3 rounded-2xl border border-outline-variant bg-surface p-5">
             <div>
-              <h2 className="font-h3 text-xl text-primary">Proposal comments</h2>
+              <h2 className="font-h3 text-xl text-primary">Proposals</h2>
               <p className="mt-1 text-sm text-on-surface-variant">
                 Review proposals, vote, and add optional comments for the group.
               </p>
@@ -101,6 +104,7 @@ export default async function ManageGovernancePage() {
                 resultsPublished: record.resultsPublished,
               }))}
               details={proposals}
+              canPublish={resolutions.canApprove}
             />
           </section>
         )}

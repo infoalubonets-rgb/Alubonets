@@ -19,9 +19,10 @@ type GovernanceRecordRow = {
 type Props = {
   records: GovernanceRecordRow[]
   details: GovernanceRecordDetail[]
+  canPublish?: boolean
 }
 
-export default function GovernanceRecordsClient({ records, details }: Props) {
+export default function GovernanceRecordsClient({ records, details, canPublish = false }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const selected = details.find((record) => record.id === selectedId) ?? null
 
@@ -71,7 +72,7 @@ export default function GovernanceRecordsClient({ records, details }: Props) {
         title={selected?.title || 'Proposal'}
         onClose={() => setSelectedId(null)}
       >
-        {selected && <GovernanceRecordDetailView record={selected} inModal />}
+        {selected && <GovernanceRecordDetailView record={selected} inModal canPublish={canPublish} />}
       </FullScreenModal>
     </>
   )

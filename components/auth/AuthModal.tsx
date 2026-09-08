@@ -163,11 +163,11 @@ export default function AuthModal() {
   return (
     <div
       id="authModal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-md auth-modal-overlay"
+      className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-md auth-modal-overlay"
       onClick={() => setOpen(false)}
     >
       <div
-        className={`auth-modal-panel bg-white rounded-2xl w-full relative ${tab === 'signup' ? 'auth-modal-wide' : ''}`}
+        className={`auth-modal-panel bg-white rounded-t-3xl sm:rounded-2xl w-full relative ${tab === 'signup' ? 'auth-modal-wide' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button

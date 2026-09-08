@@ -2,15 +2,22 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CONTACT_EMAIL, SITE_LOGO } from '@/lib/constants'
+import { SITE_LOGO } from '@/lib/constants'
 
-export default function Footer() {
+type Props = {
+  contactEmail: string
+  contactPhone?: string
+}
+
+export default function Footer({ contactEmail, contactPhone }: Props) {
   const pathname = usePathname()
 
   const linkClass = (href: string) =>
     pathname === href || (href !== '/' && pathname.startsWith(href))
       ? 'text-secondary-fixed font-bold hover:text-secondary transition-colors duration-200'
       : 'text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200'
+
+  const phoneDisplay = contactPhone?.trim() || 'Coming soon'
 
   return (
     <footer className="bg-primary dark:bg-primary-container text-on-primary dark:text-on-primary-container font-body-md text-body-md w-full mt-auto site-footer">
@@ -69,15 +76,24 @@ export default function Footer() {
               <div className="flex items-start gap-sm">
                 <span className="material-symbols-outlined text-base flex-shrink-0 mt-xs">mail</span>
                 <a
-                  href={`mailto:${CONTACT_EMAIL}`}
+                  href={`mailto:${contactEmail}`}
                   className="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200"
                 >
-                  {CONTACT_EMAIL}
+                  {contactEmail}
                 </a>
               </div>
               <div className="flex items-start gap-sm">
                 <span className="material-symbols-outlined text-base flex-shrink-0 mt-xs">call</span>
-                <span className="text-on-primary/80 dark:text-on-primary-container/80">Coming soon</span>
+                {contactPhone?.trim() ? (
+                  <a
+                    href={`tel:${contactPhone.replace(/\s+/g, '')}`}
+                    className="text-on-primary/80 dark:text-on-primary-container/80 hover:text-secondary transition-colors duration-200"
+                  >
+                    {phoneDisplay}
+                  </a>
+                ) : (
+                  <span className="text-on-primary/80 dark:text-on-primary-container/80">{phoneDisplay}</span>
+                )}
               </div>
             </div>
           </div>

@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { voteResolution } from '@/app/actions/governance'
+import { voteResolution, publishResolutionResults } from '@/app/actions/governance'
 import GovernanceCommentField from '@/components/governance/GovernanceCommentField'
 import VoteConfirmDialog from '@/components/governance/VoteConfirmDialog'
 import { governanceCategoryLabel } from '@/lib/governance-categories'
@@ -42,10 +42,12 @@ export default function GovernanceRecordDetailView({
   record,
   inModal = false,
   mode = 'full',
+  canPublish = false,
 }: {
   record: GovernanceRecordDetail
   inModal?: boolean
   mode?: 'full' | 'respond' | 'details'
+  canPublish?: boolean
 }) {
   const router = useRouter()
   const [vote, setVote] = useState<'APPROVE' | 'REJECT' | null>(record.myVote)
@@ -56,7 +58,23 @@ export default function GovernanceRecordDetailView({
   const [voteLocked, setVoteLocked] = useState(Boolean(record.myVote))
   const [confirmChoice, setConfirmChoice] = useState<'APPROVE' | 'REJECT' | null>(null)
   const [pending, startTransition] = useTransition()
+  const [publishPending, startPublish] = useTransition()
+  const [publishError, setPublishError] = useState('')
   const commentAtLimit = governanceCommentRemaining(comment.length) === 0 && comment.length > 0
+
+  const publish = () => {
+    setPublishError('')
+    const formData = new FormData()
+    formData.set('id', record.id)
+    startPublish(async () => {
+      try {
+        await publishResolutionResults(formData)
+        router.refresh()
+      } catch (e) {
+        setPublishError(e instanceof Error ? e.message : 'Could not publish results')
+      }
+    })
+  }
 
   const requestVote = (choice: 'APPROVE' | 'REJECT') => {
     if (voteLocked) return
@@ -204,12 +222,15 @@ export default function GovernanceRecordDetailView({
           </div>
         </section>
 
-      {mode !== 'respond' && (record.resultsPublished || record.responses.length > 0) && (
+      {mode !== 'respond' && (record.resultsPublished || record.responses.length > 0 || canPublish) && (
         <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-5">
           <h3 className="font-semibold text-on-surface">Responses</h3>
           <p className="mt-1 text-sm text-on-surface-variant">
             <b>{record.approveCount}</b> approve · <b>{record.rejectCount}</b> oppose
           </p>
+          {!record.resultsPublished && (
+            <p className="mt-1 text-xs text-on-surface-variant">Not yet published to everyone.</p>
+          )}
           {record.responses.length > 0 && (
             <ul className="mt-3 space-y-2">
               {record.responses.map((response) => (
@@ -224,6 +245,19 @@ export default function GovernanceRecordDetailView({
                 </li>
               ))}
             </ul>
+          )}
+          {canPublish && !record.resultsPublished && (
+            <>
+              {publishError && <p className="mt-2 text-sm text-error">{publishError}</p>}
+              <button
+                type="button"
+                disabled={publishPending}
+                onClick={publish}
+                className="mt-3 rounded-full bg-secondary-container px-4 py-2 text-sm text-on-primary disabled:opacity-50"
+              >
+                Publish results
+              </button>
+            </>
           )}
         </section>
       )}
