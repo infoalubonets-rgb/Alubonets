@@ -261,6 +261,33 @@ export async function decideResolution(formData: FormData) {
   refreshResolutions()
 }
 
+export async function updateResolutionVisibility(formData: FormData) {
+  const actor = await requireAdmin()
+  const id = z.string().min(1).parse(formData.get('id'))
+  const visibleToRoles = formData.getAll('visibleToRoles').map(String) as Role[]
+  if (visibleToRoles.length === 0) {
+    throw new Error('Select at least one dashboard to show this on.')
+  }
+  const allowAnonymous = formData.get('allowAnonymous') === 'true'
+  const allowComments = formData.get('allowComments') === 'true'
+
+  const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id } })
+  if (resolution.status !== 'APPROVED') throw new Error('Only approved proposals have visibility settings to edit.')
+
+  const updated = await prisma.resolution.update({
+    where: { id },
+    data: { visibleToRoles, allowAnonymous, allowComments },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'RESOLUTION_VISIBILITY_UPDATE',
+    entity: 'Resolution',
+    entityId: id,
+    newValue: { visibleToRoles: updated.visibleToRoles, allowAnonymous: updated.allowAnonymous, allowComments: updated.allowComments },
+  })
+  refreshResolutions()
+}
+
 export async function voteResolution(formData: FormData) {
   const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE', 'TREASURER', 'ORGANIZER', 'MEMBER'])
   const resolutionId = z.string().min(1).parse(formData.get('resolutionId'))

@@ -70,10 +70,9 @@ export default function AddDocumentModal({ categories }: { categories: Category[
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-secondary-container px-4 text-xs font-label-bold text-on-primary shadow-[0_3px_10px_rgba(254,128,21,0.22)] transition hover:opacity-90 active:scale-[0.98]"
+        className="inline-flex h-10 items-center gap-1.5 rounded-full bg-secondary-container px-4 text-xs font-label-bold text-on-primary shadow-[0_3px_10px_rgba(254,128,21,0.22)] transition hover:opacity-90 active:scale-[0.98]"
       >
-        <span className="material-symbols-outlined text-[17px]">add</span>
-        Add
+        Add new document
       </button>
 
       <FullScreenModal open={open} title="Add document" onClose={close} size="compact">

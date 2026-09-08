@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { voteResolution, publishResolutionResults } from '@/app/actions/governance'
+import { voteResolution, publishResolutionResults, updateResolutionVisibility } from '@/app/actions/governance'
 import GovernanceCommentField from '@/components/governance/GovernanceCommentField'
 import VoteConfirmDialog from '@/components/governance/VoteConfirmDialog'
 import VoteSuccessDialog from '@/components/governance/VoteSuccessDialog'
@@ -23,6 +23,7 @@ export type GovernanceRecordDetail = {
   resultsPublished: boolean
   allowAnonymous: boolean
   allowComments: boolean
+  visibleToRoles: string[]
   approveCount: number
   rejectCount: number
   myVote: 'APPROVE' | 'REJECT' | null
@@ -39,16 +40,29 @@ export type GovernanceRecordDetail = {
   }[]
 }
 
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: 'Admin',
+  EXECUTIVE: 'Executive',
+  TREASURER: 'Treasurer',
+  SECRETARY: 'Secretary',
+  ORGANIZER: 'Organizer',
+  MEMBER: 'Member',
+}
+const VISIBILITY_ROLES = ['MEMBER', 'ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER']
+
 export default function GovernanceRecordDetailView({
   record,
   inModal = false,
   mode = 'full',
   canPublish = false,
+  showVisibility = false,
 }: {
   record: GovernanceRecordDetail
   inModal?: boolean
   mode?: 'full' | 'respond' | 'details'
   canPublish?: boolean
+  /** Show the audience/visibility settings this proposal was approved with (Admin/Secretary only). */
+  showVisibility?: boolean
 }) {
   const router = useRouter()
   const [vote, setVote] = useState<'APPROVE' | 'REJECT' | null>(record.myVote)
@@ -61,7 +75,41 @@ export default function GovernanceRecordDetailView({
   const [pending, setPending] = useState(false)
   const [publishPending, setPublishPending] = useState(false)
   const [publishError, setPublishError] = useState('')
+  const [visibleRoles, setVisibleRoles] = useState<string[]>(record.visibleToRoles)
+  const [visComments, setVisComments] = useState(record.allowComments)
+  const [visAnonymous, setVisAnonymous] = useState(record.allowAnonymous)
+  const [visPending, setVisPending] = useState(false)
+  const [visSaved, setVisSaved] = useState(false)
+  const [visError, setVisError] = useState('')
   const commentAtLimit = governanceCommentRemaining(comment.length) === 0 && comment.length > 0
+
+  const toggleVisibleRole = (role: string) => {
+    setVisibleRoles((current) => (current.includes(role) ? current.filter((r) => r !== role) : [...current, role]))
+  }
+
+  const saveVisibility = async () => {
+    setVisError('')
+    if (visibleRoles.length === 0) {
+      setVisError('Select at least one dashboard to show this on.')
+      return
+    }
+    setVisPending(true)
+    const formData = new FormData()
+    formData.set('id', record.id)
+    visibleRoles.forEach((role) => formData.append('visibleToRoles', role))
+    formData.set('allowComments', visComments ? 'true' : 'false')
+    formData.set('allowAnonymous', visAnonymous ? 'true' : 'false')
+    try {
+      await updateResolutionVisibility(formData)
+      setVisSaved(true)
+      router.refresh()
+      window.setTimeout(() => setVisSaved(false), 2000)
+    } catch (e) {
+      setVisError(e instanceof Error ? e.message : 'Could not save visibility settings.')
+    } finally {
+      setVisPending(false)
+    }
+  }
 
   const publish = async () => {
     setPublishError('')
@@ -160,6 +208,82 @@ export default function GovernanceRecordDetailView({
           </div>
         )}
       </article>
+
+      {showVisibility && canPublish && (
+        <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Visibility</h3>
+          <p className="mt-1 text-xs text-on-surface-variant">Choose which dashboards can see this proposal.</p>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {VISIBILITY_ROLES.map((role) => (
+              <label key={role} className="flex items-center gap-1.5 text-xs font-medium text-on-surface">
+                <input
+                  type="checkbox"
+                  checked={visibleRoles.includes(role)}
+                  onChange={() => toggleVisibleRole(role)}
+                  className="h-4 w-4 accent-primary"
+                />
+                {ROLE_LABEL[role] || role}
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <label className="flex items-center gap-1.5 text-xs font-medium text-on-surface">
+              <input type="checkbox" checked={visComments} onChange={(e) => setVisComments(e.target.checked)} className="h-4 w-4 accent-primary" />
+              Allow comments
+            </label>
+            <label className="flex items-center gap-1.5 text-xs font-medium text-on-surface">
+              <input type="checkbox" checked={visAnonymous} onChange={(e) => setVisAnonymous(e.target.checked)} className="h-4 w-4 accent-primary" />
+              Allow anonymous responses
+            </label>
+          </div>
+          {visError && <p className="mt-2 text-xs text-error">{visError}</p>}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              disabled={visPending}
+              onClick={saveVisibility}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-on-primary disabled:cursor-wait disabled:opacity-60"
+            >
+              {visPending && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
+              {visPending ? 'Saving…' : 'Save visibility'}
+            </button>
+            {visSaved && !visPending && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700">
+                <span className="material-symbols-outlined text-[14px]">check_circle</span>Saved
+              </span>
+            )}
+          </div>
+          <p className="mt-3 border-t border-outline-variant/60 pt-2 text-xs text-on-surface-variant">
+            <span className="font-semibold text-on-surface">Managed by:</span> Admin (including Super Admin) can
+            approve, reject, and publish results · Secretary can view and track.
+          </p>
+        </section>
+      )}
+
+      {showVisibility && !canPublish && (
+        <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+          <h3 className="text-xs font-bold uppercase tracking-wide text-on-surface-variant">Visibility</h3>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {record.visibleToRoles.length > 0 ? (
+              record.visibleToRoles.map((role) => (
+                <span key={role} className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                  {ROLE_LABEL[role] || role}
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-on-surface-variant">No roles selected — hidden from member dashboards.</span>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-on-surface-variant">
+            {record.allowComments ? 'Comments allowed' : 'Comments hidden'} ·{' '}
+            {record.allowAnonymous ? 'Anonymous responses allowed' : 'Anonymous responses hidden'}
+          </p>
+          <p className="mt-3 border-t border-outline-variant/60 pt-2 text-xs text-on-surface-variant">
+            <span className="font-semibold text-on-surface">Managed by:</span> Admin (including Super Admin) can
+            approve, reject, and publish results · Secretary can view and track.
+          </p>
+        </section>
+      )}
 
       <section
         className={`rounded-2xl border bg-surface p-5 ${

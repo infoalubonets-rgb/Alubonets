@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
 import {
@@ -13,14 +13,20 @@ type DocRow = {
   id: string
   title: string
   status: string
-  version: number
-  mimeType: string | null
   categoryName: string
   uploaderName: string
-  downloadCount: number
+  uploadedAt: string
+  isDemo?: boolean
+  canView: boolean
 }
 
-export default function ManageDocumentsList({ documents }: { documents: DocRow[] }) {
+export default function ManageDocumentsList({
+  documents,
+  addAction,
+}: {
+  documents: DocRow[]
+  addAction?: ReactNode
+}) {
   const router = useRouter()
   const [rows, setRows] = useState(documents)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -61,19 +67,13 @@ export default function ManageDocumentsList({ documents }: { documents: DocRow[]
         if (singleId) {
           setRows((current) => current.map((row) => (row.id === singleId ? { ...row, status } : row)))
         } else {
-          setRows((current) =>
-            current.map((row) => (selected.has(row.id) ? { ...row, status } : row)),
-          )
+          setRows((current) => current.map((row) => (selected.has(row.id) ? { ...row, status } : row)))
         }
         router.refresh()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not update documents.')
       }
     })
-  }
-
-  function deleteOne(id: string) {
-    setPendingDeleteId(id)
   }
 
   function confirmDeleteOne() {
@@ -119,125 +119,123 @@ export default function ManageDocumentsList({ documents }: { documents: DocRow[]
   }
 
   return (
-    <div className="space-y-3">
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-h3 text-xl text-primary">Your documents</h2>
-        <div className="flex flex-wrap gap-2">
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {addAction}
           <button
             type="button"
             disabled={pending || !selected.size}
-            onClick={() => runStatus('DRAFT')}
-            className="inline-flex items-center gap-1.5 rounded-full border border-primary/25 px-4 py-2 text-xs font-label-bold text-primary disabled:opacity-50"
+            onClick={() => setConfirmBulk(true)}
+            className="inline-flex h-10 items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-3.5 text-xs font-label-bold text-red-700 disabled:opacity-40"
           >
-            <span className="material-symbols-outlined text-[17px]">visibility_off</span> Hide selected
+            Delete selected
           </button>
           <button
             type="button"
             disabled={pending || !selected.size}
             onClick={() => runStatus('PUBLISHED')}
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-label-bold text-on-primary disabled:opacity-50"
+            className="inline-flex h-10 items-center rounded-full border border-primary/25 px-3.5 text-xs font-label-bold text-primary disabled:opacity-40"
           >
-            <span className="material-symbols-outlined text-[17px]">publish</span> Publish selected
+            Publish selected
           </button>
           <button
             type="button"
             disabled={pending || !selected.size}
-            onClick={() => setConfirmBulk(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-4 py-2 text-xs font-label-bold text-red-700 disabled:opacity-50"
+            onClick={() => runStatus('DRAFT')}
+            className="inline-flex h-10 items-center rounded-full border border-outline-variant px-3.5 text-xs font-label-bold text-on-surface-variant disabled:opacity-40"
           >
-            <span className="material-symbols-outlined text-[17px]">delete</span> Delete selected
+            Hide selected
           </button>
         </div>
       </div>
 
       {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      {rows.length > 0 && (
-        <label className="flex items-center gap-2 px-1 text-xs font-semibold text-on-surface-variant">
-          <input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 accent-primary" />
-          Select all
-        </label>
-      )}
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface">
+        {rows.length > 0 && (
+          <label className="flex items-center gap-2 border-b border-outline-variant/60 px-4 py-2.5 text-xs font-semibold text-on-surface-variant sm:px-5">
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-4 w-4 accent-primary" />
+            Select all
+          </label>
+        )}
 
-      {rows.map((document) => (
-        <article
-          key={document.id}
-          className="flex items-start gap-3 rounded-2xl border border-outline-variant/60 bg-surface p-4 shadow-[0_4px_16px_rgba(0,31,80,0.05)]"
-        >
-          <input
-            type="checkbox"
-            checked={selected.has(document.id)}
-            onChange={() => toggle(document.id)}
-            aria-label={`Select ${document.title}`}
-            className="mt-1 h-4 w-4 accent-primary"
-          />
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/5 text-primary">
-            <span className="material-symbols-outlined">
-              {document.mimeType?.includes('pdf') ? 'picture_as_pdf' : 'description'}
-            </span>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h3 className="font-label-bold text-primary">{document.title}</h3>
-                <p className="mt-0.5 text-xs text-on-surface-variant">
-                  {document.categoryName} · v{document.version}.0 · {document.downloadCount} downloads ·{' '}
-                  {document.uploaderName}
-                </p>
-              </div>
-              <span
-                className={`rounded-full px-2.5 py-1 text-[9px] font-label-bold uppercase tracking-wider ${
-                  document.status === 'PUBLISHED'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-secondary-container/10 text-secondary'
-                }`}
-              >
-                {document.status === 'PUBLISHED' ? 'Visible' : 'Hidden'}
-              </span>
+        {rows.map((document) => (
+          <div
+            key={document.id}
+            className="flex flex-wrap items-center gap-3 border-b border-outline-variant/60 px-4 py-3 last:border-b-0 sm:px-5"
+          >
+            <input
+              type="checkbox"
+              checked={selected.has(document.id)}
+              onChange={() => toggle(document.id)}
+              aria-label={`Select ${document.title}`}
+              className="h-4 w-4 accent-primary"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold text-on-surface">{document.title}</p>
+              <p className="mt-0.5 truncate text-xs text-on-surface-variant">
+                {document.categoryName}
+                {' · '}
+                {document.uploaderName}
+                {' · '}
+                {new Date(document.uploadedAt).toLocaleDateString('en-KE')}
+                {document.isDemo ? ' · Demo' : ''}
+              </p>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <span
+              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                document.status === 'PUBLISHED'
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-surface-container-high text-on-surface-variant'
+              }`}
+            >
+              {document.status === 'PUBLISHED' ? 'Published' : 'Hidden'}
+            </span>
+            {document.canView && (
               <a
                 href={`/api/documents/${document.id}/download`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-full border border-outline-variant px-3 py-1.5 text-xs text-primary"
+                className="grid h-9 w-9 place-items-center rounded-full border border-primary/25 text-primary transition hover:bg-primary/5"
+                title="Open"
+                aria-label={`Open ${document.title}`}
               >
-                <span className="material-symbols-outlined text-[16px]">open_in_new</span> View
+                <span className="material-symbols-outlined text-[19px]">visibility</span>
               </a>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => runStatus(document.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED', document.id)}
-                className="inline-flex items-center gap-1 rounded-full bg-secondary-container/10 px-3 py-1.5 text-xs font-label-bold text-secondary disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined text-[16px]">
-                  {document.status === 'PUBLISHED' ? 'visibility_off' : 'publish'}
-                </span>
-                {document.status === 'PUBLISHED' ? 'Hide' : 'Publish'}
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => deleteOne(document.id)}
-                className="inline-flex items-center gap-1 rounded-full border border-red-200 px-3 py-1.5 text-xs font-label-bold text-red-700 disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined text-[16px]">delete</span> Delete
-              </button>
-            </div>
+            )}
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                runStatus(document.status === 'PUBLISHED' ? 'DRAFT' : 'PUBLISHED', document.id)
+              }
+              className="rounded-full border border-outline-variant px-3 py-1.5 text-xs font-semibold text-on-surface disabled:opacity-50"
+            >
+              {document.status === 'PUBLISHED' ? 'Hide' : 'Publish'}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setPendingDeleteId(document.id)}
+              aria-label={`Delete ${document.title}`}
+              title="Delete"
+              className="grid h-9 w-9 place-items-center rounded-full border border-red-200 text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[19px]">delete</span>
+            </button>
           </div>
-        </article>
-      ))}
+        ))}
 
-      {!rows.length && (
-        <p className="rounded-2xl border border-dashed p-10 text-center text-sm text-on-surface-variant">
-          No documents added yet.
-        </p>
-      )}
+        {!rows.length && (
+          <p className="p-8 text-center text-sm text-on-surface-variant">No documents yet.</p>
+        )}
+      </div>
 
       <ConfirmDeleteModal
         open={Boolean(pendingDeleteId)}
         title="Delete this document?"
-        description="This permanently removes the file. Members will no longer be able to open it."
+        description="This permanently removes the document from the repository."
         pending={pending}
         onCancel={() => {
           if (!pending) setPendingDeleteId(null)
@@ -250,8 +248,7 @@ export default function ManageDocumentsList({ documents }: { documents: DocRow[]
         title="Delete selected documents?"
         description={
           <>
-            Permanently delete <strong>{selected.size}</strong> document{selected.size === 1 ? '' : 's'}? Members will
-            no longer be able to open them.
+            Permanently delete <strong>{selected.size}</strong> document{selected.size === 1 ? '' : 's'}?
           </>
         }
         pending={pending}
@@ -260,6 +257,6 @@ export default function ManageDocumentsList({ documents }: { documents: DocRow[]
         }}
         onConfirm={deleteSelected}
       />
-    </div>
+    </section>
   )
 }

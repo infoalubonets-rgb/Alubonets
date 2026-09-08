@@ -28,7 +28,8 @@
     "db:bootstrap-auth": "node scripts/bootstrap-auth-users.mjs",
     "db:purge-audit": "node scripts/purge-audit-logs.mjs",
     "cron:maintenance": "node scripts/run-cron.mjs stage4-maintenance",
-    "cron:purge-audit": "node scripts/run-cron.mjs purge-audit"
+    "cron:purge-audit": "node scripts/run-cron.mjs purge-audit",
+    "icons:generate": "node scripts/generate-favicons.mjs"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

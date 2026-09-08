@@ -523,6 +523,7 @@ function mapGovernanceRecordDetail(
     resultsPublished: row.resultsPublished,
     allowAnonymous: row.allowAnonymous,
     allowComments: row.allowComments,
+    visibleToRoles: row.visibleToRoles,
     approveCount,
     rejectCount,
     myVote: mine?.vote ?? null,
