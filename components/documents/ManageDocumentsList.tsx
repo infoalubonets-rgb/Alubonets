@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
 import {
   deleteRepositoryDocument,
   deleteSelectedRepositoryDocuments,
@@ -26,6 +27,7 @@ export default function ManageDocumentsList({ documents }: { documents: DocRow[]
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const [confirmBulk, setConfirmBulk] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     setRows(documents)
@@ -71,7 +73,12 @@ export default function ManageDocumentsList({ documents }: { documents: DocRow[]
   }
 
   function deleteOne(id: string) {
-    if (!window.confirm('Delete this document permanently? Members will no longer see it.')) return
+    setPendingDeleteId(id)
+  }
+
+  function confirmDeleteOne() {
+    if (!pendingDeleteId) return
+    const id = pendingDeleteId
     setError('')
     const formData = new FormData()
     formData.set('id', id)
@@ -84,9 +91,11 @@ export default function ManageDocumentsList({ documents }: { documents: DocRow[]
           next.delete(id)
           return next
         })
+        setPendingDeleteId(null)
         router.refresh()
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not delete document.')
+        setPendingDeleteId(null)
       }
     })
   }
@@ -225,40 +234,32 @@ export default function ManageDocumentsList({ documents }: { documents: DocRow[]
         </p>
       )}
 
-      {confirmBulk && (
-        <div
-          className="fixed inset-0 z-[140] grid place-items-center bg-[#001f50]/60 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !pending) setConfirmBulk(false)
-          }}
-        >
-          <div className="w-full max-w-md rounded-3xl border border-outline-variant/60 bg-surface p-6 shadow-2xl">
-            <h3 className="font-h3 text-xl text-on-surface">Delete selected documents?</h3>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              Permanently delete <strong>{selected.size}</strong> document{selected.size === 1 ? '' : 's'}? Members
-              will no longer be able to open them.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => setConfirmBulk(false)}
-                className="rounded-full border border-outline-variant px-4 py-2.5 text-sm font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={deleteSelected}
-                className="rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {pending ? 'Deleting…' : 'Yes, delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteModal
+        open={Boolean(pendingDeleteId)}
+        title="Delete this document?"
+        description="This permanently removes the file. Members will no longer be able to open it."
+        pending={pending}
+        onCancel={() => {
+          if (!pending) setPendingDeleteId(null)
+        }}
+        onConfirm={confirmDeleteOne}
+      />
+
+      <ConfirmDeleteModal
+        open={confirmBulk}
+        title="Delete selected documents?"
+        description={
+          <>
+            Permanently delete <strong>{selected.size}</strong> document{selected.size === 1 ? '' : 's'}? Members will
+            no longer be able to open them.
+          </>
+        }
+        pending={pending}
+        onCancel={() => {
+          if (!pending) setConfirmBulk(false)
+        }}
+        onConfirm={deleteSelected}
+      />
     </div>
   )
 }

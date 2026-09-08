@@ -17,9 +17,9 @@ const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
 const testEmailOverride = () => process.env.RESEND_TEST_EMAIL || null
 
 export function baseHtml(body: string) {
-  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f7fa;font-family:sans-serif;">
-<div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);">
-  <div style="background:#001f50;padding:20px 28px;">
+  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#eef2f7;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+<div style="max-width:600px;margin:32px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 8px 28px rgba(0,31,80,.12);">
+  <div style="background:#001f50;padding:22px 28px;">
     <table cellpadding="0" cellspacing="0" border="0"><tr>
       <td style="vertical-align:middle;padding-right:14px;">
         <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" style="height:44px;width:44px;v-text-anchor:middle;" arcsize="50%" fillcolor="#fe8015" strokecolor="#fe8015"><v:fill type="frame" src="${SITE_LOGO}" /></v:roundrect><![endif]-->
@@ -31,14 +31,15 @@ export function baseHtml(body: string) {
         <!--<![endif]-->
       </td>
       <td style="vertical-align:middle;">
-        <span style="color:#fff;font-size:17px;font-weight:700;letter-spacing:-.3px;font-family:sans-serif;">Alubonets SHG</span>
+        <span style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:-.3px;font-family:sans-serif;">Alubonets SHG</span>
+        <div style="color:#fe8015;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-top:4px;">Self-Help Group</div>
       </td>
     </tr></table>
   </div>
-  <div style="height:3px;background:#fe8015;"></div>
+  <div style="height:4px;background:linear-gradient(90deg,#fe8015 0%,#f6b800 55%,#fe8015 100%);"></div>
   <div style="padding:28px 32px;">${body}</div>
-  <div style="padding:16px 32px;background:#f5f7fa;border-top:1px solid #e5e7eb;">
-    <p style="margin:0;color:#9ca3af;font-size:12px;">Alubonets Self-Help Group · <a href="${appUrl()}" style="color:#9ca3af;">${appUrl()}</a></p>
+  <div style="padding:16px 32px;background:#001f50;">
+    <p style="margin:0;color:#c7d2e5;font-size:12px;">Alubonets Self-Help Group · <a href="${appUrl()}" style="color:#fe8015;text-decoration:none;">${appUrl()}</a></p>
   </div>
 </div></body></html>`
 }

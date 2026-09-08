@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import FullScreenModal from '@/components/ui/FullScreenModal'
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
 import {
   deleteContactMessage,
   deleteSelectedContactMessages,
@@ -76,6 +77,7 @@ export default function ContactInboxRows({ messages: initialMessages }: { messag
   const [statusNotice, setStatusNotice] = useState<string | null>(null)
   const [replySuccess, setReplySuccess] = useState(false)
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const replyFormRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
@@ -115,33 +117,52 @@ export default function ContactInboxRows({ messages: initialMessages }: { messag
     if (selectedId && remove.has(selectedId)) setSelectedId(null)
   }
 
+  /** Puts optimistically-removed rows back (newest first) if the server delete failed. */
+  function restoreMessages(restored: ContactInboxMessage[]) {
+    if (!restored.length) return
+    setMessages((current) =>
+      [...current, ...restored].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    )
+  }
+
   function deleteOne(id: string) {
-    if (!window.confirm('Delete this enquiry permanently?')) return
+    setPendingDeleteId(id)
+  }
+
+  function confirmDeleteOne() {
+    if (!pendingDeleteId) return
+    const id = pendingDeleteId
+    const removed = messages.find((message) => message.id === id) ?? null
     setActionError(null)
+    setPendingDeleteId(null)
+    // Optimistic: pull it out of the UI immediately, delete on the server in the background.
+    removeMessages([id])
     const formData = new FormData()
     formData.set('id', id)
     startDeleteTransition(async () => {
       const result = await deleteContactMessage(formData)
       if (!result.ok) {
         setActionError(result.error)
-        return
+        if (removed) restoreMessages([removed])
       }
-      removeMessages([id])
     })
   }
 
   function deleteChecked() {
+    const ids = Array.from(checked)
+    const removed = messages.filter((message) => checked.has(message.id))
     setActionError(null)
+    setConfirmBulkDelete(false)
+    // Optimistic: clear them from the UI immediately, delete on the server in the background.
+    removeMessages(ids)
     const formData = new FormData()
-    Array.from(checked).forEach((id) => formData.append('ids', id))
+    ids.forEach((id) => formData.append('ids', id))
     startDeleteTransition(async () => {
       const result = await deleteSelectedContactMessages(formData)
       if (!result.ok) {
         setActionError(result.error)
-        return
+        restoreMessages(removed)
       }
-      removeMessages(Array.from(checked))
-      setConfirmBulkDelete(false)
     })
   }
 
@@ -430,40 +451,32 @@ export default function ContactInboxRows({ messages: initialMessages }: { messag
 
       <ReplySuccessToast open={replySuccess} onClose={() => setReplySuccess(false)} />
 
-      {confirmBulkDelete && (
-        <div
-          className="fixed inset-0 z-[140] grid place-items-center bg-[#001f50]/60 p-4 backdrop-blur-sm"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !deletePending) setConfirmBulkDelete(false)
-          }}
-        >
-          <div className="w-full max-w-md rounded-3xl border border-outline-variant/60 bg-surface p-6 shadow-2xl">
-            <h3 className="font-h3 text-xl text-on-surface">Delete selected enquiries?</h3>
-            <p className="mt-2 text-sm text-on-surface-variant">
-              Permanently delete <strong>{checked.size}</strong> enquir{checked.size === 1 ? 'y' : 'ies'} from the
-              contact inbox.
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                disabled={deletePending}
-                onClick={() => setConfirmBulkDelete(false)}
-                className="rounded-full border border-outline-variant px-4 py-2.5 text-sm font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={deletePending}
-                onClick={deleteChecked}
-                className="rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {deletePending ? 'Deleting…' : 'Yes, delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteModal
+        open={Boolean(pendingDeleteId)}
+        title="Delete this enquiry?"
+        description="This permanently removes the enquiry and any tracked replies from the contact inbox."
+        pending={deletePending}
+        onCancel={() => {
+          if (!deletePending) setPendingDeleteId(null)
+        }}
+        onConfirm={confirmDeleteOne}
+      />
+
+      <ConfirmDeleteModal
+        open={confirmBulkDelete}
+        title="Delete selected enquiries?"
+        description={
+          <>
+            Permanently delete <strong>{checked.size}</strong> enquir{checked.size === 1 ? 'y' : 'ies'} from the
+            contact inbox.
+          </>
+        }
+        pending={deletePending}
+        onCancel={() => {
+          if (!deletePending) setConfirmBulkDelete(false)
+        }}
+        onConfirm={deleteChecked}
+      />
     </section>
   )
 }

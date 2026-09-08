@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
 import { deleteEventFromMemberView, submitEventRsvp } from '@/app/actions/events'
 
 type Rsvp = { status: string } | undefined
@@ -25,6 +26,7 @@ export type MemberEventCard = {
 export default function MemberEventsClient({ upcoming, past }: { upcoming: MemberEventCard[]; past: MemberEventCard[] }) {
   const [detail, setDetail] = useState<MemberEventCard | null>(null)
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
+  const [pendingDelete, setPendingDelete] = useState<MemberEventCard | null>(null)
   const [deleting, startDelete] = useTransition()
   const visibleUpcoming = upcoming.filter((event) => !deletedIds.has(event.id))
   const visiblePast = past.filter((event) => !deletedIds.has(event.id))
@@ -33,12 +35,18 @@ export default function MemberEventsClient({ upcoming, past }: { upcoming: Membe
     ...visiblePast.map((event) => ({ event, past: true })),
   ].sort((a, b) => Math.abs(new Date(a.event.startsAt).getTime() - Date.now()) - Math.abs(new Date(b.event.startsAt).getTime() - Date.now()))
 
-  function removeEvent(event: MemberEventCard) {
-    if (!window.confirm(`Delete “${event.title}”? This cannot be undone.`)) return
+  function requestDelete(event: MemberEventCard) {
+    setPendingDelete(event)
+  }
+
+  function confirmDelete() {
+    if (!pendingDelete) return
+    const event = pendingDelete
     startDelete(async () => {
       await deleteEventFromMemberView(event.id)
       setDeletedIds((current) => new Set(current).add(event.id))
       setDetail(null)
+      setPendingDelete(null)
     })
   }
 
@@ -47,12 +55,27 @@ export default function MemberEventsClient({ upcoming, past }: { upcoming: Membe
       {events.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {events.map(({ event, past: isPast }) => (
-            <EventCard key={event.id} event={event} past={isPast} onView={() => setDetail(event)} onDelete={() => removeEvent(event)} deleting={deleting} />
+            <EventCard key={event.id} event={event} past={isPast} onView={() => setDetail(event)} onDelete={() => requestDelete(event)} deleting={deleting} />
           ))}
         </div>
       )}
 
-      {detail && <EventDetailsModal event={detail} onClose={() => setDetail(null)} onDelete={removeEvent} deleting={deleting} />}
+      {detail && <EventDetailsModal event={detail} onClose={() => setDetail(null)} onDelete={requestDelete} deleting={deleting} />}
+
+      <ConfirmDeleteModal
+        open={Boolean(pendingDelete)}
+        title="Delete this event?"
+        description={
+          <>
+            Delete <strong>“{pendingDelete?.title}”</strong>? This cannot be undone.
+          </>
+        }
+        pending={deleting}
+        onCancel={() => {
+          if (!deleting) setPendingDelete(null)
+        }}
+        onConfirm={confirmDelete}
+      />
     </div>
   )
 }
