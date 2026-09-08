@@ -16,7 +16,7 @@ const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
 // When set, ALL outgoing emails are redirected here (use until domain is verified)
 const testEmailOverride = () => process.env.RESEND_TEST_EMAIL || null
 
-function baseHtml(body: string) {
+export function baseHtml(body: string) {
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f7fa;font-family:sans-serif;">
 <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.07);">
   <div style="background:#001f50;padding:20px 28px;">
@@ -41,6 +41,13 @@ function baseHtml(body: string) {
     <p style="margin:0;color:#9ca3af;font-size:12px;">Alubonets Self-Help Group · <a href="${appUrl()}" style="color:#9ca3af;">${appUrl()}</a></p>
   </div>
 </div></body></html>`
+}
+
+/** Shared body for one-time verification codes (login OTP, registration email verification). */
+export function otpCodeHtml(intro: string, code: string) {
+  return baseHtml(`<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">${intro}</h2>
+    <p style="margin:0 0 20px;text-align:center;font-size:32px;font-weight:700;letter-spacing:8px;color:#001f50;background:#f5f7fa;border-radius:8px;padding:16px 0;">${code}</p>
+    <p style="color:#6b7280;font-size:13px;">This code expires in <strong>10 minutes</strong>. If you did not request it, you can ignore this email.</p>`)
 }
 
 export async function sendSupportMessageEmail(input: { memberName: string; memberEmail: string; body: string }) {

@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 import FullScreenModal from '@/components/ui/FullScreenModal'
+import ContributionCategoriesManager from '@/components/admin/ContributionCategoriesManager'
 import {
   approveFinancialTransaction,
   approveReversal,
@@ -15,7 +16,7 @@ import {
 } from '@/app/actions/finance'
 import { filterAdminManagedCategories, filterSelectableCategories } from '@/lib/payment-categories'
 
-type Category = { id: string; name: string; type: string; code: string }
+type Category = { id: string; name: string; type: string; code: string; active: boolean }
 type PendingTx = {
   id: string
   transactionNumber: string
@@ -166,34 +167,16 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
           <p className="text-sm text-on-surface-variant">
             Add categories treasurers can choose when recording a payment. If none fit, they can pick <b>Other</b> and write a short explanation.
           </p>
-
-          {adminCategories.length > 0 && (
-            <ul className="flex flex-wrap gap-2">
-              {adminCategories.map((category) => (
-                <li key={category.id} className="rounded-full border bg-surface-container-low px-3 py-1 text-sm">
-                  {category.name}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <form action={(formData) => afterAction(createContributionCategory, formData)} className="flex flex-wrap items-end gap-3">
-            <label className="min-w-[220px] flex-1 text-sm font-semibold text-on-surface">
-              Category name
-              <input
-                name="name"
-                required
-                minLength={2}
-                maxLength={80}
-                placeholder="e.g. Monthly contribution"
-                className="mt-1 block w-full rounded-lg border px-3 py-2 font-normal"
-              />
-            </label>
-            <button className="rounded-full bg-primary px-4 py-2 text-on-primary">Add category</button>
-          </form>
+          <ContributionCategoriesManager
+            categories={categories.filter((category) => category.active).map((category) => ({
+              id: category.id,
+              name: category.name,
+              type: category.type,
+              system: !adminCategories.some((managed) => managed.id === category.id),
+            }))}
+          />
         </div>
       </FullScreenModal>
-
       <FullScreenModal open={modal === 'campaigns'} title={titles.campaigns} onClose={closeModal}>
         <p className="text-sm leading-relaxed text-on-surface-variant">
           A campaign creates a <b>target amount</b> for every active member (e.g. “Contribution 3 — KES 5,000 by 30 June”).

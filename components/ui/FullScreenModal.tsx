@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 type Props = {
@@ -12,6 +12,12 @@ type Props = {
 }
 
 export default function FullScreenModal({ open, title, onClose, children, size = 'full' }: Props) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   useEffect(() => {
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -25,7 +31,7 @@ export default function FullScreenModal({ open, title, onClose, children, size =
     }
   }, [open, onClose])
 
-  if (!open) return null
+  if (!mounted || !open) return null
 
   return createPortal(
     <div

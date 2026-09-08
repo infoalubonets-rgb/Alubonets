@@ -73,8 +73,8 @@ export default function DashboardNav({
           const active = isNavActive(pathname, href, hrefs)
           const inSection = sectionActive(pathname, link, hrefs)
           const className = active || inSection
-            ? `flex min-h-11 items-center gap-sm px-sm py-2.5 rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
-            : `sidebar-link min-h-11 py-2.5 ${collapsed ? 'justify-center' : ''}`
+            ? `flex min-h-10 items-center gap-sm px-sm py-2 rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
+            : `sidebar-link min-h-10 py-2 ${collapsed ? 'justify-center' : ''}`
 
           return (
             <Link

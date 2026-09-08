@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { randomUUID } from 'crypto'
 import { Prisma, type PaymentMethod } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 

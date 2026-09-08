@@ -5,14 +5,31 @@ import { prisma } from '@/lib/prisma'
 import { createServerClient } from '@/lib/supabase-server'
 import { hashPasswordResetToken, passwordSchema } from '@/lib/password-reset'
 import { logError } from '@/lib/logger'
+import { enforceRateLimit } from '@/lib/rate-limit'
+import { requestIp } from '@/lib/membership'
 
-const bodySchema = z.object({ token: z.string().min(20), password: passwordSchema })
+const bodySchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema })
 
 export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid reset request.' }, { status: 400 })
+  const ipAddress = requestIp(request)
+  try {
+    await enforceRateLimit(`password-reset-submit-ip:${ipAddress || 'unknown'}`, 10, 15)
+  } catch {
+    return NextResponse.json({ error: 'Too many attempts. Please wait and try again.' }, { status: 429 })
+  }
   const record = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashPasswordResetToken(parsed.data.token) }, include: { user: { select: { authUserId: true } } } })
   if (!record || record.consumedAt || record.expiresAt <= new Date() || !record.user.authUserId) return NextResponse.json({ error: 'This reset link is invalid, expired, or has already been used.' }, { status: 410 })
+  const recentReset = await prisma.passwordResetToken.findFirst({
+    where: { userId: record.userId, consumedAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) } },
+  })
+  if (recentReset) {
+    return NextResponse.json(
+      { error: 'You can only reset your password once every 24 hours. Please try again later.' },
+      { status: 429 },
+    )
+  }
   const claimedAt = new Date()
   const claimed = await prisma.passwordResetToken.updateMany({ where: { id: record.id, consumedAt: null, expiresAt: { gt: claimedAt } }, data: { consumedAt: claimedAt } })
   if (claimed.count !== 1) return NextResponse.json({ error: 'This reset link is invalid, expired, or has already been used.' }, { status: 410 })

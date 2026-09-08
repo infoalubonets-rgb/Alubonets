@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 type Props = {
@@ -9,7 +10,12 @@ type Props = {
 }
 
 export default function VoteSuccessDialog({ open, choice, onClose }: Props) {
-  if (!open || !choice || typeof document === 'undefined') return null
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted || !open || !choice) return null
 
   const approve = choice === 'APPROVE'
 

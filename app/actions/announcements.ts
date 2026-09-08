@@ -5,7 +5,7 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import type { Role } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { getSessionProfile, requireActiveRole, requireAdmin } from '@/lib/auth/session'
+import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
 import { sendBroadcastEmail, sendDirectEmails } from '@/lib/email/resend'
@@ -322,28 +322,6 @@ export async function retryFailedAnnouncementEmails(formData: FormData) {
   })
   refreshAnnouncements()
   return result
-}
-
-export async function getActiveEmailSends() {
-  // Polled from the client every few seconds — must never redirect on an expired/wrong
-  // session, so this checks the profile directly instead of using requireAdmin().
-  const profile = await getSessionProfile()
-  if (!profile || (profile.role !== 'ADMIN' && !profile.isSuperAdmin)) return []
-  const sending = await prisma.announcement.findMany({
-    where: { status: 'SENDING' },
-    select: {
-      id: true,
-      title: true,
-      receipts: { select: { emailStatus: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
-  return sending.map((a) => {
-    const total = a.receipts.length
-    const sent = a.receipts.filter((r) => r.emailStatus === 'SENT' || r.emailStatus === 'SKIPPED').length
-    const failed = a.receipts.filter((r) => r.emailStatus === 'FAILED').length
-    return { id: a.id, title: a.title, total, sent, failed, pending: Math.max(0, total - sent - failed) }
-  })
 }
 
 export async function processScheduledAnnouncements() {

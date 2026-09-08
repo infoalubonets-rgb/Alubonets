@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, type FormEvent } from 'react'
+import { useEffect, useState, useTransition, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { addContributionCategory, deleteContributionCategory } from '@/app/actions/settings'
 
@@ -15,6 +15,8 @@ export default function ContributionCategoriesManager({ categories }: { categori
   const [error, setError] = useState('')
   const [isAdding, startAdding] = useTransition()
   const [isDeleting, startDeleting] = useTransition()
+
+  useEffect(() => setItems(categories), [categories])
 
   function addCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

@@ -376,6 +376,11 @@ export async function addContributionCategory(formData: FormData) {
     .max(60, 'Category name must be 60 characters or fewer.')
     .regex(CATEGORY_NAME_PATTERN, 'Use letters, numbers, spaces and basic punctuation only.')
     .parse(formData.get('name'))
+  const duplicate = await prisma.transactionCategory.findFirst({
+    where: { name: { equals: name, mode: 'insensitive' } },
+    select: { id: true },
+  })
+  if (duplicate) throw new Error('A category with this name already exists.')
   const code = await uniqueCategoryCode(name)
   const row = await prisma.transactionCategory.create({
     data: { code, name, type: 'BOTH', active: true },

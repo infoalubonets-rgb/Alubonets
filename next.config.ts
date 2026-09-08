@@ -11,6 +11,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Webpack does not understand the `node:` URI scheme by default; map it so
+  // server-only crypto imports never become UnhandledSchemeError overlays.
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'node:crypto': 'crypto',
+    }
+    return config
+  },
 }
 
 export default withSentryConfig(nextConfig, {

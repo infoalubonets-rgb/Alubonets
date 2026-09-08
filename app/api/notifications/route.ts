@@ -74,7 +74,7 @@ export async function GET() {
         return {
           id: `payment-${a.id}`,
           type: 'payment' as const,
-          title: `KES ${Math.round(amount).toLocaleString()} from ${a.user.fullName}`,
+          title: `KES ${Math.round(amount).toLocaleString()} from ${a.user?.fullName ?? 'a member'}`,
           description: meta.receipt || meta.phone || 'M-Pesa payment received',
           imageUrl: null,
           href: '/dashboard/treasurer/notifications',

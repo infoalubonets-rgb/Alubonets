@@ -2,7 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import dynamic from 'next/dynamic'
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import { ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
 import { logoutRequest, meLookup, type AuthUser, type Role } from '@/lib/auth/client'
 import { ROLE_LABEL } from '@/lib/auth/types'
@@ -10,7 +18,8 @@ import ThemeLoader from '@/components/ui/ThemeLoader'
 import DashboardNav from './DashboardNav'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import DashboardNotifications from './DashboardNotifications'
-import EmailSendProgressBanner from './EmailSendProgressBanner'
+
+const EmailSendProgressBanner = dynamic(() => import('./EmailSendProgressBanner'), { ssr: false })
 
 export type NavItem = {
   icon: string
@@ -64,6 +73,22 @@ const SIDEBAR_MAX_WIDTH = 380
 const SIDEBAR_DEFAULT_WIDTH = 224
 const SIDEBAR_COLLAPSED_WIDTH = 68
 const MOBILE_DRAWER_WIDTH = 308
+const DESKTOP_MQ = '(min-width: 768px)'
+
+function subscribeDesktop(onStoreChange: () => void) {
+  const mq = window.matchMedia(DESKTOP_MQ)
+  mq.addEventListener('change', onStoreChange)
+  return () => mq.removeEventListener('change', onStoreChange)
+}
+
+function getDesktopSnapshot() {
+  return window.matchMedia(DESKTOP_MQ).matches
+}
+
+/** Prefer desktop on the server so SSR HTML includes the sidebar (avoids “half-loaded” shells). */
+function getDesktopServerSnapshot() {
+  return true
+}
 
 export default function DashboardShell({
   role,
@@ -91,7 +116,7 @@ export default function DashboardShell({
   const [emailsSending, setEmailsSending] = useState(false)
   const [welcome, setWelcome] = useState('')
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [isDesktop, setIsDesktop] = useState(false)
+  const isDesktop = useSyncExternalStore(subscribeDesktop, getDesktopSnapshot, getDesktopServerSnapshot)
   const pageScrollRef = useRef<HTMLElement>(null)
   const [pageScrollbar, setPageScrollbar] = useState({ visible: false, top: 0, height: 0 })
   const displayRole = user?.isSuperAdmin
@@ -131,15 +156,8 @@ export default function DashboardShell({
   }, [])
 
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const sync = () => {
-      setIsDesktop(mq.matches)
-      if (mq.matches) setMobileNavOpen(false)
-    }
-    sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
-  }, [])
+    if (isDesktop) setMobileNavOpen(false)
+  }, [isDesktop])
 
   useEffect(() => {
     setMobileNavOpen(false)
@@ -257,12 +275,13 @@ export default function DashboardShell({
     }
     fetchUnread()
     const id = window.setInterval(fetchUnread, 60_000)
-    window.addEventListener('announcements-read', fetchUnread)
+    const clearUnread = () => setUnread(0)
+    window.addEventListener('announcements-read', clearUnread)
     window.addEventListener('new-announcement', fetchUnread)
     return () => {
       cancelled = true
       window.clearInterval(id)
-      window.removeEventListener('announcements-read', fetchUnread)
+      window.removeEventListener('announcements-read', clearUnread)
       window.removeEventListener('new-announcement', fetchUnread)
     }
   }, [pathname])
@@ -334,10 +353,11 @@ export default function DashboardShell({
 
   const sidebarCollapsed = isDesktop && collapsed
   const desktopSidebarWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth
-  const drawerWidth = MOBILE_DRAWER_WIDTH
-  const asideWidth = isDesktop ? desktopSidebarWidth : drawerWidth
-  const contentMargin = isDesktop ? desktopSidebarWidth : 0
+  const asideWidth = isDesktop ? desktopSidebarWidth : MOBILE_DRAWER_WIDTH
   const menuOpen = isDesktop ? !collapsed : mobileNavOpen
+  const shellStyle = {
+    ['--dash-sidebar-w' as string]: `${desktopSidebarWidth}px`,
+  } as CSSProperties
 
   const toggleTheme = () => {
     document.documentElement.classList.add('theme-transitioning')
@@ -363,8 +383,13 @@ export default function DashboardShell({
   }
 
   return (
-    <div className="dashboard-shell h-[100dvh] flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50">
-      {(role === 'ADMIN' || user?.isSuperAdmin) && pathname.startsWith('/admin/announcements') && <EmailSendProgressBanner onActiveChange={setEmailsSending} />}
+    <div
+      className="dashboard-shell h-[100dvh] flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50"
+      style={shellStyle}
+    >
+      {(role === 'ADMIN' || user?.isSuperAdmin) && pathname.startsWith('/admin/announcements') && (
+        <EmailSendProgressBanner onActiveChange={setEmailsSending} />
+      )}
 
       {!isDesktop && mobileNavOpen && (
         <button
@@ -377,9 +402,9 @@ export default function DashboardShell({
 
       <aside
         style={{ width: asideWidth }}
-        className={`bg-primary dark:bg-[#03112b] text-on-primary fixed left-0 top-0 h-[100dvh] flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] ${
+        className={`dashboard-shell-aside bg-primary dark:bg-[#03112b] text-on-primary fixed left-0 top-0 h-[100dvh] flex flex-col z-50 border-r border-white/[0.08] shadow-[2px_0_16px_rgba(0,0,0,0.28)] ${
           resizing ? '' : 'transition-[width,transform] duration-300'
-        } ${isDesktop || mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        } ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
       >
         <div
           className={`pt-lg pb-md flex items-center gap-sm border-b border-white/10 ${sidebarCollapsed ? 'justify-center px-sm' : 'px-md'}`}
@@ -477,8 +502,7 @@ export default function DashboardShell({
       </aside>
 
       <div
-        style={{ marginLeft: contentMargin }}
-        className={`relative flex-1 flex flex-col h-[100dvh] min-h-0 min-w-0 ${resizing ? '' : 'transition-[margin] duration-300'}`}
+        className={`dashboard-shell-content relative flex-1 flex flex-col h-[100dvh] min-h-0 min-w-0 ${resizing ? '' : 'transition-[margin] duration-300'}`}
       >
         <header
           className="relative bg-surface-container-lowest dark:bg-[#091a30] border-b border-outline-variant/70 dark:border-[#173056] shrink-0 z-40 flex items-center justify-between gap-2 px-3 sm:px-5 md:px-lg shadow-[0_2px_10px_rgba(0,31,80,0.035)] before:absolute before:inset-x-0 before:top-0 before:h-[2px] before:bg-primary dark:before:bg-primary-container"

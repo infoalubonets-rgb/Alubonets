@@ -1,6 +1,6 @@
 'use server'
 
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import type { FamilyRelationship } from '@prisma/client'
@@ -8,12 +8,9 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { sendFamilyInviteEmail, sendFamilyLinkedNoticeEmail } from '@/lib/email/resend'
-import { getFamilyInviteByToken, markFamilyInviteAccepted } from '@/lib/family-invite'
 import { branchHistoryData, validateFamilyAttachment } from '@/lib/family-rules'
 import { assertEligibleForAdultInvite } from '@/lib/family-transition'
 import { getSetting, SETTING_KEYS } from '@/lib/settings'
-
-export { getFamilyInviteByToken, markFamilyInviteAccepted }
 
 const relationshipEnum = z.enum(['SPOUSE', 'CHILD', 'DEPENDENT', 'OTHER'])
 

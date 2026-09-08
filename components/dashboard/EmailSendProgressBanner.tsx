@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { getActiveEmailSends } from '@/app/actions/announcements'
+import { getActiveEmailSends } from '@/app/actions/email-sends'
 
 type ActiveSend = { id: string; title: string; total: number; sent: number; failed: number; pending: number }
 

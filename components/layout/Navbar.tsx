@@ -2,16 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { openAuthModal } from '@/components/auth/AuthModal'
 import { NAV_LINKS, SITE_LOGO } from '@/lib/constants'
 
 const CLOSE_MS = 280
+const MOBILE_MENU_TITLE_ID = 'mobile-navigation-title'
 
 export default function Navbar() {
   const pathname = usePathname()
-  const menuId = useId()
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuShown, setMenuShown] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -71,7 +71,7 @@ export default function Navbar() {
 
   const drawer = menuOpen && mounted
     ? createPortal(
-        <div className="fixed inset-0 z-[300] md:hidden" role="dialog" aria-modal="true" aria-labelledby={menuId}>
+        <div className="fixed inset-0 z-[300] md:hidden" role="dialog" aria-modal="true" aria-labelledby={MOBILE_MENU_TITLE_ID}>
           <button
             type="button"
             aria-label="Close menu"
@@ -89,7 +89,7 @@ export default function Navbar() {
             <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-outline-variant px-md">
               <Link href="/" className="flex min-w-0 items-center gap-sm" onClick={closeMenu}>
                 <img src={SITE_LOGO} alt="Alubonets SHG Logo" className="h-11 w-auto object-cover" />
-                <span id={menuId} className="truncate font-h3 text-lg text-primary">
+                <span id={MOBILE_MENU_TITLE_ID} className="truncate font-h3 text-lg text-primary">
                   Alubonets
                 </span>
               </Link>
@@ -175,7 +175,7 @@ export default function Navbar() {
               className="flex h-11 w-11 items-center justify-center rounded-lg text-primary hover:bg-surface-container md:hidden"
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={menuOpen}
-              aria-controls={menuId}
+              aria-controls={MOBILE_MENU_TITLE_ID}
               onClick={toggleMenu}
               onPointerUp={(event) => event.stopPropagation()}
             >

@@ -7,6 +7,7 @@ import StatCard from '@/components/dashboard/StatCard'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { ALL_ROLES, ROLE_LABEL, type Role } from '@/lib/auth/types'
 import { ANNOUNCEMENT_ATTACHMENT_ACCEPT, validateAnnouncementAttachmentFiles } from '@/lib/announcement-attachments'
+import { actionMarkAnnouncementsRead } from '@/app/actions/domain'
 
 type AnnouncementRow = {
   id: string
@@ -30,6 +31,7 @@ type Props = {
   members: MemberOption[]
   totalSent: number
   totalFailed: number
+  contactInbox?: ReactNode
 }
 
 export default function CommunicationsAdminRoot({
@@ -42,8 +44,10 @@ export default function CommunicationsAdminRoot({
   members,
   totalSent,
   totalFailed,
+  contactInbox,
 }: Props) {
   const [modal, setModal] = useState<null | 'send' | 'history'>(null)
+  const [historyBadge, setHistoryBadge] = useState(announcements.length)
   const [attachmentError, setAttachmentError] = useState('')
   const [audienceCategory, setAudienceCategory] = useState('')
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
@@ -127,6 +131,15 @@ export default function CommunicationsAdminRoot({
     setExternalEmails([''])
   }
 
+  function openNotificationHistory() {
+    setModal('history')
+    setHistoryBadge(0)
+    window.dispatchEvent(new Event('announcements-read'))
+    void actionMarkAnnouncementsRead().catch(() => {
+      window.dispatchEvent(new Event('new-announcement'))
+    })
+  }
+
   return (
     <DashboardShell
       role="ADMIN"
@@ -142,14 +155,16 @@ export default function CommunicationsAdminRoot({
           )}
           <button
             type="button"
-            onClick={() => setModal('history')}
+            onClick={openNotificationHistory}
             className="inline-flex h-10 items-center gap-1.5 rounded-full border-2 border-secondary-container/40 bg-secondary-container/10 px-3.5 text-[12px] font-label-bold text-secondary transition hover:bg-secondary-container/20"
           >
             <span className="material-symbols-outlined text-[18px]">history</span>
             Notification history
-            <span className="rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold text-on-primary">
-              {announcements.length}
-            </span>
+            {historyBadge > 0 && (
+              <span className="rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold text-on-primary">
+                {historyBadge}
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -171,6 +186,7 @@ export default function CommunicationsAdminRoot({
           <StatCard icon="mark_email_read" label="Emails delivered" value={String(totalSent)} />
           <StatCard icon="error" label="Emails failed" value={String(totalFailed)} accent={totalFailed > 0 ? 'red' : 'default'} />
         </section>
+        {contactInbox}
       </div>
 
       {modal === 'send' && (

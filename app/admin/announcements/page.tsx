@@ -2,6 +2,7 @@ import { requireAdmin } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { createTargetedAnnouncement, retryFailedAnnouncementEmails } from '@/app/actions/announcements'
 import { updateContactDestination } from '@/app/actions/contact'
+import AssignedContactInbox from '@/components/admin/AssignedContactInbox'
 import CommunicationsAdminRoot from '@/components/admin/CommunicationsAdminRoot'
 import { CONTACT_EMAIL } from '@/lib/constants'
 
@@ -47,6 +48,11 @@ export default async function AdminAnnouncementsPage() {
       members={members}
       totalSent={totalSent}
       totalFailed={totalFailed}
+      contactInbox={
+        actor.isSuperAdmin ? (
+          <AssignedContactInbox adminId={actor.id} isSuperAdmin />
+        ) : null
+      }
     />
   )
 }

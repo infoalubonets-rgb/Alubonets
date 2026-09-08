@@ -1,4 +1,4 @@
-import { unstable_cache } from 'next/cache'
+import { unstable_cache, revalidateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { formatMonthKey, formatMonthKeys, formatPaymentMethod } from '@/lib/chart-labels'
 import type { PaymentMethod, ProjectStatus, Role, WelfareStatus } from '@prisma/client'
@@ -635,7 +635,13 @@ export const getRecentItems = unstable_cache(
         select: { id: true, url: true, caption: true, category: true, uploadedAt: true },
       }),
     ])
-    return { events, projects, photos }
+    // Serialize dates before caching — unstable_cache JSON-roundtrips Dates to strings,
+    // so callers must not assume Date instances.
+    return {
+      events: events.map((e) => ({ ...e, createdAt: e.createdAt.toISOString() })),
+      projects: projects.map((p) => ({ ...p, createdAt: p.createdAt.toISOString() })),
+      photos: photos.map((p) => ({ ...p, uploadedAt: p.uploadedAt.toISOString() })),
+    }
   },
   ['recent-items'],
   { tags: [TAGS.events, TAGS.projects, TAGS.gallery], revalidate: 120 },
@@ -765,6 +771,9 @@ export async function markAnnouncementsRead(userId: string) {
     where: { userId, readAt: null },
     data: { readAt: new Date() },
   })
+  // Without this the unread-count cache (revalidate: 60) can keep showing the old
+  // number for up to a minute after the user just read everything.
+  revalidateTag(TAGS.announcements)
 }
 
 export async function deleteAnnouncement(id: string) {

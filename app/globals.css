@@ -89,7 +89,11 @@ html.theme-transitioning *::after {
 .reveal.is-visible,
 .reveal-left.is-visible,
 .reveal-right.is-visible,
-.reveal-scale.is-visible {
+.reveal-scale.is-visible,
+html[data-pr] .reveal,
+html[data-pr] .reveal-left,
+html[data-pr] .reveal-right,
+html[data-pr] .reveal-scale {
   opacity: 1;
   transform: none;
 }
@@ -101,7 +105,8 @@ html.theme-transitioning *::after {
     opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.story-reveal.is-visible {
+.story-reveal.is-visible,
+html[data-pr] .story-reveal {
   opacity: 1;
   transform: none;
 }
@@ -458,10 +463,19 @@ textarea.contact-field-modern {
   box-shadow: 0 24px 60px rgba(0, 31, 80, 0.22);
   width: 100%;
   max-width: 22rem !important;
-  max-height: min(92dvh, 920px);
+  max-height: min(88dvh, 920px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   transition: max-width 0.2s ease;
+  margin-inline: auto;
+}
+@media (max-width: 639px) {
+  .auth-modal-panel {
+    max-height: min(85dvh, 920px);
+  }
+  .auth-modal-body {
+    padding: 0.9rem 1rem 1rem;
+  }
 }
 .auth-modal-panel.auth-modal-wide {
   max-width: min(46rem, calc(100vw - 1.5rem)) !important;
@@ -719,16 +733,48 @@ textarea.contact-field-modern {
 }
 
 @keyframes theme-loader-bounce {
-  0%, 80%, 100% {
-    transform: translateY(0) scale(0.85);
-    opacity: 0.45;
-  }
-  40% {
-    transform: translateY(-10px) scale(1);
-    opacity: 1;
-  }
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.55; }
+  40% { transform: translateY(-6px); opacity: 1; }
 }
 
+@keyframes contact-success-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes contact-success-pop {
+  from { opacity: 0; transform: translateY(12px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes contact-success-ring {
+  from { transform: scale(0.6); opacity: 0.8; }
+  to { transform: scale(1.35); opacity: 0; }
+}
+@keyframes contact-success-check {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+
+.contact-success-backdrop {
+  animation: contact-success-fade 0.25s ease-out both;
+}
+.contact-success-card {
+  animation: contact-success-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.contact-success-ring {
+  animation: contact-success-ring 0.7s ease-out both;
+}
+.contact-success-check {
+  animation: contact-success-check 0.5s 0.15s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-success-backdrop,
+  .contact-success-card,
+  .contact-success-ring,
+  .contact-success-check {
+    animation: none;
+  }
+}
 .theme-loader-dot {
   animation: theme-loader-bounce 1.05s ease-in-out infinite;
   box-shadow: 0 0 12px rgba(254, 128, 21, 0.55);
@@ -866,6 +912,21 @@ textarea.contact-field-modern {
   display: none;
   width: 0;
   height: 0;
+}
+
+/* Keep the desktop sidebar visible even before/without client hydration. */
+.dashboard-shell-content {
+  margin-left: 0;
+}
+
+@media (min-width: 768px) {
+  .dashboard-shell-content {
+    margin-left: var(--dash-sidebar-w, 14rem);
+  }
+
+  .dashboard-shell-aside {
+    transform: translateX(0) !important;
+  }
 }
 
 /* Match the family dialog scrollbar to the sidebar's narrow progress line. */

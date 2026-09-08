@@ -1,4 +1,4 @@
-import { createHash, randomInt } from 'node:crypto'
+import { createHash, randomInt } from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 
 const COOKIE_NAME = 'alubonets-registration-email'

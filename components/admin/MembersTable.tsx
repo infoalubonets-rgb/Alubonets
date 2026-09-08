@@ -1,11 +1,20 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { assignMemberBranch, createBranchLineage, setMemberStatus } from '@/app/actions/members'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
+
+function buildMembersHref(q: string, branch: string) {
+  const params = new URLSearchParams()
+  const trimmed = q.trim()
+  if (trimmed) params.set('q', trimmed)
+  if (branch) params.set('branch', branch)
+  const qs = params.toString()
+  return qs ? `/admin/members?${qs}` : '/admin/members'
+}
 
 export type MembersTableUser = {
   id: string
@@ -55,12 +64,19 @@ export default function MembersTable({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
+  const [query, setQuery] = useState(filters.q)
   const [branchFilter, setBranchFilter] = useState(filters.branch)
   const [newBranch, setNewBranch] = useState('')
+  const debounceRef = useRef<number | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    setQuery(filters.q)
+    setBranchFilter(filters.branch)
+  }, [filters.q, filters.branch])
 
   const selected = useMemo(
     () => users.find((u) => u.id === selectedId) ?? null,
@@ -73,8 +89,44 @@ export default function MembersTable({
     setOk('')
   }, [selected])
 
+  const applyFilters = useCallback(
+    (nextQ: string, nextBranch: string) => {
+      const nextHref = buildMembersHref(nextQ, nextBranch)
+      const currentHref = buildMembersHref(filters.q, filters.branch)
+      if (nextHref === currentHref) return
+      router.push(nextHref)
+    },
+    [filters.branch, filters.q, router],
+  )
+
+  const scheduleFilters = useCallback(
+    (nextQ: string, nextBranch: string) => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current)
+      debounceRef.current = window.setTimeout(() => {
+        applyFilters(nextQ, nextBranch)
+      }, 300)
+    },
+    [applyFilters],
+  )
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current)
+    }
+  }, [])
+
+  const flushFilters = useCallback(
+    (nextQ = query, nextBranch = branchFilter) => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+      applyFilters(nextQ, nextBranch)
+    },
+    [applyFilters, branchFilter, query],
+  )
+
   const close = () => setSelectedId(null)
-  const visibleUsers = branchFilter ? users.filter((user) => (user.familyBranch || 'Default') === branchFilter) : users
 
   const setStatus = (status: 'ACTIVE' | 'SUSPENDED') => {
     if (!selected) return
@@ -98,11 +150,22 @@ export default function MembersTable({
           <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">Member registry</h1>
           <p className="text-xs text-on-surface-variant dark:text-blue-200/60">Super Administrator</p>
         </div>
-        <form method="get" className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 xl:flex-nowrap">
+        <form
+          method="get"
+          onSubmit={(event) => {
+            event.preventDefault()
+            flushFilters()
+          }}
+          className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 xl:flex-nowrap"
+        >
         <select
           name="branch"
           value={branchFilter}
-          onChange={(event) => setBranchFilter(event.target.value)}
+          onChange={(event) => {
+            const nextBranch = event.target.value
+            setBranchFilter(nextBranch)
+            flushFilters(query, nextBranch)
+          }}
           aria-label="Branch or lineage"
           className="h-9 w-[150px] rounded-xl border border-outline-variant bg-surface-container-lowest px-2 text-xs"
         >
@@ -119,7 +182,12 @@ export default function MembersTable({
           </button>
           <input
             name="q"
-            defaultValue={filters.q}
+            value={query}
+            onChange={(event) => {
+              const nextQ = event.target.value
+              setQuery(nextQ)
+              scheduleFilters(nextQ, branchFilter)
+            }}
             placeholder="Search members…"
             className="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-lowest pl-8 pr-2 text-xs focus:border-secondary-container focus:outline-none focus:ring-2 focus:ring-secondary-container/40"
           />
@@ -167,7 +235,7 @@ export default function MembersTable({
                   </td>
                 </tr>
               ) : (
-                visibleUsers.map((u, i) => (
+                users.map((u, i) => (
                   <tr
                     key={u.id}
                     className={`border-t border-outline-variant/50 hover:bg-primary/[0.03] transition-colors ${

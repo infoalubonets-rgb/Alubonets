@@ -19,9 +19,11 @@ type ContentSkeletonProps = {
 }
 
 export default function DashboardSkeleton({ variant }: ContentSkeletonProps) {
+  // Short delay avoids a flash on very fast loads, without leaving slower pages
+  // (queries that take longer than a moment) looking like a blank white screen.
   const [visible, setVisible] = useState(false)
   useEffect(() => {
-    const timer = window.setTimeout(() => setVisible(true), 450)
+    const timer = window.setTimeout(() => setVisible(true), 120)
     return () => window.clearTimeout(timer)
   }, [])
   if (!visible) return null

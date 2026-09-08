@@ -1,7 +1,8 @@
-import { createHash, randomInt } from 'node:crypto'
+import { createHash, randomInt } from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
+import { otpCodeHtml } from '@/lib/email/resend'
 
 const secret = () => new TextEncoder().encode(process.env.JWT_SECRET || '')
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -20,7 +21,12 @@ export async function createEmailChallenge(userId: string, email: string) {
   const key = process.env.RESEND_API_KEY
   if (!key || key.startsWith('re_your-')) throw new Error('Email verification is not configured.')
   const recipient = process.env.RESEND_TEST_EMAIL || email
-  const { error } = await new Resend(key).emails.send({ from: process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>', to: recipient, subject: 'Your Alubonets verification code', html: `<p>Your Alubonets verification code is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>This code expires in 10 minutes.</p>` })
+  const { error } = await new Resend(key).emails.send({
+    from: process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>',
+    to: recipient,
+    subject: 'Your Alubonets sign-in code',
+    html: otpCodeHtml('Your sign-in verification code', code),
+  })
   if (error) throw new Error('Could not send verification code.')
 }
 

@@ -1,9 +1,14 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  functions = "netlify/functions"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[functions]
+  node_bundler = "esbuild"
+  directory = "netlify/functions"
 
 [context.production.environment]
   NEXT_PUBLIC_APP_ENV = "testing"

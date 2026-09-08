@@ -11,6 +11,7 @@ import {
   registrationEmailIsVerified,
   verifyRegistrationEmailCode,
 } from '@/lib/registration-email-verification'
+import { otpCodeHtml } from '@/lib/email/resend'
 
 const emailSchema = z.string().trim().toLowerCase().email('Enter a valid email address.')
 
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
       from: process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>',
       to: recipient,
       subject: 'Verify your Alubonets membership email',
-      html: `<p>Use this code to continue your Alubonets membership application:</p><p style="font-size:28px;font-weight:bold;letter-spacing:6px">${code}</p><p>The code expires in 10 minutes.</p>`,
+      html: otpCodeHtml('Verify your membership application email', code),
     })
     if (error) throw new Error('Could not send the verification code.')
     const store = await cookies()

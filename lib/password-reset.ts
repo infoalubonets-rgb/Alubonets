@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'crypto'
 import { z } from 'zod'
 
 export const PASSWORD_RESET_TTL_MINUTES = 10

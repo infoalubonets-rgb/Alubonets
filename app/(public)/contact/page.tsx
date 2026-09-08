@@ -1,7 +1,5 @@
 import type { Metadata } from 'next'
-import { sendContactMessage } from '@/app/actions/contact'
-import Script from 'next/script'
-import { TURNSTILE_TEST_SITE_KEY } from '@/lib/turnstile'
+import ContactForm from '@/components/contact/ContactForm'
 import { getPublicContent } from '@/lib/public-content'
 import { getPublicContact } from '@/lib/settings'
 
@@ -9,14 +7,8 @@ export const metadata: Metadata = {
   title: 'Contact Us',
 }
 
-export default async function ContactPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ sent?: string; error?: string }>
-}) {
-  const { sent, error } = await searchParams
+export default async function ContactPage() {
   const [content, contact] = await Promise.all([getPublicContent('CONTACT'), getPublicContact()])
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || (process.env.NODE_ENV === 'development' ? TURNSTILE_TEST_SITE_KEY : '')
   const displayEmail = contact.email
   const displayPhone = contact.phone || content.phone || 'Coming soon'
   return (
@@ -75,162 +67,7 @@ export default async function ContactPage({
             <div className="mb-md">
               <h2 className="font-h3 text-[22px] leading-snug text-primary">Send a Message</h2>
             </div>
-
-            {sent === '1' && (
-              <div className="mb-md flex items-center gap-3 rounded-xl bg-green-50 border border-green-200 px-4 py-3 text-green-700">
-                <span className="material-symbols-outlined icon-fill text-green-500">check_circle</span>
-                <p className="text-[14px] font-medium">Message sent! We&apos;ll get back to you shortly.</p>
-              </div>
-            )}
-            {(error === 'missing' || error === 'invalid') && (
-              <div className="mb-md flex items-center gap-3 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-red-700">
-                <span className="material-symbols-outlined icon-fill text-red-500">error</span>
-                <p className="text-[14px] font-medium">
-                  Please provide a valid name, email address and message.
-                </p>
-              </div>
-            )}
-            {error === 'captcha' && <div className="mb-md rounded-xl bg-red-50 p-3 text-sm text-red-700">Please complete the security check and try again.</div>}
-            {error === 'rate' && <div className="mb-md rounded-xl bg-red-50 p-3 text-sm text-red-700">Too many messages were submitted. Please wait before trying again.</div>}
-
-            <form action={sendContactMessage} className="flex flex-col gap-md">
-              <input name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
-              <div>
-                <div className="contact-section-label mb-sm">
-                  <span className="font-label-bold text-label-bold text-primary uppercase tracking-[0.14em] text-[12px]">
-                    Your Information
-                  </span>
-                  <span className="contact-section-accent" aria-hidden="true" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-                  <div className="flex flex-col gap-xs">
-                    <label className="font-label-bold text-[15px] text-on-surface" htmlFor="name">
-                      Full Name <span className="req">*</span>
-                    </label>
-                    <div className="contact-input-wrap">
-                      <input
-                        className="contact-field-modern font-body-md text-[16px] text-on-surface"
-                        id="name"
-                        name="name"
-                        placeholder="Jane Doe"
-                        type="text"
-                        required
-                      />
-                      <span className="material-symbols-outlined contact-input-icon text-[18px]">
-                        person
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-xs">
-                    <label className="font-label-bold text-[15px] text-on-surface" htmlFor="phone">
-                      Phone Number <span className="req">*</span>
-                    </label>
-                    <div className="contact-input-wrap">
-                      <input
-                        className="contact-field-modern font-body-md text-[16px] text-on-surface"
-                        id="phone"
-                        name="phone"
-                        placeholder="+254 7** *** ***"
-                        type="tel"
-                        required
-                      />
-                      <span className="material-symbols-outlined contact-input-icon text-[18px]">
-                        call
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-md mt-md">
-                  <div className="flex flex-col gap-xs">
-                    <label className="font-label-bold text-[15px] text-on-surface" htmlFor="email">
-                      Email Address <span className="req">*</span>
-                    </label>
-                    <div className="contact-input-wrap">
-                      <input
-                        className="contact-field-modern font-body-md text-[16px] text-on-surface"
-                        id="email"
-                        name="email"
-                        placeholder="jane@example.com"
-                        type="email"
-                        required
-                      />
-                      <span className="material-symbols-outlined contact-input-icon text-[18px]">
-                        mail
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-xs">
-                    <label className="font-label-bold text-[15px] text-on-surface" htmlFor="category">
-                      Category
-                    </label>
-                    <div className="contact-input-wrap">
-                      <select
-                        className="contact-select-modern font-body-md text-[16px] text-on-surface"
-                        id="category"
-                        name="category"
-                      >
-                        <option value="">Select a category</option>
-                        <option value="general">General Inquiry</option>
-                        <option value="membership">Membership</option>
-                        <option value="welfare">Welfare Support</option>
-                        <option value="financial">Financial / Loans</option>
-                        <option value="meetings">Meetings &amp; Events</option>
-                        <option value="projects">Projects</option>
-                        <option value="other">Other</option>
-                      </select>
-                      <span className="material-symbols-outlined contact-input-icon text-[18px]">
-                        expand_more
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-primary/15" />
-
-              <div>
-                <div className="contact-section-label mb-sm">
-                  <span className="font-label-bold text-label-bold text-primary uppercase tracking-[0.14em] text-[12px]">
-                    Message Details
-                  </span>
-                  <span className="contact-section-accent" aria-hidden="true" />
-                </div>
-                <div className="flex flex-col gap-xs">
-                  <label className="font-label-bold text-[15px] text-on-surface" htmlFor="message">
-                    Message <span className="req">*</span>
-                  </label>
-                  <div className="contact-input-wrap items-start">
-                    <textarea
-                      className="contact-field-modern font-body-md text-[16px] text-on-surface resize-none"
-                      id="message"
-                      name="message"
-                      placeholder="Please provide details about your inquiry..."
-                      rows={4}
-                      required
-                    />
-                    <span className="material-symbols-outlined contact-input-icon text-[18px]">
-                      edit_note
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-sm">
-                {siteKey && <><Script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer /><div className="cf-turnstile" data-sitekey={siteKey} data-theme="auto" /></>}
-                <button
-                  className="contact-submit bg-primary text-on-primary rounded-full min-h-[48px] flex-1 font-label-bold text-[15px] flex items-center justify-center"
-                  type="submit"
-                >
-                  Send Message
-                </button>
-                <button
-                  className="contact-reset border-2 border-primary/35 text-primary rounded-full min-h-[48px] flex-1 font-label-bold text-[15px]"
-                  type="reset"
-                >
-                  Clear Form
-                </button>
-              </div>
-            </form>
+            <ContactForm />
           </div>
         </div>
       </div>

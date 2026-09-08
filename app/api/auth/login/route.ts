@@ -15,21 +15,25 @@ import { logError } from '@/lib/logger'
 import { publicErrorMessage } from '@/lib/safe-error'
 
 const bodySchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().trim().toLowerCase().email().max(254),
+  password: z.string().min(1).max(200),
 })
 
 export async function POST(req: Request) {
   try {
-    const json = await req.json()
+    const json = await req.json().catch(() => null)
     const parsed = bodySchema.safeParse(json)
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid email or password.' }, { status: 400 })
     }
-    const email = parsed.data.email.toLowerCase()
+    const email = parsed.data.email
     const ipAddress = requestIp(req)
+    // Broad per-IP throttle catches account-enumeration sweeps across many emails; the
+    // per-account key below still protects a single account from a targeted brute force.
+    const ipRateKey = `login-ip:${ipAddress || 'unknown'}`
     const rateKey = `login:${ipAddress || 'unknown'}:${email}`
     try {
+      await enforceRateLimit(ipRateKey, 20, 15)
       await enforceRateLimit(rateKey, 5, 15)
     } catch (cause) {
       logError('auth.login.rate_limit_failed', cause, { email, ipAddress })

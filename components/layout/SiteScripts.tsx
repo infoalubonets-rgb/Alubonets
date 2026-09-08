@@ -48,43 +48,12 @@ function enhanceNavyCurve() {
 }
 
 // Trigger CSS animations by toggling data-pr on <html>.
-// This never touches React-managed DOM nodes, avoiding hydration mismatches.
+// Never mutate React-managed nodes (e.g. .reveal-left) — that causes hydration mismatches.
 function triggerPageReveal() {
   const html = document.documentElement
   html.removeAttribute('data-pr')
   void html.offsetHeight // force reflow so CSS animations restart
   html.setAttribute('data-pr', '1')
-}
-
-function observeReveals() {
-  const nodes = document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale, .story-reveal')
-  if (!nodes.length) return
-  if (
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
-    !('IntersectionObserver' in window)
-  ) {
-    nodes.forEach(n => n.classList.add('is-visible'))
-    return
-  }
-  const io = new IntersectionObserver(
-    entries => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return
-        entry.target.classList.add('is-visible')
-        io.unobserve(entry.target)
-      })
-    },
-    { threshold: 0.12, rootMargin: '0px 0px -6% 0px' }
-  )
-  nodes.forEach(n => {
-    if (n.classList.contains('is-visible')) return
-    const rect = n.getBoundingClientRect()
-    if (rect.top < window.innerHeight * 0.92 && rect.bottom > 40) {
-      n.classList.add('is-visible')
-    } else {
-      io.observe(n)
-    }
-  })
 }
 
 export default function SiteScripts() {
@@ -93,8 +62,7 @@ export default function SiteScripts() {
   useEffect(() => {
     enhanceNavyCurve()
     triggerPageReveal()
-    observeReveals()
-    const onRefresh = () => observeReveals()
+    const onRefresh = () => triggerPageReveal()
     window.addEventListener('public-reveal-refresh', onRefresh)
     return () => window.removeEventListener('public-reveal-refresh', onRefresh)
   }, [pathname])

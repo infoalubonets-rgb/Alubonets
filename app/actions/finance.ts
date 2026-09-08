@@ -26,6 +26,11 @@ const refreshFinance = () => {
 export async function createContributionCategory(formData: FormData) {
   const actor = await requireAdmin()
   const name = z.string().trim().min(2).max(80).parse(formData.get('name'))
+  const duplicate = await prisma.transactionCategory.findFirst({
+    where: { name: { equals: name, mode: 'insensitive' } },
+    select: { id: true },
+  })
+  if (duplicate) throw new Error('A category with this name already exists.')
   const code = await uniqueCategoryCode(name)
   const category = await prisma.transactionCategory.create({
     data: { code, name, type: 'BOTH' },

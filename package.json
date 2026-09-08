@@ -26,7 +26,9 @@
     "db:test": "node scripts/test-db-connections.mjs",
     "db:seed": "node scripts/prisma-with-env.mjs db seed",
     "db:bootstrap-auth": "node scripts/bootstrap-auth-users.mjs",
-    "db:purge-audit": "node scripts/purge-audit-logs.mjs"
+    "db:purge-audit": "node scripts/purge-audit-logs.mjs",
+    "cron:maintenance": "node scripts/run-cron.mjs stage4-maintenance",
+    "cron:purge-audit": "node scripts/run-cron.mjs purge-audit"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

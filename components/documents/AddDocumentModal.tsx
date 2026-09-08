@@ -42,6 +42,12 @@ export default function AddDocumentModal({ categories }: { categories: Category[
   }
 
   const onSubmit = (formData: FormData) => {
+    // React form actions must receive FormData (not a DOM Event). Keep this as the
+    // `action` prop only — never wire it to onSubmit/onClick.
+    if (!(formData instanceof FormData)) {
+      setError('Could not read the form. Please try again.')
+      return
+    }
     const descError = validateDescription(String(formData.get('description') || ''))
     if (descError) {
       setError(descError)

@@ -52,8 +52,28 @@ Fill `.env.local` (never commit secrets):
 | `MPESA_*` | Daraja portal | STK Push (when ready) |
 | `SUPER_ADMIN_EMAIL` | Ops bootstrap | Real Super Admin email for `db:seed` / `db:bootstrap-auth` |
 | `SUPER_ADMIN_PASSWORD` | Ops bootstrap | Auth password for that Super Admin only (never commit) |
+| `CRON_SECRET` | Local + Netlify/GitHub | Bearer token for `/api/cron/*` (never commit) |
+| `CRON_BASE_URL` | Optional | Override site URL for cron callers (defaults to `URL` / `NEXT_PUBLIC_APP_URL`) |
 
-Example shapes:
+### Cron (scheduled maintenance)
+
+Routes (require `Authorization: Bearer $CRON_SECRET`):
+
+| Route | Schedule | Purpose |
+|-------|----------|---------|
+| `/api/cron/stage4-maintenance` | Hourly | Expire documents, overdue actions, event reminders, scheduled announcements, email retries |
+| `/api/cron/purge-audit` | Daily 03:00 UTC | Audit log retention + contact submission cleanup |
+
+**Local (dev server must be running):**
+
+```bash
+npm run cron:maintenance
+npm run cron:purge-audit
+```
+
+**Netlify:** scheduled functions in `netlify/functions/` call those routes. Set `CRON_SECRET` (and `NEXT_PUBLIC_APP_URL` if needed) in Netlify site env, then redeploy.
+
+**GitHub Actions:** `.github/workflows/cron.yml` — add repo secrets `CRON_SECRET` and `CRON_APP_URL` (your live site origin). Manual run: Actions → Cron → Run workflow.
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co

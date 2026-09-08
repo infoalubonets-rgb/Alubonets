@@ -1,0 +1,63 @@
+name: Cron
+
+on:
+  schedule:
+    # Hourly maintenance (announcements, reminders, expiry sync)
+    - cron: '5 * * * *'
+    # Daily audit purge 03:15 UTC
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Which cron job to run'
+        required: true
+        default: 'maintenance'
+        type: choice
+        options:
+          - maintenance
+          - purge-audit
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve job
+        id: job
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "name=${{ inputs.job }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "15 3 * * *" ]; then
+            echo "name=purge-audit" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=maintenance" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Call cron endpoint
+        env:
+          APP_URL: ${{ secrets.CRON_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          JOB: ${{ steps.job.outputs.name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "Set repository secrets CRON_APP_URL and CRON_SECRET to enable scheduled cron."
+            exit 1
+          fi
+          BASE="${APP_URL%/}"
+          if [ "$JOB" = "purge-audit" ]; then
+            PATH_SUFFIX="/api/cron/purge-audit"
+          else
+            PATH_SUFFIX="/api/cron/stage4-maintenance"
+          fi
+          echo "POST-like GET $PATH_SUFFIX"
+          CODE=$(curl -sS -o /tmp/cron-body.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${BASE}${PATH_SUFFIX}")
+          echo "HTTP $CODE"
+          cat /tmp/cron-body.json
+          echo
+          test "$CODE" = "200"
