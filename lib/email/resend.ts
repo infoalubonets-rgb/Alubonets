@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 import type { Contribution, User } from '@prisma/client'
 import { buildReceiptPdf } from '@/lib/pdf/receipt'
-import { SITE_LOGO } from '@/lib/constants'
+import { SITE_LOGO, CONTACT_EMAIL } from '@/lib/constants'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -13,8 +13,11 @@ function getResend() {
 const from = () =>
   process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
-// When set, ALL outgoing emails are redirected here (use until domain is verified)
-const testEmailOverride = () => process.env.RESEND_TEST_EMAIL || null
+// When set, ALL outgoing emails are redirected here (use until domain is verified).
+// With the Resend onboarding sender, default to the group info inbox.
+const testEmailOverride = () =>
+  process.env.RESEND_TEST_EMAIL?.trim() ||
+  (from().includes('onboarding@resend.dev') ? CONTACT_EMAIL : null)
 
 export function baseHtml(body: string) {
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#eef2f7;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">

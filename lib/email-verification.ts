@@ -14,16 +14,16 @@ function fromAddress() {
 }
 
 /**
- * Resend's onboarding sender can only deliver to the verified Resend account inbox.
- * Until a custom domain is verified, login codes go to RESEND_TEST_EMAIL or info@.
+ * Login/registration OTP destination.
+ * Prefer RESEND_TEST_EMAIL; otherwise always use the group info inbox until a
+ * custom sending domain is verified (Resend sandbox cannot deliver to arbitrary members).
  */
 export function resolveOtpRecipient(intendedEmail: string) {
-  const override = process.env.RESEND_TEST_EMAIL?.trim()
-  if (override) return { to: override, redirected: override.toLowerCase() !== intendedEmail.toLowerCase() }
-  if (fromAddress().includes('onboarding@resend.dev')) {
-    return { to: CONTACT_EMAIL, redirected: intendedEmail.toLowerCase() !== CONTACT_EMAIL.toLowerCase() }
+  const to = (process.env.RESEND_TEST_EMAIL?.trim() || CONTACT_EMAIL)
+  return {
+    to,
+    redirected: to.toLowerCase() !== intendedEmail.trim().toLowerCase(),
   }
-  return { to: intendedEmail, redirected: false }
 }
 
 export async function verificationStillValid(token: string | undefined, userId: string, hours: number) {
