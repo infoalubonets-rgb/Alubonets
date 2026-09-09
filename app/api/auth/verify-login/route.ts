@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { getSessionProfile } from '@/lib/auth/session'
-import { verifyEmailChallenge } from '@/lib/email-verification'
-import { createEmailChallenge } from '@/lib/email-verification'
+import { createEmailChallenge, verifyEmailChallenge } from '@/lib/email-verification'
 import { ROLE_HOME } from '@/lib/auth/types'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { logError } from '@/lib/logger'
+import { publicErrorMessage } from '@/lib/safe-error'
 
 export async function POST(req: Request) {
   const profile = await getSessionProfile()
-  if (!profile) return NextResponse.json({ error: 'Session expired.' }, { status: 401 })
+  if (!profile) return NextResponse.json({ error: 'Session expired. Please sign in again.' }, { status: 401 })
   const parsed = z.object({ code: z.string().trim().regex(/^\d{6}$/) }).safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Enter the six-digit code.' }, { status: 400 })
   try {
@@ -29,14 +30,28 @@ export async function POST(req: Request) {
   })
   return NextResponse.json({ redirectTo: ROLE_HOME[profile.role] })
 }
+
 export async function PUT() {
   const profile = await getSessionProfile()
-  if (!profile) return NextResponse.json({ error: 'Session expired.' }, { status: 401 })
+  if (!profile) return NextResponse.json({ error: 'Session expired. Please sign in again.' }, { status: 401 })
   try {
     await enforceRateLimit(`verify-login-request:${profile.id}`, 5, 15)
   } catch {
     return NextResponse.json({ error: 'Too many codes requested. Please wait and try again.' }, { status: 429 })
   }
-  await createEmailChallenge(profile.id, profile.email)
-  return NextResponse.json({ ok: true })
+  try {
+    const delivery = await createEmailChallenge(profile.id, profile.email)
+    return NextResponse.json({
+      ok: true,
+      deliveredTo: delivery.to,
+      redirected: delivery.redirected,
+      accountEmail: profile.email,
+    })
+  } catch (cause) {
+    logError('auth.verify_login.put_failed', cause, { userId: profile.id })
+    return NextResponse.json(
+      { error: publicErrorMessage(cause, 'Could not send the sign-in code. Check email settings on the server.') },
+      { status: 503 },
+    )
+  }
 }

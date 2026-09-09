@@ -12,6 +12,7 @@ import {
   verifyRegistrationEmailCode,
 } from '@/lib/registration-email-verification'
 import { otpCodeHtml } from '@/lib/email/resend'
+import { resolveOtpRecipient } from '@/lib/email-verification'
 
 const emailSchema = z.string().trim().toLowerCase().email('Enter a valid email address.')
 
@@ -32,14 +33,14 @@ export async function POST(req: Request) {
     const { code, token } = await createRegistrationEmailChallenge(email)
     const key = process.env.RESEND_API_KEY
     if (!key || key.startsWith('re_your-')) throw new Error('Email verification is not configured.')
-    const recipient = process.env.RESEND_TEST_EMAIL || email
+    const { to } = resolveOtpRecipient(email)
     const { error } = await new Resend(key).emails.send({
       from: process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>',
-      to: recipient,
+      to,
       subject: 'Verify your Alubonets membership email',
       html: otpCodeHtml('Verify your membership application email', code),
     })
-    if (error) throw new Error('Could not send the verification code.')
+    if (error) throw new Error(error.message || 'Could not send the verification code.')
     const store = await cookies()
     store.set(COOKIE_NAME, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: 600 })
     return NextResponse.json({ ok: true })
