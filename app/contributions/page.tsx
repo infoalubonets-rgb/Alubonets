@@ -107,6 +107,15 @@ export default async function ContributionsPage() {
     <DashboardShell role={role} title="My contributions" nav={navForRole(role)}>
       <div className="mx-auto max-w-3xl space-y-4 pb-4 pt-4 px-4 md:px-0">
         <OfficialPaymentDestination destination={destination} />
+        {role === 'TREASURER' && (
+          <p className="rounded-2xl border border-outline-variant bg-surface p-4 text-sm text-on-surface-variant">
+            Only the Treasurer records payments. Open the{' '}
+            <a href="/dashboard/treasurer/ledger" className="font-semibold text-primary underline">
+              financial ledger
+            </a>{' '}
+            to add a contribution for a member.
+          </p>
+        )}
       </div>
       <ContributionsClient
         contributions={contributions.map((c) => ({

@@ -15,14 +15,23 @@ export default async function ExecutivePage() {
   const stats = [
     { label: 'Active members',  value: data.members,                                                   icon: 'group',                  color: 'bg-primary dark:bg-[#0c1e42]',           text: 'text-white', iconBg: 'bg-white/15' },
     { label: 'Contributions',   value: `KES ${Math.round(data.totalContributions).toLocaleString()}`,  icon: 'account_balance_wallet', color: 'bg-secondary-container dark:bg-[#c45e00]', text: 'text-white', iconBg: 'bg-white/15' },
-    { label: 'Projects',        value: data.projects.length,                                           icon: 'work',                   color: 'bg-primary-container dark:bg-[#153060]',  text: 'text-white', iconBg: 'bg-white/15' },
+    { label: 'Welfare pending', value: data.pendingWelfare,                                            icon: 'volunteer_activism',     color: 'bg-primary-container dark:bg-[#153060]',  text: 'text-white', iconBg: 'bg-white/15' },
     { label: 'Upcoming events', value: data.upcomingEvents,                                            icon: 'event',                  color: 'bg-secondary dark:bg-[#7a3a00]',          text: 'text-white', iconBg: 'bg-white/15' },
   ]
 
+  const analytics = [
+    { label: 'Pending registrations', value: data.pendingMembers, icon: 'pending_actions' },
+    { label: 'Principal branches', value: data.principals, icon: 'family_restroom' },
+    { label: 'Recorded payments', value: data.contributionCount, icon: 'payments' },
+    { label: 'Minutes awaiting approval', value: data.meetingsPending, icon: 'description' },
+    { label: 'Open meeting actions', value: data.openActions, icon: 'task_alt' },
+    { label: 'Tracked projects', value: data.projects.length, icon: 'work' },
+  ]
+
   const quickLinks = [
-    { label: 'Projects', description: `${data.projects.length} tracked · manage status and new work`, icon: 'work', href: '/dashboard/executive/projects' },
-    { label: 'Announcements', description: `${data.announcements.length} recent updates`, icon: 'campaign', href: '/dashboard/executive/announcements' },
-    { label: 'Contributions', description: 'View member contribution records', icon: 'payments', href: '/contributions' },
+    { label: 'Welfare approvals', description: `${data.pendingWelfare} request${data.pendingWelfare === 1 ? '' : 's'} need Treasurer and Executive stamps`, icon: 'volunteer_activism', href: '/dashboard/executive/welfare' },
+    { label: 'Projects', description: `${data.projects.length} tracked · read-only overview`, icon: 'work', href: '/dashboard/executive/projects' },
+    { label: 'Financial reports', description: 'Contribution, allocation and ledger reports', icon: 'assessment', href: '/financial-reports' },
   ]
 
   return (
@@ -44,6 +53,23 @@ export default async function ExecutivePage() {
             </div>
           ))}
         </div>
+
+        <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4">
+          <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider mb-3">
+            Governance and membership snapshot
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {analytics.map((item) => (
+              <div key={item.label} className="rounded-xl border border-outline-variant/70 px-3 py-2.5">
+                <div className="flex items-center gap-2 text-on-surface-variant">
+                  <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{item.icon}</span>
+                  <span className="text-[11px] uppercase tracking-wide">{item.label}</span>
+                </div>
+                <p className="mt-1 text-lg font-bold text-on-surface dark:text-blue-50">{item.value}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         {/* Contribution trend chart */}
         <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">

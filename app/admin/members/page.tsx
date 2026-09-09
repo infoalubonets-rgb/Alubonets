@@ -59,7 +59,7 @@ export default async function AdminMembersPage({
   ])
 
   const savedBranches: string[] = managedBranches ? JSON.parse(managedBranches.value) : []
-  const branches = Array.from(new Set(['Default', ...savedBranches, ...branchRows.map((f) => f.familyBranch!).filter(Boolean)])) as string[]
+  const branches = Array.from(new Set(['Default', 'Unassigned', ...savedBranches, ...branchRows.map((f) => f.familyBranch!).filter(Boolean)])) as string[]
   const pages = totalPages(total, pageSize)
 
   return (

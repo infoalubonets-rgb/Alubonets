@@ -98,6 +98,12 @@ export async function createLedgerContribution(input: {
       },
     })
     const category = await tx.transactionCategory.findUniqueOrThrow({ where: { id: input.categoryId } })
+    const allocation = await tx.fundAllocationRule.findFirst({
+      where: { active: true },
+      orderBy: { version: 'desc' },
+    })
+    const emergencyPercent = allocation?.emergencyPercent ?? 20
+    const reservePercent = allocation?.reservePercent ?? 80
     const contribution = await tx.contribution.create({
       data: {
         userId: input.userId,
@@ -115,6 +121,11 @@ export async function createLedgerContribution(input: {
         status,
         reconciliationStatus: status === 'RECONCILED' ? 'RECONCILED' : 'UNRECONCILED',
         financialTransactionId: financial.id,
+        allocationVersion: allocation?.version ?? 1,
+        emergencyPercent,
+        reservePercent,
+        emergencyAmount: Number(((input.amount * emergencyPercent) / 100).toFixed(2)),
+        reserveAmount: Number(((input.amount * reservePercent) / 100).toFixed(2)),
       },
     })
     if (input.campaignId) await refreshObligation(input.campaignId, input.userId, tx)

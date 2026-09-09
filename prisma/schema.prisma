@@ -129,6 +129,11 @@ enum WelfareStatus {
   PAID
 }
 
+enum WelfareConfidentiality {
+  STANDARD
+  CONFIDENTIAL
+}
+
 enum LoanApplicationStatus {
   DRAFT
   SUBMITTED
@@ -296,6 +301,7 @@ model User {
   familyRegistrationState  FamilyRegistrationState @default(STANDARD)
   mfaEnabled               Boolean                 @default(false)
   mfaSecret                String?
+  mfaRecoveryCodes         String?
   failedLoginCount         Int                     @default(0)
   lockedUntil              DateTime?
   lastActiveAt             DateTime?
@@ -321,6 +327,10 @@ model User {
   contributions        Contribution[] @relation("ContributionPayer")
   branchContributions  Contribution[] @relation("ContributionBranch")
   welfareRequests      WelfareRequest[]
+  welfareTreasurerApprovals WelfareRequest[] @relation("WelfareTreasurerApprover")
+  welfareExecutiveApprovals WelfareRequest[] @relation("WelfareExecutiveApprover")
+  welfareDecisions     WelfareDecision[]
+  notifications        UserNotification[]
   auditLogs            AuditLog[]
   announcements        Announcement[]
   announcementReceipts AnnouncementReceipt[]
@@ -591,6 +601,11 @@ model Contribution {
   reversedBy   Contribution? @relation("ContributionReversal", fields: [reversedById], references: [id], onDelete: SetNull)
   reverses     Contribution[] @relation("ContributionReversal")
   supportingDocuments SupportingDocument[]
+  allocationVersion    Int?
+  emergencyPercent     Float?
+  reservePercent       Float?
+  emergencyAmount      Float?
+  reserveAmount        Float?
 
   @@index([userId])
   @@index([principalMemberId])
@@ -837,6 +852,17 @@ model WelfareRequest {
   reviewNote  String?
   categoryId  String?
   category    WelfareCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  beneficiaryName String?
+  supportType     String?
+  confidentiality WelfareConfidentiality @default(STANDARD)
+  evidencePath    String?
+  treasurerApprovedAt DateTime?
+  treasurerApprovedById String?
+  treasurerApprovedBy   User? @relation("WelfareTreasurerApprover", fields: [treasurerApprovedById], references: [id], onDelete: SetNull)
+  executiveApprovedAt DateTime?
+  executiveApprovedById String?
+  executiveApprovedBy   User? @relation("WelfareExecutiveApprover", fields: [executiveApprovedById], references: [id], onDelete: SetNull)
+  decisions   WelfareDecision[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -844,6 +870,38 @@ model WelfareRequest {
   @@index([status])
   @@index([categoryId])
   @@map("welfare_requests")
+}
+
+model WelfareDecision {
+  id          String   @id @default(cuid())
+  requestId   String
+  request     WelfareRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId     String
+  actor       User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  role        Role
+  decision    String
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([requestId, createdAt])
+  @@map("welfare_decisions")
+}
+
+model UserNotification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String?
+  href      String?
+  type      String
+  entity    String?
+  entityId  String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
+  @@map("user_notifications")
 }
 
 model Project {

@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { generateMfaSecret, otpauthUrl, verifyTotp, PRIVILEGED_MFA_ROLES } from '@/lib/mfa-totp'
+import { consumeMfaRecoveryCode, generateMfaRecoveryCodes } from '@/lib/mfa-recovery'
 
 /**
  * Starts (or re-starts) authenticator enrollment.
@@ -57,9 +58,10 @@ export async function confirmMfaEnrollment(formData: FormData) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: actor.id } })
   if (!user.mfaSecret) throw new Error('Start MFA enrollment first.')
   if (!verifyTotp(user.mfaSecret, token)) throw new Error('Invalid authenticator code.')
+  const recovery = generateMfaRecoveryCodes()
   await prisma.user.update({
     where: { id: actor.id },
-    data: { mfaEnabled: true },
+    data: { mfaEnabled: true, mfaRecoveryCodes: recovery.stored },
   })
   await writeAudit({
     userId: actor.id,
@@ -68,7 +70,7 @@ export async function confirmMfaEnrollment(formData: FormData) {
     entityId: actor.id,
   })
   revalidatePath('/profile')
-  return { ok: true }
+  return { ok: true, recoveryCodes: recovery.codes }
 }
 
 export async function disableMfa(formData: FormData) {
@@ -79,7 +81,7 @@ export async function disableMfa(formData: FormData) {
   if (!verifyTotp(user.mfaSecret, token)) throw new Error('Invalid authenticator code.')
   await prisma.user.update({
     where: { id: actor.id },
-    data: { mfaEnabled: false, mfaSecret: null },
+    data: { mfaEnabled: false, mfaSecret: null, mfaRecoveryCodes: null },
   })
   await writeAudit({
     userId: actor.id,
@@ -94,5 +96,18 @@ export async function disableMfa(formData: FormData) {
 export async function verifyMfaLoginCode(userId: string, token: string) {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
   if (!user.mfaEnabled || !user.mfaSecret) return true
-  return verifyTotp(user.mfaSecret, token)
+  if (verifyTotp(user.mfaSecret, token)) return true
+  const remaining = consumeMfaRecoveryCode(user.mfaRecoveryCodes, token)
+  if (remaining == null) return false
+  await prisma.user.update({
+    where: { id: userId },
+    data: { mfaRecoveryCodes: remaining },
+  })
+  await writeAudit({
+    userId,
+    action: 'MFA_RECOVERY_USED',
+    entity: 'User',
+    entityId: userId,
+  })
+  return true
 }

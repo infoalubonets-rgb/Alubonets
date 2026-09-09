@@ -33,6 +33,32 @@ function refreshCategories() {
   revalidatePath('/dashboard/treasurer/reconciliation')
 }
 
+export async function updateDirectoryFullAccessRoles(formData: FormData) {
+  const actor = await requireAdmin()
+  const roles = formData
+    .getAll('roles')
+    .map(String)
+    .map((value) => value.trim().toUpperCase())
+    .filter((value) =>
+      ['EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'AUDITOR'].includes(value),
+    )
+  const value = roles.join(',')
+  await prisma.appSetting.upsert({
+    where: { key: 'directory_full_access_roles' },
+    create: { key: 'directory_full_access_roles', value, updatedBy: actor.id },
+    update: { value, updatedBy: actor.id },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'DIRECTORY_FULL_ACCESS_UPDATE',
+    entity: 'AppSetting',
+    entityId: 'directory_full_access_roles',
+    newValue: { roles },
+  })
+  revalidatePath('/admin/settings')
+  revalidatePath('/directory')
+}
+
 const LOCKED_SETTING_KEYS: SettingKey[] = [SETTING_KEYS.brandingSiteName, SETTING_KEYS.brandingPrimaryHex]
 
 export async function updateAppSetting(formData: FormData) {
@@ -428,4 +454,26 @@ export async function deleteContributionCategory(formData: FormData) {
     oldValue: { code: category.code, name: category.name, archived },
   })
   refreshCategories()
+}
+
+export async function setDisabledRoles(formData: FormData) {
+  const actor = await requireAdmin()
+  const roles = formData
+    .getAll('disabledRoles')
+    .map(String)
+    .filter((value) => value !== 'ADMIN' && ['EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER', 'AUDITOR'].includes(value))
+  const value = JSON.stringify(roles)
+  await prisma.appSetting.upsert({
+    where: { key: 'disabled_roles' },
+    create: { key: 'disabled_roles', value, updatedBy: actor.id },
+    update: { value, updatedBy: actor.id },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'ROLE_CATALOGUE_UPDATE',
+    entity: 'AppSetting',
+    entityId: 'disabled_roles',
+    newValue: { disabledRoles: roles },
+  })
+  revalidatePath('/admin/roles')
 }

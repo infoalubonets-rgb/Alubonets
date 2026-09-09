@@ -182,6 +182,7 @@ export const LOANS_NAV_ITEMS = {
 export const WELFARE_NAV_ITEMS = {
   member: { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/member/welfare' } satisfies NavItem,
   treasurer: { icon: 'volunteer_activism', label: 'Welfare', href: '/dashboard/treasurer/welfare' } satisfies NavItem,
+  executive: { icon: 'volunteer_activism', label: 'Welfare approvals', href: '/dashboard/executive/welfare' } satisfies NavItem,
 }
 
 export function withOptionalNav(nav: NavItem[], item: NavItem | null, afterHref?: string): NavItem[] {

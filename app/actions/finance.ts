@@ -10,6 +10,7 @@ import { TAGS } from '@/lib/data/queries'
 import { createSignedUpload } from '@/lib/upload-signed'
 import { requireWelfareEnabled } from '@/lib/feature-flags'
 import { assertNotFuture, assertNotPast } from '@/lib/dates'
+import { notifyUsers } from '@/lib/notifications'
 import {
   filterSelectableCategories,
   otherCategoryDescriptionSchema,
@@ -462,6 +463,17 @@ export async function verifyContribution(formData: FormData) {
     reason: note,
     oldValue: { status: contribution.status },
     newValue: { status },
+  })
+  await notifyUsers({
+    userIds: [contribution.userId],
+    title: decision === 'verify' ? 'Payment confirmed' : 'Payment rejected',
+    body: note || (decision === 'verify'
+      ? 'The Treasurer confirmed your recorded contribution.'
+      : 'The Treasurer rejected a recorded contribution.'),
+    href: '/contributions',
+    type: 'payment',
+    entity: 'Contribution',
+    entityId: id,
   })
   refreshFinance()
 }

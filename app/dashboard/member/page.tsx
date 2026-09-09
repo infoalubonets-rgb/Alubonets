@@ -10,7 +10,7 @@ export default async function MemberPage() {
   const profile = await getSessionProfile()
   if (!profile) redirect('/login')
 
-  const [{ total, welfareCount, announcements, events, documents }, todayActivities, nav] =
+  const [{ total, welfareCount, announcements, events, documents, nextMeeting, projectUpdates, outstandingObligations, latestPaymentStatus }, todayActivities, nav] =
     await Promise.all([
       getMemberDashboardData(profile.id),
       listTodayActivities(),
@@ -100,6 +100,50 @@ export default async function MemberPage() {
               <li className="text-sm text-on-surface-variant">Nothing scheduled for today.</li>
             )}
           </ul>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-outline-variant bg-surface p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Payment status</p>
+            <p className="mt-1 text-sm font-semibold text-on-surface">
+              {latestPaymentStatus ? `Latest recorded: ${latestPaymentStatus}` : 'No recorded payments yet'}
+            </p>
+            <p className="mt-1 text-[11px] text-on-surface-variant">
+              {outstandingObligations > 0
+                ? `${outstandingObligations} contribution obligation${outstandingObligations === 1 ? '' : 's'} still open`
+                : 'No open contribution obligations'}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-outline-variant bg-surface p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Next meeting</p>
+            {nextMeeting ? (
+              <>
+                <p className="mt-1 text-sm font-semibold text-on-surface">{nextMeeting.title}</p>
+                <p className="mt-1 text-[11px] text-on-surface-variant">
+                  {new Date(nextMeeting.heldAt).toLocaleString('en-KE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  {nextMeeting.location ? ` · ${nextMeeting.location}` : ''}
+                </p>
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-on-surface-variant">No upcoming meeting published.</p>
+            )}
+          </div>
+          <div className="rounded-2xl border border-outline-variant bg-surface p-4">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Project updates</p>
+            {projectUpdates.length ? (
+              <ul className="mt-1 space-y-1">
+                {projectUpdates.map((update) => (
+                  <li key={update.id} className="text-[12px] text-on-surface">
+                    <span className="font-semibold">{update.projectTitle}</span>
+                    {' · '}
+                    {update.title}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-on-surface-variant">No recent public project updates.</p>
+            )}
+          </div>
         </section>
 
         {/* Members no longer submit their own payments — the Treasurer records every

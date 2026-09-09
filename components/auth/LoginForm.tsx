@@ -236,18 +236,17 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
               {mode === 'signin' && needsMfa && (
                 <div>
                   <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
-                    Authenticator code
+                    Authenticator or recovery code
                   </label>
                   <input
                     type="text"
-                    inputMode="numeric"
                     autoComplete="one-time-code"
                     value={mfaToken}
                     onChange={(e) => setMfaToken(e.target.value)}
                     required
                     minLength={6}
-                    maxLength={8}
-                    placeholder="6-digit code"
+                    maxLength={20}
+                    placeholder="6-digit code or recovery code"
                     className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
                   />
                 </div>

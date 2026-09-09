@@ -169,7 +169,7 @@ export default function MembersTable({
           aria-label="Branch or lineage"
           className="h-9 w-[150px] rounded-xl border border-outline-variant bg-surface-container-lowest px-2 text-xs"
         >
-          <option value="">All branches / lineages</option>
+          <option value="">All lineages</option>
           {branches.map((value) => (
             <option key={value} value={value}>
               {value}
@@ -345,13 +345,16 @@ export default function MembersTable({
                   Role and dashboard access are managed on the Roles page.
                 </p>
                 <section className="space-y-2 border-t border-outline-variant pt-3">
-                  <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary">Branch / lineage</p>
-                  <form action={async (formData) => { await assignMemberBranch(selected.id, String(formData.get('branch') || 'Default')); router.refresh() }} className="flex gap-2">
-                    <select name="branch" defaultValue={selected.familyBranch || 'Default'} className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm">{branches.map((branch) => <option key={branch}>{branch}</option>)}</select>
+                  <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary">Lineage</p>
+                  <p className="mb-2 text-[11px] text-on-surface-variant">
+                    Registry label only — not the Principal family branch.
+                  </p>
+                  <form action={async (formData) => { await assignMemberBranch(selected.id, String(formData.get('branch') || 'Unassigned')); router.refresh() }} className="flex gap-2">
+                    <select name="branch" defaultValue={selected.familyBranch || 'Unassigned'} className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm">{branches.map((branch) => <option key={branch}>{branch}</option>)}</select>
                     <button className="rounded-lg bg-primary px-3 text-sm text-on-primary">Assign</button>
                   </form>
                   <form action={async () => { if (!newBranch.trim()) return; await createBranchLineage(newBranch); setNewBranch(''); router.refresh() }} className="flex gap-2">
-                    <input value={newBranch} onChange={(event) => setNewBranch(event.target.value)} placeholder="New branch / lineage" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm" />
+                    <input value={newBranch} onChange={(event) => setNewBranch(event.target.value)} placeholder="New lineage label" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm" />
                     <button className="rounded-lg border px-3 text-sm">Add</button>
                   </form>
                 </section>

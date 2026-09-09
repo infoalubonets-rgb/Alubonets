@@ -12,6 +12,7 @@ import { writeAudit } from '@/lib/audit'
 import { nextMembershipNumber } from '@/lib/membership'
 import { createServerClient } from '@/lib/supabase-server'
 import { branchHistoryData, validateFamilyAttachment, validateFamilyTransfer } from '@/lib/family-rules'
+import { getDisabledRoles, isRoleActive } from '@/lib/disabled-roles'
 
 const approveSchema = z.object({
   userId: z.string().min(1),
@@ -27,7 +28,13 @@ export async function createBranchLineage(name: string) {
   const clean = z.string().trim().min(2).max(80).parse(name)
   const current = await prisma.appSetting.findUnique({ where: { key: 'branch_lineages' } })
   const list: string[] = current ? JSON.parse(current.value) : []
-  const next = Array.from(new Set(['Default', ...list, clean])).sort((a, b) => a === 'Default' ? -1 : b === 'Default' ? 1 : a.localeCompare(b))
+  const next = Array.from(new Set(['Default', 'Unassigned', ...list, clean])).sort((a, b) => {
+    if (a === 'Default') return -1
+    if (b === 'Default') return 1
+    if (a === 'Unassigned') return -1
+    if (b === 'Unassigned') return 1
+    return a.localeCompare(b)
+  })
   await prisma.appSetting.upsert({ where: { key: 'branch_lineages' }, create: { key: 'branch_lineages', value: JSON.stringify(next), updatedBy: actor.id }, update: { value: JSON.stringify(next), updatedBy: actor.id } })
   revalidatePath('/admin/members')
 }
@@ -36,7 +43,7 @@ export async function assignMemberBranch(userId: string, branch: string) {
   const actor = await requireAdmin()
   const clean = z.string().trim().min(1).max(80).parse(branch)
   await prisma.memberProfile.upsert({ where: { userId }, create: { userId, familyBranch: clean }, update: { familyBranch: clean } })
-  await writeAudit({ userId: actor.id, action: 'MEMBER_BRANCH_ASSIGN', entity: 'User', entityId: userId, meta: { branch: clean } })
+  await writeAudit({ userId: actor.id, action: 'MEMBER_LINEAGE_ASSIGN', entity: 'User', entityId: userId, meta: { lineage: clean } })
   revalidatePath('/admin/members')
 }
 
@@ -207,6 +214,9 @@ export async function setMemberRole(input: z.infer<typeof roleSchema>) {
   if (role === 'ADMIN' && !actor.isSuperAdmin) {
     throw new Error('Only a Super Admin can assign the Admin role')
   }
+  if (!(await isRoleActive(role as Role))) {
+    throw new Error('That role is currently deactivated.')
+  }
 
   const updated = await prisma.user.update({
     where: { id: userId },
@@ -240,9 +250,12 @@ export async function setMemberDashboardAccess(input: z.infer<typeof accessSchem
     throw new Error('Super Admin already has access to every workspace')
   }
 
+  const disabled = await getDisabledRoles()
+  const allowedAccess = dashboardAccess.filter((role) => role === 'ADMIN' || !disabled.includes(role as Role))
+
   const updated = await prisma.user.update({
     where: { id: userId },
-    data: { dashboardAccess: dashboardAccess as Role[] },
+    data: { dashboardAccess: allowedAccess as Role[] },
   })
 
   await syncUserMetadata(updated)

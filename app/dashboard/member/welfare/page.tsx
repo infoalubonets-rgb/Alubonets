@@ -1,15 +1,14 @@
-import { cookies } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import WelfareHistoryTable from '@/components/dashboard/WelfareHistoryTable'
 import WelfareRequestForm from '@/components/dashboard/WelfareRequestForm'
 import WelfareSubmitFeedback from '@/components/dashboard/WelfareSubmitFeedback'
-import { actionCreateWelfare } from '@/app/actions/domain'
+import { actionCreateWelfare } from '@/app/actions/welfare'
 import { navForRole, withOptionalNav, WELFARE_NAV_ITEMS } from '@/lib/dashboard/nav'
 import { getSessionProfile } from '@/lib/auth/session'
-import { createClient } from '@/utils/supabase/server'
 import { getWelfarePolicy } from '@/lib/settings'
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
+import { prisma } from '@/lib/prisma'
 
 export default async function MemberWelfarePage({ searchParams }: { searchParams: Promise<{ submitted?: string; error?: string }> }) {
   const welfareOn = await isFeatureEnabled(FEATURE_FLAGS.welfareEnabled)
@@ -18,17 +17,28 @@ export default async function MemberWelfarePage({ searchParams }: { searchParams
   if (!profile) redirect('/login')
   const feedback = await searchParams
 
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
-
-  const { data: welfare } = await supabase
-    .from('welfare_requests')
-    .select('id, status, description, amount, reviewNote, createdAt')
-    .eq('userId', profile.id)
-    .order('createdAt', { ascending: false })
-
-  const [policy] = await Promise.all([getWelfarePolicy()])
-  const requests = welfare ?? []
+  const [policy, requests, categories] = await Promise.all([
+    getWelfarePolicy(),
+    prisma.welfareRequest.findMany({
+      where: { userId: profile.id },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        status: true,
+        description: true,
+        amount: true,
+        reviewNote: true,
+        createdAt: true,
+        treasurerApprovedAt: true,
+        executiveApprovedAt: true,
+      },
+    }),
+    prisma.welfareCategory.findMany({
+      where: { active: true },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true },
+    }),
+  ])
   const pendingCount = requests.filter((request) => request.status === 'PENDING').length
   const approvedCount = requests.filter((request) => ['APPROVED', 'PAID'].includes(request.status)).length
   const requestedTotal = requests.reduce((total, request) => total + Number(request.amount || 0), 0)
@@ -50,8 +60,16 @@ export default async function MemberWelfarePage({ searchParams }: { searchParams
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><span className="material-symbols-outlined">volunteer_activism</span></span>
             <h2 className="font-bold text-on-surface">Request welfare support</h2>
           </div>
+          <p className="mb-4 text-sm text-on-surface-variant">
+            Requests need both Treasurer and Executive approval. Mark a request confidential if only welfare officers should see beneficiary details.
+          </p>
           <WelfareSubmitFeedback submitted={feedback.submitted === '1'} error={feedback.error === 'limits'} />
-          <WelfareRequestForm action={actionCreateWelfare} minAmount={policy.minAmountKes} maxAmount={policy.maxAmountKes} />
+          <WelfareRequestForm
+            action={actionCreateWelfare}
+            minAmount={policy.minAmountKes}
+            maxAmount={policy.maxAmountKes}
+            categories={categories}
+          />
         </section>
 
         <section className="rounded-3xl border border-outline-variant bg-surface p-5 shadow-sm md:p-6">
@@ -59,7 +77,12 @@ export default async function MemberWelfarePage({ searchParams }: { searchParams
             <div><h2 className="font-bold text-on-surface">Request history</h2></div>
             <span className="rounded-full bg-surface-container px-3 py-1 text-xs font-bold text-on-surface-variant">{requests.length}</span>
           </div>
-          <WelfareHistoryTable requests={requests} />
+          <WelfareHistoryTable
+            requests={requests.map((request) => ({
+              ...request,
+              createdAt: request.createdAt.toISOString(),
+            }))}
+          />
         </section>
       </div>
     </DashboardShell>

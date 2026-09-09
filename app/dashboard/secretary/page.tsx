@@ -119,6 +119,48 @@ export default async function SecretaryPage() {
           ))}
         </div>
 
+        {(data.pendingMinutes.length > 0 || data.openActions.length > 0) && (
+          <div className="grid md:grid-cols-2 gap-4">
+            <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4">
+              <h2 className="font-bold text-[12px] text-[#001f50] dark:text-blue-200 uppercase tracking-widest mb-3">Minutes awaiting approval</h2>
+              {data.pendingMinutes.length === 0 ? (
+                <p className="text-[13px] text-on-surface-variant">No minutes in the approval queue.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {data.pendingMinutes.map((meeting) => (
+                    <li key={meeting.id}>
+                      <Link href={`/dashboard/secretary/meetings/${meeting.id}`} className="text-[13px] font-semibold text-primary hover:underline">
+                        {meeting.title}
+                      </Link>
+                      <p className="text-[11px] text-on-surface-variant">
+                        {new Date(meeting.heldAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4">
+              <h2 className="font-bold text-[12px] text-[#001f50] dark:text-blue-200 uppercase tracking-widest mb-3">Open actions</h2>
+              {data.openActions.length === 0 ? (
+                <p className="text-[13px] text-on-surface-variant">No open action points.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {data.openActions.map((action) => (
+                    <li key={action.id}>
+                      <p className="text-[13px] font-semibold text-on-surface">{action.title}</p>
+                      <p className="text-[11px] text-on-surface-variant">
+                        {action.meeting.title} · {action.owner.fullName}
+                        {action.dueAt ? ` · due ${new Date(action.dueAt).toLocaleDateString('en-KE')}` : ''}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        )}
+
         {/* Recent meetings + Documents */}
         <div className="grid md:grid-cols-2 gap-4">
 

@@ -13,12 +13,14 @@ import { requestIp } from '@/lib/membership'
 import { verificationStillValid } from '@/lib/email-verification'
 import { logError } from '@/lib/logger'
 import { publicErrorMessage } from '@/lib/safe-error'
+import { consumeMfaRecoveryCode } from '@/lib/mfa-recovery'
+import { writeAudit } from '@/lib/audit'
 import { verifyTotp } from '@/lib/mfa-totp'
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   password: z.string().min(1).max(200),
-  mfaToken: z.string().trim().min(6).max(8).optional(),
+  mfaToken: z.string().trim().min(6).max(20).optional(),
 })
 
 async function recordFailedLogin(email: string, userId?: string) {
@@ -202,13 +204,27 @@ export async function POST(req: Request) {
         await supabase.auth.signOut()
         return NextResponse.json({
           requiresMfa: true,
-          error: 'Enter the authenticator code for this privileged account.',
+          error: 'Enter the authenticator code or a recovery code for this privileged account.',
         }, { status: 401 })
       }
-      if (!verifyTotp(profile.mfaSecret, parsed.data.mfaToken)) {
+      const totpOk = verifyTotp(profile.mfaSecret, parsed.data.mfaToken)
+      const remaining = totpOk ? null : consumeMfaRecoveryCode(profile.mfaRecoveryCodes, parsed.data.mfaToken)
+      if (!totpOk && remaining == null) {
         await supabase.auth.signOut()
         await recordFailedLogin(email, profile.id)
-        return NextResponse.json({ error: 'Invalid authenticator code.' }, { status: 401 })
+        return NextResponse.json({ error: 'Invalid authenticator or recovery code.' }, { status: 401 })
+      }
+      if (remaining != null) {
+        await prisma.user.update({
+          where: { id: profile.id },
+          data: { mfaRecoveryCodes: remaining },
+        })
+        await writeAudit({
+          userId: profile.id,
+          action: 'MFA_RECOVERY_USED',
+          entity: 'User',
+          entityId: profile.id,
+        })
       }
     }
 

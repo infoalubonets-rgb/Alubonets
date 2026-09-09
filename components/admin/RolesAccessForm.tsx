@@ -23,6 +23,7 @@ type Props = {
   users: RolesUser[]
   actorIsSuperAdmin: boolean
   actorId: string
+  disabledRoles?: Role[]
 }
 
 type ModalKind = 'account' | 'role' | 'access' | null
@@ -37,7 +38,7 @@ const ROLE_ICON: Record<Role, string> = {
   AUDITOR: 'policy',
 }
 
-export default function RolesAccessForm({ users, actorIsSuperAdmin }: Props) {
+export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRoles = [] }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [modal, setModal] = useState<ModalKind>(null)
@@ -352,7 +353,7 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin }: Props) {
               {modal === 'role' && (
                 <ul className="max-h-[min(52vh,380px)] overflow-y-auto py-2">
                   {ALL_ROLES.map((r) => {
-                    const blocked = r === 'ADMIN' && !actorIsSuperAdmin
+                    const blocked = (r === 'ADMIN' && !actorIsSuperAdmin) || (r !== 'ADMIN' && disabledRoles.includes(r))
                     return (
                       <li key={r}>
                         <button

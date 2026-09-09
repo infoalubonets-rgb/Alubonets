@@ -12,23 +12,30 @@ import { prisma } from '@/lib/prisma'
 import { FEATURE_FLAGS, getFeatureFlags } from '@/lib/feature-flags'
 import { SETTING_KEYS, getSettings } from '@/lib/settings'
 import { CONTACT_EMAIL } from '@/lib/constants'
+import DirectoryFullAccessForm from '@/components/admin/DirectoryFullAccessForm'
 import {
   updateAppSetting,
   updateWelfareAmountLimits,
   updateLoanAmountLimits,
   updateLoanPolicy,
 } from '@/app/actions/settings'
+import { DIRECTORY_FULL_ACCESS_SETTING } from '@/app/actions/directory'
 
 export default async function AdminSettingsPage() {
   await requireAdmin()
-  const [flags, settings, txCats, nav, financeDestination, fundRule] = await Promise.all([
+  const [flags, settings, txCats, nav, financeDestination, fundRule, directoryAccess] = await Promise.all([
     getFeatureFlags(),
     getSettings(Object.values(SETTING_KEYS)),
     prisma.transactionCategory.findMany({ where: { active: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], take: 80 }),
     navWithLoans('ADMIN'),
     prisma.financeSettingVersion.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' } }),
     prisma.fundAllocationRule.findFirst({ where: { active: true }, orderBy: { version: 'desc' } }),
+    prisma.appSetting.findUnique({ where: { key: DIRECTORY_FULL_ACCESS_SETTING } }),
   ])
+  const directoryFullAccessRoles = (directoryAccess?.value || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
   const loansOn = Boolean(flags[FEATURE_FLAGS.loansEnabled])
   const welfareOn = Boolean(flags[FEATURE_FLAGS.welfareEnabled])
 
@@ -151,6 +158,14 @@ export default async function AdminSettingsPage() {
             </div>
           </SettingsSectionButton>
         )}
+
+        <SettingsSectionButton
+          title="Directory privacy"
+          description="Who may see the full member list (children stay hidden by default)"
+          icon="visibility"
+        >
+          <DirectoryFullAccessForm selectedRoles={directoryFullAccessRoles} />
+        </SettingsSectionButton>
 
         <SettingsSectionButton
           title="Contribution / transaction categories"

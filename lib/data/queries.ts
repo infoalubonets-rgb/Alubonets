@@ -50,25 +50,47 @@ export const getAdminDashboardData = unstable_cache(
 
 export const getExecutiveDashboardData = unstable_cache(
   async () => {
-    const [members, contributions, projects, events, announcements] = await Promise.all([
+    const [
+      members,
+      pendingMembers,
+      contributions,
+      projects,
+      events,
+      announcements,
+      pendingWelfare,
+      openActions,
+      meetingsPending,
+      principals,
+    ] = await Promise.all([
       prisma.user.count({ where: { status: 'ACTIVE' } }),
-      prisma.contribution.aggregate({ where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true } }),
+      prisma.user.count({ where: { status: 'PENDING' } }),
+      prisma.contribution.aggregate({ where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.project.findMany({ orderBy: { updatedAt: 'desc' }, take: 10 }),
       prisma.event.count({ where: { startsAt: { gte: new Date() } } }),
       prisma.announcement.findMany({
         where: { broadcast: true }, orderBy: { publishedAt: 'desc' }, take: 5,
       }),
+      prisma.welfareRequest.count({ where: { status: 'PENDING' } }),
+      prisma.meetingActionPoint.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS', 'OVERDUE'] } } }),
+      prisma.meeting.count({ where: { status: 'PENDING_APPROVAL' } }),
+      prisma.user.count({ where: { isPrincipal: true, status: 'ACTIVE' } }),
     ])
     return {
       members,
+      pendingMembers,
+      principals,
       totalContributions: contributions._sum.amount ?? 0,
+      contributionCount: contributions._count,
       projects,
       upcomingEvents: events,
       announcements,
+      pendingWelfare,
+      openActions,
+      meetingsPending,
     }
   },
   ['executive-dashboard'],
-  { tags: [TAGS.members, TAGS.contributions, TAGS.projects, TAGS.events, TAGS.announcements], revalidate: 60 },
+  { tags: [TAGS.members, TAGS.contributions, TAGS.projects, TAGS.events, TAGS.announcements, TAGS.welfare, TAGS.meetings], revalidate: 60 },
 )
 
 export const getTreasurerDashboardData = unstable_cache(
@@ -82,7 +104,10 @@ export const getTreasurerDashboardData = unstable_cache(
       prisma.contribution.groupBy({ by: ['category'], where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.welfareRequest.findMany({
         where: { status: { in: ['PENDING', 'APPROVED'] } },
-        include: { user: { select: { fullName: true, email: true } } },
+        include: {
+          user: { select: { fullName: true, email: true } },
+          category: { select: { name: true } },
+        },
         orderBy: { createdAt: 'desc' },
       }),
       prisma.user.findMany({
@@ -111,7 +136,7 @@ export const getTreasurerDashboardData = unstable_cache(
 
 export const getSecretaryDashboardData = unstable_cache(
   async () => {
-    const [documents, meetings, announcements, events] = await Promise.all([
+    const [documents, meetings, announcements, events, pendingMinutes, openActions] = await Promise.all([
       prisma.document.findMany({
         orderBy: { uploadedAt: 'desc' },
         include: { uploader: { select: { fullName: true } } },
@@ -125,12 +150,27 @@ export const getSecretaryDashboardData = unstable_cache(
         take: 10,
       }),
       prisma.event.findMany({ orderBy: { startsAt: 'asc' }, take: 10 }),
+      prisma.meeting.findMany({
+        where: { status: 'PENDING_APPROVAL' },
+        orderBy: { heldAt: 'desc' },
+        take: 8,
+        select: { id: true, title: true, heldAt: true, status: true },
+      }),
+      prisma.meetingActionPoint.findMany({
+        where: { status: { in: ['OPEN', 'IN_PROGRESS', 'OVERDUE'] } },
+        orderBy: { dueAt: 'asc' },
+        take: 8,
+        include: {
+          meeting: { select: { id: true, title: true } },
+          owner: { select: { fullName: true } },
+        },
+      }),
     ])
     const attendanceAvg =
       meetings.length === 0
         ? 0
         : Math.round(meetings.reduce((s, m) => s + m.attendance, 0) / meetings.length)
-    return { documents, meetings, announcements, events, attendanceAvg }
+    return { documents, meetings, announcements, events, attendanceAvg, pendingMinutes, openActions }
   },
   ['secretary-dashboard'],
   { tags: [TAGS.documents, TAGS.meetings, TAGS.announcements, TAGS.events], revalidate: 60 },
@@ -217,7 +257,7 @@ export const getOrganizerGalleryPhotos = unstable_cache(
 
 export const getMemberDashboardData = unstable_cache(
   async (userId: string) => {
-    const [contributions, announcements, events, documents, welfare] = await Promise.all([
+    const [contributions, announcements, events, documents, welfare, nextMeeting, projectUpdates, outstanding] = await Promise.all([
       prisma.contribution.findMany({ where: { userId, status: { in: ['CONFIRMED','RECONCILED'] } }, orderBy: { paidAt: 'desc' } }),
       prisma.announcement.findMany({
         where: { broadcast: true }, orderBy: { publishedAt: 'desc' }, take: 5,
@@ -233,6 +273,20 @@ export const getMemberDashboardData = unstable_cache(
         select: { id: true, title: true, fileUrl: true },
       }),
       prisma.welfareRequest.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      prisma.meeting.findFirst({
+        where: { heldAt: { gte: new Date() }, status: { in: ['FINAL', 'PENDING_APPROVAL'] } },
+        orderBy: { heldAt: 'asc' },
+        select: { id: true, title: true, heldAt: true, location: true },
+      }),
+      prisma.projectUpdate.findMany({
+        where: { project: { isPublic: true } },
+        orderBy: { publishedAt: 'desc' },
+        take: 3,
+        include: { project: { select: { id: true, title: true } } },
+      }),
+      prisma.memberContributionObligation.count({
+        where: { userId, status: { in: ['OUTSTANDING', 'PARTIALLY_PAID'] } },
+      }),
     ])
     const total = contributions.reduce((s, c) => s + c.amount, 0)
     // Convert dates to ISO strings for consistent serialization
@@ -247,6 +301,18 @@ export const getMemberDashboardData = unstable_cache(
       documents,
       welfare,
       welfareCount: welfare.length,
+      nextMeeting: nextMeeting
+        ? { ...nextMeeting, heldAt: nextMeeting.heldAt.toISOString() }
+        : null,
+      projectUpdates: projectUpdates.map((update) => ({
+        id: update.id,
+        title: update.title,
+        publishedAt: update.publishedAt.toISOString(),
+        projectTitle: update.project.title,
+        projectId: update.project.id,
+      })),
+      outstandingObligations: outstanding,
+      latestPaymentStatus: contributions[0]?.status ?? null,
     }
   },
   ['member-dashboard'],

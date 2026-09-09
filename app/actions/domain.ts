@@ -20,37 +20,19 @@ import {
   sendAnnouncement,
   updateEvent,
   updateGalleryPhoto,
-  updateWelfareStatus,
   upsertProject,
 } from '@/lib/data/queries'
 import { prisma } from '@/lib/prisma'
-import { sendBroadcastEmail, sendContributionReceiptEmail, sendWelfareStatusEmail } from '@/lib/email/resend'
+import { sendBroadcastEmail, sendContributionReceiptEmail } from '@/lib/email/resend'
 import { writeAudit } from '@/lib/audit'
-import { getWelfarePolicy } from '@/lib/settings'
-import { requireWelfareEnabled } from '@/lib/feature-flags'
 import { assertNotPast } from '@/lib/dates'
+
+export { actionCreateWelfare, actionReviewWelfare } from '@/app/actions/welfare'
 
 export async function actionCreateContribution(formData: FormData) {
   void formData
   await requireActiveRole(['TREASURER', 'ADMIN'])
   throw new Error('Direct contribution entry is disabled. Use the immutable financial ledger.')
-}
-
-export async function actionCreateWelfare(formData: FormData) {
-  await requireWelfareEnabled()
-  const actor = await requireActiveRole(['MEMBER', 'ADMIN'])
-  const description = String(formData.get('description') || '').trim()
-  const amount = Number(formData.get('amount'))
-  const policy = await getWelfarePolicy()
-  if (description.length < 3 || !Number.isFinite(amount) || amount < policy.minAmountKes || amount > policy.maxAmountKes) {
-    redirect('/dashboard/member/welfare?error=limits')
-  }
-  await prisma.welfareRequest.create({ data: { userId: actor.id, description, amount } })
-  revalidatePath('/dashboard/member/welfare')
-  revalidatePath('/dashboard/treasurer')
-  revalidatePath('/admin')
-  revalidateTag(TAGS.welfare)
-  redirect('/dashboard/member/welfare?submitted=1')
 }
 
 export async function actionEmailReceipt(formData: FormData) {
@@ -74,30 +56,6 @@ export async function actionEmailReceipt(formData: FormData) {
   })
 
   revalidatePath('/dashboard/treasurer/contributions')
-}
-
-export async function actionReviewWelfare(formData: FormData) {
-  await requireWelfareEnabled()
-  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
-  const id = String(formData.get('id') || '')
-  const status = String(formData.get('status') || '') as 'APPROVED' | 'REJECTED'
-  const reviewNote = String(formData.get('reviewNote') || '') || undefined
-  if (!id || !['APPROVED', 'REJECTED'].includes(status)) {
-    throw new Error('Invalid welfare review')
-  }
-  const updated = await updateWelfareStatus(id, status, reviewNote)
-  await sendWelfareStatusEmail(updated.user, status, reviewNote)
-  await writeAudit({
-    userId: actor.id,
-    action: 'WELFARE_REVIEW',
-    entity: 'WelfareRequest',
-    entityId: id,
-    meta: { status },
-  })
-  revalidatePath('/dashboard/treasurer')
-  revalidatePath('/dashboard/member')
-  revalidatePath('/admin')
-  revalidateTag(TAGS.welfare)
 }
 
 export async function actionUploadAnnouncementImage(

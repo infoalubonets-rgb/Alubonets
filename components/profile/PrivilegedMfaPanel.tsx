@@ -13,6 +13,7 @@ export default function PrivilegedMfaPanel({
   const [pending, startTransition] = useTransition()
   const [secret, setSecret] = useState<string | null>(null)
   const [otpauth, setOtpauth] = useState<string | null>(null)
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
@@ -61,11 +62,11 @@ export default function PrivilegedMfaPanel({
                 setMessage('')
                 startTransition(async () => {
                   try {
-                    await confirmMfaEnrollment(formData)
-                    setMessage('MFA enabled.')
+                    const result = await confirmMfaEnrollment(formData)
+                    setMessage('MFA enabled. Store the recovery codes below in a safe place — they are shown only once.')
                     setSecret(null)
                     setOtpauth(null)
-                    window.location.reload()
+                    setRecoveryCodes(result.recoveryCodes || [])
                   } catch (err) {
                     setError(err instanceof Error ? err.message : 'Invalid code.')
                   }
@@ -143,11 +144,11 @@ export default function PrivilegedMfaPanel({
               setError('')
               startTransition(async () => {
                 try {
-                  await confirmMfaEnrollment(formData)
-                  setMessage('New authenticator confirmed.')
+                  const result = await confirmMfaEnrollment(formData)
+                  setMessage('New authenticator confirmed. Store the new recovery codes below.')
                   setSecret(null)
                   setOtpauth(null)
-                  window.location.reload()
+                  setRecoveryCodes(result.recoveryCodes || [])
                 } catch (err) {
                   setError(err instanceof Error ? err.message : 'Invalid code.')
                 }
@@ -208,6 +209,17 @@ export default function PrivilegedMfaPanel({
           </button>
         </form>
         </>
+      )}
+
+      {recoveryCodes.length > 0 && (
+        <div className="mt-3 rounded-xl border border-outline-variant p-3">
+          <p className="text-xs font-semibold text-on-surface">Recovery codes (save these now)</p>
+          <ul className="mt-2 grid grid-cols-2 gap-1 font-mono text-xs">
+            {recoveryCodes.map((code) => (
+              <li key={code}>{code}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {error && <p className="mt-3 text-sm text-error">{error}</p>}

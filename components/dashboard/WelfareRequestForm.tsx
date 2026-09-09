@@ -6,6 +6,7 @@ type Props = {
   action: (formData: FormData) => Promise<void>
   minAmount: number
   maxAmount: number
+  categories: { id: string; name: string }[]
 }
 
 function SubmitButton() {
@@ -33,7 +34,12 @@ function SubmitButton() {
   )
 }
 
-export default function WelfareRequestForm({ action, minAmount, maxAmount }: Props) {
+export default function WelfareRequestForm({
+  action,
+  minAmount,
+  maxAmount,
+  categories,
+}: Props) {
   return (
     <form action={action} className="grid gap-3">
       <label className="text-xs font-bold text-on-surface-variant">
@@ -46,6 +52,49 @@ export default function WelfareRequestForm({ action, minAmount, maxAmount }: Pro
           placeholder="Tell us what support you need and why…"
           className="mt-1.5 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
         />
+      </label>
+      <label className="text-xs font-bold text-on-surface-variant">
+        Beneficiary name
+        <input
+          name="beneficiaryName"
+          maxLength={120}
+          placeholder="Who should receive this support?"
+          className="mt-1.5 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+        />
+      </label>
+      <label className="text-xs font-bold text-on-surface-variant">
+        Support type
+        <input
+          name="supportType"
+          maxLength={80}
+          placeholder="Medical, bereavement, emergency…"
+          className="mt-1.5 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+        />
+      </label>
+      {categories.length > 0 && (
+        <label className="text-xs font-bold text-on-surface-variant">
+          Category
+          <select
+            name="categoryId"
+            className="mt-1.5 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+          >
+            <option value="">Select a category</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>{category.name}</option>
+            ))}
+          </select>
+        </label>
+      )}
+      <label className="text-xs font-bold text-on-surface-variant">
+        Confidentiality
+        <select
+          name="confidentiality"
+          defaultValue="STANDARD"
+          className="mt-1.5 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-sm font-normal text-on-surface outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+        >
+          <option value="STANDARD">Standard — officers see requester details</option>
+          <option value="CONFIDENTIAL">Confidential — restricted to welfare officers</option>
+        </select>
       </label>
       <label className="text-xs font-bold text-on-surface-variant">
         Requested amount

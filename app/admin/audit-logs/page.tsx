@@ -1,13 +1,11 @@
-import { redirect } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import AuditLogsTable from '@/components/admin/AuditLogsTable'
 import PaginationBar from '@/components/ui/PaginationBar'
-import { ADMIN_NAV } from '@/lib/dashboard/nav'
+import { ADMIN_NAV, navForRole } from '@/lib/dashboard/nav'
 import { requireActiveRole } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { resolveAuditTargets, targetKey } from '@/lib/audit-resolve'
 import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
-import { navForRole } from '@/lib/dashboard/nav'
 import type { Role } from '@/lib/auth/types'
 
 export const metadata = {
@@ -24,8 +22,8 @@ export default async function AdminAuditLogsPage({
   }>
 }) {
   const actor = await requireActiveRole(['ADMIN', 'AUDITOR'])
-  const role = actor.role as Role
-  const nav = role === 'ADMIN' || actor.isSuperAdmin ? undefined : navForRole(role)
+  const role = (actor.isSuperAdmin ? 'ADMIN' : actor.role) as Role
+  const nav = role === 'ADMIN' ? ADMIN_NAV : navForRole(role)
 
   const { from = '', to = '', page: pageRaw } = await searchParams
   const page = parsePage(pageRaw)
@@ -66,7 +64,7 @@ export default async function AdminAuditLogsPage({
   const pages = totalPages(total, pageSize)
 
   return (
-    <DashboardShell role="ADMIN" title="Activity logs" nav={ADMIN_NAV}>
+    <DashboardShell role={role} title="Activity logs" nav={nav}>
       <div className="mb-4 space-y-3">
         <form className="grid gap-2 rounded-2xl border bg-surface p-4 md:grid-cols-3">
           <input

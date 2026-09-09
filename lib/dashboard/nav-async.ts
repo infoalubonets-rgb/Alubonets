@@ -26,6 +26,7 @@ export async function navWithLoans(role: Role): Promise<NavItem[]> {
         base = withOptionalNav(base, WELFARE_NAV_ITEMS.treasurer, '/financial-reports')
         break
       case 'EXECUTIVE':
+        base = withOptionalNav(base, WELFARE_NAV_ITEMS.executive, '/financial-reports')
         break
       case 'MEMBER':
       case 'SECRETARY':
@@ -43,7 +44,7 @@ export async function navWithLoans(role: Role): Promise<NavItem[]> {
     case 'TREASURER':
       return withOptionalNav(base, LOANS_NAV_ITEMS.treasurer, '/financial-reports')
     case 'EXECUTIVE':
-      return withOptionalNav(EXECUTIVE_NAV, LOANS_NAV_ITEMS.executive, '/financial-reports')
+      return withOptionalNav(base, LOANS_NAV_ITEMS.executive, '/financial-reports')
     case 'MEMBER':
     case 'SECRETARY':
     case 'ORGANIZER':
