@@ -15,6 +15,8 @@ enum Role {
   SECRETARY
   ORGANIZER
   MEMBER
+  // Read-only oversight: financial records, reports and audit history. Never writes.
+  AUDITOR
 }
 
 enum MemberStatus {
@@ -22,6 +24,9 @@ enum MemberStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+  DECEASED
+  RESIGNED
+  DISQUALIFIED
 }
 
 enum Gender {
@@ -157,6 +162,7 @@ enum TransactionStatus {
   CONFIRMED
   RECONCILED
   REVERSED
+  REJECTED
 }
 enum ReconciliationStatus {
   UNRECONCILED
@@ -243,6 +249,7 @@ enum EventAudienceType {
   ALL_MEMBERS
   SELECTED_ROLES
   SELECTED_MEMBERS
+  BRANCH_MEMBERS
 }
 
 enum EventRsvpStatus {
@@ -287,6 +294,11 @@ model User {
   principalMemberId        String?
   familyRelationship       FamilyRelationship?
   familyRegistrationState  FamilyRegistrationState @default(STANDARD)
+  mfaEnabled               Boolean                 @default(false)
+  mfaSecret                String?
+  failedLoginCount         Int                     @default(0)
+  lockedUntil              DateTime?
+  lastActiveAt             DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -300,10 +312,14 @@ model User {
   familyTransfersApproved FamilyBranchHistory[] @relation("FamilyHistoryApprover")
   familyAccountTransitions FamilyAccountTransition[] @relation("FamilyTransitionMember")
   familyTransitionsPerformed FamilyAccountTransition[] @relation("FamilyTransitionActor")
+  profileVisibility    ProfileVisibility? @relation("ProfileVisibilitySubject")
+  profileVisibilityApprovals ProfileVisibility[] @relation("ProfileVisibilityApprover")
+  profileVisibilityChanges   ProfileVisibility[] @relation("ProfileVisibilityChangedBy")
   supportConversation SupportConversation? @relation("SupportConversationOwner")
   supportMessages SupportMessage[] @relation("SupportMessageSender")
 
-  contributions        Contribution[]
+  contributions        Contribution[] @relation("ContributionPayer")
+  branchContributions  Contribution[] @relation("ContributionBranch")
   welfareRequests      WelfareRequest[]
   auditLogs            AuditLog[]
   announcements        Announcement[]
@@ -346,10 +362,13 @@ model User {
   eventAttendances EventAttendance[] @relation("EventAttendee")
   recordedEventAttendances EventAttendance[] @relation("EventAttendanceRecorder")
   eventCostsRecorded EventCost[]
+  eventBranchAudiences Event[] @relation("EventBranchAudience")
   loanApplications LoanApplication[] @relation("LoanApplicant")
   loanReviews LoanApplication[] @relation("LoanTreasurerReviewer")
   loanDecisions LoanApplication[] @relation("LoanDecider")
   loanGuarantees LoanGuarantor[]
+  dailyActivitiesCreated DailyActivity[] @relation("DailyActivityCreator")
+  financeSettingVersions FinanceSettingVersion[] @relation("FinanceSettingEditor")
 
   @@index([principalMemberId])
   @@index([isPrincipal])
@@ -540,7 +559,9 @@ model MembershipSequence {
 model Contribution {
   id            String        @id @default(cuid())
   userId        String
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User          @relation("ContributionPayer", fields: [userId], references: [id], onDelete: Cascade)
+  principalMemberId String?
+  principalMember   User?     @relation("ContributionBranch", fields: [principalMemberId], references: [id], onDelete: SetNull)
   amount        Float
   description   String?
   category      String?
@@ -550,7 +571,10 @@ model Contribution {
   paidAt        DateTime      @default(now())
   mpesaRef      String?
   createdAt     DateTime      @default(now())
-  status        TransactionStatus @default(CONFIRMED)
+  status        TransactionStatus @default(PENDING)
+  verificationNote String?
+  verifiedAt    DateTime?
+  verifiedById  String?
   reconciliationStatus ReconciliationStatus @default(UNRECONCILED)
   reconciledAt  DateTime?
   correctionReason String?
@@ -569,6 +593,7 @@ model Contribution {
   supportingDocuments SupportingDocument[]
 
   @@index([userId])
+  @@index([principalMemberId])
   @@index([paidAt])
   @@index([status, reconciliationStatus])
   @@index([campaignId, userId])
@@ -599,6 +624,8 @@ model TransactionCategory {
   description String?
   requiresEvidence Boolean @default(false)
   active Boolean @default(true)
+  sortOrder Int @default(0)
+  fixedAmountKes Float?
   contributions Contribution[]
   campaigns ContributionCampaign[]
   transactions FinancialTransaction[]
@@ -1042,6 +1069,8 @@ model Event {
   isPublic             Boolean           @default(true)
   audienceType         EventAudienceType @default(PUBLIC)
   audienceRoles        Role[]            @default([])
+  audiencePrincipalId  String?
+  audiencePrincipal    User?             @relation("EventBranchAudience", fields: [audiencePrincipalId], references: [id], onDelete: SetNull)
   capacity             Int?
   rsvpDeadlineAt       DateTime?
   budgetKes            Decimal           @default(0) @db.Decimal(14, 2)
@@ -1060,9 +1089,11 @@ model Event {
   attachments EventAttachment[]
   costs       EventCost[]
   expenses    Expense[]
+  meetings    Meeting[]
 
   @@index([startsAt])
   @@index([isPublic, startsAt])
+  @@index([audiencePrincipalId])
   @@map("events")
 }
 
@@ -1149,6 +1180,7 @@ model Document {
   mimeType          String?
   category          String?
   categoryId        String?
+  tags              String[]            @default([])
   categoryRecord    DocumentCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   accessLevel       DocumentAccessLevel @default(MEMBERS)
   allowedRoles      Role[]              @default([])
@@ -1225,6 +1257,8 @@ model Meeting {
   minutesVersion      Int           @default(1)
   publishedDocumentId String?       @unique
   publishedDocument   Document?     @relation(fields: [publishedDocumentId], references: [id], onDelete: SetNull)
+  eventId             String?
+  event               Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   invitations         MeetingInvitation[]
@@ -1233,6 +1267,7 @@ model Meeting {
   decisions           MeetingDecision[]
   versions            MeetingVersion[]
 
+  @@index([eventId])
   @@map("meetings")
 }
 
@@ -1444,6 +1479,78 @@ model AppSetting {
   updatedBy String?
   updatedAt DateTime @updatedAt
   @@map("app_settings")
+}
+
+model ProfileVisibility {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation("ProfileVisibilitySubject", fields: [userId], references: [id], onDelete: Cascade)
+  visibleToMembers      Boolean  @default(false)
+  allowedFields         Json     @default("[]")
+  approvedByPrincipalId String?
+  approvedByPrincipal   User?    @relation("ProfileVisibilityApprover", fields: [approvedByPrincipalId], references: [id], onDelete: SetNull)
+  changedById           String?
+  changedBy             User?    @relation("ProfileVisibilityChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  changedAt             DateTime @default(now())
+  reviewAt              DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([visibleToMembers])
+  @@map("profile_visibility")
+}
+
+model DailyActivity {
+  id          String   @id @default(cuid())
+  title       String
+  body        String?
+  activityType String  @default("GENERAL")
+  startsAt    DateTime @default(now())
+  endsAt      DateTime?
+  venue       String?
+  audienceType String  @default("ALL_MEMBERS")
+  audienceRoles Role[] @default([])
+  audiencePrincipalId String?
+  createdById String
+  createdBy   User     @relation("DailyActivityCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([startsAt, published])
+  @@map("daily_activities")
+}
+
+model FinanceSettingVersion {
+  id              String   @id @default(cuid())
+  bankName        String
+  accountName     String
+  accountNumber   String
+  paybillOrTill   String?
+  branchName      String?
+  notes           String?
+  active          Boolean  @default(true)
+  changedById     String?
+  changedBy       User?    @relation("FinanceSettingEditor", fields: [changedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+
+  @@index([active, createdAt])
+  @@map("finance_setting_versions")
+}
+
+model FundAllocationRule {
+  id                 String   @id @default(cuid())
+  name               String
+  emergencyPercent   Float    @default(20)
+  reservePercent     Float    @default(80)
+  active             Boolean  @default(true)
+  version            Int      @default(1)
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([active])
+  @@map("fund_allocation_rules")
 }
 
 model FeatureFlag {

@@ -3,10 +3,12 @@ import DashboardShell from '@/components/dashboard/DashboardShell'
 import AuditLogsTable from '@/components/admin/AuditLogsTable'
 import PaginationBar from '@/components/ui/PaginationBar'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
-import { requireAdmin } from '@/lib/auth/session'
+import { requireActiveRole } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { resolveAuditTargets, targetKey } from '@/lib/audit-resolve'
 import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
+import { navForRole } from '@/lib/dashboard/nav'
+import type { Role } from '@/lib/auth/types'
 
 export const metadata = {
   title: 'Activity logs',
@@ -21,11 +23,9 @@ export default async function AdminAuditLogsPage({
     page?: string
   }>
 }) {
-  try {
-    await requireAdmin()
-  } catch {
-    redirect('/admin')
-  }
+  const actor = await requireActiveRole(['ADMIN', 'AUDITOR'])
+  const role = actor.role as Role
+  const nav = role === 'ADMIN' || actor.isSuperAdmin ? undefined : navForRole(role)
 
   const { from = '', to = '', page: pageRaw } = await searchParams
   const page = parsePage(pageRaw)

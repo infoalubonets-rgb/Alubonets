@@ -5,13 +5,23 @@ export type { NavItem }
 
 const CONTRIBUTIONS_NAV: NavItem = {
   icon: 'payments',
-  label: 'Contributions',
+  label: 'Payments & Statements',
   href: '/contributions',
 }
 const ANNOUNCEMENTS_NAV: NavItem = {
   icon: 'campaign',
   label: 'Announcements',
   href: '/announcements',
+}
+const DIRECTORY_NAV: NavItem = {
+  icon: 'contacts',
+  label: 'Directory',
+  href: '/directory',
+}
+const TODAY_NAV: NavItem = {
+  icon: 'today',
+  label: 'Today / Activities',
+  href: '/today',
 }
 const PROJECTS_VIEW_NAV: NavItem = {
   icon: 'work',
@@ -54,6 +64,11 @@ export const ADMIN_NAV: NavItem[] = [
   { icon: 'campaign', label: 'Communications', href: '/admin/announcements' },
   { icon: 'folder_managed', label: 'Documents', href: '/documents/manage', children: [DOCUMENTS_VIEW_NAV] },
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
+  { icon: 'contacts', label: 'Directory', href: '/directory' },
+  { icon: 'today', label: 'Today / Activities', href: '/today' },
+  // Admins are members too — keep their own family branch and statement reachable.
+  FAMILY_NAV,
+  CONTRIBUTIONS_NAV,
   { icon: 'settings', label: 'Settings', href: '/admin/settings', children: [
     { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
   ] },
@@ -62,6 +77,7 @@ export const ADMIN_NAV: NavItem[] = [
 
 export const EXECUTIVE_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/executive' },
+  TODAY_NAV,
   SUPPORT_CHAT_NAV,
   { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
   EVENTS_VIEW_NAV,
@@ -69,13 +85,29 @@ export const EXECUTIVE_NAV: NavItem[] = [
   { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
   { icon: 'gavel', label: 'Governance', href: '/governance' },
   DOCUMENTS_VIEW_NAV,
+  DIRECTORY_NAV,
   ANNOUNCEMENTS_NAV,
   FAMILY_NAV,
   CONTRIBUTIONS_NAV,
 ]
 
+/**
+ * Auditor is oversight only — financial records, reports, governance and the audit trail.
+ * Every destination here is a read view; the role has no create/edit routes.
+ */
+export const AUDITOR_NAV: NavItem[] = [
+  { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
+  { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
+  MEETINGS_REPORTS_NAV,
+  { icon: 'gavel', label: 'Governance', href: '/governance' },
+  DOCUMENTS_VIEW_NAV,
+  DIRECTORY_NAV,
+  ANNOUNCEMENTS_NAV,
+]
+
 export const TREASURER_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/treasurer' },
+  TODAY_NAV,
   SUPPORT_CHAT_NAV,
   { icon: 'payments', label: 'Member contributions', href: '/dashboard/treasurer/contributions' },
   { icon: 'account_balance', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
@@ -88,11 +120,13 @@ export const TREASURER_NAV: NavItem[] = [
   { icon: 'gavel', label: 'Governance', href: '/governance' },
   { icon: 'savings', label: 'My contributions', href: '/contributions' },
   FAMILY_NAV,
+  DIRECTORY_NAV,
   ANNOUNCEMENTS_NAV,
 ]
 
 export const SECRETARY_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/secretary' },
+  TODAY_NAV,
   SUPPORT_CHAT_NAV,
   ANNOUNCEMENTS_NAV,
   { icon: 'summarize', label: 'Minutes & reports', href: '/dashboard/secretary/meetings' },
@@ -101,12 +135,14 @@ export const SECRETARY_NAV: NavItem[] = [
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
   { icon: 'folder_managed', label: 'Documents', href: '/documents/manage' },
   DOCUMENTS_VIEW_NAV,
+  DIRECTORY_NAV,
   FAMILY_NAV,
   CONTRIBUTIONS_NAV,
 ]
 
 export const ORGANIZER_NAV: NavItem[] = [
   { icon: 'dashboard', label: 'Overview', href: '/dashboard/organizer' },
+  TODAY_NAV,
   SUPPORT_CHAT_NAV,
   { icon: 'event', label: 'Events', href: '/dashboard/organizer/events' },
   { icon: 'photo_library', label: 'Gallery', href: '/dashboard/organizer/gallery' },
@@ -115,6 +151,7 @@ export const ORGANIZER_NAV: NavItem[] = [
   MEETINGS_REPORTS_NAV,
   DOCUMENTS_VIEW_NAV,
   { icon: 'gavel', label: 'Governance', href: '/governance' },
+  DIRECTORY_NAV,
   FAMILY_NAV,
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
@@ -122,8 +159,10 @@ export const ORGANIZER_NAV: NavItem[] = [
 
 export const MEMBER_NAV: NavItem[] = [
   { icon: 'home', label: 'Home', href: '/dashboard/member' },
+  TODAY_NAV,
   SUPPORT_CHAT_NAV,
   FAMILY_NAV,
+  DIRECTORY_NAV,
   ANNOUNCEMENTS_NAV,
   CONTRIBUTIONS_NAV,
   PROJECTS_VIEW_NAV,
@@ -176,6 +215,8 @@ export function navForRole(role: Role): NavItem[] {
       return SECRETARY_NAV
     case 'ORGANIZER':
       return ORGANIZER_NAV
+    case 'AUDITOR':
+      return AUDITOR_NAV
     case 'MEMBER':
     default:
       return MEMBER_NAV

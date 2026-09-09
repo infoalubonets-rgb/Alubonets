@@ -27,7 +27,8 @@ export function isAppRole(value: unknown): value is Role {
     value === 'TREASURER' ||
     value === 'SECRETARY' ||
     value === 'ORGANIZER' ||
-    value === 'MEMBER'
+    value === 'MEMBER' ||
+    value === 'AUDITOR'
   )
 }
 
@@ -36,6 +37,9 @@ export function isMemberStatus(value: unknown): value is MemberStatus {
     value === 'PENDING' ||
     value === 'ACTIVE' ||
     value === 'INACTIVE' ||
-    value === 'SUSPENDED'
+    value === 'SUSPENDED' ||
+    value === 'DECEASED' ||
+    value === 'RESIGNED' ||
+    value === 'DISQUALIFIED'
   )
 }

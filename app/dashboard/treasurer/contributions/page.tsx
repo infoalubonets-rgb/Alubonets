@@ -17,9 +17,10 @@ import {
 import { hasChartData } from '@/lib/chart-labels'
 import MpesaStkForm from '@/components/dashboard/MpesaStkForm'
 import PaymentsModal from '@/components/dashboard/PaymentsModal'
+import PendingContributionVerify from '@/components/dashboard/PendingContributionVerify'
 import PaginationBar from '@/components/ui/PaginationBar'
 import { prisma } from '@/lib/prisma'
-import type { Prisma } from '@prisma/client'
+import type { Prisma, TransactionStatus } from '@prisma/client'
 import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
 
 export const dynamic = 'force-dynamic'
@@ -31,26 +32,49 @@ export const metadata = {
 export default async function TreasurerContributionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string }>
+  searchParams: Promise<{ page?: string; q?: string; year?: string; purpose?: string; status?: string }>
 }) {
   const sp = await searchParams
   const page = parsePage(sp.page)
   const pageSize = 25
   const q = (sp.q || '').trim()
-  const contributionWhere = {
-    status: { in: ['CONFIRMED', 'RECONCILED'] as const },
+  const year = (sp.year || '').trim()
+  const purpose = (sp.purpose || '').trim()
+  const statusFilter = (sp.status || '').trim()
+  const yearStart = year ? new Date(`${year}-01-01T00:00:00.000Z`) : null
+  const yearEnd = year ? new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`) : null
+  const andFilters: Prisma.ContributionWhereInput[] = [
+    ...(purpose
+      ? [
+          {
+            OR: [
+              { category: { contains: purpose, mode: 'insensitive' as const } },
+              { transactionCategory: { name: { contains: purpose, mode: 'insensitive' as const } } },
+            ],
+          },
+        ]
+      : []),
     ...(q
-      ? {
-          OR: [
-            { user: { fullName: { contains: q, mode: 'insensitive' as const } } },
-            { user: { email: { contains: q, mode: 'insensitive' as const } } },
-            { mpesaRef: { contains: q, mode: 'insensitive' as const } },
-          ],
-        }
-      : {}),
+      ? [
+          {
+            OR: [
+              { user: { fullName: { contains: q, mode: 'insensitive' as const } } },
+              { user: { email: { contains: q, mode: 'insensitive' as const } } },
+              { mpesaRef: { contains: q, mode: 'insensitive' as const } },
+            ],
+          },
+        ]
+      : []),
+  ]
+  const contributionWhere: Prisma.ContributionWhereInput = {
+    status: statusFilter
+      ? { in: [statusFilter as TransactionStatus] }
+      : { in: ['CONFIRMED', 'RECONCILED'] },
+    ...(yearStart && yearEnd ? { paidAt: { gte: yearStart, lt: yearEnd } } : {}),
+    ...(andFilters.length ? { AND: andFilters } : {}),
   }
 
-  const [data, chart, analytics, mpesaContributions, failedPayments, contribTotal, recent] =
+  const [data, chart, analytics, mpesaContributions, failedPayments, contribTotal, recent, pendingRows] =
     await Promise.all([
       getTreasurerDashboardData(),
       getContributionChartSeries(),
@@ -75,6 +99,15 @@ export default async function TreasurerContributionsPage({
         skip: paginationSkip(page, pageSize),
         take: pageSize,
       }),
+      prisma.contribution.findMany({
+        where: { status: 'PENDING' },
+        include: {
+          user: { select: { fullName: true, email: true } },
+          transactionCategory: { select: { name: true } },
+        },
+        orderBy: { paidAt: 'desc' },
+        take: 50,
+      }),
     ])
 
   const catLabels = data.byCategory.map((c) => c.category || 'Uncategorized')
@@ -83,6 +116,8 @@ export default async function TreasurerContributionsPage({
   const methodValues = analytics.byMethod.map((m) => m.total)
   const topLabels = analytics.topContributors.map((t) => t.name)
   const topValues = analytics.topContributors.map((t) => t.total)
+  const currentYear = new Date().getFullYear()
+  const yearOptions = Array.from({ length: 6 }, (_, i) => String(currentYear - i))
 
   const stats = [
     { label: 'Total collected (KES)', value: Math.round(data.total).toLocaleString() },
@@ -106,6 +141,20 @@ export default async function TreasurerContributionsPage({
             ))}
           </div>
         </div>
+
+        <PendingContributionVerify
+          rows={pendingRows.map((row) => ({
+            id: row.id,
+            amount: row.amount,
+            paidAt: row.paidAt.toISOString(),
+            category: row.transactionCategory?.name || row.category,
+            memberName: row.user.fullName,
+            memberEmail: row.user.email,
+            paymentMethod: row.paymentMethod,
+            mpesaRef: row.mpesaRef,
+            statementRef: row.statementRef,
+          }))}
+        />
 
         {/* Payments modal trigger */}
         <div className="flex items-center gap-3">
@@ -184,22 +233,46 @@ export default async function TreasurerContributionsPage({
         <section className="rounded-xl border bg-surface p-4 overflow-x-auto">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold">Recent contributions</h2>
-            <form method="get" className="flex gap-2">
-              <input
-                name="q"
-                defaultValue={q}
-                placeholder="Search member or ref"
-                className="rounded-lg border px-3 py-1.5 text-sm"
-              />
-              <button className="rounded-lg border px-3 py-1.5 text-sm">Search</button>
-            </form>
+            <div className="flex flex-wrap gap-2 text-sm">
+              <a
+                className="rounded-full border px-3 py-1.5"
+                href={`/api/export/financial?from=${year || currentYear}-01-01&to=${year || currentYear}-12-31T23:59:59.999`}
+              >
+                Export CSV
+              </a>
+              <a
+                className="rounded-full border px-3 py-1.5"
+                href={`/api/export/financial-xlsx?from=${year || currentYear}-01-01&to=${year || currentYear}-12-31T23:59:59.999`}
+              >
+                Export Excel
+              </a>
+            </div>
           </div>
+          <form method="get" className="mb-3 flex flex-wrap gap-2">
+            <input name="q" defaultValue={q} placeholder="Search member or ref" className="rounded-lg border px-3 py-1.5 text-sm" />
+            <select name="year" defaultValue={year} className="rounded-lg border px-3 py-1.5 text-sm">
+              <option value="">All years</option>
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <input name="purpose" defaultValue={purpose} placeholder="Purpose / category" className="rounded-lg border px-3 py-1.5 text-sm" />
+            <select name="status" defaultValue={statusFilter} className="rounded-lg border px-3 py-1.5 text-sm">
+              <option value="">Confirmed / reconciled</option>
+              <option value="PENDING">Pending</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="RECONCILED">Reconciled</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+            <button className="rounded-lg border px-3 py-1.5 text-sm">Filter</button>
+          </form>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-on-surface-variant">
                 <th className="py-2">Member</th>
                 <th>Amount</th>
                 <th>Method</th>
+                <th>Status</th>
                 <th>Ref</th>
                 <th>Date</th>
                 <th>Receipt</th>
@@ -211,6 +284,7 @@ export default async function TreasurerContributionsPage({
                   <td className="py-2">{c.user.fullName}</td>
                   <td>{c.amount.toLocaleString()}</td>
                   <td>{c.paymentMethod}</td>
+                  <td>{c.status}</td>
                   <td>{c.mpesaRef || '—'}</td>
                   <td>{new Date(c.paidAt).toLocaleDateString()}</td>
                   <td>
@@ -234,7 +308,7 @@ export default async function TreasurerContributionsPage({
             pathname="/dashboard/treasurer/contributions"
             page={page}
             totalPages={totalPages(contribTotal, pageSize)}
-            params={{ q }}
+            params={{ q, year, purpose, status: statusFilter }}
           />
         </section>
 

@@ -29,7 +29,7 @@ type FailedPayment = {
   id: string
   createdAt: string
   meta: Prisma.JsonObject
-  user: { fullName: string; email: string }
+  user: { fullName: string; email: string } | null
 }
 
 type Tab = 'success' | 'failed'
@@ -175,7 +175,7 @@ export default function PaymentsModal({
                           <td className="py-3 px-5 text-[13px] text-on-surface-variant">
                             {new Date(p.paidAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </td>
-                          <td className="py-3 px-4 text-[13px] font-medium text-on-surface">{p.user.fullName}</td>
+                          <td className="py-3 px-4 text-[13px] font-medium text-on-surface">{p.user?.fullName ?? 'Deleted member'}</td>
                           <td className="py-3 px-4 text-[13px] font-semibold text-secondary dark:text-orange-400">
                             KES {Math.round(p.amount).toLocaleString()}
                           </td>
@@ -209,7 +209,7 @@ export default function PaymentsModal({
                             <td className="py-3 px-5 text-[13px] text-on-surface-variant">
                               {new Date(f.createdAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </td>
-                            <td className="py-3 px-4 text-[13px] font-medium text-on-surface">{f.user.fullName}</td>
+                            <td className="py-3 px-4 text-[13px] font-medium text-on-surface">{f.user?.fullName ?? 'Deleted member'}</td>
                             <td className="py-3 px-4 text-[13px] text-on-surface-variant">
                               {meta.amount ? `KES ${Math.round(meta.amount).toLocaleString()}` : '—'}
                             </td>

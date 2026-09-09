@@ -1,13 +1,26 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { SECRETARY_NAV } from '@/lib/dashboard/nav'
 import MeetingMinutesEditor from '@/components/meetings/MeetingMinutesEditor'
+import { prisma } from '@/lib/prisma'
 
-export default function NewMeetingPage() {
+export default async function NewMeetingPage() {
+  const events = await prisma.event.findMany({
+    where: { startsAt: { gte: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365) } },
+    select: { id: true, title: true, startsAt: true },
+    orderBy: { startsAt: 'desc' },
+    take: 100,
+  })
+
   return (
     <DashboardShell role="SECRETARY" title="New meeting" nav={SECRETARY_NAV}>
       <div className="p-4 md:p-6">
         <MeetingMinutesEditor
           mode="create"
+          events={events.map((event) => ({
+            id: event.id,
+            title: event.title,
+            startsAt: event.startsAt.toISOString(),
+          }))}
           initial={{
             title: '',
             heldAt: new Date().toISOString(),
@@ -20,6 +33,7 @@ export default function NewMeetingPage() {
             agenda: '',
             minutes: '',
             nextMeetingAt: '',
+            eventId: '',
             status: 'DRAFT',
           }}
         />

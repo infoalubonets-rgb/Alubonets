@@ -3,6 +3,16 @@ import { withSentryConfig } from '@sentry/nextjs'
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  async redirects() {
+    return [
+      // Email clients / old copy sometimes use underscore; the real page is hyphenated.
+      {
+        source: '/reset_password',
+        destination: '/reset-password',
+        permanent: false,
+      },
+    ]
+  },
   images: {
     remotePatterns: [
       {

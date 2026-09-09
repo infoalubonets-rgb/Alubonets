@@ -11,7 +11,7 @@ import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
 export default async function DocumentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; page?: string }>
+  searchParams: Promise<{ q?: string; category?: string; tag?: string; page?: string }>
 }) {
   const actor = await requireActiveRole([
     'ADMIN',
@@ -22,7 +22,7 @@ export default async function DocumentsPage({
     'MEMBER',
   ])
   await Promise.all([ensureDocumentCategories(), syncExpiredDocuments()])
-  const { q = '', category = '', page: pageRaw } = await searchParams
+  const { q = '', category = '', tag = '', page: pageRaw } = await searchParams
   const page = parsePage(pageRaw)
   const pageSize = 24
   const canAdd = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || actor.role === 'ORGANIZER'
@@ -34,10 +34,12 @@ export default async function DocumentsPage({
               OR: [
                 { title: { contains: q, mode: 'insensitive' } },
                 { description: { contains: q, mode: 'insensitive' } },
+                { tags: { has: q } },
               ],
             }
           : {}),
         ...(category ? { categoryId: category } : {}),
+        ...(tag ? { tags: { has: tag } } : {}),
         status: 'PUBLISHED',
       },
       include: { categoryRecord: true, uploader: { select: { fullName: true } } },
@@ -83,6 +85,12 @@ export default async function DocumentsPage({
               </option>
             ))}
           </select>
+          <input
+            name="tag"
+            defaultValue={tag}
+            placeholder="Tag"
+            className="h-10 w-28 rounded-lg border px-3 py-2 text-sm"
+          />
           <button
             className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-on-primary"
             aria-label="Search documents"
@@ -107,9 +115,29 @@ export default async function DocumentsPage({
                 </span>
               </div>
               {document.description && <p className="mt-3 text-sm">{document.description}</p>}
+              {!!document.tags?.length && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {document.tags.map((item) => (
+                    <a
+                      key={item}
+                      href={`/documents?tag=${encodeURIComponent(item)}`}
+                      className="rounded-full bg-surface-container px-2 py-0.5 text-[11px] text-on-surface-variant"
+                    >
+                      #{item}
+                    </a>
+                  ))}
+                </div>
+              )}
               <p className="mt-2 text-xs text-on-surface-variant">
                 Published {document.uploadedAt.toLocaleDateString()} by {document.uploader.fullName}
               </p>
+              {(document.mimeType || '').includes('pdf') && (
+                <iframe
+                  title={`Preview ${document.title}`}
+                  src={`/api/documents/${document.id}/download`}
+                  className="mt-3 h-48 w-full rounded-xl border bg-surface-container-low"
+                />
+              )}
               <a
                 href={`/api/documents/${document.id}/download`}
                 target="_blank"
@@ -126,7 +154,7 @@ export default async function DocumentsPage({
             No documents found.
           </p>
         )}
-        <PaginationBar pathname="/documents" page={page} totalPages={pages} params={{ q, category }} />
+        <PaginationBar pathname="/documents" page={page} totalPages={pages} params={{ q, category, tag }} />
       </div>
     </DashboardShell>
   )

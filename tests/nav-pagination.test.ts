@@ -33,8 +33,9 @@ describe('withOptionalNav', () => {
     expect(nav[financeIdx + 1]?.href).toBe('/admin/loans')
   })
 
-  it('keeps the admin sidebar to 11 top-level sections', () => {
-    expect(ADMIN_NAV).toHaveLength(11)
+  it('keeps the admin sidebar to 15 top-level sections', () => {
+    // 11 originally, plus Directory, Today/Activities, My Family and My contributions.
+    expect(ADMIN_NAV).toHaveLength(15)
   })
 
   it('keeps every former admin destination in a main section or related page', () => {
@@ -54,7 +55,7 @@ describe('withOptionalNav', () => {
       '/documents/manage',
       '/documents',
       '/governance/manage',
-      '/admin/content',
+      // '/admin/content' was removed in 04ec719 — the page no longer exists.
       '/admin/roles',
       '/admin/announcements',
       '/admin/settings',
@@ -69,7 +70,9 @@ describe('navForRole', () => {
   it('returns role-specific nav', () => {
     expect(navForRole('TREASURER')[0]?.href).toBe('/dashboard/treasurer')
     expect(navForRole('MEMBER').some((n) => n.href === '/dashboard/member')).toBe(true)
-    expect(navForRole('MEMBER').some((n) => n.href?.startsWith('/governance'))).toBe(false)
+    // Members reach the read/vote governance page, but never the manage console.
+    expect(navForRole('MEMBER').some((n) => n.href === '/governance')).toBe(true)
+    expect(navForRole('MEMBER').some((n) => n.href === '/governance/manage')).toBe(false)
   })
 })
 

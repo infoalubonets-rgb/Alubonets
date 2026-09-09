@@ -13,11 +13,26 @@ import { requestIp } from '@/lib/membership'
 import { verificationStillValid } from '@/lib/email-verification'
 import { logError } from '@/lib/logger'
 import { publicErrorMessage } from '@/lib/safe-error'
+import { verifyTotp } from '@/lib/mfa-totp'
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   password: z.string().min(1).max(200),
+  mfaToken: z.string().trim().min(6).max(8).optional(),
 })
+
+async function recordFailedLogin(email: string, userId?: string) {
+  if (!userId) return
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) return
+  const failedLoginCount = user.failedLoginCount + 1
+  const lockedUntil =
+    failedLoginCount >= 5 ? new Date(Date.now() + 30 * 60 * 1000) : user.lockedUntil
+  await prisma.user.update({
+    where: { id: userId },
+    data: { failedLoginCount, lockedUntil },
+  })
+}
 
 export async function POST(req: Request) {
   try {
@@ -38,6 +53,25 @@ export async function POST(req: Request) {
     } catch (cause) {
       logError('auth.login.rate_limit_failed', cause, { email, ipAddress })
       return NextResponse.json({ error: publicErrorMessage(cause, 'Too many attempts. Please wait and try again.') }, { status: 429 })
+    }
+
+    const precheck = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        lockedUntil: true,
+        mfaEnabled: true,
+        mfaSecret: true,
+      },
+    })
+    if (precheck?.lockedUntil && precheck.lockedUntil > new Date()) {
+      return NextResponse.json(
+        {
+          error:
+            'This account is temporarily locked after too many failed sign-in attempts. Try again later or contact an administrator.',
+        },
+        { status: 423 },
+      )
     }
 
     const cookieStore = await cookies()
@@ -62,6 +96,7 @@ export async function POST(req: Request) {
         where: { email },
         select: { id: true },
       })
+      await recordFailedLogin(email, knownProfile?.id)
       await prisma.loginEvent.create({
         data: {
           userId: knownProfile?.id,
@@ -162,7 +197,34 @@ export async function POST(req: Request) {
       )
     }
 
-    if (process.env.BYPASS_LOGIN_VERIFICATION !== 'true') {
+    if (profile.mfaEnabled && profile.mfaSecret) {
+      if (!parsed.data.mfaToken) {
+        await supabase.auth.signOut()
+        return NextResponse.json({
+          requiresMfa: true,
+          error: 'Enter the authenticator code for this privileged account.',
+        }, { status: 401 })
+      }
+      if (!verifyTotp(profile.mfaSecret, parsed.data.mfaToken)) {
+        await supabase.auth.signOut()
+        await recordFailedLogin(email, profile.id)
+        return NextResponse.json({ error: 'Invalid authenticator code.' }, { status: 401 })
+      }
+    }
+
+    if (profile.failedLoginCount > 0 || profile.lockedUntil) {
+      await prisma.user.update({
+        where: { id: profile.id },
+        data: { failedLoginCount: 0, lockedUntil: null, lastActiveAt: new Date() },
+      })
+    } else {
+      await prisma.user.update({
+        where: { id: profile.id },
+        data: { lastActiveAt: new Date() },
+      }).catch(() => undefined)
+    }
+
+    if (!(process.env.NODE_ENV !== 'production' && process.env.BYPASS_LOGIN_VERIFICATION === 'true')) {
       const cookieStoreForVerification = await cookies()
       const verificationHours = 24
       const verified = await verificationStillValid(

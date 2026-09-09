@@ -93,8 +93,29 @@ export async function recordLedgerContribution(formData: FormData) {
   }
   const description = paymentDescription(data.description?.trim() || 'Member contribution', otherLabel)
   assertNotFuture(data.occurredAt, 'Contribution date')
-  const result = await createLedgerContribution({ ...data, categoryId, description, receivedBy: actor.fullName, actorId: actor.id })
-  await writeAudit({ userId: actor.id, action: 'LEDGER_CONTRIBUTION_CREATE', entity: 'FinancialTransaction', entityId: result.financial.id, meta: { contributionId: result.contribution.id, ...data } })
+  const evidence = z.object({
+    evidencePath: z.string().min(1, 'A receipt or proof of payment is required for every contribution.'),
+    evidenceMimeType: z.string().min(1),
+    evidenceTitle: z.string().min(1),
+  }).parse({
+    evidencePath: formData.get('evidencePath'),
+    evidenceMimeType: formData.get('evidenceMimeType'),
+    evidenceTitle: formData.get('evidenceTitle'),
+  })
+  const threshold = Number((await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value || 50000)
+  const status = data.amount >= threshold ? 'PENDING' : 'CONFIRMED'
+  const result = await createLedgerContribution({
+    ...data,
+    categoryId,
+    description,
+    receivedBy: actor.fullName,
+    actorId: actor.id,
+    status,
+    proofPath: evidence.evidencePath,
+    proofMimeType: evidence.evidenceMimeType,
+    proofTitle: evidence.evidenceTitle,
+  })
+  await writeAudit({ userId: actor.id, action: 'LEDGER_CONTRIBUTION_CREATE', entity: 'FinancialTransaction', entityId: result.financial.id, meta: { contributionId: result.contribution.id, status, ...data } })
   refreshFinance()
 }
 
@@ -141,7 +162,8 @@ export async function recordExpense(formData: FormData) {
     evidenceTitle: formData.get('evidenceTitle'),
   })
   const threshold = Number((await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value || 50000)
-  const approvalRequired = data.amount >= threshold && actor.role !== 'ADMIN'
+  // Guide: Admin must not bypass finance approval merely because of system role.
+  const approvalRequired = data.amount >= threshold
   const period = await getOpenPeriod(data.occurredAt)
   const transaction = await prisma.financialTransaction.create({
     data: {
@@ -182,7 +204,8 @@ export async function recordWelfareDisbursement(formData: FormData) {
   const period = await getOpenPeriod(data.occurredAt)
   const category = await prisma.transactionCategory.findUniqueOrThrow({ where: { id: 'cat-welfare-disbursement' } })
   const threshold = Number((await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value || 50000)
-  const approvalRequired = data.amount >= threshold && actor.role !== 'ADMIN'
+  // Guide: Admin must not bypass finance approval merely because of system role.
+  const approvalRequired = data.amount >= threshold
   const transaction = await prisma.$transaction(async (tx) => {
     const created = await tx.financialTransaction.create({
       data: {
@@ -214,10 +237,14 @@ export async function recordWelfareDisbursement(formData: FormData) {
 }
 
 export async function approveFinancialTransaction(formData: FormData) {
-  const actor = await requireAdmin()
+  const actor = await requireActiveRole(['ADMIN', 'TREASURER'])
   const id = z.string().min(1).parse(formData.get('id'))
   const transaction = await prisma.financialTransaction.findUniqueOrThrow({ where: { id } })
   if (transaction.status !== 'PENDING') throw new Error('Only pending transactions can be approved.')
+  // Maker-checker: whoever created/recorded this transaction cannot also approve it.
+  if (transaction.createdById === actor.id) {
+    throw new Error('You recorded this transaction — a different Admin or Treasurer must approve it.')
+  }
   await prisma.$transaction(async (tx) => {
     await tx.financialTransaction.update({ where: { id }, data: { status: 'CONFIRMED', approvedById: actor.id, confirmedAt: new Date() } })
     const disbursement = await tx.disbursement.findUnique({ where: { transactionId: id } })
@@ -258,10 +285,14 @@ export async function proposeReversal(formData: FormData) {
 }
 
 export async function approveReversal(formData: FormData) {
-  const actor = await requireAdmin()
+  const actor = await requireActiveRole(['ADMIN', 'TREASURER'])
   const id = z.string().min(1).parse(formData.get('id'))
   const reversal = await prisma.financialTransaction.findUniqueOrThrow({ where: { id } })
   if (reversal.type !== 'REVERSAL' || reversal.status !== 'PENDING' || !reversal.originalTransactionId) throw new Error('Invalid reversal request.')
+  // Maker-checker: whoever proposed this reversal cannot also approve it.
+  if (reversal.createdById === actor.id) {
+    throw new Error('You proposed this reversal — a different Admin or Treasurer must approve it.')
+  }
   await prisma.$transaction([
     prisma.financialTransaction.update({ where: { id }, data: { status: 'CONFIRMED', approvedById: actor.id, confirmedAt: new Date() } }),
     prisma.financialTransaction.update({ where: { id: reversal.originalTransactionId }, data: { status: 'REVERSED', reversedAt: new Date() } }),
@@ -383,4 +414,180 @@ export async function updateLoanApplicationLimit(formData: FormData): Promise<{ 
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'Could not save loan limit.')
   }
+}
+
+export async function verifyContribution(formData: FormData) {
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const id = z.string().min(1).parse(formData.get('id'))
+  const decision = z.enum(['verify', 'reject']).parse(formData.get('decision'))
+  const note = z.string().trim().max(1000).optional().parse(formData.get('note') || undefined)
+  const contribution = await prisma.contribution.findUniqueOrThrow({
+    where: { id },
+    include: { financialTransaction: { select: { createdById: true } } },
+  })
+  if (contribution.status !== 'PENDING') throw new Error('Only pending payments can be verified or rejected.')
+  // Maker-checker: whoever recorded this contribution cannot also verify it.
+  if (contribution.financialTransaction?.createdById === actor.id) {
+    throw new Error('You recorded this contribution — a different Treasurer or Admin must verify it.')
+  }
+  const status = decision === 'verify' ? 'CONFIRMED' : 'REJECTED'
+  await prisma.$transaction([
+    prisma.contribution.update({
+      where: { id },
+      data: {
+        status,
+        verificationNote: note || null,
+        verifiedAt: new Date(),
+        verifiedById: actor.id,
+      },
+    }),
+    ...(contribution.financialTransactionId
+      ? [
+          prisma.financialTransaction.update({
+            where: { id: contribution.financialTransactionId },
+            data: {
+              status,
+              confirmedAt: decision === 'verify' ? new Date() : null,
+              approvedById: decision === 'verify' ? actor.id : null,
+            },
+          }),
+        ]
+      : []),
+  ])
+  await writeAudit({
+    userId: actor.id,
+    action: decision === 'verify' ? 'CONTRIBUTION_VERIFY' : 'CONTRIBUTION_REJECT',
+    entity: 'Contribution',
+    entityId: id,
+    reason: note,
+    oldValue: { status: contribution.status },
+    newValue: { status },
+  })
+  refreshFinance()
+}
+
+export async function publishFinanceDestination(formData: FormData) {
+  const actor = await requireAdmin()
+  const data = z.object({
+    bankName: z.string().trim().min(2).max(120),
+    accountName: z.string().trim().min(2).max(120),
+    accountNumber: z.string().trim().min(4).max(40),
+    paybillOrTill: z.string().trim().max(40).optional().or(z.literal('')),
+    branchName: z.string().trim().max(120).optional().or(z.literal('')),
+    notes: z.string().trim().max(500).optional().or(z.literal('')),
+  }).parse({
+    bankName: formData.get('bankName'),
+    accountName: formData.get('accountName'),
+    accountNumber: formData.get('accountNumber'),
+    paybillOrTill: formData.get('paybillOrTill') || '',
+    branchName: formData.get('branchName') || '',
+    notes: formData.get('notes') || '',
+  })
+
+  await prisma.financeSettingVersion.updateMany({ where: { active: true }, data: { active: false } })
+  const version = await prisma.financeSettingVersion.create({
+    data: {
+      bankName: data.bankName,
+      accountName: data.accountName,
+      accountNumber: data.accountNumber,
+      paybillOrTill: data.paybillOrTill || null,
+      branchName: data.branchName || null,
+      notes: data.notes || null,
+      active: true,
+      changedById: actor.id,
+    },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'FINANCE_DESTINATION_UPDATE',
+    entity: 'FinanceSettingVersion',
+    entityId: version.id,
+    newValue: data,
+  })
+  refreshFinance()
+  revalidatePath('/admin/settings')
+  revalidatePath('/contributions')
+}
+
+export async function getActiveFinanceDestination() {
+  return prisma.financeSettingVersion.findFirst({
+    where: { active: true },
+    orderBy: { createdAt: 'desc' },
+  })
+}
+
+/**
+ * Branch payment summary for a Principal Member's own family branch.
+ *
+ * The branch is derived from the session, never trusted from the caller: a Principal may only
+ * read their own branch, and only Admin/Super Admin may inspect somebody else's.
+ */
+export async function getBranchContributionSummary(principalId?: string) {
+  const viewer = await requireActiveRole(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'])
+  const isAdmin = viewer.role === 'ADMIN' || viewer.isSuperAdmin
+  const targetId = principalId && isAdmin ? principalId : viewer.id
+
+  if (!isAdmin && !viewer.isPrincipal) {
+    throw new Error('Only a Principal Member can view branch payments.')
+  }
+
+  const branchWhere = { principalMemberId: targetId }
+  // Total comes from an aggregate over the whole branch — a page of recent rows would undercount.
+  const [totalAgg, rows] = await Promise.all([
+    prisma.contribution.aggregate({
+      where: { ...branchWhere, status: { in: ['CONFIRMED', 'RECONCILED'] } },
+      _sum: { amount: true },
+    }),
+    prisma.contribution.findMany({
+      where: { ...branchWhere, status: { in: ['CONFIRMED', 'RECONCILED', 'PENDING'] } },
+      orderBy: { paidAt: 'desc' },
+      take: 100,
+      include: {
+        user: { select: { fullName: true } },
+        transactionCategory: { select: { name: true } },
+      },
+    }),
+  ])
+
+  return {
+    total: totalAgg._sum.amount ?? 0,
+    rows: rows.map((row) => ({
+      id: row.id,
+      memberName: row.user.fullName,
+      amount: row.amount,
+      status: row.status,
+      purpose: row.transactionCategory?.name || row.category || '—',
+      paidAt: row.paidAt.toISOString(),
+    })),
+  }
+}
+
+export async function updateFundAllocationRule(formData: FormData) {
+  const actor = await requireAdmin()
+  const emergencyPercent = z.coerce.number().min(0).max(100).parse(formData.get('emergencyPercent'))
+  const reservePercent = z.coerce.number().min(0).max(100).parse(formData.get('reservePercent'))
+  if (Math.round(emergencyPercent + reservePercent) !== 100) {
+    throw new Error('Emergency and reserve percentages must add up to 100.')
+  }
+  await prisma.fundAllocationRule.updateMany({ where: { active: true }, data: { active: false } })
+  const latest = await prisma.fundAllocationRule.findFirst({ orderBy: { version: 'desc' } })
+  const rule = await prisma.fundAllocationRule.create({
+    data: {
+      name: 'Active allocation rule',
+      emergencyPercent,
+      reservePercent,
+      active: true,
+      version: (latest?.version || 0) + 1,
+      notes: `Updated by ${actor.fullName}`,
+    },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'FUND_ALLOCATION_RULE_UPDATE',
+    entity: 'FundAllocationRule',
+    entityId: rule.id,
+    newValue: { emergencyPercent, reservePercent, version: rule.version },
+  })
+  revalidatePath('/admin/settings')
+  return rule
 }

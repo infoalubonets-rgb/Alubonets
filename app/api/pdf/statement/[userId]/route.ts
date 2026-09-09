@@ -26,11 +26,16 @@ export async function GET(
   if (!profile || profile.status !== 'ACTIVE') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const canView = profile.id === userId || profile.role === 'ADMIN' || profile.role === 'TREASURER'
-  if (!canView) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // A Principal Member may also pull statements for the members attached to their branch.
+  const canView =
+    profile.id === userId ||
+    profile.role === 'ADMIN' ||
+    profile.role === 'TREASURER' ||
+    user.principalMemberId === profile.id
+  if (!canView) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { fullName, email } = user
 
   const sp        = req.nextUrl.searchParams

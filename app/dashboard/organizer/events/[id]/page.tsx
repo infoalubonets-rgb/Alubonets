@@ -24,7 +24,7 @@ export default async function OrganizerEventManagePage({
 }) {
   await requireActiveRole(['ORGANIZER', 'ADMIN', 'SECRETARY'])
   const { id } = await params
-  const [event, members] = await Promise.all([
+  const [event, members, principals] = await Promise.all([
     prisma.event.findUnique({
       where: { id },
       include: {
@@ -37,6 +37,11 @@ export default async function OrganizerEventManagePage({
     }),
     prisma.user.findMany({
       where: { status: 'ACTIVE' },
+      select: { id: true, fullName: true },
+      orderBy: { fullName: 'asc' },
+    }),
+    prisma.user.findMany({
+      where: { status: 'ACTIVE', isPrincipal: true },
       select: { id: true, fullName: true },
       orderBy: { fullName: 'asc' },
     }),
@@ -80,7 +85,13 @@ export default async function OrganizerEventManagePage({
 
         <section className="rounded-2xl border bg-surface p-5">
           <h2 className="font-h3 text-lg text-primary">Event details</h2>
-          <form action={upsertEventDetails} className="mt-3 grid gap-2 md:grid-cols-3">
+          <form
+            action={async (formData) => {
+              'use server'
+              await upsertEventDetails(formData)
+            }}
+            className="mt-3 grid gap-2 md:grid-cols-3"
+          >
             <input type="hidden" name="id" value={event.id} />
             <input name="title" required defaultValue={event.title} className="rounded-lg border px-3 py-2" />
             <input
@@ -100,6 +111,19 @@ export default async function OrganizerEventManagePage({
               <option value="ALL_MEMBERS">All members</option>
               <option value="SELECTED_ROLES">Selected roles</option>
               <option value="SELECTED_MEMBERS">Selected members</option>
+              <option value="BRANCH_MEMBERS">Family branch</option>
+            </select>
+            <select
+              name="audiencePrincipalId"
+              defaultValue={event.audiencePrincipalId || ''}
+              className="rounded-lg border px-3 py-2"
+            >
+              <option value="">Branch principal (if family branch)</option>
+              {principals.map((principal) => (
+                <option key={principal.id} value={principal.id}>
+                  {principal.fullName}
+                </option>
+              ))}
             </select>
             <input name="capacity" type="number" min={1} defaultValue={event.capacity ?? ''} placeholder="Capacity" className="rounded-lg border px-3 py-2" />
             <input

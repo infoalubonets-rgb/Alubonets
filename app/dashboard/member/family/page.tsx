@@ -1,9 +1,12 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import FamilyBranchClient from '@/components/dashboard/FamilyBranchClient'
 import FamilyAdministrationClient from '@/components/admin/FamilyAdministrationClient'
+import FamilyVisibilityControls from '@/components/dashboard/FamilyVisibilityControls'
+import BranchPaymentsPanel from '@/components/dashboard/BranchPaymentsPanel'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
+import { ageOn } from '@/lib/profile-privacy'
 
 const RELATIONSHIP_LABEL: Record<string, string> = {
   SPOUSE: 'Spouse',
@@ -39,6 +42,7 @@ export default async function MemberFamilyPage() {
           familyRegistrationState: true,
           phone: true,
           memberProfile: { select: { dateOfBirth: true, familyBranch: true } },
+          profileVisibility: { select: { visibleToMembers: true, allowedFields: true } },
           isPrincipal: true,
         },
       },
@@ -177,6 +181,28 @@ export default async function MemberFamilyPage() {
         }))}
         transitionHistory={transitionHistory.map((item) => ({ ...item, memberName: item.member.fullName, member: undefined, occurredAt: item.occurredAt.toISOString() }))}
       />}
+      {!canAdministerFamilies && me.isPrincipal && (
+        <div className="mt-4 space-y-4 px-4 md:px-0">
+          <FamilyVisibilityControls
+            members={me.attachedMembers.map((m) => {
+              const dob = m.memberProfile?.dateOfBirth
+              const isChild =
+                ['SON', 'DAUGHTER', 'CHILD', 'DEPENDENT'].includes(m.familyRelationship || '') &&
+                (!dob || ageOn(dob) < 18)
+              return {
+                id: m.id,
+                fullName: m.fullName,
+                visibleToMembers: Boolean(m.profileVisibility?.visibleToMembers),
+                allowedFields: Array.isArray(m.profileVisibility?.allowedFields)
+                  ? (m.profileVisibility!.allowedFields as string[])
+                  : ['fullName', 'role', 'familyBranch'],
+                isChild,
+              }
+            })}
+          />
+          <BranchPaymentsPanel />
+        </div>
+      )}
     </DashboardShell>
   )
 }

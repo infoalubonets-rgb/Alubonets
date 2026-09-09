@@ -4,15 +4,18 @@ import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navWithLoans } from '@/lib/dashboard/nav-async'
 import { getSessionProfile } from '@/lib/auth/session'
 import { getMemberDashboardData } from '@/lib/data/queries'
-import MemberContributeModal from '@/components/dashboard/MemberContributeModal'
+import { listTodayActivities } from '@/app/actions/activities'
 
 export default async function MemberPage() {
   const profile = await getSessionProfile()
   if (!profile) redirect('/login')
 
-  const { total, welfareCount, announcements, events, documents } =
-    await getMemberDashboardData(profile.id)
-  const nav = await navWithLoans(profile.role)
+  const [{ total, welfareCount, announcements, events, documents }, todayActivities, nav] =
+    await Promise.all([
+      getMemberDashboardData(profile.id),
+      listTodayActivities(),
+      navWithLoans(profile.role),
+    ])
 
   return (
     <DashboardShell
@@ -75,10 +78,33 @@ export default async function MemberPage() {
           </div>
         </div>
 
-        {/* Contribute CTA */}
-        <div className="flex justify-end">
-          <MemberContributeModal />
-        </div>
+        <section className="rounded-2xl border border-outline-variant bg-surface p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-h3 text-base text-primary">Today’s activities</h2>
+            <Link href="/today" className="text-xs font-semibold text-primary underline">
+              Open feed
+            </Link>
+          </div>
+          <ul className="mt-3 space-y-2">
+            {todayActivities.slice(0, 3).map((activity) => (
+              <li key={activity.id} className="text-sm">
+                <span className="font-semibold text-on-surface">{activity.title}</span>
+                <span className="text-on-surface-variant">
+                  {' · '}
+                  {new Date(activity.startsAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
+                  {activity.venue ? ` · ${activity.venue}` : ''}
+                </span>
+              </li>
+            ))}
+            {!todayActivities.length && (
+              <li className="text-sm text-on-surface-variant">Nothing scheduled for today.</li>
+            )}
+          </ul>
+        </section>
+
+        {/* Members no longer submit their own payments — the Treasurer records every
+            contribution, and it appears here once recorded. The M-Pesa self-pay flow is
+            kept in the codebase but hidden until online payments are switched back on. */}
 
         {/* Quick actions */}
         <div className="grid sm:grid-cols-2 gap-3">

@@ -5,6 +5,7 @@ export type Role =
   | 'SECRETARY'
   | 'ORGANIZER'
   | 'MEMBER'
+  | 'AUDITOR'
 
 export const ALL_ROLES: Role[] = [
   'ADMIN',
@@ -13,6 +14,7 @@ export const ALL_ROLES: Role[] = [
   'SECRETARY',
   'ORGANIZER',
   'MEMBER',
+  'AUDITOR',
 ]
 
 export const DASHBOARD_ROLES: Role[] = [
@@ -22,6 +24,7 @@ export const DASHBOARD_ROLES: Role[] = [
   'SECRETARY',
   'ORGANIZER',
   'MEMBER',
+  'AUDITOR',
 ]
 
 export type AuthUser = {
@@ -50,6 +53,7 @@ export const ROLE_HOME: Record<Role, string> = {
   SECRETARY: '/dashboard/secretary',
   ORGANIZER: '/dashboard/organizer',
   MEMBER: '/dashboard/member',
+  AUDITOR: '/financial-reports',
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -59,6 +63,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   SECRETARY: 'Secretary',
   ORGANIZER: 'Organizer',
   MEMBER: 'Member',
+  AUDITOR: 'Auditor (read-only)',
 }
 
 /** Primary role + extras; Admin and Super Admin get every dashboard. */
@@ -98,6 +103,8 @@ export function isSharedAuthenticatedPath(pathname: string): boolean {
     '/documents',
     '/financial-reports',
     '/family',
+    '/directory',
+    '/today',
   ]
   if (pathname === '/dashboard/member/family' || pathname.startsWith('/dashboard/member/family/')) {
     return true

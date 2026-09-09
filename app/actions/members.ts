@@ -42,19 +42,19 @@ export async function assignMemberBranch(userId: string, branch: string) {
 
 const roleSchema = z.object({
   userId: z.string().min(1),
-  role: z.enum(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER']),
+  role: z.enum(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER', 'AUDITOR']),
 })
 
 const accessSchema = z.object({
   userId: z.string().min(1),
   dashboardAccess: z.array(
-    z.enum(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'])
+    z.enum(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER', 'AUDITOR'])
   ),
 })
 
 const statusSchema = z.object({
   userId: z.string().min(1),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING']),
+  status: z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED', 'PENDING', 'DECEASED', 'RESIGNED', 'DISQUALIFIED']),
 })
 
 const superSchema = z.object({
@@ -91,17 +91,21 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
   }
 
   if (!approve) {
-    await prisma.$transaction(async (tx) => {
-      // Family history and transition records intentionally use restrictive
-      // foreign keys. A pending applicant may already have these records when
-      // a Principal Member invited or linked them before admin review.
-      await tx.familyBranchHistory.deleteMany({ where: { memberId: userId } })
-      await tx.familyAccountTransition.deleteMany({ where: { memberId: userId } })
-      await tx.user.delete({ where: { id: userId } })
+    // Soft retention: keep the applicant row (and any family/history links) with
+    // INACTIVE + rejectedAt so finance/audit references are never hard-deleted.
+    const authUserId = user.authUserId
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: 'INACTIVE',
+        rejectionReason: note || 'Application rejected',
+        rejectedAt: new Date(),
+        approvalNotes: null,
+        approvedAt: null,
+        identityVerificationStatus: 'REJECTED',
+        authUserId: null,
+      },
     })
-    // The application is already gone from the primary database. Audit and
-    // external Auth cleanup can finish after the response instead of keeping
-    // the approvals modal blocked on network latency.
     after(async () => {
       await writeAudit({
         userId: actor.id,
@@ -110,16 +114,16 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
         entityId: userId,
         reason: note,
         oldValue: { status: user.status, email: user.email },
-        newValue: { deleted: true },
-        meta: { rejectedApplicant: user.fullName, rejectedEmail: user.email },
+        newValue: { status: 'INACTIVE', rejectedAt: updated.rejectedAt },
+        meta: { rejectedApplicant: user.fullName, rejectedEmail: user.email, retained: true },
       })
-      if (user.authUserId) {
-        const { error } = await createServerClient().auth.admin.deleteUser(user.authUserId)
+      if (authUserId) {
+        const { error } = await createServerClient().auth.admin.deleteUser(authUserId)
         if (error) console.error('Could not delete rejected Supabase user', error)
       }
     })
     revalidateAdmin()
-    return null
+    return updated
   }
 
   const status = 'ACTIVE'

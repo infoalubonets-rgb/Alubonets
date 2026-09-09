@@ -64,3 +64,49 @@ export function assertNotPast(date: Date | null | undefined, label: string) {
 export function assertNotFuture(date: Date | null | undefined, label: string) {
   if (date && date.getTime() > Date.now()) throw new Error(`${label} cannot be in the future.`)
 }
+
+/**
+ * The group's operating timezone. Server processes often run in UTC, so "today" must be
+ * resolved against this rather than the host clock, or members in Kenya see the wrong day
+ * for the first three hours after midnight.
+ */
+export const APP_TIMEZONE = process.env.APP_TIMEZONE || 'Africa/Nairobi'
+
+/** Milliseconds that `timeZone` is ahead of UTC at the given instant. */
+function timezoneOffsetMs(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date)
+  const read = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? '0')
+  const asUtc = Date.UTC(
+    read('year'),
+    read('month') - 1,
+    read('day'),
+    read('hour') % 24,
+    read('minute'),
+    read('second'),
+  )
+  return asUtc - date.getTime()
+}
+
+/** First and last instants of "today" as experienced in the group's timezone. */
+export function todayRange(now: Date = new Date(), timeZone: string = APP_TIMEZONE) {
+  const offset = timezoneOffsetMs(now, timeZone)
+  const local = new Date(now.getTime() + offset)
+  const startOfLocalDay = Date.UTC(
+    local.getUTCFullYear(),
+    local.getUTCMonth(),
+    local.getUTCDate(),
+  )
+  return {
+    start: new Date(startOfLocalDay - offset),
+    end: new Date(startOfLocalDay + 24 * 60 * 60 * 1000 - 1 - offset),
+  }
+}

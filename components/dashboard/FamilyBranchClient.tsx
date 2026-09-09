@@ -13,6 +13,8 @@ import {
 
 const RELATIONSHIPS = [
   { value: 'SPOUSE', label: 'Spouse' },
+  { value: 'SON', label: 'Son' },
+  { value: 'DAUGHTER', label: 'Daughter' },
   { value: 'CHILD', label: 'Child' },
   { value: 'DEPENDENT', label: 'Dependent' },
   { value: 'OTHER', label: 'Other' },

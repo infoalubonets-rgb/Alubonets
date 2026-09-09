@@ -34,6 +34,45 @@ async function upload(_actorId: string, file: File, groupId: string, version: nu
   return { path, mimeType: file.type || 'application/octet-stream' }
 }
 
+const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024
+
+/**
+ * Confirms a browser-uploaded object really exists at the path we issued, and reports its
+ * true size and content type from Storage. The client sends only a path; its claimed
+ * mime type and the existence of the file are never taken on trust.
+ */
+async function verifyUploadedObject(storagePath: string, expectedGroupId: string) {
+  const prefix = `repository/${expectedGroupId}/`
+  if (!storagePath.startsWith(prefix) || storagePath.includes('..')) {
+    throw new Error('That upload does not belong to this document.')
+  }
+  const objectName = storagePath.slice(prefix.length)
+  if (!objectName || objectName.includes('/')) {
+    throw new Error('That upload does not belong to this document.')
+  }
+  const extension = objectName.split('.').pop()?.toLowerCase()
+  if (!extension || !(DOC_EXTS as readonly string[]).includes(extension)) {
+    throw new Error('Only PDF, Word, Excel, or CSV files are allowed.')
+  }
+
+  const { data, error } = await createServerClient()
+    .storage.from('documents')
+    .list(prefix.replace(/\/$/, ''), { search: objectName, limit: 100 })
+  if (error) throw new Error(`Could not verify the upload: ${error.message}`)
+
+  const object = data?.find((entry) => entry.name === objectName)
+  if (!object) throw new Error('The uploaded file could not be found. Please upload it again.')
+
+  const size = Number(object.metadata?.size ?? 0)
+  if (size <= 0) throw new Error('The uploaded file is empty. Please upload it again.')
+  if (size > MAX_DOCUMENT_BYTES) throw new Error('Document must be 15 MB or smaller.')
+
+  return {
+    path: storagePath,
+    mimeType: String(object.metadata?.mimetype || 'application/octet-stream'),
+  }
+}
+
 function roles(formData: FormData) {
   return formData.getAll('allowedRoles').map(String) as Role[]
 }
@@ -76,34 +115,53 @@ export async function uploadRepositoryDocument(formData: FormData) {
     categoryId: z.string().min(1),
     accessLevel: z.enum(['PUBLIC','MEMBERS','SELECTED_ROLES','ADMIN_SECRETARY']),
     status: z.enum(['DRAFT','PUBLISHED']),
+    tags: z.string().optional(),
     effectiveAt: z.coerce.date().optional(),
     expiresAt: z.coerce.date().optional(),
   }).parse({
     title: formData.get('title'), description: formData.get('description') || undefined,
     categoryId: formData.get('categoryId'), accessLevel: formData.get('accessLevel'),
-    status: formData.get('status'), effectiveAt: formData.get('effectiveAt') || undefined,
+    status: formData.get('status'), tags: formData.get('tags') || undefined,
+    effectiveAt: formData.get('effectiveAt') || undefined,
     expiresAt: formData.get('expiresAt') || undefined,
   })
   const category = await prisma.documentCategory.findUniqueOrThrow({ where: { id: data.categoryId } })
+  const tags = (data.tags || '')
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 12)
 
   const storagePath = z.string().min(1).optional().parse(formData.get('storagePath') || undefined)
   const versionGroupId = z.string().min(1).optional().parse(formData.get('versionGroupId') || undefined)
-  const mimeType = z.string().optional().parse(formData.get('mimeType') || undefined)
-
   let file: { path: string; mimeType: string }
   let groupId: string
 
   if (storagePath && versionGroupId) {
     groupId = versionGroupId
-    file = { path: storagePath, mimeType: mimeType || 'application/octet-stream' }
+    // Never trust the client's path or mime type — confirm the object against Storage.
+    file = await verifyUploadedObject(storagePath, versionGroupId)
   } else {
     groupId = crypto.randomUUID()
     file = await upload(actor.id, formData.get('file') as File, groupId, 1)
   }
 
   const document = await prisma.document.create({ data: {
-    ...data, category: category.name, allowedRoles: roles(formData), storagePath: file.path, fileUrl: `storage://documents/${file.path}`,
-    mimeType: file.mimeType, uploadedBy: actor.id, versionGroupId: groupId,
+    title: data.title,
+    description: data.description,
+    categoryId: data.categoryId,
+    accessLevel: data.accessLevel,
+    status: data.status,
+    effectiveAt: data.effectiveAt,
+    expiresAt: data.expiresAt,
+    tags,
+    category: category.name,
+    allowedRoles: roles(formData),
+    storagePath: file.path,
+    fileUrl: `storage://documents/${file.path}`,
+    mimeType: file.mimeType,
+    uploadedBy: actor.id,
+    versionGroupId: groupId,
   } })
   await writeAudit({ userId: actor.id, action: data.status === 'PUBLISHED' ? 'DOCUMENT_PUBLISH' : 'DOCUMENT_UPLOAD', entity: 'Document', entityId: document.id, newValue: { ...data, category: category.name, version: 1 } })
   refresh()
@@ -234,13 +292,62 @@ export async function setSelectedDocumentStatus(formData: FormData) {
   refresh()
 }
 
+/**
+ * Decides whether a document may be destroyed or must be retained.
+ *
+ * Anything members have already seen, that another record points at, or that forms part of a
+ * version chain is group history: it gets archived (hidden, but recoverable) rather than erased.
+ * Only an untouched draft can be deleted outright.
+ */
+async function assessDocumentRetention(id: string) {
+  const document = await prisma.document.findUniqueOrThrow({
+    where: { id },
+    include: {
+      _count: { select: { downloads: true, projectLinks: true } },
+      nextVersion: { select: { id: true } },
+      publishedMeeting: { select: { id: true } },
+    },
+  })
+
+  const reasons: string[] = []
+  if (document.status === 'PUBLISHED') reasons.push('it has been published to members')
+  if (document._count.downloads > 0) reasons.push('members have downloaded it')
+  if (document._count.projectLinks > 0) reasons.push('it is attached to a project')
+  if (document.publishedMeeting) reasons.push('it holds published meeting minutes')
+  if (document.version > 1 || document.previousVersionId || document.nextVersion) {
+    reasons.push('it belongs to a version history')
+  }
+
+  return { document, mustRetain: reasons.length > 0, reasons }
+}
+
 export async function deleteRepositoryDocument(formData: FormData) {
   // Staff who manage documents may delete; members never reach this page/action.
   const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
   const id = z.string().min(1).parse(formData.get('id'))
   const reasonRaw = String(formData.get('reason') || '').trim()
-  const reason = reasonRaw.length >= 5 ? reasonRaw.slice(0, 1000) : 'Deleted from the document repository'
-  const document = await prisma.document.findUniqueOrThrow({ where: { id } })
+  const reason = reasonRaw.length >= 5 ? reasonRaw.slice(0, 1000) : 'Removed from the document repository'
+  const { document, mustRetain, reasons } = await assessDocumentRetention(id)
+
+  if (mustRetain) {
+    // Archive: the record and its file stay put so the history remains auditable.
+    await prisma.document.update({
+      where: { id },
+      data: { status: 'ARCHIVED', archivedAt: new Date() },
+    })
+    await writeAudit({
+      userId: actor.id,
+      action: 'DOCUMENT_ARCHIVE',
+      entity: 'Document',
+      entityId: id,
+      reason: `${reason} — archived instead of deleted because ${reasons.join(', ')}.`,
+      oldValue: { status: document.status, title: document.title, version: document.version },
+      newValue: { status: 'ARCHIVED', retainedBecause: reasons },
+    })
+    refresh()
+    return { archived: true as const, reasons }
+  }
+
   if (document.storagePath) {
     await createServerClient().storage.from('documents').remove([document.storagePath])
   }
@@ -254,6 +361,30 @@ export async function deleteRepositoryDocument(formData: FormData) {
     oldValue: { title: document.title, version: document.version, storagePath: document.storagePath },
   })
   refresh()
+  return { archived: false as const, reasons: [] as string[] }
+}
+
+/** Brings an archived document back into the repository as a draft. */
+export async function restoreRepositoryDocument(formData: FormData) {
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
+  const id = z.string().min(1).parse(formData.get('id'))
+  const document = await prisma.document.findUniqueOrThrow({ where: { id } })
+  if (document.status !== 'ARCHIVED') throw new Error('Only archived documents can be restored.')
+
+  await prisma.document.update({
+    where: { id },
+    data: { status: 'DRAFT', archivedAt: null },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'DOCUMENT_RESTORE',
+    entity: 'Document',
+    entityId: id,
+    reason: 'Restored from the document archive',
+    oldValue: { status: 'ARCHIVED' },
+    newValue: { status: 'DRAFT', title: document.title },
+  })
+  refresh()
 }
 
 export async function deleteSelectedRepositoryDocuments(formData: FormData) {
@@ -263,28 +394,58 @@ export async function deleteSelectedRepositoryDocuments(formData: FormData) {
   const reasonRaw = String(formData.get('reason') || '').trim()
   const reason = reasonRaw.length >= 5 ? reasonRaw.slice(0, 1000) : 'Bulk deleted from the document repository'
 
-  const documents = await prisma.document.findMany({
+  const existing = await prisma.document.findMany({
     where: { id: { in: ids } },
-    select: { id: true, title: true, version: true, storagePath: true },
+    select: { id: true },
   })
-  if (!documents.length) throw new Error('No matching documents to delete.')
+  if (!existing.length) throw new Error('No matching documents to delete.')
 
-  const storagePaths = documents.map((doc) => doc.storagePath).filter((path): path is string => Boolean(path))
-  if (storagePaths.length) {
-    await createServerClient().storage.from('documents').remove(storagePaths)
+  // Assess each one: history-bearing documents are archived, the rest are removed.
+  const assessed = await Promise.all(existing.map((doc) => assessDocumentRetention(doc.id)))
+  const toArchive = assessed.filter((entry) => entry.mustRetain)
+  const toDelete = assessed.filter((entry) => !entry.mustRetain)
+
+  if (toArchive.length) {
+    await prisma.document.updateMany({
+      where: { id: { in: toArchive.map((entry) => entry.document.id) } },
+      data: { status: 'ARCHIVED', archivedAt: new Date() },
+    })
   }
-  await prisma.document.deleteMany({ where: { id: { in: documents.map((doc) => doc.id) } } })
-  await Promise.all(
-    documents.map((document) =>
+
+  if (toDelete.length) {
+    const storagePaths = toDelete
+      .map((entry) => entry.document.storagePath)
+      .filter((path): path is string => Boolean(path))
+    if (storagePaths.length) {
+      await createServerClient().storage.from('documents').remove(storagePaths)
+    }
+    await prisma.document.deleteMany({
+      where: { id: { in: toDelete.map((entry) => entry.document.id) } },
+    })
+  }
+
+  await Promise.all([
+    ...toArchive.map((entry) =>
+      writeAudit({
+        userId: actor.id,
+        action: 'DOCUMENT_ARCHIVE',
+        entity: 'Document',
+        entityId: entry.document.id,
+        reason: `${reason} — archived instead of deleted because ${entry.reasons.join(', ')}.`,
+        oldValue: { status: entry.document.status, title: entry.document.title, version: entry.document.version, bulk: true },
+        newValue: { status: 'ARCHIVED', retainedBecause: entry.reasons },
+      }),
+    ),
+    ...toDelete.map((entry) =>
       writeAudit({
         userId: actor.id,
         action: 'DOCUMENT_DELETE',
         entity: 'Document',
-        entityId: document.id,
+        entityId: entry.document.id,
         reason,
-        oldValue: { title: document.title, version: document.version, storagePath: document.storagePath, bulk: true },
+        oldValue: { title: entry.document.title, version: entry.document.version, storagePath: entry.document.storagePath, bulk: true },
       }),
     ),
-  )
+  ])
   refresh()
 }

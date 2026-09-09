@@ -10,7 +10,7 @@ import { writeAudit } from '@/lib/audit'
 import { sendFamilyInviteEmail, sendFamilyLinkedNoticeEmail } from '@/lib/email/resend'
 import { branchHistoryData, validateFamilyAttachment } from '@/lib/family-rules'
 
-const relationshipEnum = z.enum(['SPOUSE', 'CHILD', 'DEPENDENT', 'OTHER'])
+const relationshipEnum = z.enum(['SPOUSE', 'SON', 'DAUGHTER', 'CHILD', 'DEPENDENT', 'OTHER'])
 
 const linkSchema = z.object({
   email: z.string().email(),

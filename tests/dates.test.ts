@@ -8,6 +8,7 @@ import {
   toDateInputValue,
   toDateTimeInputValue,
   todayInputValue,
+  todayRange,
   tomorrowInputValue,
 } from '../lib/dates'
 
@@ -93,5 +94,26 @@ describe('assertNotFuture', () => {
 
   it('treats an absent optional date as valid', () => {
     expect(() => assertNotFuture(null, 'Payment date')).not.toThrow()
+  })
+})
+
+describe('todayRange', () => {
+  it('spans a full day in the group timezone, not the server timezone', () => {
+    // 00:30 UTC is already 03:30 the same day in Nairobi (UTC+3).
+    const { start, end } = todayRange(new Date('2026-09-09T00:30:00.000Z'), 'Africa/Nairobi')
+    // Local midnight in Nairobi is 21:00 UTC the previous day.
+    expect(start.toISOString()).toBe('2026-09-08T21:00:00.000Z')
+    expect(end.toISOString()).toBe('2026-09-09T20:59:59.999Z')
+  })
+
+  it('rolls to the next day once local midnight passes', () => {
+    // 21:30 UTC is 00:30 the NEXT day in Nairobi, so "today" must have advanced.
+    const { start } = todayRange(new Date('2026-09-09T21:30:00.000Z'), 'Africa/Nairobi')
+    expect(start.toISOString()).toBe('2026-09-09T21:00:00.000Z')
+  })
+
+  it('always covers exactly one day', () => {
+    const { start, end } = todayRange(new Date('2026-09-09T12:00:00.000Z'), 'Africa/Nairobi')
+    expect(end.getTime() - start.getTime()).toBe(24 * 60 * 60 * 1000 - 1)
   })
 })

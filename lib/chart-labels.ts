@@ -34,6 +34,9 @@ export const MEMBER_STATUS_LABELS: Record<MemberStatus, string> = {
   PENDING: 'Pending',
   INACTIVE: 'Inactive',
   SUSPENDED: 'Suspended',
+  DECEASED: 'Deceased',
+  RESIGNED: 'Resigned',
+  DISQUALIFIED: 'Disqualified',
 }
 
 export function formatMemberStatus(status: MemberStatus | string): string {

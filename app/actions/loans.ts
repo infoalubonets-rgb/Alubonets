@@ -363,7 +363,7 @@ export async function recordLoanDisbursement(formData: FormData) {
     (await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value ||
       50000,
   )
-  const approvalRequired = data.amount >= threshold && actor.role !== 'ADMIN' && !actor.isSuperAdmin
+  const approvalRequired = data.amount >= threshold
 
   const transaction = await prisma.$transaction(async (tx) => {
     const created = await tx.financialTransaction.create({

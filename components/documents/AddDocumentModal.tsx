@@ -166,6 +166,11 @@ export default function AddDocumentModal({
               </option>
             ))}
           </select>
+          <input
+            name="tags"
+            placeholder="Tags (comma-separated, e.g. welfare, education)"
+            className="rounded-xl border px-3 py-2.5 md:col-span-2"
+          />
           <label className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3 text-sm text-primary md:col-span-2">
             <span className="font-label-bold">Choose PDF, Word, or Excel</span>
             <span className="ml-2 text-xs text-on-surface-variant">Maximum 15 MB</span>

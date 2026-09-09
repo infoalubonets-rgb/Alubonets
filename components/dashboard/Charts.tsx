@@ -13,6 +13,7 @@ import {
   Legend,
   Filler,
 } from 'chart.js'
+import type { ChartTypeRegistry, TooltipItem } from 'chart.js'
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2'
 
 ChartJS.register(
@@ -37,21 +38,32 @@ type SeriesProps = {
   values: number[]
 }
 
-function chartValue(ctx: { parsed: number | { y?: number; x?: number }; raw?: number }) {
-  return typeof ctx.parsed === 'number' ? ctx.parsed : (ctx.parsed.y ?? ctx.parsed.x ?? ctx.raw ?? 0)
+/**
+ * Union (not intersection) of every chart type's tooltip item, so one tooltip config can be
+ * shared across line/bar/pie/doughnut. Written as a distributed mapped type — `TooltipItem<
+ * keyof ChartTypeRegistry>` would intersect the `parsed` shapes instead of unioning them.
+ */
+type AnyTooltipItem = { [K in keyof ChartTypeRegistry]: TooltipItem<K> }[keyof ChartTypeRegistry]
+
+function chartValue(ctx: AnyTooltipItem) {
+  const parsed = ctx.parsed as number | { y?: number | null; x?: number | null } | null
+  if (typeof parsed === 'number') return parsed
+  if (typeof parsed?.y === 'number') return parsed.y
+  if (typeof parsed?.x === 'number') return parsed.x
+  return typeof ctx.raw === 'number' ? ctx.raw : 0
 }
 
 const kesTooltip = {
   callbacks: {
-    label: (ctx: { label?: string; parsed: number | { y?: number; x?: number }; raw?: number }) =>
-      `${ctx.label ? `${ctx.label}: ` : ''}${formatKes(Number(chartValue(ctx)))}`,
+    label: (ctx: AnyTooltipItem) =>
+      `${ctx.label ? `${ctx.label}: ` : ''}${formatKes(chartValue(ctx))}`,
   },
 }
 
 const countTooltip = {
   callbacks: {
-    label: (ctx: { label?: string; parsed: number | { y?: number; x?: number }; raw?: number }) =>
-      `${ctx.label ? `${ctx.label}: ` : ''}${Number(chartValue(ctx)).toLocaleString()}`,
+    label: (ctx: AnyTooltipItem) =>
+      `${ctx.label ? `${ctx.label}: ` : ''}${chartValue(ctx).toLocaleString()}`,
   },
 }
 

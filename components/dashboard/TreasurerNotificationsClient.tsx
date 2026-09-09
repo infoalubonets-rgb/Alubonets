@@ -9,7 +9,7 @@ type Payment = {
   id: string
   createdAt: string
   meta: Prisma.JsonObject
-  user: { fullName: string; email: string }
+  user: { fullName: string; email: string } | null
 }
 
 const SEEN_KEY = 'treasurer-notif-seen-ts'
@@ -113,12 +113,12 @@ export default function TreasurerNotificationsClient({ payments }: { payments: P
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <p className="text-[13px] font-semibold text-on-surface dark:text-blue-50">
-                    {p.user.fullName}
+                    {p.user?.fullName ?? 'Deleted member'}
                     {isNew && (
                       <span className="ml-2 text-[10px] font-bold text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/40 px-1.5 py-0.5 rounded-full">NEW</span>
                     )}
                   </p>
-                  <p className="text-[11px] text-on-surface-variant">{p.user.email}</p>
+                  <p className="text-[11px] text-on-surface-variant">{p.user?.email ?? '—'}</p>
                 </div>
                 <span className="text-[11px] text-on-surface-variant shrink-0">{relativeTime(p.createdAt)}</span>
               </div>

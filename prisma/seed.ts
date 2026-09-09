@@ -83,6 +83,10 @@ async function main() {
     'Finance',
     'Project',
     'Correspondence',
+    'Welfare',
+    'Education',
+    'Health',
+    'Archive',
     'Other',
   ] as const
   for (const name of prescribedCategories) {

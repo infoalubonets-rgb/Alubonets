@@ -19,6 +19,10 @@ export default async function MemberEventsPage() {
         { isPublic: true },
         { audienceType: 'ALL_MEMBERS' },
         { audienceType: 'SELECTED_ROLES', audienceRoles: { has: actor.role } },
+        {
+          audienceType: 'BRANCH_MEMBERS',
+          audiencePrincipalId: actor.isPrincipal ? actor.id : actor.principalMemberId || '__none__',
+        },
         { invitations: { some: { userId: actor.id } } },
         { rsvps: { some: { userId: actor.id } } },
       ],

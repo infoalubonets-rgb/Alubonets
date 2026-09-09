@@ -9,6 +9,7 @@ type Contribution = {
   amount: number
   paidAt: string
   category: string | null
+  status?: string
 }
 
 type Preset = 'all' | '7d' | '1m' | 'custom'
@@ -38,17 +39,39 @@ function monthAgo() {
   return toInput(d)
 }
 
+type FamilyMember = {
+  id: string
+  fullName: string
+  contributions: Contribution[]
+}
+
 export default function ContributionsClient({
   contributions,
   userId,
+  familyMembers = [],
+  canSubmitPayment = false,
 }: {
   contributions: Contribution[]
   userId: string
+  familyMembers?: FamilyMember[]
+  /** Only the Treasurer records payments; members simply see what was recorded for them. */
+  canSubmitPayment?: boolean
 }) {
   const [preset, setPreset]       = useState<Preset>('all')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate]     = useState('')
+  const [year, setYear]           = useState('')
+  const [purpose, setPurpose]     = useState('')
+  const [status, setStatus]       = useState('')
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [viewingId, setViewingId] = useState(userId)
+
+  const people = useMemo(
+    () => [{ id: userId, fullName: 'You', contributions }, ...familyMembers],
+    [userId, contributions, familyMembers],
+  )
+  const viewing = people.find((p) => p.id === viewingId) ?? people[0]
+  const viewingContributions = viewing.contributions
 
   const router = useRouter()
   useEffect(() => {
@@ -66,21 +89,43 @@ export default function ContributionsClient({
     // 'custom' keeps whatever is in the inputs
   }
 
+  const purposes = useMemo(() => {
+    const set = new Set<string>()
+    viewingContributions.forEach((c) => {
+      if (c.category) set.add(c.category)
+    })
+    return Array.from(set).sort()
+  }, [viewingContributions])
+
+  const years = useMemo(() => {
+    const set = new Set<string>()
+    viewingContributions.forEach((c) => set.add(String(new Date(c.paidAt).getFullYear())))
+    return Array.from(set).sort((a, b) => Number(b) - Number(a))
+  }, [viewingContributions])
+
   const filtered = useMemo(() => {
-    if (!startDate && !endDate) return contributions
-    const s = startDate ? new Date(startDate + 'T00:00:00') : null
-    const e = endDate   ? new Date(endDate   + 'T23:59:59') : null
-    return contributions.filter((c) => {
+    return viewingContributions.filter((c) => {
       const d = new Date(c.paidAt)
+      if (year && String(d.getFullYear()) !== year) return false
+      if (purpose && (c.category || '') !== purpose) return false
+      if (status && (c.status || 'CONFIRMED') !== status) return false
+      const s = startDate ? new Date(startDate + 'T00:00:00') : null
+      const e = endDate ? new Date(endDate + 'T23:59:59') : null
       if (s && d < s) return false
       if (e && d > e) return false
       return true
     })
-  }, [contributions, startDate, endDate])
+  }, [viewingContributions, startDate, endDate, year, purpose, status])
 
-  const total = useMemo(() => filtered.reduce((s, c) => s + c.amount, 0), [filtered])
+  const total = useMemo(
+    () =>
+      filtered
+        .filter((c) => !c.status || c.status === 'CONFIRMED' || c.status === 'RECONCILED')
+        .reduce((s, c) => s + c.amount, 0),
+    [filtered],
+  )
 
-  const isFiltered = preset !== 'all' || !!(startDate || endDate)
+  const isFiltered = preset !== 'all' || !!(startDate || endDate || year || purpose || status)
   const filterLabel =
     preset === '7d' ? 'Last 7 days' :
     preset === '1m' ? 'Last month' :
@@ -95,7 +140,7 @@ export default function ContributionsClient({
       if (startDate) params.set('startDate', startDate)
       if (endDate)   params.set('endDate',   endDate)
       const qs  = params.toString()
-      const url = `/api/pdf/statement/${userId}${qs ? '?' + qs : ''}`
+      const url = `/api/pdf/statement/${viewing.id}${qs ? '?' + qs : ''}`
       const res = await fetch(url)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const blob = await res.blob()
@@ -113,12 +158,40 @@ export default function ContributionsClient({
   return (
     <div className="max-w-3xl mx-auto space-y-4 pb-10">
 
+      {familyMembers.length > 0 && (
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+          <p className="text-[11px] font-label-bold uppercase tracking-wide text-on-surface-variant">
+            Viewing contributions for
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {people.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setViewingId(p.id)}
+                className={`px-3 py-1.5 rounded-full text-[12px] font-semibold border transition-colors ${
+                  viewing.id === p.id
+                    ? 'bg-primary text-on-primary border-primary'
+                    : 'bg-surface-container border-outline-variant text-on-surface-variant hover:border-primary/50 hover:text-primary'
+                }`}
+              >
+                {p.fullName}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-on-surface-variant">
+            As Principal Member, you can review contributions for members attached to your family branch.
+          </p>
+        </div>
+      )}
+
       {/* Summary + PDF + filters */}
       <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 border-t-4 border-t-secondary-container space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[12px] font-label-bold uppercase tracking-wide text-secondary">
-              Your total{filterLabel ? <> · <span className="font-normal normal-case">{filterLabel}</span></> : ''}
+              {viewing.id === userId ? 'Your total' : `${viewing.fullName}'s total`}
+              {filterLabel ? <> · <span className="font-normal normal-case">{filterLabel}</span></> : ''}
             </p>
             <p className="mt-1 text-3xl font-h3 font-bold text-primary">
               KES {Math.round(total).toLocaleString()}
@@ -201,6 +274,40 @@ export default function ContributionsClient({
               )}
             </div>
           )}
+
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              className="rounded-lg border border-outline-variant px-3 py-1.5 text-[12px] bg-surface"
+            >
+              <option value="">All years</option>
+              {years.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <select
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              className="rounded-lg border border-outline-variant px-3 py-1.5 text-[12px] bg-surface"
+            >
+              <option value="">All purposes</option>
+              {purposes.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="rounded-lg border border-outline-variant px-3 py-1.5 text-[12px] bg-surface"
+            >
+              <option value="">All statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="RECONCILED">Reconciled</option>
+              <option value="REJECTED">Rejected</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -215,7 +322,7 @@ export default function ContributionsClient({
               </span>
             )}
           </div>
-          <MemberContributeModal />
+          {canSubmitPayment && viewing.id === userId && <MemberContributeModal />}
         </div>
 
         {filtered.length === 0 ? (
@@ -230,6 +337,7 @@ export default function ContributionsClient({
                   <th className="py-3 px-4 font-label-bold">Date</th>
                   <th className="py-3 px-4 font-label-bold">Amount</th>
                   <th className="py-3 px-4 font-label-bold">Category</th>
+                  <th className="py-3 px-4 font-label-bold">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -245,6 +353,7 @@ export default function ContributionsClient({
                       KES {c.amount.toLocaleString()}
                     </td>
                     <td className="py-3 px-4">{c.category || '—'}</td>
+                    <td className="py-3 px-4">{c.status || 'CONFIRMED'}</td>
                   </tr>
                 ))}
               </tbody>

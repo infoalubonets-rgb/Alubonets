@@ -128,7 +128,7 @@ export default function MembersTable({
 
   const close = () => setSelectedId(null)
 
-  const setStatus = (status: 'ACTIVE' | 'SUSPENDED') => {
+  const setStatus = (status: 'ACTIVE' | 'SUSPENDED' | 'DECEASED' | 'RESIGNED' | 'DISQUALIFIED' | 'INACTIVE') => {
     if (!selected) return
     setError('')
     setOk('')
@@ -359,7 +359,7 @@ export default function MembersTable({
                   <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary mb-2">
                     Account actions
                   </p>
-                  {selected.status === 'SUSPENDED' ? (
+                  {selected.status === 'SUSPENDED' || selected.status === 'INACTIVE' ? (
                     <button
                       type="button"
                       disabled={pending}
@@ -369,17 +369,32 @@ export default function MembersTable({
                       Restore member
                     </button>
                   ) : selected.status === 'ACTIVE' ? (
-                    <button
-                      type="button"
-                      disabled={pending || selected.isSuperAdmin}
-                      onClick={() => setStatus('SUSPENDED')}
-                      className="w-full h-11 rounded-full border border-error/40 text-error font-label-bold text-sm hover:bg-error-container/40 disabled:opacity-40"
-                    >
-                      Suspend member
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        disabled={pending || selected.isSuperAdmin}
+                        onClick={() => setStatus('SUSPENDED')}
+                        className="w-full h-11 rounded-full border border-error/40 text-error font-label-bold text-sm hover:bg-error-container/40 disabled:opacity-40"
+                      >
+                        Suspend member
+                      </button>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['RESIGNED', 'DECEASED', 'DISQUALIFIED'] as const).map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            disabled={pending || selected.isSuperAdmin}
+                            onClick={() => setStatus(status)}
+                            className="h-9 rounded-lg border border-outline-variant text-[11px] font-semibold text-on-surface-variant hover:border-primary/40 disabled:opacity-40"
+                          >
+                            {status === 'RESIGNED' ? 'Resigned' : status === 'DECEASED' ? 'Deceased' : 'Disqualified'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ) : (
                     <p className="text-sm text-on-surface-variant">
-                      Status actions apply to ACTIVE / SUSPENDED members only.
+                      Status actions apply to ACTIVE / SUSPENDED / INACTIVE members.
                     </p>
                   )}
                 </section>

@@ -31,6 +31,10 @@ function isProtectedPath(pathname: string) {
     || pathname.startsWith('/documents/')
     || pathname === '/governance'
     || pathname.startsWith('/governance/')
+    || pathname === '/directory'
+    || pathname.startsWith('/directory/')
+    || pathname === '/today'
+    || pathname.startsWith('/today/')
   )
 }
 
@@ -47,8 +51,14 @@ function allowedPath(
   const target = roleForDashboardPath(pathname)
   if (!target) return false
 
-  // /admin* requires ADMIN primary or Super Admin
+  // /admin* requires ADMIN primary or Super Admin — except read-only audit logs for Auditors.
   if (target === 'ADMIN') {
+    if (
+      (pathname === '/admin/audit-logs' || pathname.startsWith('/admin/audit-logs/')) &&
+      (role === 'AUDITOR' || opts.dashboardAccess?.includes('AUDITOR'))
+    ) {
+      return true
+    }
     return role === 'ADMIN' || Boolean(opts.isSuperAdmin)
   }
 
@@ -147,6 +157,28 @@ export async function middleware(req: NextRequest) {
     return redirectWithCookies(url)
   }
 
+  // Idle session timeout (default 12 hours). Privileged roles can use SESSION_IDLE_MINUTES.
+  const idleMinutes = Number(process.env.SESSION_IDLE_MINUTES || 720)
+  if (Number.isFinite(idleMinutes) && idleMinutes > 0) {
+    const lastActiveRaw = req.cookies.get('alubonets_last_active')?.value
+    const lastActiveMs = lastActiveRaw ? Number(lastActiveRaw) : Date.now()
+    if (Number.isFinite(lastActiveMs) && Date.now() - lastActiveMs > idleMinutes * 60_000) {
+      await supabase.auth.signOut()
+      const url = req.nextUrl.clone()
+      url.pathname = pathname.startsWith('/admin') ? '/admin/login' : '/login'
+      url.searchParams.set('error', 'session_timeout')
+      const redirect = redirectWithCookies(url)
+      redirect.cookies.set('alubonets_last_active', '', { path: '/', maxAge: 0 })
+      return redirect
+    }
+    supabaseResponse.cookies.set('alubonets_last_active', String(Date.now()), {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 400,
+      httpOnly: true,
+    })
+  }
+
   const role = isAppRole(user.app_metadata?.role) ? user.app_metadata.role : null
   const status = isMemberStatus(user.app_metadata?.status)
     ? user.app_metadata.status
@@ -154,8 +186,12 @@ export async function middleware(req: NextRequest) {
   const isSuperAdmin = Boolean(user.app_metadata?.isSuperAdmin)
   const dashboardAccess = parseDashboardAccess(user.app_metadata?.dashboardAccess)
 
+  // Production hardening: never honor login-verification bypass outside development.
+  const allowVerificationBypass =
+    process.env.NODE_ENV !== 'production' && process.env.BYPASS_LOGIN_VERIFICATION === 'true'
+
   if (
-    process.env.BYPASS_LOGIN_VERIFICATION !== 'true' &&
+    !allowVerificationBypass &&
     status === 'ACTIVE' &&
     isProtectedPath(pathname) &&
     pathname !== '/verify-login'

@@ -9,7 +9,14 @@ export async function POST(req: NextRequest) {
   if (!profile || profile.status !== 'ACTIVE') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  // All active roles can initiate their own contribution
+  // Members do not submit their own payments — the Treasurer records every contribution.
+  // Enforced here as well as in the UI, since a server action is a callable HTTP endpoint.
+  if (profile.role !== 'TREASURER' && profile.role !== 'ADMIN' && !profile.isSuperAdmin) {
+    return NextResponse.json(
+      { error: 'Only the Treasurer can record payments. Please hand your payment details to the Treasurer.' },
+      { status: 403 },
+    )
+  }
 
   if (!mpesaConfigured()) {
     return NextResponse.json(

@@ -872,6 +872,7 @@ export async function createMeeting(data: {
   attendance: number
   recordedBy: string
   status?: 'DRAFT' | 'NOTICE' | 'PENDING_APPROVAL' | 'FINAL'
+  eventId?: string | null
 }) {
   return prisma.meeting.create({ data })
 }
@@ -894,6 +895,7 @@ export async function updateMeeting(
     publishedDocumentId?: string | null
     approvedById?: string | null
     approvedAt?: Date | null
+    eventId?: string | null
   }
 ) {
   return prisma.meeting.update({ where: { id }, data })

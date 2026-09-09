@@ -8,26 +8,29 @@ const fetchOpts: RequestInit = {
   cache: 'no-store',
 }
 
-export async function loginRequest(email: string, password: string) {
+export async function loginRequest(email: string, password: string, mfaToken?: string) {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 25_000)
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, ...(mfaToken ? { mfaToken } : {}) }),
       signal: controller.signal,
       ...fetchOpts,
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      throw new Error(data.error || 'Invalid credentials')
+      const err = new Error(data.error || 'Invalid credentials') as Error & { requiresMfa?: boolean }
+      err.requiresMfa = Boolean(data.requiresMfa)
+      throw err
     }
     return data as {
       user: AuthUser
       redirectTo: string
       status?: string
       requiresVerification?: boolean
+      requiresMfa?: boolean
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {

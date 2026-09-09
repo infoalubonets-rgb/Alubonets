@@ -24,9 +24,12 @@ export type MeetingEditorValues = {
   agenda: string
   minutes: string
   nextMeetingAt: string
+  eventId?: string
   status?: 'DRAFT' | 'NOTICE' | 'PENDING_APPROVAL' | 'FINAL'
   publishedDocumentId?: string | null
 }
+
+type EventOption = { id: string; title: string; startsAt: string }
 
 function toLocalInput(isoOrLocal: string) {
   if (!isoOrLocal) return ''
@@ -62,13 +65,16 @@ const INPUT =
 export default function MeetingMinutesEditor({
   initial,
   mode,
+  events = [],
 }: {
   initial: MeetingEditorValues
   mode: 'create' | 'edit'
+  events?: EventOption[]
 }) {
   const router = useRouter()
   const [values, setValues] = useState({
     ...initial,
+    eventId: initial.eventId || '',
     heldAt: toLocalInput(initial.heldAt),
     nextMeetingAt: initial.nextMeetingAt ? toLocalInput(initial.nextMeetingAt) : '',
   })
@@ -112,6 +118,7 @@ export default function MeetingMinutesEditor({
     fd.set('agenda', values.agenda)
     fd.set('minutes', values.minutes)
     fd.set('nextMeetingAt', values.nextMeetingAt)
+    if (values.eventId) fd.set('eventId', values.eventId)
     return fd
   }
 
@@ -238,6 +245,22 @@ export default function MeetingMinutesEditor({
               />
             </Field>
           </div>
+
+          <Field label="Linked event" hint="(optional)">
+            <select
+              value={values.eventId || ''}
+              onChange={(e) => set('eventId', e.target.value)}
+              className={INPUT}
+              disabled={locked}
+            >
+              <option value="">No linked event</option>
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.title} · {new Date(event.startsAt).toLocaleDateString('en-KE')}
+                </option>
+              ))}
+            </select>
+          </Field>
 
           <Field label="Opening">
             <textarea

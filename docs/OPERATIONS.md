@@ -54,6 +54,9 @@ Fill `.env.local` (never commit secrets):
 | `SUPER_ADMIN_PASSWORD` | Ops bootstrap | Auth password for that Super Admin only (never commit) |
 | `CRON_SECRET` | Local + Netlify/GitHub | Bearer token for `/api/cron/*` (never commit) |
 | `CRON_BASE_URL` | Optional | Override site URL for cron callers (defaults to `URL` / `NEXT_PUBLIC_APP_URL`) |
+| `SESSION_IDLE_MINUTES` | Auth | Idle session timeout in minutes (default `720` = 12 hours) |
+| `BYPASS_LOGIN_VERIFICATION` | Local only | Must be unset/`false` in production (ignored when `NODE_ENV=production`) |
+| `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` | Local only | Login autofill; forced off in production builds |
 
 ### Cron (scheduled maintenance)
 
@@ -308,6 +311,17 @@ Database backups do not automatically prove that uploaded files in Supabase Stor
 | Storage sample file check | Pass / Fail |
 | Notes | |
 | Sign-off | |
+
+### Production launch security checklist
+
+- [ ] `NODE_ENV=production` on the host
+- [ ] `BYPASS_LOGIN_VERIFICATION` unset or `false` (middleware and login API ignore it in production anyway)
+- [ ] `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS=false` (autofill is also disabled when `NODE_ENV=production`)
+- [ ] Seed / demo passwords rotated or demo accounts disabled (`SEED_DEMO_ACCOUNTS=false`)
+- [ ] Privileged roles enrolled in MFA from **My profile**
+- [ ] `SESSION_IDLE_MINUTES` set to the approved idle policy
+- [ ] Staging restore drill completed and recorded above
+- [ ] Accessibility / responsive UAT signed on mobile, tablet and desktop
 
 
 ---

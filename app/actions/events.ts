@@ -40,7 +40,8 @@ export async function upsertEventDetails(formData: FormData) {
       endsAt: z.coerce.date().optional(),
       imageUrl: z.string().trim().optional(),
       isPublic: z.enum(['on', 'off']).optional(),
-      audienceType: z.enum(['PUBLIC', 'ALL_MEMBERS', 'SELECTED_ROLES', 'SELECTED_MEMBERS']),
+      audienceType: z.enum(['PUBLIC', 'ALL_MEMBERS', 'SELECTED_ROLES', 'SELECTED_MEMBERS', 'BRANCH_MEMBERS']),
+      audiencePrincipalId: z.string().optional(),
       capacity: z.coerce.number().int().positive().optional(),
       rsvpDeadlineAt: z.coerce.date().optional(),
       budgetKes: z.coerce.number().min(0).optional(),
@@ -58,6 +59,7 @@ export async function upsertEventDetails(formData: FormData) {
       imageUrl: formData.get('imageUrl') || undefined,
       isPublic: formData.get('isPublic') === 'off' ? 'off' : 'on',
       audienceType: formData.get('audienceType') || 'PUBLIC',
+      audiencePrincipalId: formData.get('audiencePrincipalId') || undefined,
       capacity: formData.get('capacity') || undefined,
       rsvpDeadlineAt: formData.get('rsvpDeadlineAt') || undefined,
       budgetKes: formData.get('budgetKes') || undefined,
@@ -69,6 +71,9 @@ export async function upsertEventDetails(formData: FormData) {
   const existing = data.id ? await prisma.event.findUnique({ where: { id: data.id }, select: { startsAt: true, rsvpDeadlineAt: true } }) : null
   if (data.startsAt.getTime() !== existing?.startsAt.getTime()) assertNotPast(data.startsAt, 'Event date')
   if (data.rsvpDeadlineAt && data.rsvpDeadlineAt.getTime() !== existing?.rsvpDeadlineAt?.getTime()) assertNotPast(data.rsvpDeadlineAt, 'RSVP deadline')
+  if (data.audienceType === 'BRANCH_MEMBERS' && !data.audiencePrincipalId) {
+    throw new Error('Select a Principal Member for branch audience events.')
+  }
   const audienceRoles = formData.getAll('audienceRoles').map(String) as Role[]
   const offsets = (data.reminderOffsetsHours || '')
     .split(',')
@@ -84,6 +89,7 @@ export async function upsertEventDetails(formData: FormData) {
     imageUrl: data.imageUrl ?? null,
     isPublic: data.audienceType === 'PUBLIC' || data.isPublic !== 'off',
     audienceType: data.audienceType,
+    audiencePrincipalId: data.audienceType === 'BRANCH_MEMBERS' ? data.audiencePrincipalId ?? null : null,
     audienceRoles,
     capacity: data.capacity ?? null,
     rsvpDeadlineAt: data.rsvpDeadlineAt ?? null,
@@ -119,7 +125,14 @@ export async function circulateEventInvitations(formData: FormData) {
           ? { role: { in: event.audienceRoles } }
           : event.audienceType === 'SELECTED_MEMBERS'
             ? { id: { in: selectedIds } }
-            : {}),
+            : event.audienceType === 'BRANCH_MEMBERS' && event.audiencePrincipalId
+              ? {
+                  OR: [
+                    { id: event.audiencePrincipalId },
+                    { principalMemberId: event.audiencePrincipalId },
+                  ],
+                }
+              : { id: '__none__' }),
     },
     select: { id: true },
   })

@@ -8,6 +8,10 @@ export const PRESCRIBED_DOCUMENT_CATEGORIES = [
   'Finance',
   'Project',
   'Correspondence',
+  'Welfare',
+  'Education',
+  'Health',
+  'Archive',
   'Reports',
   'Other',
 ] as const

@@ -22,6 +22,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   const [mode, setMode] = useState<'signin' | 'register'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [mfaToken, setMfaToken] = useState('')
+  const [needsMfa, setNeedsMfa] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
@@ -55,6 +57,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
       )
     } else if (err === 'inactive') {
       setError('Your account is not active. Contact an administrator.')
+    } else if (err === 'session_timeout') {
+      setError('Your session expired after inactivity. Please sign in again.')
     } else if (err === 'oauth') {
       setError('Google sign-in failed. Please try again or use email and password.')
     }
@@ -87,7 +91,11 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
         router.refresh()
         return
       }
-      const { user, redirectTo, status, requiresVerification } = await loginRequest(email, password)
+      const { user, redirectTo, status, requiresVerification } = await loginRequest(
+        email,
+        password,
+        needsMfa ? mfaToken : undefined,
+      )
       if (status === 'PENDING') {
         if (admin) {
           await logoutRequest()
@@ -109,7 +117,13 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
       }
       router.refresh()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      const mfaRequired = Boolean((err as Error & { requiresMfa?: boolean })?.requiresMfa)
+      if (mfaRequired) {
+        setNeedsMfa(true)
+        setError('Enter the authenticator code for this account.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -179,7 +193,9 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                     required
                     className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
                   />
-                  {mode === 'signin' && process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS !== 'false' && (
+                  {mode === 'signin' &&
+                    process.env.NODE_ENV !== 'production' &&
+                    process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS !== 'false' && (
                     <DevAccountsDropdown
                       open={devOpen}
                       onPick={(devEmail, devPassword) => {
@@ -217,6 +233,25 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   </button>
                 </div>
               </div>
+              {mode === 'signin' && needsMfa && (
+                <div>
+                  <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
+                    Authenticator code
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={mfaToken}
+                    onChange={(e) => setMfaToken(e.target.value)}
+                    required
+                    minLength={6}
+                    maxLength={8}
+                    placeholder="6-digit code"
+                    className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
+                  />
+                </div>
+              )}
               {mode === 'register' && (
                 <div>
                   <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
@@ -234,9 +269,9 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   />
                 </div>
               )}
-              {error && (
+              {friendly && (
                 <p className="text-error text-center font-caption text-caption text-[12px]">
-                  Sign-in needs your attention.
+                  {friendly.message}
                 </p>
               )}
               <div className="flex justify-center mt-xs">

@@ -3,6 +3,7 @@ import DashboardShell from '@/components/dashboard/DashboardShell'
 import SettingsSectionButton from '@/components/admin/SettingsSectionButton'
 import FeatureFlagsToggles from '@/components/admin/FeatureFlagsToggles'
 import ContactFinanceForm from '@/components/admin/ContactFinanceForm'
+import FinanceDestinationForm from '@/components/admin/FinanceDestinationForm'
 import AppSettingForm from '@/components/admin/AppSettingForm'
 import ContributionCategoriesManager from '@/components/admin/ContributionCategoriesManager'
 import { requireAdmin } from '@/lib/auth/session'
@@ -20,11 +21,13 @@ import {
 
 export default async function AdminSettingsPage() {
   await requireAdmin()
-  const [flags, settings, txCats, nav] = await Promise.all([
+  const [flags, settings, txCats, nav, financeDestination, fundRule] = await Promise.all([
     getFeatureFlags(),
     getSettings(Object.values(SETTING_KEYS)),
-    prisma.transactionCategory.findMany({ where: { active: true }, orderBy: { name: 'asc' }, take: 80 }),
+    prisma.transactionCategory.findMany({ where: { active: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], take: 80 }),
     navWithLoans('ADMIN'),
+    prisma.financeSettingVersion.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' } }),
+    prisma.fundAllocationRule.findFirst({ where: { active: true }, orderBy: { version: 'desc' } }),
   ])
   const loansOn = Boolean(flags[FEATURE_FLAGS.loansEnabled])
   const welfareOn = Boolean(flags[FEATURE_FLAGS.welfareEnabled])
@@ -50,6 +53,17 @@ export default async function AdminSettingsPage() {
             publicPhone={settings[SETTING_KEYS.contactPublicPhone] || ''}
             enquiryEmail={settings[SETTING_KEYS.contactDestinationEmail] || CONTACT_EMAIL}
             approvalThreshold={settings[SETTING_KEYS.financialApprovalThresholdKes] || '50000'}
+          />
+        </SettingsSectionButton>
+
+        <SettingsSectionButton
+          title="Official payment destination"
+          description="Group bank / paybill details with change history and fund allocation"
+          icon="account_balance"
+        >
+          <FinanceDestinationForm
+            destination={financeDestination}
+            allocation={fundRule}
           />
         </SettingsSectionButton>
 

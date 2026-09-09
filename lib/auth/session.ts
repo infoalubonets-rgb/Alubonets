@@ -13,6 +13,9 @@ export type SessionProfile = AuthUser & {
   authUserId: string | null
   isSuperAdmin: boolean
   dashboardAccess: Role[]
+  /** Branch owner for an attached member; null for principals and unattached members. */
+  principalMemberId: string | null
+  isPrincipal: boolean
 }
 
 export type AppMetadataPayload = {
@@ -23,6 +26,7 @@ export type AppMetadataPayload = {
   dbUserId: string   // stored so requests can skip the DB lookup
   fullName: string
   isPrincipal?: boolean
+  principalMemberId?: string | null
 }
 
 export async function syncAppMetadata(
@@ -58,6 +62,7 @@ export async function syncUserMetadata(user: User) {
     dbUserId: user.id,
     fullName: user.fullName,
     isPrincipal: user.isPrincipal,
+    principalMemberId: user.principalMemberId,
   })
 }
 
@@ -75,8 +80,10 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
 
   const meta = authUser.app_metadata ?? {}
 
-  // Fast path: JWT already carries everything we need — skip the DB entirely
-  if (isAppRole(meta.role) && meta.status && meta.dbUserId) {
+  // Fast path: JWT already carries everything we need — skip the DB entirely.
+  // Tokens minted before branch fields were added lack `principalMemberId`; those must
+  // fall through to the DB so branch-scoped queries never run against a missing value.
+  if (isAppRole(meta.role) && meta.status && meta.dbUserId && 'principalMemberId' in meta) {
     const fullName = (meta.fullName as string) || authUser.email?.split('@')[0] || ''
     return {
       id: meta.dbUserId as string,
@@ -88,6 +95,8 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
       authUserId: authUser.id,
       isSuperAdmin: Boolean(meta.isSuperAdmin),
       dashboardAccess: (meta.dashboardAccess ?? []) as Role[],
+      principalMemberId: (meta.principalMemberId ?? null) as string | null,
+      isPrincipal: Boolean(meta.isPrincipal),
     }
   }
 
@@ -133,6 +142,8 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
     authUserId: profile.authUserId,
     isSuperAdmin: profile.isSuperAdmin ?? false,
     dashboardAccess: (profile.dashboardAccess ?? []) as Role[],
+    principalMemberId: profile.principalMemberId ?? null,
+    isPrincipal: profile.isPrincipal ?? false,
   }
 }
 

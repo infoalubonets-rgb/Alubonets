@@ -29,6 +29,7 @@ const meetingFields = z.object({
   agenda: z.string().optional().nullable(),
   minutes: z.string().optional().nullable(),
   nextMeetingAt: z.string().optional().nullable(),
+  eventId: z.string().optional().nullable(),
 })
 
 function emptyToNull(v: string | null | undefined) {
@@ -57,6 +58,7 @@ export async function actionCreateMeeting(formData: FormData) {
     agenda: formData.get('agenda'),
     minutes: formData.get('minutes'),
     nextMeetingAt: formData.get('nextMeetingAt'),
+    eventId: formData.get('eventId') || null,
   })
 
   assertNotPast(parseNextMeeting(parsed.nextMeetingAt), 'Next meeting date')
@@ -75,6 +77,7 @@ export async function actionCreateMeeting(formData: FormData) {
     nextMeetingAt: parseNextMeeting(parsed.nextMeetingAt) ?? undefined,
     recordedBy: actor.id,
     status: 'DRAFT',
+    eventId: emptyToNull(parsed.eventId),
   })
 
   await writeAudit({
@@ -109,6 +112,7 @@ export async function actionUpdateMeeting(formData: FormData) {
     agenda: formData.get('agenda'),
     minutes: formData.get('minutes'),
     nextMeetingAt: formData.get('nextMeetingAt'),
+    eventId: formData.get('eventId') || null,
   })
 
   // A next-meeting date already stored in the past stays as-is, so only a *changed*
@@ -128,6 +132,7 @@ export async function actionUpdateMeeting(formData: FormData) {
     agenda: emptyToNull(parsed.agenda),
     minutes: emptyToNull(parsed.minutes),
     nextMeetingAt,
+    eventId: emptyToNull(parsed.eventId),
   })
 
   await writeAudit({

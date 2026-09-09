@@ -47,7 +47,10 @@ export async function createLedgerContribution(input: {
   receivedBy: string
   actorId: string
   occurredAt?: Date
-  status?: 'PENDING' | 'CONFIRMED' | 'RECONCILED'
+  status?: 'PENDING' | 'CONFIRMED' | 'RECONCILED' | 'REJECTED'
+  proofPath?: string | null
+  proofMimeType?: string | null
+  proofTitle?: string | null
 }) {
   const occurredAt = input.occurredAt || new Date()
   return prisma.$transaction(async (tx) => {
@@ -57,7 +60,12 @@ export async function createLedgerContribution(input: {
       const duplicate = await tx.financialTransaction.findUnique({ where: { providerReference: input.providerReference } })
       if (duplicate) throw new Error(`Transaction reference ${input.providerReference} has already been used.`)
     }
-    const status = input.status || 'CONFIRMED'
+    const payer = await tx.user.findUniqueOrThrow({
+      where: { id: input.userId },
+      select: { id: true, isPrincipal: true, principalMemberId: true },
+    })
+    const principalMemberId = payer.isPrincipal ? payer.id : payer.principalMemberId
+    const status = input.status || 'PENDING'
     const financial = await tx.financialTransaction.create({
       data: {
         transactionNumber: transactionNumber(),
@@ -70,19 +78,30 @@ export async function createLedgerContribution(input: {
         categoryId: input.categoryId,
         periodId: period.id,
         createdById: input.actorId,
-        confirmedAt: status === 'PENDING' ? null : new Date(),
+        confirmedAt: status === 'PENDING' || status === 'REJECTED' ? null : new Date(),
         entries: {
           create: [
             { accountId: source.id, debit: input.amount, credit: 0, memo: 'Money received' },
             { accountId: 'acct-contribution-income', debit: 0, credit: input.amount, memo: 'Contribution income' },
           ],
         },
+        supportingDocuments: input.proofPath
+          ? {
+              create: {
+                title: input.proofTitle || 'Payment proof',
+                fileUrl: input.proofPath,
+                mimeType: input.proofMimeType || 'application/octet-stream',
+                uploadedById: input.actorId,
+              },
+            }
+          : undefined,
       },
     })
     const category = await tx.transactionCategory.findUniqueOrThrow({ where: { id: input.categoryId } })
     const contribution = await tx.contribution.create({
       data: {
         userId: input.userId,
+        principalMemberId,
         amount: input.amount,
         description: input.description,
         category: category.name,

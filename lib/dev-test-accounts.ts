@@ -15,6 +15,7 @@ export type DevAccount = { email: string; password: string; label: string }
 
 /** Client-side autofill list (local testing). Passwords from public env — never commit real .env.local. */
 export function getTestAccounts(): DevAccount[] {
+  if (process.env.NODE_ENV === 'production') return []
   if (process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === 'false') return []
 
   const seedPassword = process.env.NEXT_PUBLIC_SEED_AUTH_PASSWORD || ''

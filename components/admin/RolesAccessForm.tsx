@@ -34,6 +34,7 @@ const ROLE_ICON: Record<Role, string> = {
   SECRETARY: 'description',
   ORGANIZER: 'event',
   MEMBER: 'person',
+  AUDITOR: 'policy',
 }
 
 export default function RolesAccessForm({ users, actorIsSuperAdmin }: Props) {

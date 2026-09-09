@@ -7,8 +7,10 @@ import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
 import type { Role } from '@/lib/auth/types'
 import AccountSecurity from '@/components/profile/AccountSecurity'
+import PrivilegedMfaPanel from '@/components/profile/PrivilegedMfaPanel'
 import MemberDetailsForm from '@/components/profile/MemberDetailsForm'
 import { createServerClient } from '@/lib/supabase-server'
+import { PRIVILEGED_MFA_ROLES } from '@/lib/mfa-totp'
 
 export const metadata = {
   title: 'My profile',
@@ -78,6 +80,10 @@ export default async function ProfilePage() {
       }} />
       <div className="mx-auto mt-4 max-w-lg pb-12">
         <AccountSecurity />
+        <PrivilegedMfaPanel
+          enabled={user.mfaEnabled}
+          canManage={PRIVILEGED_MFA_ROLES.includes(user.role as (typeof PRIVILEGED_MFA_ROLES)[number]) || user.isSuperAdmin}
+        />
       </div>
     </DashboardShell>
   )
