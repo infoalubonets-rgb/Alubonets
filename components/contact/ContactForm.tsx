@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { sendContactMessage, type ContactSubmitResult } from '@/app/actions/contact'
+import { sendContactMessage } from '@/app/actions/contact'
+import type { ContactSubmitResult } from '@/lib/contact-types'
 
 function ContactSuccessModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [mounted, setMounted] = useState(false)

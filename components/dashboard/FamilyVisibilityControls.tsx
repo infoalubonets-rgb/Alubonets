@@ -2,7 +2,8 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { setProfileVisibility, DIRECTORY_SAFE_FIELDS } from '@/app/actions/directory'
+import { setProfileVisibility } from '@/app/actions/directory'
+import { DIRECTORY_SAFE_FIELDS } from '@/lib/directory'
 
 type Attached = {
   id: string

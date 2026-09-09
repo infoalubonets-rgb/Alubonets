@@ -19,7 +19,7 @@ import {
   updateLoanAmountLimits,
   updateLoanPolicy,
 } from '@/app/actions/settings'
-import { DIRECTORY_FULL_ACCESS_SETTING } from '@/app/actions/directory'
+import { DIRECTORY_FULL_ACCESS_SETTING } from '@/lib/directory'
 
 export default async function AdminSettingsPage() {
   await requireAdmin()

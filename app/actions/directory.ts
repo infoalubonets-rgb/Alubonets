@@ -6,8 +6,11 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { ageOn } from '@/lib/profile-privacy'
-
-const DIRECTORY_SAFE_FIELDS = ['fullName', 'role', 'familyBranch', 'profession', 'skills', 'location'] as const
+import {
+  DIRECTORY_FULL_ACCESS_SETTING,
+  DIRECTORY_SAFE_FIELDS,
+  type DirectoryMember,
+} from '@/lib/directory'
 
 const visibilitySchema = z.object({
   userId: z.string().min(1),
@@ -15,10 +18,6 @@ const visibilitySchema = z.object({
   allowedFields: z.array(z.enum(DIRECTORY_SAFE_FIELDS)).default(['fullName', 'role', 'familyBranch']),
   reviewAt: z.string().optional().nullable(),
 })
-
-export type DirectorySafeField = (typeof DIRECTORY_SAFE_FIELDS)[number]
-
-export { DIRECTORY_SAFE_FIELDS }
 
 function isChildDependent(relationship: string | null | undefined, dob: Date | null | undefined) {
   if (relationship === 'SON' || relationship === 'DAUGHTER' || relationship === 'CHILD' || relationship === 'DEPENDENT') {
@@ -28,31 +27,12 @@ function isChildDependent(relationship: string | null | undefined, dob: Date | n
   return false
 }
 
-/**
- * Roles allowed to see every active member regardless of individual visibility settings.
- * Admin and Super Admin always qualify; extra roles are opt-in from Admin → Settings.
- */
-export const DIRECTORY_FULL_ACCESS_SETTING = 'directory_full_access_roles'
-
 async function rolesWithFullDirectoryAccess(): Promise<string[]> {
   const row = await prisma.appSetting.findUnique({ where: { key: DIRECTORY_FULL_ACCESS_SETTING } })
   return (row?.value || '')
     .split(',')
     .map((value) => value.trim().toUpperCase())
     .filter(Boolean)
-}
-
-export type DirectoryMember = {
-  id: string
-  fullName: string
-  relationship: string | null
-  principalName: string | null
-  isPrincipal: boolean
-  role: string | null
-  familyBranch: string | null
-  profession: string | null
-  skills: string | null
-  location: string | null
 }
 
 export async function getDirectoryMembers(): Promise<DirectoryMember[]> {

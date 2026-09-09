@@ -12,6 +12,7 @@ import { logError } from '@/lib/logger'
 import { renderEmailTemplate } from '@/lib/email/templates'
 import { headers } from 'next/headers'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import type { ContactSubmitResult } from '@/lib/contact-types'
 
 const contactSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -129,10 +130,6 @@ async function createContactSubmissionAndNotify({
   revalidatePath('/admin/announcements')
   return submission
 }
-
-export type ContactSubmitResult =
-  | { ok: true }
-  | { ok: false; error: 'invalid' | 'rate' }
 
 export async function sendContactMessage(formData: FormData): Promise<ContactSubmitResult> {
   // Honeypot — pretend success so bots don't retry.
