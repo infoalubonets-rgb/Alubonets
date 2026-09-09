@@ -15,7 +15,6 @@ import {
   TopContributorsChart,
 } from '@/components/dashboard/Charts'
 import { hasChartData } from '@/lib/chart-labels'
-import MpesaStkForm from '@/components/dashboard/MpesaStkForm'
 import PaymentsModal from '@/components/dashboard/PaymentsModal'
 import PendingContributionVerify from '@/components/dashboard/PendingContributionVerify'
 import PaginationBar from '@/components/ui/PaginationBar'
@@ -310,11 +309,6 @@ export default async function TreasurerContributionsPage({
             totalPages={totalPages(contribTotal, pageSize)}
             params={{ q, year, purpose, status: statusFilter }}
           />
-        </section>
-
-        <section className="rounded-xl border bg-surface p-4">
-          <h2 className="font-semibold mb-2">M-Pesa STK Push</h2>
-          <MpesaStkForm />
         </section>
       </div>
     </DashboardShell>

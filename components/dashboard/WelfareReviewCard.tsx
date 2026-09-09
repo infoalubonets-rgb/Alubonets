@@ -53,7 +53,7 @@ export default function WelfareReviewCard({
       </div>
       <dl className="grid gap-1 text-xs text-on-surface-variant sm:grid-cols-2">
         {!confidential && <div>Requester: {request.user.fullName}</div>}
-        {request.beneficiaryName && <div>Beneficiary: {confidential ? 'Restricted' : request.beneficiaryName}</div>}
+        {request.beneficiaryName && <div>Beneficiary: {request.beneficiaryName}</div>}
         {request.supportType && <div>Support type: {request.supportType}</div>}
         {request.category?.name && <div>Category: {request.category.name}</div>}
         <div>Treasurer: {treasurerDone ? 'Approved' : 'Awaiting'}</div>

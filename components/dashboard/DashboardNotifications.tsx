@@ -1,16 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import Link from 'next/link'
+import { markNotificationsRead } from '@/app/actions/notifications'
 
 type NotifItem = {
   id: string
-  type: 'event' | 'project' | 'gallery' | 'payment'
+  type: string
   title: string
   description: string
   imageUrl: string | null
   href: string
   createdAt: string
+  readAt?: string | null
 }
 
 type CleanupCounts = {
@@ -58,12 +58,15 @@ function dismissCleanupReminder() {
   try { localStorage.setItem(CLEANUP_KEY, String(Date.now())) } catch {}
 }
 
-const CFG = {
+const CFG: Record<string, { icon: string; label: string; bg: string; color: string }> = {
   event:   { icon: 'event',         label: 'New event',       bg: 'bg-primary/10',     color: 'text-primary' },
   project: { icon: 'work',          label: 'New project',     bg: 'bg-green-100 dark:bg-green-900/20',   color: 'text-green-700 dark:text-green-400' },
   gallery: { icon: 'photo_library', label: 'New photo',       bg: 'bg-purple-100 dark:bg-purple-900/20', color: 'text-purple-700 dark:text-purple-400' },
   payment: { icon: 'payments',      label: 'New contribution', bg: 'bg-orange-100 dark:bg-orange-900/20', color: 'text-orange-600 dark:text-orange-400' },
+  welfare: { icon: 'volunteer_activism', label: 'Welfare', bg: 'bg-secondary/10', color: 'text-secondary' },
 }
+
+const DEFAULT_CFG = { icon: 'notifications', label: 'Notice', bg: 'bg-primary/10', color: 'text-primary' }
 
 export default function DashboardNotifications() {
   const [items, setItems] = useState<NotifItem[]>([])
@@ -111,6 +114,11 @@ export default function DashboardNotifications() {
   const dismiss = useCallback((id: string) => {
     markSeen(id)
     setItems((prev) => prev.filter((i) => i.id !== id))
+    if (id.startsWith('notice-')) {
+      const formData = new FormData()
+      formData.set('id', id.slice('notice-'.length))
+      void markNotificationsRead(formData)
+    }
   }, [])
 
   const dismissAll = useCallback(() => {
@@ -196,7 +204,7 @@ function CleanupCard({ counts, onDismiss }: { counts: CleanupCounts; onDismiss: 
 }
 
 function NotifCard({ item, onDismiss }: { item: NotifItem; onDismiss: () => void }) {
-  const cfg = CFG[item.type]
+  const cfg = CFG[item.type] ?? DEFAULT_CFG
 
   useEffect(() => {
     const t = setTimeout(onDismiss, 12_000)

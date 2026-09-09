@@ -2,6 +2,7 @@
 import { requireActiveRole } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { writeAudit } from '@/lib/audit'
+import { reportRangeFromSearch } from '@/lib/report-period'
 
 function cell(value: unknown) {
   const text = String(value ?? '')
@@ -13,8 +14,10 @@ function cell(value: unknown) {
 
 export async function GET(req: NextRequest) {
   const actor = await requireActiveRole(['TREASURER', 'ADMIN', 'EXECUTIVE'])
-  const from = new Date(req.nextUrl.searchParams.get('from') || '2026-01-01')
-  const to = new Date(req.nextUrl.searchParams.get('to') || '2026-12-31T23:59:59.999')
+  const { from, to } = reportRangeFromSearch(
+    req.nextUrl.searchParams.get('from'),
+    req.nextUrl.searchParams.get('to'),
+  )
   const category = req.nextUrl.searchParams.get('category')
   const rows = await prisma.financialTransaction.findMany({
     where: {

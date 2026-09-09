@@ -274,7 +274,7 @@ export const getMemberDashboardData = unstable_cache(
       }),
       prisma.welfareRequest.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
       prisma.meeting.findFirst({
-        where: { heldAt: { gte: new Date() }, status: { in: ['FINAL', 'PENDING_APPROVAL'] } },
+        where: { heldAt: { gte: new Date() }, status: { in: ['FINAL', 'NOTICE'] } },
         orderBy: { heldAt: 'asc' },
         select: { id: true, title: true, heldAt: true, location: true },
       }),

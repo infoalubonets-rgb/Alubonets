@@ -23,7 +23,7 @@ function startOfWeek(date: Date) {
 }
 
 export default function EventsCalendar({ events, hrefFor }: Props) {
-  const [mode, setMode] = useState<'month' | 'week'>('month')
+  const [mode, setMode] = useState<'month' | 'week' | 'list'>('month')
   const [cursor, setCursor] = useState(() => {
     const d = new Date()
     return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -60,6 +60,10 @@ export default function EventsCalendar({ events, hrefFor }: Props) {
 
   const monthLabel = cursor.toLocaleDateString('en-KE', { month: 'long', year: 'numeric' })
   const weekLabel = `${weekDays[0].toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })} – ${weekDays[6].toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}`
+  const listed = useMemo(
+    () => [...events].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+    [events],
+  )
 
   return (
     <div className="rounded-2xl border bg-surface p-4">
@@ -79,7 +83,15 @@ export default function EventsCalendar({ events, hrefFor }: Props) {
           >
             Week
           </button>
+          <button
+            type="button"
+            className={`rounded-lg border px-2 py-1 text-sm ${mode === 'list' ? 'bg-primary text-on-primary' : ''}`}
+            onClick={() => setMode('list')}
+          >
+            List
+          </button>
         </div>
+        {mode !== 'list' && (
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -111,6 +123,7 @@ export default function EventsCalendar({ events, hrefFor }: Props) {
             Next
           </button>
         </div>
+        )}
       </div>
 
       {mode === 'month' ? (
@@ -149,7 +162,7 @@ export default function EventsCalendar({ events, hrefFor }: Props) {
             })}
           </div>
         </>
-      ) : (
+      ) : mode === 'week' ? (
         <div className="grid gap-2 md:grid-cols-7">
           {weekDays.map((day) => {
             const key = `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`
@@ -176,6 +189,30 @@ export default function EventsCalendar({ events, hrefFor }: Props) {
             )
           })}
         </div>
+      ) : (
+        <ul className="divide-y divide-outline-variant">
+          {listed.map((e) => {
+            const when = new Date(e.startsAt)
+            return (
+              <li key={e.id} className="flex items-start gap-3 py-2">
+                <div className="w-14 shrink-0 text-center">
+                  <p className="text-[10px] font-bold uppercase text-secondary">{when.toLocaleDateString('en-KE', { month: 'short' })}</p>
+                  <p className="text-lg font-bold text-primary leading-none">{when.getDate()}</p>
+                </div>
+                <div className="min-w-0">
+                  <Link href={hrefFor?.(e.id) || `/dashboard/organizer/events/${e.id}`} className="text-sm font-semibold text-primary hover:underline">
+                    {e.title}
+                  </Link>
+                  <p className="text-[11px] text-on-surface-variant">
+                    {when.toLocaleString('en-KE', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {e.location ? ` · ${e.location}` : ''}
+                  </p>
+                </div>
+              </li>
+            )
+          })}
+          {!listed.length && <li className="py-6 text-sm text-on-surface-variant">No events to list.</li>}
+        </ul>
       )}
     </div>
   )

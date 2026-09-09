@@ -1,9 +1,7 @@
 import { isFeatureEnabled, FEATURE_FLAGS } from '@/lib/feature-flags'
 import {
   ADMIN_NAV,
-  EXECUTIVE_NAV,
   MEMBER_NAV,
-  TREASURER_NAV,
   LOANS_NAV_ITEMS,
   WELFARE_NAV_ITEMS,
   withOptionalNav,

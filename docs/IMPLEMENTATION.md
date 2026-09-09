@@ -1,9 +1,11 @@
 # Alubonets Website Upgrade — Implementation Status
 
-**Source:** Alubonets Self-Help Group Website Upgrade Structure & Developer Guide<br>
+**Source:** Alubonets Self-Help Group Website Upgrade Structure & Developer Guide, plus the later Simple Software Requirements Specification (sections 1–25)<br>
 **Target:** on or before 5 September 2026<br>
-**Status basis:** September 2026 implementation pass against the Upgrade Guide gap plan<br>
+**Status basis:** 9 September 2026 implementation pass against the SRS audit batches<br>
 **Confirmed UI decision:** Principal Members use the existing Member dashboard with additional family features. There is no separate Principal dashboard.
+
+Welfare requests now require Treasurer **and** Executive approval, with self-approval barred and a Confidential flag for officer-only details. MFA enrollment issues one-time recovery codes. Admin Roles can deactivate catalogue roles (except Admin). Allocation percentages are snapshotted onto recorded contributions. Financial exports default to the current calendar year.
 
 Companion documents: [Data model](./DATA_MODEL.md) · [Architecture](./ARCHITECTURE.md) · [Operations](./OPERATIONS.md) · [Acceptance](./ACCEPTANCE.md)
 

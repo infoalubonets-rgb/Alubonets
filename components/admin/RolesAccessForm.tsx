@@ -395,7 +395,7 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
                   <p className="text-[11px] text-on-surface-variant px-1 pb-1">
                     Home role stays on. Tap others to grant or revoke extra dashboards.
                   </p>
-                  {ALL_ROLES.map((r) => {
+                  {ALL_ROLES.filter((r) => r === role || r === 'ADMIN' || !disabledRoles.includes(r)).map((r) => {
                     const checked = access.includes(r) || role === r
                     const locked = role === r
                     return (
