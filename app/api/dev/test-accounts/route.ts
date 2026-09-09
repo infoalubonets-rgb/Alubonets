@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getTestAccounts } from '@/lib/dev-test-accounts'
+import { getTestAccounts, testAccountsEnabled } from '@/lib/dev-test-accounts'
 
 export const dynamic = 'force-dynamic'
 
-/** Optional JSON mirror of the client autofill list (local testing). */
+/** Optional JSON mirror of the client autofill list (testing only). */
 export async function GET() {
-  if (process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === 'false') {
+  if (!testAccountsEnabled()) {
     return NextResponse.json({ error: 'Test accounts disabled.' }, { status: 404 })
-  }
-  if (process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_APP_ENV === 'production') {
-    return NextResponse.json({ error: 'Not available in production.' }, { status: 404 })
   }
 
   const accounts = getTestAccounts()

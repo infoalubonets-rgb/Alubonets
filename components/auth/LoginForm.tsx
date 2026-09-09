@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
 import { ADMIN_LOGIN_LOGO } from '@/lib/constants'
 import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
+import { testAccountsEnabled } from '@/lib/dev-test-accounts'
 import { homeForRole, loginRequest, logoutRequest, meLookup, registerRequest, type AuthUser } from '@/lib/auth/client'
 import ErrorDialog from '@/components/ui/ErrorDialog'
 import { friendlyError } from '@/lib/safe-error'
@@ -193,9 +194,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                     required
                     className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
                   />
-                  {mode === 'signin' &&
-                    process.env.NODE_ENV !== 'production' &&
-                    process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS !== 'false' && (
+                  {mode === 'signin' && testAccountsEnabled() && (
                     <DevAccountsDropdown
                       open={devOpen}
                       onPick={(devEmail, devPassword) => {

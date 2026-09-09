@@ -1,4 +1,4 @@
-/** Local testing emails/labels — passwords come from NEXT_PUBLIC_* env at build time. */
+/** Role emails/labels — passwords come from NEXT_PUBLIC_* env at build time. */
 export const TEST_ACCOUNT_META: { email: string; label: string }[] = [
   { email: 'superadmin@alubonets.com', label: 'Super Admin' },
   { email: 'admin@alubonets.com', label: 'Admin' },
@@ -13,10 +13,19 @@ export const TEST_ACCOUNT_META: { email: string; label: string }[] = [
 
 export type DevAccount = { email: string; password: string; label: string }
 
-/** Client-side autofill list (local testing). Passwords from public env — never commit real .env.local. */
+/**
+ * Local: on unless NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS=false.
+ * Production/live: off unless NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS=true (explicit opt-in on Vercel).
+ */
+export function testAccountsEnabled() {
+  if (process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === 'false') return false
+  if (process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === 'true') return true
+  return process.env.NODE_ENV !== 'production'
+}
+
+/** Autofill list. Passwords from public env — anyone can see them when this is enabled. */
 export function getTestAccounts(): DevAccount[] {
-  if (process.env.NODE_ENV === 'production') return []
-  if (process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS === 'false') return []
+  if (!testAccountsEnabled()) return []
 
   const seedPassword = process.env.NEXT_PUBLIC_SEED_AUTH_PASSWORD || ''
   const superPassword = process.env.NEXT_PUBLIC_SUPER_ADMIN_PASSWORD || seedPassword
@@ -31,7 +40,6 @@ export function getTestAccounts(): DevAccount[] {
     }
   })
 
-  // If real Super Admin email differs from the demo slot, keep both entries
   if (superEmail && !accounts.some((a) => a.email.toLowerCase() === superEmail)) {
     accounts.unshift({
       email: superEmail,

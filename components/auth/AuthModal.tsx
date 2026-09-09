@@ -5,6 +5,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { homeForRole, loginRequest, registerRequest } from '@/lib/auth/client'
 import { createClient } from '@/utils/supabase/client'
 import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
+import { testAccountsEnabled } from '@/lib/dev-test-accounts'
 import GoogleButton from '@/components/auth/GoogleButton'
 import RegistrationWizard from '@/components/auth/RegistrationWizard'
 import { PasswordVisibilityIcon } from '@/components/auth/AuthIcons'
@@ -207,7 +208,7 @@ export default function AuthModal() {
                     autoComplete="off"
                     required
                   />
-                  {process.env.NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS !== 'false' && (
+                  {testAccountsEnabled() && (
                     <DevAccountsDropdown
                       open={devOpen}
                       onPick={(devEmail, devPassword) => {
