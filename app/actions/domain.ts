@@ -26,8 +26,6 @@ import { sendBroadcastEmail, sendContributionReceiptEmail } from '@/lib/email/re
 import { writeAudit } from '@/lib/audit'
 import { assertNotPast } from '@/lib/dates'
 
-export { actionCreateWelfare, actionReviewWelfare } from '@/app/actions/welfare'
-
 export async function actionCreateContribution(formData: FormData) {
   void formData
   await requireActiveRole(['TREASURER', 'ADMIN'])
