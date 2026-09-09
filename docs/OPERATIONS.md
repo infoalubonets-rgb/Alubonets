@@ -171,12 +171,27 @@ Routes already exist: `app/api/mpesa/stk`, `app/api/mpesa/callback`.
 
 ## 9. Hosting (Vercel + Supabase)
 
-1. Import repo to Vercel; set all env vars.  
-2. `NEXT_PUBLIC_APP_URL` = production domain.  
-3. Supabase Auth redirect URLs = production.  
-4. Resend DNS for the sending domain.  
-5. `npm run db:push` or migrate against production.  
-6. Point M-Pesa callback at production when live.
+GitHub repo: `https://github.com/vouh/Alubonets`.
+
+1. In [Vercel](https://vercel.com/new), import that GitHub repo (Framework Preset: Next.js, Root Directory: `.`).
+2. **Before the first deploy**, add Environment Variables for Production and Preview. Vercel does not read `.env.local`. A new project with empty env will fail `prebuild` with `Missing required environment variables`.
+3. Required names (copy from local `.env.local`, not the example placeholders):
+
+   | Name | Notes |
+   |---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | `https://….supabase.co` |
+   | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | or `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+   | `SUPABASE_SERVICE_ROLE_KEY` | server only |
+   | `DATABASE_URL` | pooler / transaction mode |
+   | `DIRECT_URL` | session / direct |
+   | `NEXT_PUBLIC_APP_URL` | production origin, e.g. `https://alubonets.vercel.app` then the custom domain |
+
+4. Also set `NEXT_PUBLIC_APP_ENV=production`, `CRON_SECRET`, and email/Sentry keys as needed.
+5. Do **not** set `BYPASS_LOGIN_VERIFICATION` or `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` on Vercel.
+6. Redeploy after saving env (Deployments → … → Redeploy). Env added after a failed build is not applied until you redeploy.
+7. In Supabase Auth, add the Vercel URL to Redirect URLs and Site URL.
+8. Run `npm run db:migrate:deploy` against production (already applied from this workspace if you used the same database).
+9. Point M-Pesa callback at production when live.
 
 Shared PHP hosting is not suitable for this stack.
 
