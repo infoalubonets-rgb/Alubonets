@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import ModuleDisabled from '@/components/dashboard/ModuleDisabled'
 import { requireActiveRole } from '@/lib/auth/session'
 import { TREASURER_NAV, LOANS_NAV_ITEMS, withOptionalNav } from '@/lib/dashboard/nav'
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
@@ -18,7 +19,7 @@ export default async function TreasurerLoanDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  if (!(await isFeatureEnabled(FEATURE_FLAGS.loansEnabled))) notFound()
+  if (!(await isFeatureEnabled(FEATURE_FLAGS.loansEnabled))) return <ModuleDisabled module="Loans" />
   await requireActiveRole(['TREASURER', 'ADMIN'])
   const { id } = await params
   const loan = await prisma.loanApplication.findUnique({
@@ -200,8 +201,6 @@ export default async function TreasurerLoanDetailPage({
               <p>{loan.applicant.email}</p>
               <p>{loan.applicant.phone || 'No phone'}</p>
               <p className="mt-2 text-xs text-on-surface-variant">
-                Branch: {profile?.familyBranch || '—'}
-                <br />
                 Category: {profile?.memberCategory || '—'}
                 <br />
                 Profession: {profile?.profession || '—'}

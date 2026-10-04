@@ -31,6 +31,9 @@ export default async function AdminRolesPage() {
             email: u.email,
             role: u.role as Role,
             isSuperAdmin: u.isSuperAdmin,
+            isPrincipal: u.isPrincipal,
+            attachedToPrincipal: Boolean(u.principalMemberId),
+            active: u.status === 'ACTIVE',
             dashboardAccess: (Array.isArray(u.dashboardAccess) ? u.dashboardAccess : []) as Role[],
           }))}
         />

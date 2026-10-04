@@ -10,6 +10,7 @@ import {
   linkExistingFamilyMember,
   revokeFamilyInvite,
 } from '@/app/actions/family'
+import { transferMyAttachedMember } from '@/app/actions/members'
 
 const RELATIONSHIPS = [
   { value: 'SPOUSE', label: 'Spouse' },
@@ -39,20 +40,19 @@ type BranchMember = {
   registrationState: string
   isYou?: boolean
   phone?: string | null
-  lineage?: string | null
 }
 
 export default function FamilyBranchClient({
   isPrincipal,
-  defaultLineage,
   principalName,
   relationshipLabel,
   members,
   pendingInvites,
   transitionHistory,
+  otherPrincipals = [],
 }: {
   isPrincipal: boolean
-  defaultLineage: string
+  otherPrincipals?: Array<{ id: string; fullName: string }>
   principalName: string | null
   relationshipLabel: string | null
   members: BranchMember[]
@@ -71,8 +71,11 @@ export default function FamilyBranchClient({
   // from the browser's clock and the attribute survives hydration unchanged.
   const [today, setToday] = useState('')
   useEffect(() => setToday(todayInputValue()), [])
-  const [lineage, setLineage] = useState(defaultLineage)
   const [detailMember, setDetailMember] = useState<BranchMember | null>(null)
+  const [transferMember, setTransferMember] = useState<BranchMember | null>(null)
+  const [transferTo, setTransferTo] = useState('')
+  const [transferReason, setTransferReason] = useState('')
+  const [transferError, setTransferError] = useState('')
   const [error, setError] = useState('')
   const friendly = error ? friendlyError(error, 'We could not update the family branch. Please try again.') : null
   const [ok, setOk] = useState('')
@@ -113,7 +116,21 @@ export default function FamilyBranchClient({
     setEmail('')
     setPhone('')
     setDateOfBirth('')
-    setLineage(defaultLineage)
+  }
+
+  const submitTransfer = () => {
+    if (!transferMember) return
+    setTransferError('')
+    startTransition(async () => {
+      try {
+        await transferMyAttachedMember({ memberId: transferMember.id, newPrincipalId: transferTo, reason: transferReason })
+        setTransferMember(null)
+        setOk(`${transferMember.fullName} was moved to another Principal.`)
+        router.refresh()
+      } catch (cause) {
+        setTransferError(cause instanceof Error ? cause.message : 'Could not transfer this member')
+      }
+    })
   }
 
   const submit = () => {
@@ -133,7 +150,6 @@ export default function FamilyBranchClient({
             email,
             phone,
             dateOfBirth,
-            lineage,
           })
           if (result.mode === 'INVITE_NEW') {
             setOk(
@@ -211,12 +227,23 @@ export default function FamilyBranchClient({
                   </p>
                   <p className="truncate text-xs text-on-surface-variant dark:text-blue-200/55">{member.email}</p>
                   <p className="text-xs text-on-surface-variant dark:text-blue-200/55">
-                    {member.phone || 'No phone'} · Lineage: {member.lineage || 'Not provided'}
+                    {member.phone || 'No phone'}
                   </p>
                 </div>
                 <span className="rounded-full bg-surface-container px-2.5 py-1 text-[10px] font-semibold text-on-surface-variant dark:bg-[#111f36] dark:text-blue-200">
                   {member.relationship || 'Family member'}
                 </span>
+                {isPrincipal && !member.isYou && otherPrincipals.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setTransferMember(member); setTransferTo(''); setTransferReason(''); setTransferError('') }}
+                    aria-label={`Transfer ${member.fullName} to another Principal`}
+                    title="Transfer to another Principal"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant text-primary transition hover:bg-primary/5"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">move_up</span>
+                  </button>
+                )}
                 <button type="button" onClick={() => setDetailMember(member)} aria-label={`View details for ${member.fullName}`} title="View member details" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant text-primary transition hover:bg-primary/5">
                   <span className="material-symbols-outlined text-[18px]">visibility</span>
                 </button>
@@ -264,12 +291,38 @@ export default function FamilyBranchClient({
                 ['Relationship', detailMember.relationship || 'Family member'],
                 ['Email', detailMember.email],
                 ['Phone', detailMember.phone || 'Not provided'],
-                ['Lineage', detailMember.lineage || 'Not provided'],
                 ['Membership status', detailMember.status],
                 ['Registration state', detailMember.registrationState.replaceAll('_', ' ')],
               ].map(([label, value]) => <div key={label} className="rounded-lg bg-surface-container-low p-3"><dt className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">{label}</dt><dd className="mt-1 break-words text-sm">{value}</dd></div>)}
             </dl>
             <button type="button" onClick={() => setDetailMember(null)} className="mt-5 w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Close</button>
+          </section>
+        </div>
+      )}
+
+      {transferMember && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) setTransferMember(null) }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="transfer-member-title" className="w-full max-w-md rounded-t-2xl bg-surface p-5 shadow-2xl dark:bg-[#0d1729] sm:rounded-2xl">
+            <h2 id="transfer-member-title" className="font-h3 text-xl text-primary">Transfer {transferMember.fullName}</h2>
+            <p className="mt-1 text-xs text-on-surface-variant">Move this member to another Principal’s branch. Their payments and history stay with them.</p>
+            <label className="mt-4 block text-sm font-medium">
+              New Principal
+              <select value={transferTo} onChange={(event) => setTransferTo(event.target.value)} className="mt-1 block h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm dark:bg-[#111f36]">
+                <option value="">Choose a Principal</option>
+                {otherPrincipals.map((principal) => <option key={principal.id} value={principal.id}>{principal.fullName}</option>)}
+              </select>
+            </label>
+            <label className="mt-3 block text-sm font-medium">
+              Reason
+              <input value={transferReason} onChange={(event) => setTransferReason(event.target.value)} placeholder="e.g. Got married and joined her husband’s branch" className="mt-1 block h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm dark:bg-[#111f36]" />
+            </label>
+            {transferError && <p className="mt-3 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{transferError}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" disabled={pending} onClick={() => setTransferMember(null)} className="h-10 rounded-lg border border-outline-variant px-4 text-sm font-semibold">Cancel</button>
+              <button type="button" disabled={pending || !transferTo || transferReason.trim().length < 5} onClick={submitTransfer} className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary disabled:opacity-50">
+                {pending ? 'Moving…' : 'Transfer member'}
+              </button>
+            </div>
           </section>
         </div>
       )}
@@ -362,13 +415,6 @@ export default function FamilyBranchClient({
                   </label>
                 </div>
               )}
-              {mode !== 'LINK_EXISTING' && (
-                <label className="block text-sm font-medium">
-                  Lineage / family origin <span className="font-normal text-on-surface-variant">(optional)</span>
-                  <textarea value={lineage} onChange={(event) => setLineage(event.target.value)} placeholder="Family lineage or origin" className="mt-1 min-h-14 w-full resize-y rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm dark:bg-[#111f36]" />
-                </label>
-              )}
-
               {error && <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">The request needs your attention.</p>}
               {ok && !error && <p className="rounded-lg bg-primary/5 px-3 py-2 text-sm text-primary">{ok}</p>}
               {inviteUrl && <p className="break-all rounded-lg bg-surface-container-low p-3 text-xs">Invite link: {inviteUrl}</p>}

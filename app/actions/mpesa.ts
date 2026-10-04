@@ -1,9 +1,9 @@
 'use server'
 
 import { revalidateTag } from 'next/cache'
-import { requireSessionProfile } from '@/lib/auth/session'
+import { requireActiveRole } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
-import { initiateStkPush, formatPhone } from '@/lib/mpesa'
+import { initiateStkPush } from '@/lib/mpesa'
 import { TAGS } from '@/lib/data/queries'
 
 export async function actionInitiateStkPush(data: {
@@ -11,43 +11,54 @@ export async function actionInitiateStkPush(data: {
   amount: number
   category: string
   description?: string
+  userId?: string
+  categoryId?: string
+  campaignId?: string
+  projectId?: string
+  contributionPeriod?: string
 }): Promise<{ checkoutRequestId: string; message: string }> {
-  const profile = await requireSessionProfile()
-  if (profile.status !== 'ACTIVE') throw new Error('Account not active')
+  // Same rule as /api/mpesa/stk: the Treasurer records payments until member-facing STK is switched on.
+  const profile = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const { mpesaCallbackUrl, mpesaConfigured } = await import('@/lib/mpesa/daraja')
+  const { resolveStkPurpose } = await import('@/lib/mpesa/purpose')
+  if (!mpesaConfigured()) throw new Error('M-Pesa is not configured yet.')
 
   const amount = Math.round(data.amount)
   if (!data.phone) throw new Error('Phone number is required')
   if (!amount || amount < 1) throw new Error('Amount must be at least KES 1')
-
-  const callbackUrl =
-    process.env.MPESA_CALLBACK_URL ??
-    `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'}/api/mpesa/callback`
+  const purpose = await resolveStkPurpose({
+    categoryId: data.categoryId || undefined,
+    campaignId: data.campaignId || undefined,
+    projectId: data.projectId || undefined,
+    contributionPeriod: data.contributionPeriod || undefined,
+  })
+  const targetUserId = data.userId || profile.id
 
   const result = await initiateStkPush({
     phone: data.phone,
     amount,
     accountRef: 'ALUBONETS',
     description: (data.category || 'Contribution').slice(0, 13),
-    callbackUrl,
+    callbackUrl: mpesaCallbackUrl(),
   })
 
   if (result.ResponseCode !== '0') {
     throw new Error(result.ResponseDescription || 'STK Push was rejected. Try again.')
   }
 
-  // Record a pending contribution — mpesaRef holds CheckoutRequestID until callback confirms
   await prisma.auditLog.create({
     data: {
-      userId:        profile.id,
+      userId: profile.id,
       action: 'MPESA_STK_INIT',
       entity: 'PaymentEvent',
       meta: {
         checkoutRequestId: result.CheckoutRequestID,
-        targetUserId: profile.id,
+        targetUserId,
         amount,
         phone: data.phone,
         category: data.category,
         description: data.description || null,
+        ...purpose,
       },
     },
   })

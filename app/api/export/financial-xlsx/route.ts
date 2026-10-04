@@ -13,7 +13,7 @@ function cell(value: unknown) {
 }
 
 export async function GET(req: NextRequest) {
-  const actor = await requireActiveRole(['TREASURER', 'ADMIN', 'EXECUTIVE'])
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN', 'EXECUTIVE', 'AUDITOR'])
   const { from, to } = reportRangeFromSearch(
     req.nextUrl.searchParams.get('from'),
     req.nextUrl.searchParams.get('to'),

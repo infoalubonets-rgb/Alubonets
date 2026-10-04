@@ -11,6 +11,7 @@ import {
   removeProjectResponsible,
   unlinkProjectDocument,
   updateProjectFinance,
+  updateProjectSchedule,
 } from '@/app/actions/projects'
 import { moneyNumber } from '@/lib/projects'
 import { todayInputValue } from '@/lib/dates'
@@ -23,6 +24,8 @@ type ProjectDetail = {
   title: string
   status: string
   progress: number
+  startDate: Date | null
+  endDate: Date | null
   budgetKes: unknown
   fundingTargetKes: unknown
   actualExpenditureKes: unknown
@@ -52,21 +55,33 @@ type ProjectDetail = {
   documents: { id: string; document: { id: string; title: string } }[]
 }
 
+type Financials = {
+  raisedFromInvestments: number
+  raisedFromContributions: number
+  raised: number
+  spent: number
+  linkedExpenseCount: number
+}
+
 export default function ProjectManagePanel({
   project,
+  financials,
   members,
   documents,
   manageBase,
   canModerate = false,
 }: {
   project: ProjectDetail
+  financials: Financials
   members: Member[]
   documents: Doc[]
   manageBase: string
   canModerate?: boolean
 }) {
-  const raised = project.investments.reduce((sum, row) => sum + moneyNumber(row.amount), 0)
+  const raised = financials.raised
   const target = moneyNumber(project.fundingTargetKes)
+  const percent = target > 0 ? Math.min(100, Math.round((raised / target) * 100)) : project.progress
+  const day = (value: Date | null) => (value ? value.toISOString().slice(0, 10) : '')
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -77,7 +92,7 @@ export default function ProjectManagePanel({
           </Link>
           <h1 className="font-h3 text-2xl text-primary">{project.title}</h1>
           <p className="text-sm text-on-surface-variant">
-            {project.status} · Progress {project.progress}% · Raised KES {raised.toLocaleString()}
+            {project.status} · Progress {percent}% · Raised KES {raised.toLocaleString()}
             {target > 0 ? ` / ${target.toLocaleString()}` : ''}
           </p>
         </div>
@@ -88,6 +103,37 @@ export default function ProjectManagePanel({
           Export CSV
         </a>
       </div>
+
+      <section className="rounded-2xl border bg-surface p-5">
+        <h2 className="font-h3 text-lg text-primary">Funding progress</h2>
+        <div className="mt-3 h-3 overflow-hidden rounded-full bg-surface-container-high">
+          <div className="h-full bg-primary" style={{ width: `${percent}%` }} />
+        </div>
+        <div className="mt-3 grid gap-3 text-sm md:grid-cols-4">
+          <div><p className="text-xs text-on-surface-variant">Raised</p><b>KES {raised.toLocaleString()}</b>{target > 0 ? <span className="text-xs"> of {target.toLocaleString()} ({percent}%)</span> : null}</div>
+          <div><p className="text-xs text-on-surface-variant">From investments</p><b>KES {financials.raisedFromInvestments.toLocaleString()}</b></div>
+          <div><p className="text-xs text-on-surface-variant">From member payments</p><b>KES {financials.raisedFromContributions.toLocaleString()}</b></div>
+          <div><p className="text-xs text-on-surface-variant">Spent (linked expenses)</p><b>KES {financials.spent.toLocaleString()}</b></div>
+        </div>
+        {target <= 0 && <p className="mt-2 text-xs text-on-surface-variant">Set a funding target below so the progress bar follows money raised.</p>}
+      </section>
+
+      <section className="rounded-2xl border bg-surface p-5">
+        <h2 className="font-h3 text-lg text-primary">Schedule</h2>
+        <p className="mt-1 text-xs text-on-surface-variant">The status changes by itself: Upcoming before the start date, Ongoing until the end date, then Completed.</p>
+        <form action={updateProjectSchedule} className="mt-3 flex flex-wrap items-end gap-2">
+          <input type="hidden" name="projectId" value={project.id} />
+          <label className="text-xs">
+            Start date
+            <input name="startDate" type="date" defaultValue={day(project.startDate)} className="mt-1 block rounded-lg border px-3 py-2" />
+          </label>
+          <label className="text-xs">
+            End date
+            <input name="endDate" type="date" defaultValue={day(project.endDate)} className="mt-1 block rounded-lg border px-3 py-2" />
+          </label>
+          <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Save dates</button>
+        </form>
+      </section>
 
       <section className="rounded-2xl border bg-surface p-5">
         <h2 className="font-h3 text-lg text-primary">Finance</h2>

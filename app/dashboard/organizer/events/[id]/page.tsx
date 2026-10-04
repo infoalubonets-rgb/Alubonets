@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { requireActiveRole } from '@/lib/auth/session'
-import { ORGANIZER_NAV } from '@/lib/dashboard/nav'
+import { ORGANIZER_NAV, SECRETARY_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import {
   addEventAttachment,
@@ -22,7 +22,8 @@ export default async function OrganizerEventManagePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await requireActiveRole(['ORGANIZER', 'ADMIN', 'SECRETARY'])
+  const actor = await requireActiveRole(['ORGANIZER', 'ADMIN', 'SECRETARY'])
+  const asSecretary = actor.role === 'SECRETARY'
   const { id } = await params
   const [event, members, principals] = await Promise.all([
     prisma.event.findUnique({
@@ -59,7 +60,7 @@ export default async function OrganizerEventManagePage({
   }
 
   return (
-    <DashboardShell role="ORGANIZER" title="Manage event" nav={ORGANIZER_NAV}>
+    <DashboardShell role={asSecretary ? 'SECRETARY' : 'ORGANIZER'} title="Manage event" nav={asSecretary ? SECRETARY_NAV : ORGANIZER_NAV}>
       <div className="space-y-6 p-4 md:p-6">
         <Link href="/dashboard/organizer/events" className="text-sm text-primary underline">
           Back to events

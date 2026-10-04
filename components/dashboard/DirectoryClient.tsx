@@ -7,7 +7,6 @@ type DirectoryMember = {
   principalName: string | null
   isPrincipal: boolean
   role: string | null
-  familyBranch: string | null
   profession: string | null
   skills: string | null
   location: string | null
@@ -32,7 +31,6 @@ export default function DirectoryClient({ members }: { members: DirectoryMember[
             </div>
             <dl className="mt-2 space-y-1 text-xs text-on-surface-variant">
               {member.role && <div><dt className="inline font-semibold text-on-surface">Role: </dt><dd className="inline">{member.role}</dd></div>}
-              {member.familyBranch && <div><dt className="inline font-semibold text-on-surface">Lineage: </dt><dd className="inline">{member.familyBranch}</dd></div>}
               {member.profession && <div><dt className="inline font-semibold text-on-surface">Profession: </dt><dd className="inline">{member.profession}</dd></div>}
               {member.skills && <div><dt className="inline font-semibold text-on-surface">Skills: </dt><dd className="inline">{member.skills}</dd></div>}
               {member.location && <div><dt className="inline font-semibold text-on-surface">Location: </dt><dd className="inline">{member.location}</dd></div>}

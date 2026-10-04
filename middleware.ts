@@ -62,6 +62,14 @@ function allowedPath(
     return role === 'ADMIN' || Boolean(opts.isSuperAdmin)
   }
 
+  // The Secretary shares event management with the Organizing Secretary.
+  if (
+    (pathname === '/dashboard/organizer/events' || pathname.startsWith('/dashboard/organizer/events/')) &&
+    (role === 'SECRETARY' || opts.dashboardAccess?.includes('SECRETARY'))
+  ) {
+    return true
+  }
+
   const allowed = allowedDashboards({
     role,
     isSuperAdmin: opts.isSuperAdmin,

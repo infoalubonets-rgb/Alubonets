@@ -4,6 +4,7 @@ import ProjectManagePanel from '@/components/projects/ProjectManagePanel'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
+import { getProjectFinancials } from '@/lib/project-status'
 
 export default async function ExecutiveProjectManagePage({
   params,
@@ -12,7 +13,7 @@ export default async function ExecutiveProjectManagePage({
 }) {
   const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE'])
   const { id } = await params
-  const [project, members, documents] = await Promise.all([
+  const [project, members, documents, financials] = await Promise.all([
     prisma.project.findUnique({
       where: { id },
       include: {
@@ -41,6 +42,7 @@ export default async function ExecutiveProjectManagePage({
       orderBy: { uploadedAt: 'desc' },
       take: 100,
     }),
+    getProjectFinancials(id),
   ])
   if (!project) notFound()
 
@@ -48,6 +50,7 @@ export default async function ExecutiveProjectManagePage({
     <DashboardShell role={actor.role} title="Manage project" nav={navForRole(actor.role)}>
       <ProjectManagePanel
         project={project}
+        financials={financials}
         members={members}
         documents={documents}
         manageBase="/dashboard/executive/projects"

@@ -23,6 +23,10 @@ type StkMeta = {
   targetUserId?: string
   amount?: number
   phone?: string
+  categoryId?: string
+  campaignId?: string | null
+  projectId?: string | null
+  contributionPeriod?: string | null
 }
 
 async function findStkInit(checkoutRequestId: string) {
@@ -116,7 +120,11 @@ export async function POST(req: NextRequest) {
   if (targetUserId) {
     try {
       const result = await createLedgerContribution({
-        userId: targetUserId, amount, description: `M-Pesa STK ${phone}`, categoryId: 'cat-other-income',
+        userId: targetUserId, amount, description: `M-Pesa STK ${phone}`,
+        categoryId: stkMeta?.categoryId || 'cat-other-income',
+        campaignId: stkMeta?.campaignId || null,
+        projectId: stkMeta?.projectId || null,
+        contributionPeriod: stkMeta?.contributionPeriod || null,
         sourceAccountId: 'acct-mpesa', paymentMethod: 'MPESA', providerReference,
         receivedBy: 'M-Pesa Daraja', actorId: targetUserId, status: 'RECONCILED',
       })

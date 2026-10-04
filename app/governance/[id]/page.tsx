@@ -14,6 +14,7 @@ export default async function GovernanceRecordPage({ params }: { params: Promise
     'TREASURER',
     'ORGANIZER',
     'MEMBER',
+    'AUDITOR',
   ])
   const record = await getGovernanceRecordForViewer(id, actor)
   if (!record) notFound()
@@ -21,7 +22,7 @@ export default async function GovernanceRecordPage({ params }: { params: Promise
   return (
     <DashboardShell role={actor.role} title="Governance" nav={navForRole(actor.role)}>
       <div className="p-4 md:p-6">
-        <GovernanceRecordDetailView record={record} />
+        <GovernanceRecordDetailView record={record} readOnly={actor.role === 'AUDITOR'} />
       </div>
     </DashboardShell>
   )

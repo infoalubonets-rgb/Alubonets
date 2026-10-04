@@ -9,6 +9,7 @@ import ContributionCategoriesManager from '@/components/admin/ContributionCatego
 import { requireAdmin } from '@/lib/auth/session'
 import { navWithLoans } from '@/lib/dashboard/nav-async'
 import { prisma } from '@/lib/prisma'
+import { isSystemCategoryCode } from '@/lib/payment-categories'
 import { FEATURE_FLAGS, getFeatureFlags } from '@/lib/feature-flags'
 import { SETTING_KEYS, getSettings } from '@/lib/settings'
 import { CONTACT_EMAIL } from '@/lib/constants'
@@ -59,6 +60,7 @@ export default async function AdminSettingsPage() {
             publicEmail={settings[SETTING_KEYS.contactPublicEmail] || CONTACT_EMAIL}
             publicPhone={settings[SETTING_KEYS.contactPublicPhone] || ''}
             enquiryEmail={settings[SETTING_KEYS.contactDestinationEmail] || CONTACT_EMAIL}
+            recipients={settings[SETTING_KEYS.contactRecipients] || ''}
             approvalThreshold={settings[SETTING_KEYS.financialApprovalThresholdKes] || '50000'}
           />
         </SettingsSectionButton>
@@ -177,7 +179,8 @@ export default async function AdminSettingsPage() {
               id: category.id,
               name: category.name,
               type: category.type,
-              system: ['LOAN_DISBURSEMENT', 'LOAN_REPAYMENT', 'WELFARE_DISBURSEMENT', 'OTHER'].includes(category.code),
+              billingKind: category.billingKind,
+              system: isSystemCategoryCode(category.code),
             }))}
           />
         </SettingsSectionButton>

@@ -167,6 +167,21 @@ Without a key, the app skips sending and continues.
 
 Routes already exist: `app/api/mpesa/stk`, `app/api/mpesa/callback`.
 
+### PayBill vs Buy Goods (till)
+
+| Variable | PayBill | Buy Goods (till) |
+|---|---|---|
+| `MPESA_ENV` | `sandbox` while testing, `production` when live | same |
+| `MPESA_TRANSACTION_TYPE` | `CustomerPayBillOnline` (default) | `CustomerBuyGoodsOnline` |
+| `MPESA_SHORTCODE` | PayBill number | Store (head office) number from Safaricom |
+| `MPESA_TILL_NUMBER` | not used | Till number that receives the money |
+| `MPESA_PASSKEY` | Lipa Na M-Pesa Online passkey for the shortcode | same |
+| `MPESA_CALLBACK_URL` | optional, defaults to `NEXT_PUBLIC_APP_URL/api/mpesa/callback` | same |
+
+STK requests may include `categoryId`, `campaignId`, `projectId` and `contributionPeriod` (YYYY-MM). They are saved on the `MPESA_STK_INIT` audit row and applied to the contribution when the callback confirms payment. Without a purpose the payment lands in **Other income** for the Treasurer to reclassify.
+
+STK stays Treasurer/Admin-only (`/api/mpesa/stk` and `actionInitiateStkPush` both enforce the role) until the till credentials arrive and the committee agrees to open it to members.
+
 ---
 
 ## 9. Hosting (Vercel + Supabase)
@@ -337,6 +352,19 @@ Database backups do not automatically prove that uploaded files in Supabase Stor
 - [ ] `SESSION_IDLE_MINUTES` set to the approved idle policy
 - [ ] Staging restore drill completed and recorded above
 - [ ] Accessibility / responsive UAT signed on mobile, tablet and desktop
+
+### Go-live checklist (new domain, email, M-Pesa)
+
+- [ ] `NEXT_PUBLIC_APP_URL` set to the final custom domain (used in emails, callbacks and cron)
+- [ ] Custom domain added in Vercel and in Supabase Auth → URL configuration (site URL + redirect URLs)
+- [ ] Resend sending domain verified; `FROM_EMAIL` uses that domain (not `onboarding@resend.dev`)
+- [ ] `RESEND_TEST_EMAIL` removed so emails reach real recipients instead of the test inbox
+- [ ] `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` removed / `false` and test-account passwords rotated
+- [ ] Admin → Settings → Contact & finance: enquiry forwarding email and "Also send to" recipients confirmed
+- [ ] Admin → Finance: monthly fee, grace days, annual fee and renewal days confirmed with the Treasurer
+- [ ] `prisma migrate deploy` run against production (includes `20261003120000_meeting_sep9_changes`)
+- [ ] M-Pesa: `MPESA_ENV=production`, live consumer key/secret, passkey, shortcode and (for a till) `MPESA_TRANSACTION_TYPE=CustomerBuyGoodsOnline` + `MPESA_TILL_NUMBER`
+- [ ] One live KES 1 STK test recorded, callback received and the contribution shows under the right purpose
 
 
 ---

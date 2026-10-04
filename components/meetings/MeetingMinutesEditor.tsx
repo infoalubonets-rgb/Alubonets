@@ -30,6 +30,15 @@ export type MeetingEditorValues = {
 }
 
 type EventOption = { id: string; title: string; startsAt: string }
+type AttendanceStatus = 'PRESENT' | 'APOLOGY' | 'ABSENT'
+type MemberOption = { id: string; fullName: string }
+export type AttendanceRecord = { userId: string; status: AttendanceStatus }
+
+const STATUS_LABEL: Record<AttendanceStatus, string> = {
+  PRESENT: 'Present',
+  APOLOGY: 'Apology',
+  ABSENT: 'Absent',
+}
 
 function toLocalInput(isoOrLocal: string) {
   if (!isoOrLocal) return ''
@@ -66,12 +75,38 @@ export default function MeetingMinutesEditor({
   initial,
   mode,
   events = [],
+  members = [],
+  initialAttendance = [],
+  invitedUserIds = [],
 }: {
   initial: MeetingEditorValues
   mode: 'create' | 'edit'
   events?: EventOption[]
+  members?: MemberOption[]
+  initialAttendance?: AttendanceRecord[]
+  invitedUserIds?: string[]
 }) {
   const router = useRouter()
+  const [marks, setMarks] = useState<Record<string, AttendanceStatus>>(() => {
+    if (initialAttendance.length) return Object.fromEntries(initialAttendance.map((r) => [r.userId, r.status]))
+    return Object.fromEntries(invitedUserIds.map((userId) => [userId, 'PRESENT' as AttendanceStatus]))
+  })
+  // Records are only saved once the picker is used, so text-only legacy minutes are left alone.
+  const [pickerUsed, setPickerUsed] = useState(initialAttendance.length > 0)
+  const [memberQuery, setMemberQuery] = useState('')
+  const memberName = useMemo(() => new Map(members.map((m) => [m.id, m.fullName])), [members])
+  const markedIds = Object.keys(marks).sort((a, b) => (memberName.get(a) || '').localeCompare(memberName.get(b) || ''))
+  const namesWith = (status: AttendanceStatus) =>
+    markedIds.filter((id) => marks[id] === status).map((id) => memberName.get(id) || 'Member')
+  const suggestions = memberQuery.trim()
+    ? members
+        .filter((m) => !marks[m.id] && m.fullName.toLowerCase().includes(memberQuery.trim().toLowerCase()))
+        .slice(0, 8)
+    : []
+  const updateMarks = (next: Record<string, AttendanceStatus>) => {
+    setMarks(next)
+    setPickerUsed(true)
+  }
   const [values, setValues] = useState({
     ...initial,
     eventId: initial.eventId || '',
@@ -104,12 +139,20 @@ export default function MeetingMinutesEditor({
     } catch { return '—' }
   }, [values.heldAt])
 
+  const extraLines = (text: string) => text.split('\n').map((line) => line.trim()).filter(Boolean)
+  const computedAttendance = pickerUsed
+    ? namesWith('PRESENT').length + extraLines(values.attendees).length
+    : values.attendance || 0
+
   const buildFormData = () => {
     const fd = new FormData()
     if (values.id) fd.set('id', values.id)
     fd.set('title', values.title)
     fd.set('heldAt', values.heldAt)
-    fd.set('attendance', String(values.attendance || 0))
+    fd.set('attendance', String(computedAttendance))
+    if (pickerUsed) {
+      fd.set('attendanceRecords', JSON.stringify(markedIds.map((userId) => ({ userId, status: marks[userId] }))))
+    }
     fd.set('opening', values.opening)
     fd.set('attendees', values.attendees)
     fd.set('membersAbsent', values.membersAbsent)
@@ -165,11 +208,14 @@ export default function MeetingMinutesEditor({
     }
   }
 
+  const joinNames = (status: AttendanceStatus, text: string) =>
+    (pickerUsed ? [...namesWith(status), ...extraLines(text)] : extraLines(text)).join('\n')
+
   const previewSections = [
     { label: 'Opening', body: values.opening },
-    { label: 'Members Present', body: values.attendees },
-    { label: 'Absent with Apology', body: values.membersApology },
-    { label: 'Absent', body: values.membersAbsent },
+    { label: 'Members Present', body: joinNames('PRESENT', values.attendees) },
+    { label: 'Absent with Apology', body: joinNames('APOLOGY', values.membersApology) },
+    { label: 'Absent', body: joinNames('ABSENT', values.membersAbsent) },
     { label: 'Agenda', body: values.agenda },
     { label: 'Discussion', body: values.minutes },
     { label: 'Any Other Business', body: values.aob },
@@ -234,14 +280,14 @@ export default function MeetingMinutesEditor({
                 disabled={locked}
               />
             </Field>
-            <Field label="Attendance" hint="(total present)">
+            <Field label="Attendance" hint={pickerUsed ? '(calculated from the list below)' : '(total present)'}>
               <input
                 type="number"
                 min={0}
-                value={values.attendance}
+                value={computedAttendance}
                 onChange={(e) => set('attendance', Number(e.target.value))}
                 className={INPUT}
-                disabled={locked}
+                disabled={locked || pickerUsed}
               />
             </Field>
           </div>
@@ -279,7 +325,99 @@ export default function MeetingMinutesEditor({
               <span className="material-symbols-outlined text-[14px]">group</span>
               Attendance
             </p>
-            <Field label="Members Present" hint="(one per line)">
+            {members.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-[12px] text-on-surface-variant">
+                    Pick members from the database{invitedUserIds.length ? ' (invited members are pre-listed)' : ''}.
+                  </p>
+                  {markedIds.length > 0 && !locked && (
+                    <button
+                      type="button"
+                      onClick={() => updateMarks(Object.fromEntries(markedIds.map((id) => [id, 'PRESENT' as AttendanceStatus])))}
+                      className="text-[12px] font-semibold text-primary"
+                    >
+                      Mark all present
+                    </button>
+                  )}
+                </div>
+                {!locked && (
+                  <div className="relative">
+                    <input
+                      value={memberQuery}
+                      onChange={(e) => setMemberQuery(e.target.value)}
+                      placeholder="Search members to add…"
+                      className={INPUT}
+                    />
+                    {suggestions.length > 0 && (
+                      <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-outline-variant bg-surface shadow-lg">
+                        {suggestions.map((member) => (
+                          <li key={member.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateMarks({ ...marks, [member.id]: 'PRESENT' })
+                                setMemberQuery('')
+                              }}
+                              className="block w-full px-3 py-2 text-left text-[13px] hover:bg-surface-container"
+                            >
+                              {member.fullName}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {markedIds.length > 0 && (
+                  <ul className="max-h-72 space-y-1 overflow-y-auto">
+                    {markedIds.map((id) => (
+                      <li key={id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface px-2 py-1.5">
+                        <span className="text-[13px]">{memberName.get(id) || 'Member'}</span>
+                        <div className="flex items-center gap-1">
+                          {(Object.keys(STATUS_LABEL) as AttendanceStatus[]).map((status) => (
+                            <button
+                              key={status}
+                              type="button"
+                              disabled={locked}
+                              onClick={() => updateMarks({ ...marks, [id]: status })}
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                marks[id] === status
+                                  ? status === 'PRESENT'
+                                    ? 'bg-primary text-on-primary'
+                                    : 'bg-secondary-container text-on-primary'
+                                  : 'border border-outline-variant text-on-surface-variant'
+                              }`}
+                            >
+                              {STATUS_LABEL[status]}
+                            </button>
+                          ))}
+                          {!locked && (
+                            <button
+                              type="button"
+                              aria-label="Remove"
+                              onClick={() => {
+                                const next = { ...marks }
+                                delete next[id]
+                                updateMarks(next)
+                              }}
+                              className="ml-1 text-on-surface-variant"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">close</span>
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[12px] text-on-surface-variant">
+                  {namesWith('PRESENT').length} present · {namesWith('APOLOGY').length} apologies ·{' '}
+                  {namesWith('ABSENT').length} absent
+                </p>
+              </div>
+            )}
+            <Field label="Members Present" hint={members.length ? '(guests or names not in the list — one per line)' : '(one per line)'}>
               <textarea
                 value={values.attendees}
                 onChange={(e) => set('attendees', e.target.value)}
@@ -429,7 +567,7 @@ export default function MeetingMinutesEditor({
               <p className="text-[12px] text-gray-500">{previewDate}</p>
               <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded bg-[#001f50]/8 text-[11px] font-semibold text-[#001f50]">
                 <span className="material-symbols-outlined text-[12px]">person</span>
-                {values.attendance || 0} present
+                {computedAttendance} present
               </div>
             </div>
 

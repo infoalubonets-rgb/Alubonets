@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
 import { buildMeetingMinutesPdf, minutesFilename } from '@/lib/pdf/minutes'
+import { ATTENDANCE_RECORDS_INCLUDE } from '@/lib/meeting-attendance'
 
 export async function GET(
   _req: NextRequest,
@@ -20,6 +21,7 @@ export async function GET(
       agendaItems: { orderBy: { position: 'asc' } },
       actionPoints: { include: { owner: { select: { fullName: true } } } },
       decisions: { orderBy: { decidedAt: 'asc' } },
+      attendanceRecords: ATTENDANCE_RECORDS_INCLUDE,
     },
   })
   if (!meeting) {

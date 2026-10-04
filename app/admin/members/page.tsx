@@ -79,6 +79,10 @@ export default async function AdminMembersPage({
           membershipNumber: u.membershipNumber,
           memberCategory: u.memberProfile?.memberCategory ?? null,
           familyBranch: u.memberProfile?.familyBranch ?? null,
+          standing: u.standing,
+          standingReason: u.standingReason,
+          standingOverride: u.standingOverride,
+          standingOverrideUntil: u.standingOverrideUntil?.toISOString() ?? null,
         }))}
         branches={branches}
         filters={{ q, branch }}

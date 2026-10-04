@@ -7,7 +7,7 @@ import { createServerClient } from '@/lib/supabase-server'
 import { writeAudit } from '@/lib/audit'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY','EXECUTIVE','TREASURER','ORGANIZER','MEMBER'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY','EXECUTIVE','TREASURER','ORGANIZER','MEMBER','AUDITOR'])
   const { id } = await params
   const document = await prisma.document.findUnique({ where: { id } })
   if (!document || !canReadDocument(document, actor.role)) return NextResponse.json({ error: 'Not found' }, { status: 404 })

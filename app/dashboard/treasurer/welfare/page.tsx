@@ -1,5 +1,5 @@
-import { notFound } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import ModuleDisabled from '@/components/dashboard/ModuleDisabled'
 import { TREASURER_NAV, WELFARE_NAV_ITEMS, withOptionalNav } from '@/lib/dashboard/nav'
 import { getTreasurerDashboardData } from '@/lib/data/queries'
 import { prisma } from '@/lib/prisma'
@@ -8,7 +8,7 @@ import WelfareReviewCard from '@/components/dashboard/WelfareReviewCard'
 
 export default async function TreasurerWelfarePage() {
   const welfareOn = await isFeatureEnabled(FEATURE_FLAGS.welfareEnabled)
-  if (!welfareOn) notFound()
+  if (!welfareOn) return <ModuleDisabled module="Welfare" />
   const data = await getTreasurerDashboardData()
   const accounts = await prisma.financialAccount.findMany({
     where: { active: true, code: { in: ['CASH', 'BANK', 'MPESA', 'WELFARE_FUND'] } },

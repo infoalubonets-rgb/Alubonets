@@ -7,6 +7,7 @@ type Props = {
   publicEmail: string
   publicPhone: string
   enquiryEmail: string
+  recipients: string
   approvalThreshold: string
 }
 
@@ -14,11 +15,13 @@ export default function ContactFinanceForm({
   publicEmail,
   publicPhone,
   enquiryEmail,
+  recipients,
   approvalThreshold,
 }: Props) {
   const [email, setEmail] = useState(publicEmail)
   const [phone, setPhone] = useState(publicPhone)
   const [forwardTo, setForwardTo] = useState(enquiryEmail)
+  const [alsoTo, setAlsoTo] = useState(recipients)
   const [threshold, setThreshold] = useState(approvalThreshold)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +51,11 @@ export default function ContactFinanceForm({
       setError('Enter a valid enquiry forwarding email.')
       return
     }
+    const extra = alsoTo.split(/[,;\n]/).map((v) => v.trim()).filter(Boolean)
+    if (extra.some((v) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))) {
+      setError('Additional recipients must be valid emails separated by commas.')
+      return
+    }
     if (!/^\d+(\.\d{1,2})?$/.test(trimmedThreshold)) {
       setError('Approval threshold must be a number in KES.')
       return
@@ -59,6 +67,7 @@ export default function ContactFinanceForm({
         publicEmail: trimmedEmail,
         publicPhone: trimmedPhone,
         enquiryEmail: trimmedForward,
+        recipients: extra.join(', '),
         approvalThreshold: trimmedThreshold,
       })
       if (result.ok) {
@@ -122,6 +131,19 @@ export default function ContactFinanceForm({
             className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
             placeholder="enquiries@example.com"
           />
+        </label>
+        <label className="block text-sm">
+          Also send to (comma-separated)
+          <textarea
+            value={alsoTo}
+            onChange={(e) => setAlsoTo(e.target.value)}
+            rows={2}
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+            placeholder="secretary@example.com, treasurer@example.com"
+          />
+          <span className="mt-1 block text-xs text-on-surface-variant">
+            Leave blank to copy every active Secretary, Treasurer and Executive member.
+          </span>
         </label>
       </div>
 

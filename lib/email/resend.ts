@@ -55,16 +55,26 @@ export function otpCodeHtml(intro: string, code: string) {
 }
 
 export async function sendSupportMessageEmail(input: { memberName: string; memberEmail: string; body: string }) {
-  const admin = await prisma.user.findFirst({ where: { isSuperAdmin: true, status: 'ACTIVE' }, orderBy: { createdAt: 'asc' }, select: { id: true, email: true } })
-  if (!admin) return { skipped: true as const }
-  const recipient = testEmailOverride() || admin.email
+  const responders = await prisma.user.findMany({
+    where: { status: 'ACTIVE', OR: [{ isSuperAdmin: true }, { role: { in: ['ADMIN', 'EXECUTIVE'] } }] },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, email: true },
+    take: 25,
+  })
+  if (!responders.length) return { skipped: true as const }
+  const override = testEmailOverride()
+  const recipients = override ? [{ id: responders[0].id, email: override }] : responders
   const resend = getResend()
   const subject = `Support message from ${input.memberName}`
   const html = baseHtml(`<h2>New support message</h2><p><strong>${input.memberName}</strong> (${input.memberEmail}) wrote:</p><p style="white-space:pre-wrap">${input.body.replace(/[<>&]/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]!))}</p><p><a href="${appUrl()}/support-chat">Open support chat</a></p>`)
   if (!resend) return { skipped: true as const }
-  const result = await resend.emails.send({ from: from(), to: recipient, subject, html })
-  await prisma.emailLog.create({ data: { userId: admin.id, toEmail: recipient, subject, template: 'support_message', status: result.error ? 'failed' : 'accepted', meta: { providerMessageId: result.data?.id || null, memberEmail: input.memberEmail } } })
-  return { skipped: false as const, accepted: !result.error }
+  let accepted = 0
+  for (const recipient of recipients) {
+    const result = await resend.emails.send({ from: from(), to: recipient.email, subject, html })
+    if (!result.error) accepted += 1
+    await prisma.emailLog.create({ data: { userId: recipient.id, toEmail: recipient.email, subject, template: 'support_message', status: result.error ? 'failed' : 'accepted', meta: { providerMessageId: result.data?.id || null, memberEmail: input.memberEmail } } })
+  }
+  return { skipped: false as const, accepted: accepted > 0 }
 }
 
 export async function sendPasswordResetEmail(input: { userId: string; fullName: string; email: string; resetUrl: string }) {

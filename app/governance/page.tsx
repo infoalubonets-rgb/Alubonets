@@ -12,6 +12,7 @@ export default async function GovernancePage() {
     'TREASURER',
     'ORGANIZER',
     'MEMBER',
+    'AUDITOR',
   ])
   const details = await getGovernanceRecordsDetailsForViewer(actor)
 
@@ -30,6 +31,7 @@ export default async function GovernancePage() {
             resultsPublished: record.resultsPublished,
           }))}
           details={details}
+          readOnly={actor.role === 'AUDITOR'}
         />
       </div>
     </DashboardShell>

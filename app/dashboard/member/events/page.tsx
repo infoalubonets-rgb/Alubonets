@@ -3,6 +3,9 @@ import MemberEventsClient from '@/components/dashboard/MemberEventsClient'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
+import MemberGate from '@/components/public/MemberGate'
+import { getMemberStanding } from '@/lib/membership-standing-sync'
+import { hasPaidUpAccess } from '@/lib/membership-standing'
 
 export default async function MemberEventsPage() {
   const actor = await requireActiveRole([
@@ -40,7 +43,8 @@ export default async function MemberEventsPage() {
   })
   const creatorByEvent = new Map(creationLogs.map((log) => [log.entityId, log.userId]))
   const canDeleteAnyEvent = actor.isSuperAdmin || actor.role === 'ADMIN'
-  const isOrganizer = actor.role === 'ORGANIZER' || actor.dashboardAccess.includes('ORGANIZER')
+  const isOrganizer = actor.role === 'ORGANIZER' || actor.role === 'SECRETARY'
+    || actor.dashboardAccess.includes('ORGANIZER') || actor.dashboardAccess.includes('SECRETARY')
   const now = new Date()
   const toCard = (event: (typeof events)[number]) => ({
     id: event.id, title: event.title, description: event.description, location: event.location, mapsUrl: event.mapsUrl,
@@ -52,10 +56,14 @@ export default async function MemberEventsPage() {
     canDelete: canDeleteAnyEvent || (isOrganizer && creatorByEvent.get(event.id) === actor.id),
   })
 
-  const upcoming = events
-    .filter((event) => event.startsAt >= now)
-    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
-    .map(toCard)
+  const { standing, reason } = await getMemberStanding(actor.id)
+  const paidUp = hasPaidUpAccess({ role: actor.role, isSuperAdmin: actor.isSuperAdmin, standing })
+  const upcoming = paidUp
+    ? events
+        .filter((event) => event.startsAt >= now)
+        .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())
+        .map(toCard)
+    : []
   const past = events
     .filter((event) => event.startsAt < now)
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
@@ -63,7 +71,8 @@ export default async function MemberEventsPage() {
 
   return (
     <DashboardShell role={actor.role} title="Events" nav={navForRole(actor.role)}>
-      <div className="p-4 md:p-6">
+      <div className="space-y-4 p-4 md:p-6">
+        {!paidUp && <MemberGate variant="renew" what="Upcoming events" reason={reason} />}
         <MemberEventsClient upcoming={upcoming} past={past} />
       </div>
     </DashboardShell>

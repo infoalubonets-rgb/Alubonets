@@ -8,9 +8,21 @@ import PaymentCategoryFields from '@/components/finance/PaymentCategoryFields'
 
 type Category = { id: string; name: string }
 type Account = { id: string; name: string }
+type Project = { id: string; title: string }
 
-export default function RecordExpenseForm({ categories, accounts }: { categories: Category[]; accounts: Account[] }) {
+export default function RecordExpenseForm({
+  categories,
+  accounts,
+  projects = [],
+  today,
+}: {
+  categories: Category[]
+  accounts: Account[]
+  projects?: Project[]
+  today: string
+}) {
   const router = useRouter()
+  const [formKey, setFormKey] = useState(0)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
 
@@ -36,6 +48,7 @@ export default function RecordExpenseForm({ categories, accounts }: { categories
 
       await recordExpense(formData)
       form.reset()
+      setFormKey((key) => key + 1)
       router.refresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not record this expense. Try again.')
@@ -49,11 +62,11 @@ export default function RecordExpenseForm({ categories, accounts }: { categories
       <input name="amount" type="number" min="1" required disabled={pending} placeholder="Amount KES" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
       <input name="payee" required disabled={pending} placeholder="Payee" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
       <input name="purpose" required disabled={pending} placeholder="Purpose" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
-      <PaymentCategoryFields categories={categories} kind="expense" descriptionPlaceholder="Short note about this expense" />
+      <PaymentCategoryFields key={formKey} categories={categories} kind="expense" projects={projects} descriptionPlaceholder="Short note about this expense" />
       <select name="sourceAccountId" required disabled={pending} className="rounded-lg border px-3 py-2 disabled:opacity-60">
         {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
       </select>
-      <input name="occurredAt" type="date" required disabled={pending} defaultValue={new Date().toISOString().slice(0, 10)} className="rounded-lg border px-3 py-2 disabled:opacity-60" />
+      <input name="occurredAt" type="date" required disabled={pending} max={today} defaultValue={today} className="rounded-lg border px-3 py-2 disabled:opacity-60" />
       <label className="text-sm md:col-span-3">
         Supporting document
         <input name="evidence" type="file" required disabled={pending} accept=".pdf,image/*" className="mt-1 block disabled:opacity-60" />

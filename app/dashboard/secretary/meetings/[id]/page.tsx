@@ -10,22 +10,34 @@ export default async function EditMeetingPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [meeting, events] = await Promise.all([
-    prisma.meeting.findUnique({ where: { id } }),
+  const [meeting, events, activeMembers] = await Promise.all([
+    prisma.meeting.findUnique({
+      where: { id },
+      include: {
+        attendanceRecords: { include: { user: { select: { id: true, fullName: true } } } },
+        invitations: { select: { userId: true } },
+      },
+    }),
     prisma.event.findMany({
       where: { startsAt: { gte: new Date(Date.now() - 1000 * 60 * 60 * 24 * 365) } },
       select: { id: true, title: true, startsAt: true },
       orderBy: { startsAt: 'desc' },
       take: 100,
     }),
+    prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true }, orderBy: { fullName: 'asc' } }),
   ])
   if (!meeting) notFound()
+  const members = new Map(activeMembers.map((member) => [member.id, member]))
+  for (const record of meeting.attendanceRecords) members.set(record.user.id, record.user)
 
   return (
     <DashboardShell role="SECRETARY" title="Edit minutes" nav={SECRETARY_NAV}>
       <div className="p-4 md:p-6">
         <MeetingMinutesEditor
           mode="edit"
+          members={[...members.values()]}
+          initialAttendance={meeting.attendanceRecords.map((record) => ({ userId: record.userId, status: record.status }))}
+          invitedUserIds={meeting.invitations.map((invitation) => invitation.userId)}
           events={events.map((event) => ({
             id: event.id,
             title: event.title,

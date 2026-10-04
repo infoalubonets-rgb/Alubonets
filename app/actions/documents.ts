@@ -87,7 +87,7 @@ export async function createDocumentCategory(formData: FormData) {
 
 /** Browser uploads straight to Storage; call before uploadRepositoryDocument with storagePath. */
 export async function requestRepositoryDocumentUploadUrl(formData: FormData) {
-  await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
+  await requireActiveRole(['ADMIN', 'SECRETARY'])
   const fileName = z.string().min(1).parse(formData.get('fileName'))
   const extension = fileName.split('.').pop()?.toLowerCase()
   if (!extension || !(DOC_EXTS as readonly string[]).includes(extension)) {
@@ -101,7 +101,7 @@ export async function requestRepositoryDocumentUploadUrl(formData: FormData) {
 }
 
 export async function uploadRepositoryDocument(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY'])
   const data = z.object({
     title: z.string().trim().min(2).max(180),
     description: z
@@ -229,7 +229,7 @@ export async function uploadReport(formData: FormData) {
 }
 
 export async function replaceRepositoryDocument(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY'])
   const id = z.string().min(1).parse(formData.get('id'))
   const reason = z.string().trim().min(5).max(1000).parse(formData.get('reason'))
   const old = await prisma.document.findUniqueOrThrow({ where: { id } })
@@ -249,7 +249,7 @@ export async function replaceRepositoryDocument(formData: FormData) {
 }
 
 export async function setDocumentStatus(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY'])
   const id = z.string().min(1).parse(formData.get('id'))
   const status = z.enum(['DRAFT','PUBLISHED','ARCHIVED','EXPIRED']).parse(formData.get('status'))
   const reason = z.string().trim().min(3).max(500).parse(formData.get('reason'))
@@ -266,7 +266,7 @@ export async function setDocumentStatus(formData: FormData) {
 }
 
 export async function setSelectedDocumentStatus(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY','ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY'])
   const singleId = z.string().optional().parse(formData.get('singleId') || undefined)
   const ids = singleId ? [singleId] : formData.getAll('documentIds').map(String)
   if (!ids.length) throw new Error('Select at least one document.')
@@ -323,7 +323,7 @@ async function assessDocumentRetention(id: string) {
 
 export async function deleteRepositoryDocument(formData: FormData) {
   // Staff who manage documents may delete; members never reach this page/action.
-  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY'])
   const id = z.string().min(1).parse(formData.get('id'))
   const reasonRaw = String(formData.get('reason') || '').trim()
   const reason = reasonRaw.length >= 5 ? reasonRaw.slice(0, 1000) : 'Removed from the document repository'
@@ -366,7 +366,7 @@ export async function deleteRepositoryDocument(formData: FormData) {
 
 /** Brings an archived document back into the repository as a draft. */
 export async function restoreRepositoryDocument(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY'])
   const id = z.string().min(1).parse(formData.get('id'))
   const document = await prisma.document.findUniqueOrThrow({ where: { id } })
   if (document.status !== 'ARCHIVED') throw new Error('Only archived documents can be restored.')
@@ -388,7 +388,7 @@ export async function restoreRepositoryDocument(formData: FormData) {
 }
 
 export async function deleteSelectedRepositoryDocuments(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY'])
   const ids = formData.getAll('documentIds').map(String).filter(Boolean)
   if (!ids.length) throw new Error('Select at least one document.')
   const reasonRaw = String(formData.get('reason') || '').trim()

@@ -111,12 +111,12 @@ export default async function AdminPage() {
           <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>family_history</span>
-              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Family branches</h2>
+              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Members per Principal</h2>
             </div>
             {hasChartData(familyBranches.values) ? (
               <FamilyBranchChart labels={familyBranches.labels} values={familyBranches.values} />
             ) : (
-              <ChartEmpty message="No family branch data recorded yet." />
+              <ChartEmpty message="No Principal members yet." />
             )}
           </section>
         </div>

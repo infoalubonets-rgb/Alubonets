@@ -6,12 +6,13 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { sendSupportMessageEmail } from '@/lib/email/resend'
 import { logError } from '@/lib/logger'
 import { writeAudit } from '@/lib/audit'
+import { isSupportResponder } from '@/lib/support-chat'
 
 const messageSchema = z.object({ conversationId: z.string().optional(), body: z.string().trim().min(1).max(4000) })
 export async function sendSupportMessage(input: z.infer<typeof messageSchema>) {
   const actor = await requireActiveRole()
   const data = messageSchema.parse(input)
-  const isAdmin = actor.isSuperAdmin || actor.role === 'ADMIN'
+  const isAdmin = isSupportResponder(actor)
   let conversation
   if (isAdmin && data.conversationId) {
     conversation = await prisma.supportConversation.findUnique({ where: { id: data.conversationId }, include: { user: true } })
@@ -27,7 +28,7 @@ export async function sendSupportMessage(input: z.infer<typeof messageSchema>) {
 
 export async function markSupportConversationRead(conversationId: string) {
   const actor = await requireActiveRole()
-  const isAdmin = actor.isSuperAdmin || actor.role === 'ADMIN'
+  const isAdmin = isSupportResponder(actor)
   await prisma.supportMessage.updateMany({ where: { conversationId, ...(isAdmin ? { senderId: { not: actor.id }, readByAdminAt: null } : { senderId: { not: actor.id }, readByMemberAt: null }) }, data: isAdmin ? { readByAdminAt: new Date() } : { readByMemberAt: new Date() } })
   revalidatePath('/support-chat')
 }

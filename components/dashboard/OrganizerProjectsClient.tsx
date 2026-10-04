@@ -16,6 +16,8 @@ export type ProjectRow = {
   isPublic?: boolean
   progress: number
   updatedAt: string
+  startDate?: string | null
+  endDate?: string | null
 }
 
 const STATUS_COLORS: Record<string, string> = {

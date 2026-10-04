@@ -1,5 +1,5 @@
-import { notFound } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import ModuleDisabled from '@/components/dashboard/ModuleDisabled'
 import { EXECUTIVE_NAV, WELFARE_NAV_ITEMS, withOptionalNav } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
@@ -9,7 +9,7 @@ import { requireActiveRole } from '@/lib/auth/session'
 export default async function ExecutiveWelfarePage() {
   await requireActiveRole(['EXECUTIVE', 'ADMIN'])
   const welfareOn = await isFeatureEnabled(FEATURE_FLAGS.welfareEnabled)
-  if (!welfareOn) notFound()
+  if (!welfareOn) return <ModuleDisabled module="Welfare" />
   const nav = withOptionalNav(EXECUTIVE_NAV, WELFARE_NAV_ITEMS.executive, '/financial-reports')
   const pending = await prisma.welfareRequest.findMany({
     where: { status: { in: ['PENDING', 'APPROVED'] } },

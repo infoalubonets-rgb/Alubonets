@@ -404,15 +404,29 @@ export async function actionUpsertProject(formData: FormData) {
   const rawProgress = Number(formData.get('progress') ?? 0)
   const progress = Math.min(100, Math.max(0, isNaN(rawProgress) ? 0 : rawProgress))
   const isPublic = formData.get('isPublic') !== 'off'
+  const parseDay = (key: string) => {
+    const raw = String(formData.get(key) || '')
+    if (!raw) return undefined
+    const value = new Date(`${raw}T00:00:00.000Z`)
+    if (Number.isNaN(value.getTime())) throw new Error('Enter a valid date.')
+    return value
+  }
+  const startDate = parseDay('startDate')
+  const endDate = parseDay('endDate')
+  if (startDate && endDate && endDate < startDate) throw new Error('The end date cannot be before the start date.')
+  const { deriveProjectStatus, syncProjectFinancials } = await import('@/lib/project-status')
   const project = await upsertProject({
     id: existingId,
     title,
     description,
-    status,
+    status: deriveProjectStatus(startDate, endDate) ?? status,
     imageUrl: String(formData.get('imageUrl') || '') || undefined,
     isPublic,
     progress,
+    startDate: startDate ?? (formData.has('startDate') ? null : undefined),
+    endDate: endDate ?? (formData.has('endDate') ? null : undefined),
   })
+  await syncProjectFinancials(project.id).catch((error) => console.error('Project financial sync failed', error))
 
   // Only notify on creation (not updates)
   if (!existingId) {

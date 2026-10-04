@@ -5,7 +5,7 @@ export const TEST_ACCOUNT_META: { email: string; label: string }[] = [
   { email: 'executive@alubonets.com', label: 'Executive' },
   { email: 'treasurer@alubonets.com', label: 'Treasurer' },
   { email: 'secretary@alubonets.com', label: 'Secretary' },
-  { email: 'organizer@alubonets.com', label: 'Organizer' },
+  { email: 'organizer@alubonets.com', label: 'Organizing Secretary' },
   { email: 'principal@alubonets.com', label: 'Principal Member' },
   { email: 'member@alubonets.com', label: 'Member' },
   { email: 'pending@alubonets.com', label: 'Member (pending)' },

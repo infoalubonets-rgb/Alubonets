@@ -3,6 +3,7 @@ import { PDFDocument } from 'pdf-lib'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
 import { buildMeetingMinutesPdf } from '@/lib/pdf/minutes'
+import { ATTENDANCE_RECORDS_INCLUDE } from '@/lib/meeting-attendance'
 
 export async function GET() {
   const profile = await getSessionProfile()
@@ -21,6 +22,7 @@ export async function GET() {
       agendaItems: { orderBy: { position: 'asc' } },
       actionPoints: { include: { owner: { select: { fullName: true } } } },
       decisions: { orderBy: { decidedAt: 'asc' } },
+      attendanceRecords: ATTENDANCE_RECORDS_INCLUDE,
     },
   })
 

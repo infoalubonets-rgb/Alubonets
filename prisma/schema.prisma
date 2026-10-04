@@ -29,6 +29,23 @@ enum MemberStatus {
   DISQUALIFIED
 }
 
+enum MemberStanding {
+  PAID_UP
+  LAPSED
+}
+
+enum BillingKind {
+  NONE
+  MONTHLY
+  ANNUAL
+}
+
+enum MeetingAttendanceStatus {
+  PRESENT
+  APOLOGY
+  ABSENT
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -169,12 +186,14 @@ enum TransactionStatus {
   REVERSED
   REJECTED
 }
+
 enum ReconciliationStatus {
   UNRECONCILED
   MATCHED
   RECONCILED
   DISPUTED
 }
+
 enum AccountType {
   ASSET
   LIABILITY
@@ -182,6 +201,7 @@ enum AccountType {
   INCOME
   EXPENSE
 }
+
 enum TransactionType {
   CONTRIBUTION
   EXPENSE
@@ -191,21 +211,25 @@ enum TransactionType {
   TRANSFER
   OPENING_BALANCE
 }
+
 enum CategoryType {
   INCOME
   EXPENSE
   BOTH
 }
+
 enum PeriodStatus {
   OPEN
   CLOSED
 }
+
 enum ObligationStatus {
   OUTSTANDING
   PARTIALLY_PAID
   PAID
   WAIVED
 }
+
 enum PaymentEventStatus {
   UNMATCHED
   MATCHED
@@ -278,107 +302,116 @@ enum AnnouncementPublishStatus {
 }
 
 model User {
-  id              String       @id @default(cuid())
-  authUserId      String?      @unique
-  email           String       @unique
-  fullName        String
-  phone           String?
-  location        String?
-  role            Role         @default(MEMBER)
-  status          MemberStatus @default(PENDING)
-  isSuperAdmin    Boolean      @default(false)
-  dashboardAccess Role[]       @default([])
-  avatarUrl       String?
-  membershipNumber String?     @unique
-  approvalNotes     String?
-  rejectionReason  String?
-  approvedAt        DateTime?
-  rejectedAt        DateTime?
+  id                         String                     @id @default(cuid())
+  authUserId                 String?                    @unique
+  email                      String                     @unique
+  fullName                   String
+  phone                      String?
+  location                   String?
+  role                       Role                       @default(MEMBER)
+  status                     MemberStatus               @default(PENDING)
+  isSuperAdmin               Boolean                    @default(false)
+  dashboardAccess            Role[]                     @default([])
+  avatarUrl                  String?
+  membershipNumber           String?                    @unique
+  approvalNotes              String?
+  rejectionReason            String?
+  approvedAt                 DateTime?
+  rejectedAt                 DateTime?
   identityVerificationStatus IdentityVerificationStatus @default(NOT_REVIEWED)
-  isPrincipal              Boolean                 @default(false)
-  principalMemberId        String?
-  familyRelationship       FamilyRelationship?
-  familyRegistrationState  FamilyRegistrationState @default(STANDARD)
-  mfaEnabled               Boolean                 @default(false)
-  mfaSecret                String?
-  mfaRecoveryCodes         String?
-  failedLoginCount         Int                     @default(0)
-  lockedUntil              DateTime?
-  lastActiveAt             DateTime?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  isPrincipal                Boolean                    @default(false)
+  principalMemberId          String?
+  familyRelationship         FamilyRelationship?
+  familyRegistrationState    FamilyRegistrationState    @default(STANDARD)
+  mfaEnabled                 Boolean                    @default(false)
+  mfaSecret                  String?
+  mfaRecoveryCodes           String?
+  failedLoginCount           Int                        @default(0)
+  lockedUntil                DateTime?
+  lastActiveAt               DateTime?
+  standing                   MemberStanding             @default(PAID_UP)
+  standingReason             String?
+  standingCheckedAt          DateTime?
+  standingOverride           MemberStanding?
+  standingOverrideUntil      DateTime?
+  publicProfileFields        String[]                   @default([])
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
 
-  principal            User?  @relation("FamilyBranch", fields: [principalMemberId], references: [id], onDelete: Restrict)
-  attachedMembers      User[] @relation("FamilyBranch")
-  familyInvitesSent    FamilyInvite[] @relation("FamilyInviteSender")
-  familyInvitesReceived FamilyInvite[] @relation("FamilyInviteMember")
-  familyBranchHistory  FamilyBranchHistory[] @relation("FamilyHistoryMember")
-  familyTransfersFrom  FamilyBranchHistory[] @relation("FamilyHistoryFromPrincipal")
-  familyTransfersTo    FamilyBranchHistory[] @relation("FamilyHistoryToPrincipal")
-  familyTransfersApproved FamilyBranchHistory[] @relation("FamilyHistoryApprover")
-  familyAccountTransitions FamilyAccountTransition[] @relation("FamilyTransitionMember")
+  committeeProfiles          CommitteeProfile[]        @relation("CommitteeMember")
+  meetingAttendances         MeetingAttendance[]       @relation("MeetingAttendee")
+  recordedMeetingAttendances MeetingAttendance[]       @relation("MeetingAttendanceRecorder")
+  principal                  User?                     @relation("FamilyBranch", fields: [principalMemberId], references: [id], onDelete: Restrict)
+  attachedMembers            User[]                    @relation("FamilyBranch")
+  familyInvitesSent          FamilyInvite[]            @relation("FamilyInviteSender")
+  familyInvitesReceived      FamilyInvite[]            @relation("FamilyInviteMember")
+  familyBranchHistory        FamilyBranchHistory[]     @relation("FamilyHistoryMember")
+  familyTransfersFrom        FamilyBranchHistory[]     @relation("FamilyHistoryFromPrincipal")
+  familyTransfersTo          FamilyBranchHistory[]     @relation("FamilyHistoryToPrincipal")
+  familyTransfersApproved    FamilyBranchHistory[]     @relation("FamilyHistoryApprover")
+  familyAccountTransitions   FamilyAccountTransition[] @relation("FamilyTransitionMember")
   familyTransitionsPerformed FamilyAccountTransition[] @relation("FamilyTransitionActor")
-  profileVisibility    ProfileVisibility? @relation("ProfileVisibilitySubject")
-  profileVisibilityApprovals ProfileVisibility[] @relation("ProfileVisibilityApprover")
-  profileVisibilityChanges   ProfileVisibility[] @relation("ProfileVisibilityChangedBy")
-  supportConversation SupportConversation? @relation("SupportConversationOwner")
-  supportMessages SupportMessage[] @relation("SupportMessageSender")
+  profileVisibility          ProfileVisibility?        @relation("ProfileVisibilitySubject")
+  profileVisibilityApprovals ProfileVisibility[]       @relation("ProfileVisibilityApprover")
+  profileVisibilityChanges   ProfileVisibility[]       @relation("ProfileVisibilityChangedBy")
+  supportConversation        SupportConversation?      @relation("SupportConversationOwner")
+  supportMessages            SupportMessage[]          @relation("SupportMessageSender")
 
-  contributions        Contribution[] @relation("ContributionPayer")
-  branchContributions  Contribution[] @relation("ContributionBranch")
-  welfareRequests      WelfareRequest[]
-  welfareTreasurerApprovals WelfareRequest[] @relation("WelfareTreasurerApprover")
-  welfareExecutiveApprovals WelfareRequest[] @relation("WelfareExecutiveApprover")
-  welfareDecisions     WelfareDecision[]
-  notifications        UserNotification[]
-  auditLogs            AuditLog[]
-  announcements        Announcement[]
-  announcementReceipts AnnouncementReceipt[]
-  documents            Document[]
-  meetings             Meeting[]      @relation("MeetingRecorder")
-  galleryPhotos        GalleryPhoto[]
-  emailLogs            EmailLog[]
-  memberProfile        MemberProfile?
-  consentRecords       ConsentRecord[]
-  loginEvents          LoginEvent[]
-  passwordResetTokens  PasswordResetToken[]
-  assignedContacts     ContactSubmission[] @relation("ContactAssignee")
-  contactReplies       ContactReply[]
-  editedContent        PublicContentVersion[]
-  committeeProfilesEdited CommitteeProfile[] @relation("CommitteeEditor")
-  createdFinancialTransactions FinancialTransaction[] @relation("TransactionCreator")
-  approvedFinancialTransactions FinancialTransaction[] @relation("TransactionApprover")
-  contributionObligations MemberContributionObligation[]
-  reconciliationsPerformed Reconciliation[] @relation("ReconciledBy")
-  financialDocuments SupportingDocument[] @relation("DocumentUploader")
-  documentDownloads DocumentDownload[]
-  meetingInvitations MeetingInvitation[]
-  ownedActionPoints MeetingActionPoint[] @relation("ActionPointOwner")
-  createdActionPoints MeetingActionPoint[] @relation("ActionPointCreator")
-  createdDecisions MeetingDecision[]
-  approvedMeetings Meeting[] @relation("MeetingApprover")
-  createdResolutions Resolution[] @relation("ResolutionCreatedBy")
-  decidedResolutions Resolution[] @relation("ResolutionDecidedBy")
-  publishedResolutions Resolution[] @relation("ResolutionPublishedBy")
-  resolutionResponses ResolutionResponse[]
-  projectResponsibilities ProjectResponsible[]
-  projectComments ProjectComment[] @relation("ProjectCommentAuthor")
-  moderatedProjectComments ProjectComment[] @relation("ProjectCommentModerator")
-  projectInvestments ProjectInvestment[] @relation("ProjectInvestor")
-  recordedProjectInvestments ProjectInvestment[] @relation("ProjectInvestmentRecorder")
-  projectUpdates ProjectUpdate[]
-  eventInvitations EventInvitation[]
-  eventRsvps EventRSVP[]
-  eventAttendances EventAttendance[] @relation("EventAttendee")
-  recordedEventAttendances EventAttendance[] @relation("EventAttendanceRecorder")
-  eventCostsRecorded EventCost[]
-  eventBranchAudiences Event[] @relation("EventBranchAudience")
-  loanApplications LoanApplication[] @relation("LoanApplicant")
-  loanReviews LoanApplication[] @relation("LoanTreasurerReviewer")
-  loanDecisions LoanApplication[] @relation("LoanDecider")
-  loanGuarantees LoanGuarantor[]
-  dailyActivitiesCreated DailyActivity[] @relation("DailyActivityCreator")
-  financeSettingVersions FinanceSettingVersion[] @relation("FinanceSettingEditor")
+  contributions                 Contribution[]                 @relation("ContributionPayer")
+  branchContributions           Contribution[]                 @relation("ContributionBranch")
+  welfareRequests               WelfareRequest[]
+  welfareTreasurerApprovals     WelfareRequest[]               @relation("WelfareTreasurerApprover")
+  welfareExecutiveApprovals     WelfareRequest[]               @relation("WelfareExecutiveApprover")
+  welfareDecisions              WelfareDecision[]
+  notifications                 UserNotification[]
+  auditLogs                     AuditLog[]
+  announcements                 Announcement[]
+  announcementReceipts          AnnouncementReceipt[]
+  documents                     Document[]
+  meetings                      Meeting[]                      @relation("MeetingRecorder")
+  galleryPhotos                 GalleryPhoto[]
+  emailLogs                     EmailLog[]
+  memberProfile                 MemberProfile?
+  consentRecords                ConsentRecord[]
+  loginEvents                   LoginEvent[]
+  passwordResetTokens           PasswordResetToken[]
+  assignedContacts              ContactSubmission[]            @relation("ContactAssignee")
+  contactReplies                ContactReply[]
+  editedContent                 PublicContentVersion[]
+  committeeProfilesEdited       CommitteeProfile[]             @relation("CommitteeEditor")
+  createdFinancialTransactions  FinancialTransaction[]         @relation("TransactionCreator")
+  approvedFinancialTransactions FinancialTransaction[]         @relation("TransactionApprover")
+  contributionObligations       MemberContributionObligation[]
+  reconciliationsPerformed      Reconciliation[]               @relation("ReconciledBy")
+  financialDocuments            SupportingDocument[]           @relation("DocumentUploader")
+  documentDownloads             DocumentDownload[]
+  meetingInvitations            MeetingInvitation[]
+  ownedActionPoints             MeetingActionPoint[]           @relation("ActionPointOwner")
+  createdActionPoints           MeetingActionPoint[]           @relation("ActionPointCreator")
+  createdDecisions              MeetingDecision[]
+  approvedMeetings              Meeting[]                      @relation("MeetingApprover")
+  createdResolutions            Resolution[]                   @relation("ResolutionCreatedBy")
+  decidedResolutions            Resolution[]                   @relation("ResolutionDecidedBy")
+  publishedResolutions          Resolution[]                   @relation("ResolutionPublishedBy")
+  resolutionResponses           ResolutionResponse[]
+  projectResponsibilities       ProjectResponsible[]
+  projectComments               ProjectComment[]               @relation("ProjectCommentAuthor")
+  moderatedProjectComments      ProjectComment[]               @relation("ProjectCommentModerator")
+  projectInvestments            ProjectInvestment[]            @relation("ProjectInvestor")
+  recordedProjectInvestments    ProjectInvestment[]            @relation("ProjectInvestmentRecorder")
+  projectUpdates                ProjectUpdate[]
+  eventInvitations              EventInvitation[]
+  eventRsvps                    EventRSVP[]
+  eventAttendances              EventAttendance[]              @relation("EventAttendee")
+  recordedEventAttendances      EventAttendance[]              @relation("EventAttendanceRecorder")
+  eventCostsRecorded            EventCost[]
+  eventBranchAudiences          Event[]                        @relation("EventBranchAudience")
+  loanApplications              LoanApplication[]              @relation("LoanApplicant")
+  loanReviews                   LoanApplication[]              @relation("LoanTreasurerReviewer")
+  loanDecisions                 LoanApplication[]              @relation("LoanDecider")
+  loanGuarantees                LoanGuarantor[]
+  dailyActivitiesCreated        DailyActivity[]                @relation("DailyActivityCreator")
+  financeSettingVersions        FinanceSettingVersion[]        @relation("FinanceSettingEditor")
 
   @@index([principalMemberId])
   @@index([isPrincipal])
@@ -425,13 +458,13 @@ model FamilyAccountTransition {
 }
 
 model SupportConversation {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation("SupportConversationOwner", fields: [userId], references: [id], onDelete: Cascade)
+  id        String           @id @default(cuid())
+  userId    String           @unique
+  user      User             @relation("SupportConversationOwner", fields: [userId], references: [id], onDelete: Cascade)
   subject   String?
   closedAt  DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
   messages  SupportMessage[]
 
   @@index([updatedAt])
@@ -455,18 +488,18 @@ model SupportMessage {
 }
 
 model FamilyBranchHistory {
-  id                String   @id @default(cuid())
-  memberId          String
-  member            User     @relation("FamilyHistoryMember", fields: [memberId], references: [id], onDelete: Restrict)
-  fromPrincipalId   String?
-  fromPrincipal     User?    @relation("FamilyHistoryFromPrincipal", fields: [fromPrincipalId], references: [id], onDelete: Restrict)
-  toPrincipalId     String
-  toPrincipal       User     @relation("FamilyHistoryToPrincipal", fields: [toPrincipalId], references: [id], onDelete: Restrict)
-  relationship      FamilyRelationship
-  approvedById      String
-  approvedBy        User     @relation("FamilyHistoryApprover", fields: [approvedById], references: [id], onDelete: Restrict)
-  reason            String
-  effectiveAt       DateTime @default(now())
+  id              String             @id @default(cuid())
+  memberId        String
+  member          User               @relation("FamilyHistoryMember", fields: [memberId], references: [id], onDelete: Restrict)
+  fromPrincipalId String?
+  fromPrincipal   User?              @relation("FamilyHistoryFromPrincipal", fields: [fromPrincipalId], references: [id], onDelete: Restrict)
+  toPrincipalId   String
+  toPrincipal     User               @relation("FamilyHistoryToPrincipal", fields: [toPrincipalId], references: [id], onDelete: Restrict)
+  relationship    FamilyRelationship
+  approvedById    String
+  approvedBy      User               @relation("FamilyHistoryApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  reason          String
+  effectiveAt     DateTime           @default(now())
 
   @@index([memberId, effectiveAt])
   @@index([fromPrincipalId])
@@ -504,14 +537,14 @@ model MemberProfile {
 }
 
 model ConsentRecord {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  termsVersion    String
-  privacyVersion  String
-  acceptedAt      DateTime @default(now())
-  ipAddress       String?
-  userAgent       String?
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  termsVersion   String
+  privacyVersion String
+  acceptedAt     DateTime @default(now())
+  ipAddress      String?
+  userAgent      String?
 
   @@index([userId, acceptedAt])
   @@map("consent_records")
@@ -534,12 +567,12 @@ model LoginEvent {
 }
 
 model RateLimit {
-  id           String   @id @default(cuid())
-  key          String   @unique
-  attempts     Int      @default(0)
-  windowStart  DateTime @default(now())
+  id           String    @id @default(cuid())
+  key          String    @unique
+  attempts     Int       @default(0)
+  windowStart  DateTime  @default(now())
   blockedUntil DateTime?
-  updatedAt    DateTime @updatedAt
+  updatedAt    DateTime  @updatedAt
 
   @@map("rate_limits")
 }
@@ -567,48 +600,51 @@ model MembershipSequence {
 }
 
 model Contribution {
-  id            String        @id @default(cuid())
-  userId        String
-  user          User          @relation("ContributionPayer", fields: [userId], references: [id], onDelete: Cascade)
-  principalMemberId String?
-  principalMember   User?     @relation("ContributionBranch", fields: [principalMemberId], references: [id], onDelete: SetNull)
-  amount        Float
-  description   String?
-  category      String?
-  paymentMethod PaymentMethod @default(CASH)
-  receivedBy    String?
-  statementRef  String?
-  paidAt        DateTime      @default(now())
-  mpesaRef      String?
-  createdAt     DateTime      @default(now())
-  status        TransactionStatus @default(PENDING)
-  verificationNote String?
-  verifiedAt    DateTime?
-  verifiedById  String?
-  reconciliationStatus ReconciliationStatus @default(UNRECONCILED)
-  reconciledAt  DateTime?
-  correctionReason String?
-  sourceAccountId String?
-  sourceAccount FinancialAccount? @relation(fields: [sourceAccountId], references: [id], onDelete: SetNull)
-  categoryId    String?
-  transactionCategory TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  campaignId    String?
-  campaign      ContributionCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  financialTransactionId String? @unique
-  financialTransaction FinancialTransaction? @relation(fields: [financialTransactionId], references: [id], onDelete: Restrict)
-  contributionPeriod String?
-  reversedById String?
-  reversedBy   Contribution? @relation("ContributionReversal", fields: [reversedById], references: [id], onDelete: SetNull)
-  reverses     Contribution[] @relation("ContributionReversal")
-  supportingDocuments SupportingDocument[]
-  allocationVersion    Int?
-  emergencyPercent     Float?
-  reservePercent       Float?
-  emergencyAmount      Float?
-  reserveAmount        Float?
+  id                     String                @id @default(cuid())
+  userId                 String
+  user                   User                  @relation("ContributionPayer", fields: [userId], references: [id], onDelete: Cascade)
+  principalMemberId      String?
+  principalMember        User?                 @relation("ContributionBranch", fields: [principalMemberId], references: [id], onDelete: SetNull)
+  amount                 Float
+  description            String?
+  category               String?
+  paymentMethod          PaymentMethod         @default(CASH)
+  receivedBy             String?
+  statementRef           String?
+  paidAt                 DateTime              @default(now())
+  mpesaRef               String?
+  createdAt              DateTime              @default(now())
+  status                 TransactionStatus     @default(PENDING)
+  verificationNote       String?
+  verifiedAt             DateTime?
+  verifiedById           String?
+  reconciliationStatus   ReconciliationStatus  @default(UNRECONCILED)
+  reconciledAt           DateTime?
+  correctionReason       String?
+  sourceAccountId        String?
+  sourceAccount          FinancialAccount?     @relation(fields: [sourceAccountId], references: [id], onDelete: SetNull)
+  categoryId             String?
+  transactionCategory    TransactionCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  campaignId             String?
+  campaign               ContributionCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  financialTransactionId String?               @unique
+  financialTransaction   FinancialTransaction? @relation(fields: [financialTransactionId], references: [id], onDelete: Restrict)
+  contributionPeriod     String?
+  reversedById           String?
+  reversedBy             Contribution?         @relation("ContributionReversal", fields: [reversedById], references: [id], onDelete: SetNull)
+  reverses               Contribution[]        @relation("ContributionReversal")
+  supportingDocuments    SupportingDocument[]
+  allocationVersion      Int?
+  emergencyPercent       Float?
+  reservePercent         Float?
+  emergencyAmount        Float?
+  reserveAmount          Float?
+  projectId              String?
+  project                Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([principalMemberId])
+  @@index([projectId])
   @@index([paidAt])
   @@index([status, reconciliationStatus])
   @@index([campaignId, userId])
@@ -616,255 +652,270 @@ model Contribution {
 }
 
 model FinancialAccount {
-  id String @id @default(cuid())
-  code String @unique
-  name String
-  type AccountType
-  description String?
-  restricted Boolean @default(false)
-  active Boolean @default(true)
-  entries LedgerEntry[]
+  id                  String         @id @default(cuid())
+  code                String         @unique
+  name                String
+  type                AccountType
+  description         String?
+  restricted          Boolean        @default(false)
+  active              Boolean        @default(true)
+  entries             LedgerEntry[]
   sourceContributions Contribution[]
-  paymentEvents PaymentEvent[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  paymentEvents       PaymentEvent[]
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
   @@map("financial_accounts")
 }
 
 model TransactionCategory {
-  id String @id @default(cuid())
-  code String @unique
-  name String
-  type CategoryType
-  description String?
-  requiresEvidence Boolean @default(false)
-  active Boolean @default(true)
-  sortOrder Int @default(0)
-  fixedAmountKes Float?
-  contributions Contribution[]
-  campaigns ContributionCampaign[]
-  transactions FinancialTransaction[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String                 @id @default(cuid())
+  code             String                 @unique
+  name             String
+  type             CategoryType
+  description      String?
+  requiresEvidence Boolean                @default(false)
+  active           Boolean                @default(true)
+  sortOrder        Int                    @default(0)
+  fixedAmountKes   Float?
+  billingKind      BillingKind            @default(NONE)
+  contributions    Contribution[]
+  campaigns        ContributionCampaign[]
+  transactions     FinancialTransaction[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
   @@map("transaction_categories")
 }
 
 model AccountingPeriod {
-  id String @id @default(cuid())
-  year Int
-  month Int
-  startsAt DateTime
-  endsAt DateTime
-  status PeriodStatus @default(OPEN)
-  closedAt DateTime?
-  closedBy String?
-  transactions FinancialTransaction[]
+  id              String                 @id @default(cuid())
+  year            Int
+  month           Int
+  startsAt        DateTime
+  endsAt          DateTime
+  status          PeriodStatus           @default(OPEN)
+  closedAt        DateTime?
+  closedBy        String?
+  transactions    FinancialTransaction[]
   reconciliations Reconciliation[]
+
   @@unique([year, month])
   @@index([status, startsAt])
   @@map("accounting_periods")
 }
 
 model FinancialTransaction {
-  id String @id @default(cuid())
-  transactionNumber String @unique
-  type TransactionType
-  status TransactionStatus @default(PENDING)
-  amount Decimal @db.Decimal(14, 2)
-  description String
-  occurredAt DateTime
-  providerReference String? @unique
-  correctionReason String?
-  categoryId String?
-  category TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  periodId String
-  period AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
-  createdById String
-  createdBy User @relation("TransactionCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  approvedById String?
-  approvedBy User? @relation("TransactionApprover", fields: [approvedById], references: [id], onDelete: Restrict)
-  confirmedAt DateTime?
-  reconciledAt DateTime?
-  reversedAt DateTime?
+  id                    String                 @id @default(cuid())
+  transactionNumber     String                 @unique
+  type                  TransactionType
+  status                TransactionStatus      @default(PENDING)
+  amount                Decimal                @db.Decimal(14, 2)
+  description           String
+  occurredAt            DateTime
+  providerReference     String?                @unique
+  correctionReason      String?
+  categoryId            String?
+  category              TransactionCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  periodId              String
+  period                AccountingPeriod       @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  createdById           String
+  createdBy             User                   @relation("TransactionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedById          String?
+  approvedBy            User?                  @relation("TransactionApprover", fields: [approvedById], references: [id], onDelete: Restrict)
+  confirmedAt           DateTime?
+  reconciledAt          DateTime?
+  reversedAt            DateTime?
   originalTransactionId String?
-  originalTransaction FinancialTransaction? @relation("TransactionReversal", fields: [originalTransactionId], references: [id], onDelete: Restrict)
+  originalTransaction   FinancialTransaction?  @relation("TransactionReversal", fields: [originalTransactionId], references: [id], onDelete: Restrict)
   reversingTransactions FinancialTransaction[] @relation("TransactionReversal")
-  entries LedgerEntry[]
-  contribution Contribution?
-  expense Expense?
-  disbursement Disbursement?
-  adjustment Adjustment?
-  reconciliation Reconciliation?
-  supportingDocuments SupportingDocument[]
-  loanLedgerLinks LoanLedgerLink[]
-  createdAt DateTime @default(now())
+  entries               LedgerEntry[]
+  contribution          Contribution?
+  expense               Expense?
+  disbursement          Disbursement?
+  adjustment            Adjustment?
+  reconciliation        Reconciliation?
+  supportingDocuments   SupportingDocument[]
+  loanLedgerLinks       LoanLedgerLink[]
+  createdAt             DateTime               @default(now())
+
   @@index([occurredAt, status])
   @@index([categoryId, occurredAt])
   @@map("financial_transactions")
 }
 
 model LedgerEntry {
-  id String @id @default(cuid())
+  id            String               @id @default(cuid())
   transactionId String
-  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
-  accountId String
-  account FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  debit Decimal @default(0) @db.Decimal(14, 2)
-  credit Decimal @default(0) @db.Decimal(14, 2)
-  memo String?
-  createdAt DateTime @default(now())
+  transaction   FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  accountId     String
+  account       FinancialAccount     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  debit         Decimal              @default(0) @db.Decimal(14, 2)
+  credit        Decimal              @default(0) @db.Decimal(14, 2)
+  memo          String?
+  createdAt     DateTime             @default(now())
+
   @@index([accountId, createdAt])
   @@index([transactionId])
   @@map("ledger_entries")
 }
 
 model ContributionCampaign {
-  id String @id @default(cuid())
-  title String
-  description String?
-  targetAmount Decimal @db.Decimal(14, 2)
-  categoryId String
-  category TransactionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  startsAt DateTime
-  dueAt DateTime?
-  active Boolean @default(true)
-  createdById String
-  contributions Contribution[]
-  obligations MemberContributionObligation[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String                         @id @default(cuid())
+  title           String
+  description     String?
+  targetAmount    Decimal                        @db.Decimal(14, 2)
+  perMemberTarget Decimal?                       @db.Decimal(14, 2)
+  categoryId      String
+  category        TransactionCategory            @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  startsAt        DateTime
+  dueAt           DateTime?
+  active          Boolean                        @default(true)
+  createdById     String
+  contributions   Contribution[]
+  obligations     MemberContributionObligation[]
+  createdAt       DateTime                       @default(now())
+  updatedAt       DateTime                       @updatedAt
+
   @@index([active, startsAt])
   @@map("contribution_campaigns")
 }
 
 model MemberContributionObligation {
-  id String @id @default(cuid())
-  campaignId String
-  campaign ContributionCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  targetAmount Decimal @db.Decimal(14, 2)
-  status ObligationStatus @default(OUTSTANDING)
+  id           String               @id @default(cuid())
+  campaignId   String
+  campaign     ContributionCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetAmount Decimal              @db.Decimal(14, 2)
+  status       ObligationStatus     @default(OUTSTANDING)
   waivedReason String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
   @@unique([campaignId, userId])
   @@index([userId, status])
   @@map("member_contribution_obligations")
 }
 
 model PaymentEvent {
-  id String @id @default(cuid())
-  provider String
-  providerReference String @unique
-  amount Decimal @db.Decimal(14, 2)
-  phone String?
-  payerName String?
-  receivedAt DateTime
-  rawPayload Json?
-  status PaymentEventStatus @default(UNMATCHED)
-  matchedUserId String?
+  id                    String             @id @default(cuid())
+  provider              String
+  providerReference     String             @unique
+  amount                Decimal            @db.Decimal(14, 2)
+  phone                 String?
+  payerName             String?
+  receivedAt            DateTime
+  rawPayload            Json?
+  status                PaymentEventStatus @default(UNMATCHED)
+  matchedUserId         String?
   matchedContributionId String?
-  sourceAccountId String?
-  sourceAccount FinancialAccount? @relation(fields: [sourceAccountId], references: [id], onDelete: SetNull)
-  reconciliation Reconciliation?
-  createdAt DateTime @default(now())
+  sourceAccountId       String?
+  sourceAccount         FinancialAccount?  @relation(fields: [sourceAccountId], references: [id], onDelete: SetNull)
+  reconciliation        Reconciliation?
+  createdAt             DateTime           @default(now())
+
   @@index([status, receivedAt])
   @@index([phone, receivedAt])
   @@map("payment_events")
 }
 
 model Reconciliation {
-  id String @id @default(cuid())
-  transactionId String @unique
-  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
-  paymentEventId String? @unique
-  paymentEvent PaymentEvent? @relation(fields: [paymentEventId], references: [id], onDelete: Restrict)
-  periodId String
-  period AccountingPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
-  notes String
+  id             String               @id @default(cuid())
+  transactionId  String               @unique
+  transaction    FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  paymentEventId String?              @unique
+  paymentEvent   PaymentEvent?        @relation(fields: [paymentEventId], references: [id], onDelete: Restrict)
+  periodId       String
+  period         AccountingPeriod     @relation(fields: [periodId], references: [id], onDelete: Restrict)
+  notes          String
   reconciledById String
-  reconciledBy User @relation("ReconciledBy", fields: [reconciledById], references: [id], onDelete: Restrict)
-  reconciledAt DateTime @default(now())
+  reconciledBy   User                 @relation("ReconciledBy", fields: [reconciledById], references: [id], onDelete: Restrict)
+  reconciledAt   DateTime             @default(now())
+
   @@index([reconciledAt])
   @@map("reconciliations")
 }
 
 model Expense {
-  id String @id @default(cuid())
-  transactionId String @unique
-  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
-  payee String
-  purpose String
-  approvalRequired Boolean @default(false)
-  projectId String?
-  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  eventId String?
-  event Event? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  id               String               @id @default(cuid())
+  transactionId    String               @unique
+  transaction      FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  payee            String
+  purpose          String
+  approvalRequired Boolean              @default(false)
+  projectId        String?
+  project          Project?             @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  eventId          String?
+  event            Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
   @@index([projectId])
   @@index([eventId])
   @@map("expenses")
 }
 
 model Disbursement {
-  id String @id @default(cuid())
-  transactionId String @unique
-  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
-  beneficiary String
-  purpose String
+  id               String               @id @default(cuid())
+  transactionId    String               @unique
+  transaction      FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  beneficiary      String
+  purpose          String
   welfareRequestId String?
+
   @@map("disbursements")
 }
 
 model Adjustment {
-  id String @id @default(cuid())
-  transactionId String @unique
-  transaction FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
-  reason String
-  oldValue Json?
-  newValue Json?
+  id            String               @id @default(cuid())
+  transactionId String               @unique
+  transaction   FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  reason        String
+  oldValue      Json?
+  newValue      Json?
+
   @@map("adjustments")
 }
 
 model SupportingDocument {
-  id String @id @default(cuid())
-  transactionId String?
-  transaction FinancialTransaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  id             String                @id @default(cuid())
+  transactionId  String?
+  transaction    FinancialTransaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
   contributionId String?
-  contribution Contribution? @relation(fields: [contributionId], references: [id], onDelete: Restrict)
-  title String
-  fileUrl String
-  mimeType String
-  uploadedById String
-  uploadedBy User @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
-  createdAt DateTime @default(now())
+  contribution   Contribution?         @relation(fields: [contributionId], references: [id], onDelete: Restrict)
+  title          String
+  fileUrl        String
+  mimeType       String
+  uploadedById   String
+  uploadedBy     User                  @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  createdAt      DateTime              @default(now())
+
   @@index([transactionId])
   @@map("supporting_documents")
 }
 
 model WelfareRequest {
-  id          String        @id @default(cuid())
-  userId      String
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  description String
-  amount      Float?
-  status      WelfareStatus @default(PENDING)
-  reviewNote  String?
-  categoryId  String?
-  category    WelfareCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  beneficiaryName String?
-  supportType     String?
-  confidentiality WelfareConfidentiality @default(STANDARD)
-  evidencePath    String?
-  treasurerApprovedAt DateTime?
+  id                    String                 @id @default(cuid())
+  userId                String
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  description           String
+  amount                Float?
+  status                WelfareStatus          @default(PENDING)
+  reviewNote            String?
+  categoryId            String?
+  category              WelfareCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  beneficiaryName       String?
+  supportType           String?
+  confidentiality       WelfareConfidentiality @default(STANDARD)
+  evidencePath          String?
+  treasurerApprovedAt   DateTime?
   treasurerApprovedById String?
-  treasurerApprovedBy   User? @relation("WelfareTreasurerApprover", fields: [treasurerApprovedById], references: [id], onDelete: SetNull)
-  executiveApprovedAt DateTime?
+  treasurerApprovedBy   User?                  @relation("WelfareTreasurerApprover", fields: [treasurerApprovedById], references: [id], onDelete: SetNull)
+  executiveApprovedAt   DateTime?
   executiveApprovedById String?
-  executiveApprovedBy   User? @relation("WelfareExecutiveApprover", fields: [executiveApprovedById], references: [id], onDelete: SetNull)
-  decisions   WelfareDecision[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  executiveApprovedBy   User?                  @relation("WelfareExecutiveApprover", fields: [executiveApprovedById], references: [id], onDelete: SetNull)
+  decisions             WelfareDecision[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -873,15 +924,15 @@ model WelfareRequest {
 }
 
 model WelfareDecision {
-  id          String   @id @default(cuid())
-  requestId   String
-  request     WelfareRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  actorId     String
-  actor       User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
-  role        Role
-  decision    String
-  note        String?
-  createdAt   DateTime @default(now())
+  id        String         @id @default(cuid())
+  requestId String
+  request   WelfareRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actorId   String
+  actor     User           @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  role      Role
+  decision  String
+  note      String?
+  createdAt DateTime       @default(now())
 
   @@index([requestId, createdAt])
   @@map("welfare_decisions")
@@ -905,30 +956,31 @@ model UserNotification {
 }
 
 model Project {
-  id                    String        @id @default(cuid())
-  title                 String
-  description           String
-  status                ProjectStatus @default(UPCOMING)
-  imageUrl              String?
-  isPublic              Boolean       @default(true)
-  progress              Int           @default(0)
-  startDate             DateTime?
-  endDate               DateTime?
-  budgetKes             Decimal       @default(0) @db.Decimal(14, 2)
-  fundingTargetKes      Decimal       @default(0) @db.Decimal(14, 2)
-  actualExpenditureKes  Decimal       @default(0) @db.Decimal(14, 2)
-  categoryId            String?
-  category              ProjectCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  id                   String           @id @default(cuid())
+  title                String
+  description          String
+  status               ProjectStatus    @default(UPCOMING)
+  imageUrl             String?
+  isPublic             Boolean          @default(true)
+  progress             Int              @default(0)
+  startDate            DateTime?
+  endDate              DateTime?
+  budgetKes            Decimal          @default(0) @db.Decimal(14, 2)
+  fundingTargetKes     Decimal          @default(0) @db.Decimal(14, 2)
+  actualExpenditureKes Decimal          @default(0) @db.Decimal(14, 2)
+  categoryId           String?
+  category             ProjectCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
-  responsibles ProjectResponsible[]
-  comments     ProjectComment[]
-  investments  ProjectInvestment[]
-  milestones   ProjectMilestone[]
-  updates      ProjectUpdate[]
-  documents    ProjectDocument[]
-  expenses     Expense[]
+  responsibles  ProjectResponsible[]
+  comments      ProjectComment[]
+  investments   ProjectInvestment[]
+  milestones    ProjectMilestone[]
+  updates       ProjectUpdate[]
+  documents     ProjectDocument[]
+  expenses      Expense[]
+  contributions Contribution[]
 
   @@index([categoryId])
   @@index([isPublic, updatedAt])
@@ -1271,6 +1323,7 @@ model DocumentCategory {
   active    Boolean    @default(true)
   createdAt DateTime   @default(now())
   documents Document[]
+
   @@map("document_categories")
 }
 
@@ -1283,12 +1336,13 @@ model DocumentDownload {
   ipAddress    String?
   userAgent    String?
   downloadedAt DateTime @default(now())
+
   @@index([documentId, downloadedAt])
   @@map("document_downloads")
 }
 
 model Meeting {
-  id                  String        @id @default(cuid())
+  id                  String               @id @default(cuid())
   title               String
   agenda              String?
   minutes             String?
@@ -1300,26 +1354,27 @@ model Meeting {
   resolutions         String?
   aob                 String?
   nextMeetingAt       DateTime?
-  status              MeetingStatus @default(DRAFT)
+  status              MeetingStatus        @default(DRAFT)
   heldAt              DateTime
-  attendance          Int           @default(0)
+  attendance          Int                  @default(0)
   recordedBy          String
-  recorder            User          @relation("MeetingRecorder", fields: [recordedBy], references: [id], onDelete: Cascade)
+  recorder            User                 @relation("MeetingRecorder", fields: [recordedBy], references: [id], onDelete: Cascade)
   noticeBody          String?
   noticeSentAt        DateTime?
-  audienceType        MeetingAudienceType @default(ALL_MEMBERS)
-  audienceRoles       Role[]        @default([])
+  audienceType        MeetingAudienceType  @default(ALL_MEMBERS)
+  audienceRoles       Role[]               @default([])
   approvedById        String?
-  approvedBy          User?         @relation("MeetingApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedBy          User?                @relation("MeetingApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedAt          DateTime?
-  minutesVersion      Int           @default(1)
-  publishedDocumentId String?       @unique
-  publishedDocument   Document?     @relation(fields: [publishedDocumentId], references: [id], onDelete: SetNull)
+  minutesVersion      Int                  @default(1)
+  publishedDocumentId String?              @unique
+  publishedDocument   Document?            @relation(fields: [publishedDocumentId], references: [id], onDelete: SetNull)
   eventId             String?
-  event               Event?        @relation(fields: [eventId], references: [id], onDelete: SetNull)
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  event               Event?               @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
   invitations         MeetingInvitation[]
+  attendanceRecords   MeetingAttendance[]
   agendaItems         MeetingAgendaItem[]
   actionPoints        MeetingActionPoint[]
   decisions           MeetingDecision[]
@@ -1330,25 +1385,44 @@ model Meeting {
 }
 
 model MeetingInvitation {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   meetingId String
-  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meeting   Meeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   sentAt    DateTime?
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+
   @@unique([meetingId, userId])
   @@map("meeting_invitations")
 }
 
+model MeetingAttendance {
+  id           String                  @id @default(cuid())
+  meetingId    String
+  meeting      Meeting                 @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User                    @relation("MeetingAttendee", fields: [userId], references: [id], onDelete: Cascade)
+  status       MeetingAttendanceStatus @default(PRESENT)
+  recordedById String?
+  recordedBy   User?                   @relation("MeetingAttendanceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@unique([meetingId, userId])
+  @@index([userId])
+  @@map("meeting_attendance")
+}
+
 model MeetingAgendaItem {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   meetingId   String
-  meeting     Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  meeting     Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   position    Int
   title       String
   description String?
+
   @@unique([meetingId, position])
   @@map("meeting_agenda_items")
 }
@@ -1368,6 +1442,7 @@ model MeetingActionPoint {
   completedAt DateTime?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+
   @@index([ownerId, status])
   @@map("meeting_action_points")
 }
@@ -1383,6 +1458,7 @@ model MeetingDecision {
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
   createdAt   DateTime @default(now())
+
   @@index([decidedAt])
   @@map("meeting_decisions")
 }
@@ -1399,30 +1475,31 @@ enum ResolutionVoteChoice {
 }
 
 model Resolution {
-  id               String           @id @default(cuid())
+  id               String               @id @default(cuid())
   title            String
   body             String
-  category         String           @default("RESOLUTION")
+  category         String               @default("RESOLUTION")
   imageUrl         String?
   documentUrl      String?
   documentName     String?
-  status           ResolutionStatus @default(PENDING_APPROVAL)
-  visibleToRoles   Role[]           @default([])
+  status           ResolutionStatus     @default(PENDING_APPROVAL)
+  visibleToRoles   Role[]               @default([])
   createdById      String
-  createdBy        User             @relation("ResolutionCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy        User                 @relation("ResolutionCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
   decidedById      String?
-  decidedBy        User?            @relation("ResolutionDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedBy        User?                @relation("ResolutionDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
   decidedAt        DateTime?
   rejectionReason  String?
-  resultsPublished Boolean          @default(false)
-  allowAnonymous   Boolean          @default(true)
-  allowComments    Boolean          @default(true)
+  resultsPublished Boolean              @default(false)
+  allowAnonymous   Boolean              @default(true)
+  allowComments    Boolean              @default(true)
   publishedById    String?
-  publishedBy      User?            @relation("ResolutionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedBy      User?                @relation("ResolutionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
   publishedAt      DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
   responses        ResolutionResponse[]
+
   @@index([status])
   @@index([category, createdAt])
   @@map("resolutions")
@@ -1439,6 +1516,7 @@ model ResolutionResponse {
   anonymous    Boolean              @default(false)
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
+
   @@unique([resolutionId, userId])
   @@map("resolution_responses")
 }
@@ -1452,6 +1530,7 @@ model MeetingVersion {
   reason      String
   createdById String
   createdAt   DateTime @default(now())
+
   @@unique([meetingId, version])
   @@map("meeting_versions")
 }
@@ -1492,22 +1571,22 @@ model AuditLog {
 }
 
 model ContactSubmission {
-  id          String    @id @default(cuid())
-  name        String
-  email       String
-  phone       String?
-  category    String?
-  message     String
-  emailStatus String    @default("pending")
-  readAt      DateTime?
-  status      ContactStatus @default(UNREAD)
+  id           String         @id @default(cuid())
+  name         String
+  email        String
+  phone        String?
+  category     String?
+  message      String
+  emailStatus  String         @default("pending")
+  readAt       DateTime?
+  status       ContactStatus  @default(UNREAD)
   assignedToId String?
-  assignedTo   User?    @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedTo   User?          @relation("ContactAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   resolvedAt   DateTime?
   spamAt       DateTime?
   retainUntil  DateTime?
   replies      ContactReply[]
-  createdAt   DateTime  @default(now())
+  createdAt    DateTime       @default(now())
 
   @@index([createdAt])
   @@index([readAt])
@@ -1517,95 +1596,97 @@ model ContactSubmission {
 }
 
 model ContactReply {
-  id           String @id @default(cuid())
-  submissionId String
-  submission   ContactSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
-  sentById     String
-  sentBy       User @relation(fields: [sentById], references: [id], onDelete: Restrict)
-  subject      String
-  body         String
-  method       String
-  deliveryStatus String @default("recorded")
-  sentAt       DateTime @default(now())
+  id             String            @id @default(cuid())
+  submissionId   String
+  submission     ContactSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  sentById       String
+  sentBy         User              @relation(fields: [sentById], references: [id], onDelete: Restrict)
+  subject        String
+  body           String
+  method         String
+  deliveryStatus String            @default("recorded")
+  sentAt         DateTime          @default(now())
+
   @@index([submissionId, sentAt])
   @@map("contact_replies")
 }
 
 model AppSetting {
-  key       String @id
+  key       String   @id
   value     String
   updatedBy String?
   updatedAt DateTime @updatedAt
+
   @@map("app_settings")
 }
 
 model ProfileVisibility {
-  id                    String   @id @default(cuid())
-  userId                String   @unique
-  user                  User     @relation("ProfileVisibilitySubject", fields: [userId], references: [id], onDelete: Cascade)
-  visibleToMembers      Boolean  @default(false)
-  allowedFields         Json     @default("[]")
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  User      @relation("ProfileVisibilitySubject", fields: [userId], references: [id], onDelete: Cascade)
+  visibleToMembers      Boolean   @default(false)
+  allowedFields         Json      @default("[]")
   approvedByPrincipalId String?
-  approvedByPrincipal   User?    @relation("ProfileVisibilityApprover", fields: [approvedByPrincipalId], references: [id], onDelete: SetNull)
+  approvedByPrincipal   User?     @relation("ProfileVisibilityApprover", fields: [approvedByPrincipalId], references: [id], onDelete: SetNull)
   changedById           String?
-  changedBy             User?    @relation("ProfileVisibilityChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
-  changedAt             DateTime @default(now())
+  changedBy             User?     @relation("ProfileVisibilityChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+  changedAt             DateTime  @default(now())
   reviewAt              DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([visibleToMembers])
   @@map("profile_visibility")
 }
 
 model DailyActivity {
-  id          String   @id @default(cuid())
-  title       String
-  body        String?
-  activityType String  @default("GENERAL")
-  startsAt    DateTime @default(now())
-  endsAt      DateTime?
-  venue       String?
-  audienceType String  @default("ALL_MEMBERS")
-  audienceRoles Role[] @default([])
+  id                  String    @id @default(cuid())
+  title               String
+  body                String?
+  activityType        String    @default("GENERAL")
+  startsAt            DateTime  @default(now())
+  endsAt              DateTime?
+  venue               String?
+  audienceType        String    @default("ALL_MEMBERS")
+  audienceRoles       Role[]    @default([])
   audiencePrincipalId String?
-  createdById String
-  createdBy   User     @relation("DailyActivityCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  published   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdById         String
+  createdBy           User      @relation("DailyActivityCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  published           Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([startsAt, published])
   @@map("daily_activities")
 }
 
 model FinanceSettingVersion {
-  id              String   @id @default(cuid())
-  bankName        String
-  accountName     String
-  accountNumber   String
-  paybillOrTill   String?
-  branchName      String?
-  notes           String?
-  active          Boolean  @default(true)
-  changedById     String?
-  changedBy       User?    @relation("FinanceSettingEditor", fields: [changedById], references: [id], onDelete: SetNull)
-  createdAt       DateTime @default(now())
+  id            String   @id @default(cuid())
+  bankName      String
+  accountName   String
+  accountNumber String
+  paybillOrTill String?
+  branchName    String?
+  notes         String?
+  active        Boolean  @default(true)
+  changedById   String?
+  changedBy     User?    @relation("FinanceSettingEditor", fields: [changedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
 
   @@index([active, createdAt])
   @@map("finance_setting_versions")
 }
 
 model FundAllocationRule {
-  id                 String   @id @default(cuid())
-  name               String
-  emergencyPercent   Float    @default(20)
-  reservePercent     Float    @default(80)
-  active             Boolean  @default(true)
-  version            Int      @default(1)
-  notes              String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id               String   @id @default(cuid())
+  name             String
+  emergencyPercent Float    @default(20)
+  reservePercent   Float    @default(80)
+  active           Boolean  @default(true)
+  version          Int      @default(1)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([active])
   @@map("fund_allocation_rules")
@@ -1617,28 +1698,31 @@ model FeatureFlag {
   updatedBy String?
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
+
   @@map("feature_flags")
 }
 
 model WelfareCategory {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   name      String
-  active    Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active    Boolean          @default(true)
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
   requests  WelfareRequest[]
+
   @@map("welfare_categories")
 }
 
 model ProjectCategory {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
-  active    Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active    Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   projects  Project[]
+
   @@map("project_categories")
 }
 
@@ -1650,31 +1734,32 @@ model MembershipClass {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
   @@map("membership_classes")
 }
 
 model LoanApplication {
-  id             String                @id @default(cuid())
-  applicantId    String
-  applicant      User                  @relation("LoanApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
-  amountKes      Decimal               @db.Decimal(14, 2)
-  purpose        String
-  dueAt          DateTime?
+  id               String                @id @default(cuid())
+  applicantId      String
+  applicant        User                  @relation("LoanApplicant", fields: [applicantId], references: [id], onDelete: Cascade)
+  amountKes        Decimal               @db.Decimal(14, 2)
+  purpose          String
+  dueAt            DateTime?
   installmentNotes String?
-  notes          String?
-  status         LoanApplicationStatus @default(SUBMITTED)
-  treasurerNote  String?
-  reviewedById   String?
-  reviewedBy     User?                 @relation("LoanTreasurerReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  reviewedAt     DateTime?
-  decidedById    String?
-  decidedBy      User?                 @relation("LoanDecider", fields: [decidedById], references: [id], onDelete: SetNull)
-  decidedAt      DateTime?
-  decisionNote   String?
-  disbursedAt    DateTime?
-  closedAt       DateTime?
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  notes            String?
+  status           LoanApplicationStatus @default(SUBMITTED)
+  treasurerNote    String?
+  reviewedById     String?
+  reviewedBy       User?                 @relation("LoanTreasurerReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt       DateTime?
+  decidedById      String?
+  decidedBy        User?                 @relation("LoanDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt        DateTime?
+  decisionNote     String?
+  disbursedAt      DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
   guarantors  LoanGuarantor[]
   ledgerLinks LoanLedgerLink[]
@@ -1685,21 +1770,21 @@ model LoanApplication {
 }
 
 model LoanGuarantor {
-  id          String              @id @default(cuid())
-  loanId      String
-  loan        LoanApplication     @relation(fields: [loanId], references: [id], onDelete: Cascade)
-  userId      String?
-  user        User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fullName    String?
-  idNumber    String?
-  phone       String?
-  residence   String?
+  id           String              @id @default(cuid())
+  loanId       String
+  loan         LoanApplication     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  userId       String?
+  user         User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName     String?
+  idNumber     String?
+  phone        String?
+  residence    String?
   relationship String?
-  kraPin      String?
-  status      LoanGuarantorStatus @default(PENDING)
-  note        String?
-  respondedAt DateTime?
-  createdAt   DateTime            @default(now())
+  kraPin       String?
+  status       LoanGuarantorStatus @default(PENDING)
+  note         String?
+  respondedAt  DateTime?
+  createdAt    DateTime            @default(now())
 
   @@unique([loanId, userId])
   @@index([loanId, idNumber])
@@ -1708,13 +1793,13 @@ model LoanGuarantor {
 }
 
 model LoanLedgerLink {
-  id            String             @id @default(cuid())
+  id            String               @id @default(cuid())
   loanId        String
-  loan          LoanApplication    @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  loan          LoanApplication      @relation(fields: [loanId], references: [id], onDelete: Cascade)
   transactionId String
   transaction   FinancialTransaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
   kind          LoanLedgerKind
-  createdAt     DateTime           @default(now())
+  createdAt     DateTime             @default(now())
 
   @@unique([transactionId])
   @@index([loanId, kind])
@@ -1722,57 +1807,64 @@ model LoanLedgerLink {
 }
 
 model PublicContent {
-  id          String @id @default(cuid())
-  group       ContentGroup @unique
-  status      ContentStatus @default(DRAFT)
-  draftData   Json
+  id            String                 @id @default(cuid())
+  group         ContentGroup           @unique
+  status        ContentStatus          @default(DRAFT)
+  draftData     Json
   publishedData Json?
-  publishedAt DateTime?
-  versions    PublicContentVersion[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  publishedAt   DateTime?
+  versions      PublicContentVersion[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
   @@map("public_content")
 }
 
 model PublicContentVersion {
-  id        String @id @default(cuid())
+  id        String        @id @default(cuid())
   contentId String
   content   PublicContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
   editorId  String
-  editor    User @relation(fields: [editorId], references: [id], onDelete: Restrict)
+  editor    User          @relation(fields: [editorId], references: [id], onDelete: Restrict)
   data      Json
   action    String
-  createdAt DateTime @default(now())
+  createdAt DateTime      @default(now())
+
   @@index([contentId, createdAt])
   @@map("public_content_versions")
 }
 
 model CommitteeProfile {
-  id          String @id @default(cuid())
-  name        String
-  position    String
-  biography   String
-  photoUrl    String?
-  displayOrder Int @default(0)
-  termStart   DateTime?
-  termEnd     DateTime?
-  status      ContentStatus @default(DRAFT)
-  editedById  String
-  editedBy    User @relation("CommitteeEditor", fields: [editedById], references: [id], onDelete: Restrict)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String        @id @default(cuid())
+  name             String
+  position         String
+  biography        String
+  responsibilities String?
+  userId           String?
+  user             User?         @relation("CommitteeMember", fields: [userId], references: [id], onDelete: SetNull)
+  photoUrl         String?
+  displayOrder     Int           @default(0)
+  termStart        DateTime?
+  termEnd          DateTime?
+  status           ContentStatus @default(DRAFT)
+  editedById       String
+  editedBy         User          @relation("CommitteeEditor", fields: [editedById], references: [id], onDelete: Restrict)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
   @@index([status, displayOrder])
   @@map("committee_profiles")
 }
 
 model EmailVerificationChallenge {
-  id        String @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   codeHash  String
-  attempts  Int @default(0)
+  attempts  Int       @default(0)
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+
   @@index([userId, createdAt])
   @@map("email_verification_challenges")
 }

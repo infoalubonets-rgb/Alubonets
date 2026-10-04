@@ -27,6 +27,7 @@ export async function GET(
   const canView =
     profile.role === 'ADMIN' ||
     profile.role === 'TREASURER' ||
+    profile.role === 'AUDITOR' ||
     contribution.userId === profile.id
   if (!canView) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

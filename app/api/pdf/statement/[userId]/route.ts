@@ -34,6 +34,7 @@ export async function GET(
     profile.id === userId ||
     profile.role === 'ADMIN' ||
     profile.role === 'TREASURER' ||
+    profile.role === 'AUDITOR' ||
     user.principalMemberId === profile.id
   if (!canView) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { fullName, email } = user

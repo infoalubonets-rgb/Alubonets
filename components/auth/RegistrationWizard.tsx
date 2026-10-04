@@ -23,7 +23,7 @@ const initial = {
   location: '',
   gender: 'MALE',
   dateOfBirth: '',
-  familyBranch: 'Default',
+  familyBranch: '',
   nextOfKinName: '',
   nextOfKinPhone: '',
   nextOfKinRelationship: '',
@@ -74,13 +74,6 @@ export default function RegistrationWizard({
   const [sameAsKin, setSameAsKin] = useState(true)
   const [consentAccepted, setConsentAccepted] = useState(false)
   const [error, setError] = useState('')
-  const [branchOptions, setBranchOptions] = useState<string[]>(['Default'])
-
-  useEffect(() => {
-    fetch('/api/branches').then((response) => response.ok ? response.json() : null).then((data) => {
-      if (data?.branches?.length) setBranchOptions(data.branches)
-    }).catch(() => {})
-  }, [])
   const [loading, setLoading] = useState(false)
   const [resumed, setResumed] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -98,7 +91,6 @@ export default function RegistrationWizard({
         email: invite.email,
         fullName: invite.fullName || current.fullName,
         phone: invite.phone || current.phone,
-        familyBranch: invite.familyBranchHint || invite.principalName || current.familyBranch,
       }))
       setEmailVerified(true)
       setStep(1)
@@ -170,7 +162,7 @@ export default function RegistrationWizard({
     if (current === 2 && !required(['dateOfBirth', 'location']))
       return fail('Complete all personal information.')
     if (current === 3) {
-      if (!required(['familyBranch', 'nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelationship']))
+      if (!required(['nextOfKinName', 'nextOfKinPhone', 'nextOfKinRelationship']))
         return fail('Complete all family information.')
       if (!sameAsKin && !required(['emergencyContactName', 'emergencyContactPhone']))
         return fail('Complete the emergency contact details.')
@@ -424,7 +416,6 @@ export default function RegistrationWizard({
         {step === 3 && (
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              {select('familyBranch', 'Family branch/lineage', branchOptions)}
               {input('nextOfKinRelationship', 'Next-of-kin relationship')}
               {input('nextOfKinName', 'Next of kin name')}
               {input('nextOfKinPhone', 'Next of kin phone', 'tel')}
@@ -466,9 +457,6 @@ export default function RegistrationWizard({
               </p>
               <p>
                 <b>Phone:</b> {form.phone}
-              </p>
-              <p>
-                <b>Family branch:</b> {form.familyBranch}
               </p>
             </div>
             <label className="flex items-start gap-3 text-sm">

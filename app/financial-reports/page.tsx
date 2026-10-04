@@ -12,7 +12,7 @@ export default async function FinancialReportsPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string; category?: string }>
 }) {
-  const actor = await requireActiveRole(['TREASURER', 'ADMIN', 'EXECUTIVE'])
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN', 'EXECUTIVE', 'AUDITOR'])
   const filters = await searchParams
   const from = filters.from ? new Date(filters.from) : new Date('2026-01-01')
   const to = filters.to ? new Date(`${filters.to}T23:59:59.999`) : new Date('2026-12-31T23:59:59.999')
@@ -83,6 +83,9 @@ export default async function FinancialReportsPage({
             className="rounded-full border px-4 py-2"
           >
             Export CSV
+          </a>
+          <a href="/financial-reports/active-months" className="rounded-full border px-4 py-2">
+            Active months per member
           </a>
         </form>
 

@@ -5,11 +5,15 @@ import { enforceRateLimit } from '@/lib/rate-limit'
 /** System category used when treasurer picks "Other" and explains the payment. */
 export const OTHER_CATEGORY_ID = 'cat-other-income'
 
+/** Category stamped on payments recorded against a project. */
+export const PROJECT_CATEGORY_ID = 'cat-project-contribution'
+
 const SYSTEM_CATEGORY_CODES = new Set([
   'LOAN_DISBURSEMENT',
   'LOAN_REPAYMENT',
   'WELFARE_DISBURSEMENT',
   'OTHER',
+  'PROJECT_CONTRIBUTION',
 ])
 
 export const OTHER_CATEGORY_DESCRIPTION_MIN = 5
@@ -67,7 +71,14 @@ export async function resolvePaymentCategory(input: {
   categoryId: string
   otherCategoryDescription?: string | null
   actorId: string
+  projectId?: string | null
 }) {
+  if (input.projectId) {
+    await prisma.project.findUniqueOrThrow({ where: { id: input.projectId }, select: { id: true } })
+    const category = await prisma.transactionCategory.findUniqueOrThrow({ where: { id: PROJECT_CATEGORY_ID } })
+    return { categoryId: category.id, otherLabel: null as string | null }
+  }
+  if (!input.categoryId) throw new Error('Choose the purpose of this payment.')
   if (isOtherCategoryId(input.categoryId)) {
     await enforceRateLimit(`payment-other:${input.actorId}`, 30, 60)
     const otherLabel = otherCategoryDescriptionSchema.parse(input.otherCategoryDescription)

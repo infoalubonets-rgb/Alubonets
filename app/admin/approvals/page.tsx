@@ -36,7 +36,6 @@ export default async function AdminApprovalsPage() {
             ['Gender', profile.gender],
             ['Date of birth', profile.dateOfBirth?.toLocaleDateString()],
             ['Address', profile.address],
-            ['Family branch', profile.familyBranch],
             ['Member category', profile.memberCategory?.replaceAll('_', ' ')],
             ['Next of kin', `${profile.nextOfKinName} · ${profile.nextOfKinPhone} · ${profile.nextOfKinRelationship}`],
             ['Emergency contact', `${profile.emergencyContactName} · ${profile.emergencyContactPhone}`],

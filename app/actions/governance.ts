@@ -167,7 +167,7 @@ export async function createMinutesRevision(formData: FormData) {
 }
 
 export async function markMeetingNoticesRead() {
-  const actor = await requireActiveRole(['ADMIN','SECRETARY','EXECUTIVE','TREASURER','ORGANIZER','MEMBER'])
+  const actor = await requireActiveRole(['ADMIN','SECRETARY','EXECUTIVE','TREASURER','ORGANIZER','MEMBER','AUDITOR'])
   await prisma.meetingInvitation.updateMany({
     where: { userId: actor.id, readAt: null },
     data: { readAt: new Date() },

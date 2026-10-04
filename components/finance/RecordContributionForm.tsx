@@ -7,22 +7,30 @@ import { uploadToSignedUrlWithProgress } from '@/lib/upload-client'
 import PaymentCategoryFields from '@/components/finance/PaymentCategoryFields'
 
 type Member = { id: string; fullName: string; membershipNumber: string | null }
-type Campaign = { id: string; title: string; targetAmount: number }
-type Category = { id: string; name: string }
+type Campaign = { id: string; title: string; categoryId: string }
+type Category = { id: string; name: string; billingKind?: string | null }
 type Account = { id: string; name: string }
+type Project = { id: string; title: string }
 
 export default function RecordContributionForm({
   members,
   campaigns,
   categories,
   accounts,
+  projects = [],
+  today,
 }: {
   members: Member[]
   campaigns: Campaign[]
   categories: Category[]
   accounts: Account[]
+  projects?: Project[]
+  /** Today's date in the group's timezone (YYYY-MM-DD). */
+  today: string
 }) {
   const router = useRouter()
+  const [billingKind, setBillingKind] = useState('NONE')
+  const [formKey, setFormKey] = useState(0)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [progress, setProgress] = useState<{ percent: number; status: string } | null>(null)
@@ -54,6 +62,8 @@ export default function RecordContributionForm({
 
       await recordLedgerContribution(formData)
       form.reset()
+      setFormKey((key) => key + 1)
+      setBillingKind('NONE')
       setProgress(null)
       router.refresh()
     } catch (cause) {
@@ -69,11 +79,20 @@ export default function RecordContributionForm({
       <select name="userId" required disabled={pending} className="rounded-lg border px-3 py-2 disabled:opacity-60">
         {members.map((m) => <option key={m.id} value={m.id}>{m.membershipNumber || '—'} · {m.fullName}</option>)}
       </select>
-      <select name="campaignId" disabled={pending} className="rounded-lg border px-3 py-2 disabled:opacity-60">
-        <option value="">No campaign</option>
-        {campaigns.map((c) => <option key={c.id} value={c.id}>{c.title} · KES {Number(c.targetAmount).toLocaleString()}</option>)}
-      </select>
-      <PaymentCategoryFields categories={categories} kind="income" />
+      <PaymentCategoryFields
+        key={formKey}
+        categories={categories}
+        kind="income"
+        campaigns={campaigns}
+        projects={projects}
+        onBillingKindChange={setBillingKind}
+      />
+      {billingKind === 'MONTHLY' && (
+        <label className="text-sm">
+          Month this payment covers
+          <input name="contributionPeriod" type="month" required disabled={pending} defaultValue={today.slice(0, 7)} className="mt-1 block w-full rounded-lg border px-3 py-2 disabled:opacity-60" />
+        </label>
+      )}
       <input name="amount" type="number" min="1" required disabled={pending} placeholder="Amount KES" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
       <select name="sourceAccountId" required disabled={pending} className="rounded-lg border px-3 py-2 disabled:opacity-60">
         {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -82,7 +101,10 @@ export default function RecordContributionForm({
         <option>CASH</option><option>MPESA</option><option>BANK</option><option>OTHER</option>
       </select>
       <input name="providerReference" disabled={pending} placeholder="Unique transaction reference" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
-      <input name="occurredAt" type="date" required disabled={pending} defaultValue={new Date().toISOString().slice(0, 10)} className="rounded-lg border px-3 py-2 disabled:opacity-60" />
+      <label className="text-sm">
+        Date paid (past dates allowed for backdating)
+        <input name="occurredAt" type="date" required disabled={pending} max={today} defaultValue={today} className="mt-1 block w-full rounded-lg border px-3 py-2 disabled:opacity-60" />
+      </label>
       <label className="text-sm md:col-span-3">
         Receipt / proof of payment
         <input type="file" name="evidence" required disabled={pending} accept=".pdf,image/*" className="mt-1 block w-full text-sm disabled:opacity-60" />

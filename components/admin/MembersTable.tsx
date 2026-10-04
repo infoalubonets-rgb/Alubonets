@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { assignMemberBranch, createBranchLineage, setMemberStatus } from '@/app/actions/members'
+import { setMemberStanding, setMemberStatus } from '@/app/actions/members'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
 
 function buildMembersHref(q: string, branch: string) {
@@ -30,6 +30,10 @@ export type MembersTableUser = {
   membershipNumber: string | null
   memberCategory: string | null
   familyBranch: string | null
+  standing: 'PAID_UP' | 'LAPSED'
+  standingReason: string | null
+  standingOverride: 'PAID_UP' | 'LAPSED' | null
+  standingOverrideUntil: string | null
 }
 
 type Props = {
@@ -55,7 +59,6 @@ function statusStyles(status: string) {
 
 export default function MembersTable({
   users,
-  branches = [],
   filters = { q: '', branch: '' },
 }: Props) {
   const router = useRouter()
@@ -66,7 +69,6 @@ export default function MembersTable({
   const [ok, setOk] = useState('')
   const [query, setQuery] = useState(filters.q)
   const [branchFilter, setBranchFilter] = useState(filters.branch)
-  const [newBranch, setNewBranch] = useState('')
   const debounceRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -127,6 +129,23 @@ export default function MembersTable({
   )
 
   const close = () => setSelectedId(null)
+  const [standingUntil, setStandingUntil] = useState('')
+
+  const applyStanding = (mode: 'AUTO' | 'PAID_UP' | 'LAPSED') => {
+    if (!selected) return
+    setError('')
+    setOk('')
+    startTransition(async () => {
+      try {
+        await setMemberStanding({ userId: selected.id, mode, until: mode === 'AUTO' ? undefined : standingUntil || undefined })
+        setOk(mode === 'AUTO' ? 'Standing returned to automatic rules' : mode === 'PAID_UP' ? 'Marked paid-up' : 'Marked lapsed')
+        setStandingUntil('')
+        router.refresh()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not update standing')
+      }
+    })
+  }
 
   const setStatus = (status: 'ACTIVE' | 'SUSPENDED' | 'DECEASED' | 'RESIGNED' | 'DISQUALIFIED' | 'INACTIVE') => {
     if (!selected) return
@@ -158,24 +177,6 @@ export default function MembersTable({
           }}
           className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 xl:flex-nowrap"
         >
-        <select
-          name="branch"
-          value={branchFilter}
-          onChange={(event) => {
-            const nextBranch = event.target.value
-            setBranchFilter(nextBranch)
-            flushFilters(query, nextBranch)
-          }}
-          aria-label="Branch or lineage"
-          className="h-9 w-[150px] rounded-xl border border-outline-variant bg-surface-container-lowest px-2 text-xs"
-        >
-          <option value="">All lineages</option>
-          {branches.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
         <div className="relative w-full sm:w-48 lg:w-52">
           <button type="submit" aria-label="Search members" title="Search" className="absolute left-1 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-outline transition hover:bg-primary hover:text-on-primary">
             <span className="material-symbols-outlined text-[18px]">search</span>
@@ -222,6 +223,9 @@ export default function MembersTable({
                 <th className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
                   Status
                 </th>
+                <th className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">
+                  Standing
+                </th>
                 <th className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant text-right w-16">
                   View
                 </th>
@@ -230,7 +234,7 @@ export default function MembersTable({
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-on-surface-variant">
+                  <td colSpan={7} className="py-10 text-center text-on-surface-variant">
                     No members found
                   </td>
                 </tr>
@@ -267,6 +271,17 @@ export default function MembersTable({
                       >
                         {u.status}
                       </span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span
+                        title={u.standingReason || undefined}
+                        className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-label-bold uppercase tracking-wide ${u.standing === 'PAID_UP' ? 'bg-green-100 text-green-800' : 'bg-error-container text-error'}`}
+                      >
+                        {u.standing === 'PAID_UP' ? 'Paid-up' : 'Lapsed'}
+                      </span>
+                      {u.standingReason && u.standing === 'LAPSED' && (
+                        <p className="mt-1 max-w-[180px] truncate text-[11px] text-on-surface-variant">{u.standingReason}</p>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
@@ -345,18 +360,25 @@ export default function MembersTable({
                   Role and dashboard access are managed on the Roles page.
                 </p>
                 <section className="space-y-2 border-t border-outline-variant pt-3">
-                  <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary">Lineage</p>
-                  <p className="mb-2 text-[11px] text-on-surface-variant">
-                    Registry label only — not the Principal family branch.
+                  <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary">Membership standing</p>
+                  <p className="text-sm">
+                    <b>{selected.standing === 'PAID_UP' ? 'Paid-up' : 'Lapsed'}</b>
+                    {selected.standingReason ? ` — ${selected.standingReason}` : ''}
                   </p>
-                  <form action={async (formData) => { await assignMemberBranch(selected.id, String(formData.get('branch') || 'Unassigned')); router.refresh() }} className="flex gap-2">
-                    <select name="branch" defaultValue={selected.familyBranch || 'Unassigned'} className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm">{branches.map((branch) => <option key={branch}>{branch}</option>)}</select>
-                    <button className="rounded-lg bg-primary px-3 text-sm text-on-primary">Assign</button>
-                  </form>
-                  <form action={async () => { if (!newBranch.trim()) return; await createBranchLineage(newBranch); setNewBranch(''); router.refresh() }} className="flex gap-2">
-                    <input value={newBranch} onChange={(event) => setNewBranch(event.target.value)} placeholder="New lineage label" className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm" />
-                    <button className="rounded-lg border px-3 text-sm">Add</button>
-                  </form>
+                  <p className="text-[11px] text-on-surface-variant">
+                    {selected.standingOverride
+                      ? `Manual setting${selected.standingOverrideUntil ? ` until ${new Date(selected.standingOverrideUntil).toLocaleDateString()}` : ' (no end date)'}.`
+                      : 'Automatic — follows payments and the rules in Admin Finance.'}
+                  </p>
+                  <label className="block text-[11px] font-semibold text-on-surface-variant">
+                    Until (optional — leave empty for no end date)
+                    <input type="date" value={standingUntil} onChange={(e) => setStandingUntil(e.target.value)} className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm" />
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button type="button" disabled={pending} onClick={() => applyStanding('PAID_UP')} className="h-9 rounded-lg bg-primary text-[11px] font-semibold text-on-primary disabled:opacity-50">Mark paid-up</button>
+                    <button type="button" disabled={pending} onClick={() => applyStanding('LAPSED')} className="h-9 rounded-lg border border-error/40 text-[11px] font-semibold text-error disabled:opacity-50">Mark lapsed</button>
+                    <button type="button" disabled={pending || !selected.standingOverride} onClick={() => applyStanding('AUTO')} className="h-9 rounded-lg border border-outline-variant text-[11px] font-semibold disabled:opacity-40">Automatic</button>
+                  </div>
                 </section>
                 <section className="pt-1 border-t border-outline-variant">
                   <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary mb-2">

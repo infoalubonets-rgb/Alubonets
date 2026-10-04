@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin, syncUserMetadata } from '@/lib/auth/session'
+import { requireActiveRole, requireAdmin, syncUserMetadata } from '@/lib/auth/session'
 import { sendMemberApprovedEmail } from '@/lib/email/resend'
 import type { FamilyRelationship, Role } from '@prisma/client'
 import { ALL_ROLES } from '@/lib/auth/types'
@@ -193,6 +193,10 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
   })
 
   if (approve) {
+    const { attachOpenCampaignsToMember } = await import('@/lib/campaigns')
+    await attachOpenCampaignsToMember(updated.id).catch((error) => {
+      console.error('Could not attach open campaigns to new member', error)
+    })
     await sendMemberApprovedEmail(updated)
   }
 
@@ -213,6 +217,9 @@ export async function setMemberRole(input: z.infer<typeof roleSchema>) {
 
   if (role === 'ADMIN' && !actor.isSuperAdmin) {
     throw new Error('Only a Super Admin can assign the Admin role')
+  }
+  if (target.role === 'ADMIN' && !actor.isSuperAdmin) {
+    throw new Error('Only a Super Admin can change an Admin’s role')
   }
   if (!(await isRoleActive(role as Role))) {
     throw new Error('That role is currently deactivated.')
@@ -248,6 +255,12 @@ export async function setMemberDashboardAccess(input: z.infer<typeof accessSchem
   if (!target) throw new Error('User not found')
   if (target.isSuperAdmin) {
     throw new Error('Super Admin already has access to every workspace')
+  }
+  if (!actor.isSuperAdmin) {
+    if (target.role === 'ADMIN') throw new Error('Only a Super Admin can change an Admin’s access')
+    const hadAdmin = target.dashboardAccess.includes('ADMIN')
+    const wantsAdmin = dashboardAccess.includes('ADMIN')
+    if (hadAdmin !== wantsAdmin) throw new Error('Only a Super Admin can grant or remove Admin access')
   }
 
   const disabled = await getDisabledRoles()
@@ -311,6 +324,43 @@ export async function setMemberStatus(input: z.infer<typeof statusSchema>) {
 
   revalidateAdmin()
   return updated
+}
+
+const standingSchema = z.object({
+  userId: z.string().min(1),
+  mode: z.enum(['AUTO', 'PAID_UP', 'LAPSED']),
+  until: z.string().optional(),
+})
+
+/** Admin override of paid-up standing; AUTO hands the member back to the payment rules. */
+export async function setMemberStanding(input: z.infer<typeof standingSchema>) {
+  const actor = await requireAdmin()
+  const { userId, mode, until } = standingSchema.parse(input)
+  const target = await prisma.user.findUnique({ where: { id: userId } })
+  if (!target) throw new Error('User not found')
+  const untilDate = until ? new Date(`${until}T23:59:59`) : null
+  if (untilDate && (Number.isNaN(untilDate.getTime()) || untilDate < new Date())) {
+    throw new Error('The end date must be today or later.')
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: mode === 'AUTO'
+      ? { standingOverride: null, standingOverrideUntil: null }
+      : { standingOverride: mode, standingOverrideUntil: untilDate },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'MEMBER_STANDING_OVERRIDE',
+    entity: 'User',
+    entityId: userId,
+    reason: mode === 'AUTO' ? 'Returned to automatic standing' : `Set to ${mode}${untilDate ? ` until ${until}` : ''}`,
+    oldValue: { standing: target.standing, override: target.standingOverride, until: target.standingOverrideUntil },
+    newValue: { override: mode === 'AUTO' ? null : mode, until: untilDate },
+  })
+  const { recomputeMemberStanding } = await import('@/lib/membership-standing-sync')
+  await recomputeMemberStanding(userId, actor.id)
+  revalidateAdmin()
 }
 
 export async function setSuperAdminFlag(input: z.infer<typeof superSchema>) {
@@ -427,7 +477,40 @@ const transferFamilyMemberSchema = z.object({
 export async function transferFamilyMember(input: z.infer<typeof transferFamilyMemberSchema>) {
   const actor = await requireAdmin()
   const data = transferFamilyMemberSchema.parse(input)
+  return moveFamilyMember({ ...data, actorId: actor.id })
+}
 
+const transferMyAttachedMemberSchema = z.object({
+  memberId: z.string().min(1),
+  newPrincipalId: z.string().min(1),
+  reason: z.string().trim().min(5, 'Give a short reason (at least 5 characters).').max(1000),
+})
+
+/** A Principal hands one of their own attached members over to another Principal. */
+export async function transferMyAttachedMember(input: z.infer<typeof transferMyAttachedMemberSchema>) {
+  const actor = await requireActiveRole()
+  const data = transferMyAttachedMemberSchema.parse(input)
+  if (!actor.isPrincipal) throw new Error('Only a Principal Member can transfer attached members.')
+  const member = await prisma.user.findUnique({ where: { id: data.memberId }, select: { principalMemberId: true, familyRelationship: true } })
+  if (!member || member.principalMemberId !== actor.id) throw new Error('You can only transfer members attached to your own branch.')
+  if (data.newPrincipalId === actor.id) throw new Error('Choose a different Principal.')
+  const relationship = (['SPOUSE', 'CHILD', 'DEPENDENT', 'OTHER'] as const).includes(member.familyRelationship as 'SPOUSE')
+    ? (member.familyRelationship as 'SPOUSE' | 'CHILD' | 'DEPENDENT' | 'OTHER')
+    : 'OTHER'
+  const moved = await moveFamilyMember({ ...data, relationship, actorId: actor.id })
+  const { recomputeStandingSafely } = await import('@/lib/finance')
+  await recomputeStandingSafely(moved.id, actor.id)
+  return { id: moved.id }
+}
+
+async function moveFamilyMember(data: {
+  memberId: string
+  newPrincipalId: string
+  relationship: 'SPOUSE' | 'CHILD' | 'DEPENDENT' | 'OTHER'
+  reason: string
+  actorId: string
+}) {
+  const actor = { id: data.actorId }
   const [member, nextPrincipal] = await Promise.all([
     prisma.user.findUnique({ where: { id: data.memberId } }),
     prisma.user.findUnique({ where: { id: data.newPrincipalId } }),

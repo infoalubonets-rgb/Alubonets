@@ -20,7 +20,7 @@ const labels: Record<string, string> = {
   EXECUTIVE: 'Executive',
   TREASURER: 'Treasurer',
   SECRETARY: 'Secretary',
-  ORGANIZER: 'Organizer',
+  ORGANIZER: 'Organizing Secretary',
   MEMBER: 'Member',
   PREFER_NOT_TO_SAY: 'Prefer not to say',
   BACHELORS: "Bachelor's degree",
@@ -38,7 +38,7 @@ const initial = {
   location: '',
   gender: 'MALE',
   dateOfBirth: '',
-  familyBranch: 'Default',
+  familyBranch: '',
   nextOfKinName: '',
   nextOfKinPhone: '',
   nextOfKinRelationship: '',
@@ -154,7 +154,6 @@ export default function RegistrationForm() {
 
         <Section title="Family and emergency information">
           <div className="grid gap-4 md:grid-cols-2">
-            {input('familyBranch', 'Family branch/lineage')}
             {input('nextOfKinRelationship', 'Next-of-kin relationship')}
             {input('nextOfKinName', 'Next of kin name')}
             {input('nextOfKinPhone', 'Next of kin phone', 'tel')}

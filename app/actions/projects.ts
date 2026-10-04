@@ -9,6 +9,7 @@ import { writeAudit } from '@/lib/audit'
 import { TAGS, sendAnnouncement } from '@/lib/data/queries'
 import { canModerateProjectComments, isProjectManager } from '@/lib/projects'
 import { assertNotFuture, assertNotPast } from '@/lib/dates'
+import { deriveProjectStatus, syncProjectFinancials } from '@/lib/project-status'
 
 function refreshProject(projectId?: string) {
   revalidatePath('/projects')
@@ -73,6 +74,46 @@ export async function updateProjectFinance(formData: FormData) {
       fundingTargetKes: updated.fundingTargetKes,
       actualExpenditureKes: updated.actualExpenditureKes,
     },
+  })
+  await syncProjectFinancials(data.projectId)
+  refreshProject(data.projectId)
+}
+
+/** Start and end dates drive the project status automatically. */
+export async function updateProjectSchedule(formData: FormData) {
+  const actor = await requireManager()
+  const data = z
+    .object({
+      projectId: z.string().min(1),
+      startDate: z.coerce.date().optional(),
+      endDate: z.coerce.date().optional(),
+    })
+    .parse({
+      projectId: formData.get('projectId'),
+      startDate: formData.get('startDate') || undefined,
+      endDate: formData.get('endDate') || undefined,
+    })
+  if (data.startDate && data.endDate && data.endDate < data.startDate) {
+    throw new Error('The end date cannot be before the start date.')
+  }
+  const old = await prisma.project.findUniqueOrThrow({ where: { id: data.projectId } })
+  const status = deriveProjectStatus(data.startDate, data.endDate) ?? old.status
+  const updated = await prisma.project.update({
+    where: { id: data.projectId },
+    data: {
+      startDate: data.startDate ?? null,
+      endDate: data.endDate ?? null,
+      status,
+      ...(status === 'COMPLETED' && old.status !== 'COMPLETED' && Number(old.fundingTargetKes) <= 0 ? { progress: 100 } : {}),
+    },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'PROJECT_SCHEDULE_UPDATE',
+    entity: 'Project',
+    entityId: data.projectId,
+    oldValue: { startDate: old.startDate, endDate: old.endDate, status: old.status },
+    newValue: { startDate: updated.startDate, endDate: updated.endDate, status: updated.status },
   })
   refreshProject(data.projectId)
 }
@@ -256,6 +297,7 @@ export async function recordProjectInvestment(formData: FormData) {
     entityId: investment.id,
     newValue: data,
   })
+  await syncProjectFinancials(data.projectId)
   refreshProject(data.projectId)
 }
 
@@ -273,6 +315,7 @@ export async function deleteProjectInvestment(formData: FormData) {
     reason,
     oldValue: { projectId: row.projectId, userId: row.userId, amount: row.amount },
   })
+  await syncProjectFinancials(row.projectId)
   refreshProject(row.projectId)
 }
 

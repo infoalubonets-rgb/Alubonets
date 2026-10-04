@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getPublicEvents } from '@/lib/data/queries'
+import { getMemberAccess } from '@/lib/auth/member-access'
+import MemberGate from '@/components/public/MemberGate'
 
 export const metadata: Metadata = {
   title: 'Events — Alubonets SHG',
@@ -111,13 +113,29 @@ function EventCard({ event, past = false }: { event: EventRow; past?: boolean })
   )
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function PublicEventsPage() {
+  const access = await getMemberAccess()
+  if (access.state === 'anonymous') {
+    return (
+      <main className="flex-grow">
+        <div className="max-w-container-max mx-auto px-md md:px-lg py-xl">
+          <MemberGate variant="login" what="Events" returnTo="/events" />
+        </div>
+      </main>
+    )
+  }
   const { upcoming, past } = await getPublicEvents()
+  const canSeeUpcoming = access.state === 'paid'
 
   return (
     <main className="flex-grow">
       <div className="max-w-container-max mx-auto px-md md:px-lg py-xl space-y-xxl">
-
+        {!canSeeUpcoming && (
+          <MemberGate variant="renew" what="Upcoming events" reason={access.reason} />
+        )}
+        {canSeeUpcoming && (
         <section>
           <div className="reveal mb-lg flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
@@ -147,6 +165,7 @@ export default async function PublicEventsPage() {
             </div>
           )}
         </section>
+        )}
 
         {past.length > 0 && (
           <section>

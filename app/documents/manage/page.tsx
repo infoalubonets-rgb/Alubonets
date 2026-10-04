@@ -7,7 +7,7 @@ import { ensureDemoDocument, ensureDocumentCategories } from '@/lib/document-cat
 import { syncExpiredDocuments } from '@/lib/documents'
 
 export default async function ManageDocumentsPage() {
-  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY'])
   await Promise.all([ensureDocumentCategories(), syncExpiredDocuments()])
   await ensureDemoDocument(actor.id)
 

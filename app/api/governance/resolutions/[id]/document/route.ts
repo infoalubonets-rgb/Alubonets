@@ -5,7 +5,7 @@ import { createServerClient } from '@/lib/supabase-server'
 
 /** Signed download for a proposal attachment (PDF/Word/Excel) stored in the private documents bucket. */
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE', 'TREASURER', 'ORGANIZER', 'MEMBER'])
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'EXECUTIVE', 'TREASURER', 'ORGANIZER', 'MEMBER', 'AUDITOR'])
   const { id } = await params
   const resolution = await prisma.resolution.findUnique({ where: { id } })
   if (!resolution?.documentUrl) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -25,7 +25,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const isCreator = resolution.createdById === actor.id
   const isVisible =
     resolution.status === 'APPROVED' &&
-    (resolution.visibleToRoles.length === 0 || resolution.visibleToRoles.includes(actor.role))
+    (actor.role === 'AUDITOR' ||
+      resolution.visibleToRoles.length === 0 ||
+      resolution.visibleToRoles.includes(actor.role))
   if (!isStaff && !isCreator && !isVisible) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }

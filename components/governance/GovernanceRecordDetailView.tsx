@@ -45,7 +45,7 @@ const ROLE_LABEL: Record<string, string> = {
   EXECUTIVE: 'Executive',
   TREASURER: 'Treasurer',
   SECRETARY: 'Secretary',
-  ORGANIZER: 'Organizer',
+  ORGANIZER: 'Organizing Secretary',
   MEMBER: 'Member',
 }
 const VISIBILITY_ROLES = ['MEMBER', 'ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER']
@@ -56,6 +56,7 @@ export default function GovernanceRecordDetailView({
   mode = 'full',
   canPublish = false,
   showVisibility = false,
+  readOnly = false,
 }: {
   record: GovernanceRecordDetail
   inModal?: boolean
@@ -63,6 +64,8 @@ export default function GovernanceRecordDetailView({
   canPublish?: boolean
   /** Show the audience/visibility settings this proposal was approved with (Admin/Secretary only). */
   showVisibility?: boolean
+  /** Oversight viewers (Auditor) see the record and responses but cannot vote. */
+  readOnly?: boolean
 }) {
   const router = useRouter()
   const [vote, setVote] = useState<'APPROVE' | 'REJECT' | null>(record.myVote)
@@ -285,6 +288,7 @@ export default function GovernanceRecordDetailView({
         </section>
       )}
 
+      {!readOnly && (
       <section
         className={`rounded-2xl border bg-surface p-5 ${
           commentAtLimit && !voteLocked ? 'border-error' : 'border-outline-variant'
@@ -367,6 +371,7 @@ export default function GovernanceRecordDetailView({
           </>
         )}
       </section>
+      )}
 
       {mode !== 'respond' && (record.resultsPublished || record.responses.length > 0 || canPublish) && (
         <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-5">

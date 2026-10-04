@@ -4,6 +4,8 @@ import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
 import { submitEventRsvp } from '@/app/actions/events'
+import { getMemberAccess } from '@/lib/auth/member-access'
+import MemberGate from '@/components/public/MemberGate'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -25,6 +27,20 @@ export default async function EventDetailPage({ params }: Props) {
     },
   })
   if (!event) notFound()
+
+  const access = await getMemberAccess()
+  const eventIsPast = new Date(event.startsAt) < new Date()
+  if (access.state === 'anonymous' || (!eventIsPast && access.state === 'lapsed')) {
+    return (
+      <main className="flex-grow">
+        <div className="mx-auto max-w-container-max px-md py-xl md:px-lg">
+          {access.state === 'anonymous'
+            ? <MemberGate variant="login" what="Events" returnTo={`/events/${event.id}`} />
+            : <MemberGate variant="renew" what="Upcoming events" reason={access.reason} />}
+        </div>
+      </main>
+    )
+  }
 
   const invited =
     profile &&

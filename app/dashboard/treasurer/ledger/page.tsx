@@ -5,17 +5,21 @@ import { proposeReversal } from '@/app/actions/finance'
 import { accountBalances } from '@/lib/finance'
 import RecordExpenseForm from '@/components/finance/RecordExpenseForm'
 import RecordContributionForm from '@/components/finance/RecordContributionForm'
-import { filterSelectableCategories } from '@/lib/payment-categories'
+import { filterSelectableCategories, isSystemCategoryCode } from '@/lib/payment-categories'
+import ContributionCategoriesManager from '@/components/admin/ContributionCategoriesManager'
+import { appTodayInputValue } from '@/lib/dates'
 
 export default async function LedgerPage() {
-  const [members, categories, campaigns, accounts, transactions, balances] = await Promise.all([
+  const [members, categories, campaigns, accounts, transactions, balances, projects] = await Promise.all([
     prisma.user.findMany({ where: { status: 'ACTIVE' }, orderBy: { fullName: 'asc' }, select: { id:true,fullName:true,membershipNumber:true } }),
     prisma.transactionCategory.findMany({ where: { active:true }, orderBy: { name:'asc' } }),
     prisma.contributionCampaign.findMany({ where: { active:true }, orderBy: { startsAt:'desc' } }),
     prisma.financialAccount.findMany({ where: { active:true,type:'ASSET' }, orderBy:{name:'asc'} }),
     prisma.financialTransaction.findMany({ orderBy:{occurredAt:'desc'},take:100,include:{category:true,createdBy:true} }),
     accountBalances(),
+    prisma.project.findMany({ where: { status: { not: 'COMPLETED' } }, orderBy: { title: 'asc' }, select: { id: true, title: true } }),
   ])
+  const today = appTodayInputValue()
   const incomeCategories = filterSelectableCategories(categories, 'income')
   const expenseCategories = filterSelectableCategories(categories, 'expense')
 
@@ -23,17 +27,30 @@ export default async function LedgerPage() {
     <section className="grid gap-3 md:grid-cols-3">{balances.filter((a)=>a.type==='ASSET').map((a)=><div key={a.id} className="rounded-xl border bg-surface p-4"><p className="text-xs uppercase">{a.name}</p><b>KES {a.balance.toLocaleString()}</b></div>)}</section>
     <section className="rounded-2xl border bg-surface p-5">
       <h2 className="font-h3 text-xl text-primary">Record member contribution</h2>
-      <p className="mt-1 text-xs text-on-surface-variant">Contributions at or above the financial approval threshold are recorded as pending until a different Treasurer or Admin verifies them.</p>
+      <p className="mt-1 text-xs text-on-surface-variant">Every payment needs a purpose. Choose a campaign or project to count the payment towards its target. Historical payments can be backdated.</p>
       <RecordContributionForm
         members={members}
-        campaigns={campaigns.map((c) => ({ id: c.id, title: c.title, targetAmount: Number(c.targetAmount) }))}
+        campaigns={campaigns.map((c) => ({ id: c.id, title: c.title, categoryId: c.categoryId }))}
         categories={incomeCategories}
         accounts={accounts}
+        projects={projects}
+        today={today}
       />
     </section>
     <section className="rounded-2xl border bg-surface p-5">
       <h2 className="font-h3 text-xl text-primary">Record expense</h2>
-      <RecordExpenseForm categories={expenseCategories} accounts={accounts} />
+      <RecordExpenseForm categories={expenseCategories} accounts={accounts} projects={projects} today={today} />
+    </section>
+    <section className="rounded-2xl border bg-surface p-5">
+      <h2 className="font-h3 text-xl text-primary">Payment purposes</h2>
+      <p className="mt-1 text-xs text-on-surface-variant">Add purposes the Treasurer can pick. Mark the monthly fee and annual subscription purposes so membership standing is calculated correctly.</p>
+      <div className="mt-3">
+        <ContributionCategoriesManager
+          categories={categories
+            .filter((category) => !isSystemCategoryCode(category.code))
+            .map((category) => ({ id: category.id, name: category.name, type: category.type, billingKind: category.billingKind, system: false }))}
+        />
+      </div>
     </section>
     <section className="rounded-2xl border bg-surface p-5"><h2 className="font-h3 text-xl text-primary">Immutable transaction history</h2><div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead><tr><th>Number</th><th>Date</th><th>Type</th><th>Status</th><th>Category</th><th>Amount</th><th>Correction</th></tr></thead><tbody>{transactions.map((tx)=><tr key={tx.id} className="border-t"><td>{tx.transactionNumber}</td><td>{tx.occurredAt.toLocaleDateString()}</td><td>{tx.type}</td><td>{tx.status}</td><td>{tx.category?.name||'—'}</td><td>KES {Number(tx.amount).toLocaleString()}</td><td>{['CONFIRMED','RECONCILED'].includes(tx.status)&&<form action={proposeReversal} className="flex gap-1"><input type="hidden" name="id" value={tx.id}/><input name="reason" required minLength={5} placeholder="Correction reason" className="w-36 rounded border px-2"/><button className="text-error underline">Propose reversal</button></form>}</td></tr>)}</tbody></table></div></section>
   </div></DashboardShell>

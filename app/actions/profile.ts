@@ -15,7 +15,7 @@ const profileSchema = z.object({
 const memberDetailsSchema = z.object({
   phone: z.string().trim().min(1).max(40),
   location: z.string().trim().min(1).max(250),
-  familyBranch: z.string().trim().min(1).max(120),
+  familyBranch: z.string().trim().max(120).optional().transform((value) => value || undefined),
   nextOfKinName: z.string().trim().min(1).max(120),
   nextOfKinPhone: z.string().trim().min(1).max(40),
   nextOfKinRelationship: z.string().trim().min(1).max(80),
@@ -76,6 +76,22 @@ export async function updateMyMemberDetails(input: z.infer<typeof memberDetailsS
     meta: { changedFields: Object.keys(data) },
   })
   revalidatePath('/profile')
+}
+
+export async function updateMyPublicProfileFields(fields: string[]) {
+  const session = await requireSessionProfile()
+  const { sanitizePublicProfileFields } = await import('@/lib/public-profile')
+  const publicProfileFields = sanitizePublicProfileFields(z.array(z.string().max(40)).max(20).parse(fields))
+  await prisma.user.update({ where: { id: session.id }, data: { publicProfileFields } })
+  await writeAudit({
+    userId: session.id,
+    action: 'PUBLIC_PROFILE_FIELDS_UPDATE',
+    entity: 'User',
+    entityId: session.id,
+    newValue: { publicProfileFields },
+  })
+  revalidatePath('/profile')
+  revalidatePath('/about')
 }
 
 export async function updateMyAvatarPath(path: string) {

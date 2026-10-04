@@ -96,6 +96,11 @@ function timezoneOffsetMs(date: Date, timeZone: string) {
   return asUtc - date.getTime()
 }
 
+/** Today's `YYYY-MM-DD` in the group's timezone, safe to compute on a UTC server. */
+export function appTodayInputValue(now: Date = new Date(), timeZone: string = APP_TIMEZONE) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+}
+
 /** First and last instants of "today" as experienced in the group's timezone. */
 export function todayRange(now: Date = new Date(), timeZone: string = APP_TIMEZONE) {
   const offset = timezoneOffsetMs(now, timeZone)

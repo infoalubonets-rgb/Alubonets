@@ -3,6 +3,7 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { canReadDocument } from '@/lib/documents'
+import { ATTENDANCE_RECORDS_INCLUDE, attendanceLists } from '@/lib/meeting-attendance'
 import { uploadReport } from '@/app/actions/documents'
 import ReportsMeetingsRows from '@/components/reports/ReportsMeetingsRows'
 import AddReportModal from '@/components/reports/AddReportModal'
@@ -20,6 +21,7 @@ export default async function MeetingsReportsPage() {
     'TREASURER',
     'ORGANIZER',
     'MEMBER',
+    'AUDITOR',
   ])
   const canManage = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
 
@@ -38,6 +40,7 @@ export default async function MeetingsReportsPage() {
           agendaItems: { orderBy: { position: 'asc' } },
           actionPoints: { include: { owner: { select: { fullName: true } } }, orderBy: { createdAt: 'asc' } },
           decisions: { orderBy: { createdAt: 'asc' } },
+          attendanceRecords: ATTENDANCE_RECORDS_INCLUDE,
         },
         orderBy: { heldAt: 'desc' },
       }),
@@ -65,7 +68,9 @@ export default async function MeetingsReportsPage() {
             uploaderName: report.uploader.fullName,
             uploadedAt: report.uploadedAt.toISOString(),
           }))}
-          meetings={meetings.map((meeting) => ({
+          meetings={meetings.map((meeting) => {
+            const attendanceNames = attendanceLists(meeting)
+            return {
             id: meeting.id,
             title: meeting.title,
             status: meeting.status,
@@ -78,9 +83,9 @@ export default async function MeetingsReportsPage() {
             agenda: meeting.agenda,
             minutes: meeting.minutes,
             opening: meeting.opening,
-            attendees: meeting.attendees,
-            membersAbsent: meeting.membersAbsent,
-            membersApology: meeting.membersApology,
+            attendees: attendanceNames.present || null,
+            membersAbsent: attendanceNames.absent || null,
+            membersApology: attendanceNames.apology || null,
             resolutions: meeting.resolutions,
             aob: meeting.aob,
             nextMeetingAt: meeting.nextMeetingAt?.toISOString() || null,
@@ -99,7 +104,8 @@ export default async function MeetingsReportsPage() {
               reference: decision.reference,
               decidedAt: decision.decidedAt.toISOString(),
             })),
-          }))}
+            }
+          })}
         />
       </DashboardShell>
       </ReportsFilterProvider>

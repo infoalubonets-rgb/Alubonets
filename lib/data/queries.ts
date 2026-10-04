@@ -332,17 +332,18 @@ export const getPublicGallery = unstable_cache(
   { tags: [TAGS.gallery], revalidate: 300 },
 )
 
-export const getPublicProjects = unstable_cache(
-  async () => prisma.project.findMany({ where: { isPublic: true }, orderBy: { updatedAt: 'desc' } }),
-  ['public-projects'],
+/** All projects — the page itself restricts them to paid-up members. */
+export const getMemberProjects = unstable_cache(
+  async () => prisma.project.findMany({ orderBy: [{ startDate: 'desc' }, { updatedAt: 'desc' }] }),
+  ['member-projects'],
   { tags: [TAGS.projects], revalidate: 300 },
 )
 
-// Returns public events with ISO string dates for the public events page
+/** Events for the members' events page; the page decides who may see upcoming vs past. */
 export const getPublicEvents = unstable_cache(
   async () => {
     const events = await prisma.event.findMany({
-      where: { isPublic: true },
+      where: { OR: [{ isPublic: true }, { audienceType: { in: ['PUBLIC', 'ALL_MEMBERS'] } }] },
       orderBy: { startsAt: 'asc' },
       select: {
         id: true, title: true, description: true, location: true, mapsUrl: true,
@@ -361,10 +362,10 @@ export const getPublicEvents = unstable_cache(
     }))
     return {
       upcoming: rows.filter((e) => new Date(e.startsAt) >= now),
-      past: rows.filter((e) => new Date(e.startsAt) < now).reverse().slice(0, 6),
+      past: rows.filter((e) => new Date(e.startsAt) < now).reverse().slice(0, 24),
     }
   },
-  ['public-events'],
+  ['member-events'],
   { tags: [TAGS.events], revalidate: 300 },
 )
 
@@ -409,15 +410,17 @@ export const getMemberGrowthSeries = unstable_cache(
 
 export const getFamilyBranchDistribution = unstable_cache(
   async () => {
-    const rows = await prisma.memberProfile.groupBy({
-      by: ['familyBranch'],
-      _count: true,
-      where: { familyBranch: { not: null } },
+    const principals = await prisma.user.findMany({
+      where: { isPrincipal: true, status: 'ACTIVE' },
+      select: { fullName: true, _count: { select: { attachedMembers: { where: { status: 'ACTIVE' } } } } },
     })
-    const sorted = [...rows].sort((a, b) => b._count - a._count)
+    const sorted = principals
+      .map((principal) => ({ label: principal.fullName, count: principal._count.attachedMembers + 1 }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12)
     return {
-      labels: sorted.map((r) => r.familyBranch || 'Unassigned'),
-      values: sorted.map((r) => r._count),
+      labels: sorted.map((row) => row.label),
+      values: sorted.map((row) => row.count),
     }
   },
   ['family-branch-chart'],
@@ -530,7 +533,7 @@ export async function getResolutionsForViewer(actor: { id: string; role: Role; i
 }
 
 function canViewGovernanceRecords(actor: { role: Role }) {
-  return actor.role === 'ADMIN' || actor.role === 'SECRETARY'
+  return actor.role === 'ADMIN' || actor.role === 'SECRETARY' || actor.role === 'AUDITOR'
 }
 
 function governanceRecordWhere(actor: { role: Role }) {
@@ -764,6 +767,8 @@ export const getOrganizerProjects = unstable_cache(
       isPublic: p.isPublic,
       progress: p.progress,
       updatedAt: p.updatedAt.toISOString(),
+      startDate: p.startDate ? p.startDate.toISOString().slice(0, 10) : null,
+      endDate: p.endDate ? p.endDate.toISOString().slice(0, 10) : null,
     }))
   },
   ['organizer-projects'],
@@ -1003,8 +1008,8 @@ export async function upsertProject(data: {
   imageUrl?: string
   isPublic?: boolean
   progress?: number
-  startDate?: Date
-  endDate?: Date
+  startDate?: Date | null
+  endDate?: Date | null
 }) {
   if (data.id) {
     return prisma.project.update({

@@ -39,6 +39,15 @@ async function ensureEnquiryDestinationEmail() {
   return CONTACT_EMAIL
 }
 
+async function defaultContactRecipients(): Promise<string[]> {
+  const users = await prisma.user.findMany({
+    where: { status: 'ACTIVE', role: { in: ['SECRETARY', 'TREASURER', 'EXECUTIVE'] } },
+    select: { email: true },
+    take: 20,
+  })
+  return users.map((user) => user.email.trim().toLowerCase()).filter(Boolean)
+}
+
 async function resolveContactAssigneeId() {
   const superAdmin = await prisma.user.findFirst({
     where: { isSuperAdmin: true, status: 'ACTIVE' },
@@ -81,9 +90,10 @@ async function createContactSubmissionAndNotify({
       assignedToId,
     },
   })
-  const { enquiryEmail } = await getPublicContact()
+  const { enquiryEmail, recipients } = await getPublicContact()
   // Prefer the Communications / Settings destination; fall back to CONTACT_EMAIL.
   const destination = enquiryEmail || destinationEmail || CONTACT_EMAIL
+  const copies = recipients.length ? recipients : await defaultContactRecipients()
 
   const key = process.env.RESEND_API_KEY
   if (key && !key.startsWith('re_your-')) {
@@ -113,6 +123,18 @@ async function createContactSubmissionAndNotify({
         where: { id: submission.id },
         data: { emailStatus: error ? 'failed' : 'sent' },
       })
+      // Sent separately: one unverified copy recipient must not block the primary notification.
+      const extra = copies.filter((address) => !to.includes(address))
+      if (extra.length) {
+        const copy = await resend.emails.send({
+          from,
+          to: extra,
+          replyTo: email,
+          subject: rendered.subject,
+          html: rendered.html,
+        })
+        if (copy.error) logError('contact.email.copies_failed', copy.error, { submissionId: submission.id })
+      }
     } catch (error) {
       logError('contact.email.failed', error, { submissionId: submission.id })
       await prisma.contactSubmission.update({

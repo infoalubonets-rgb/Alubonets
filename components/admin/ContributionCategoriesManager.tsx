@@ -2,14 +2,41 @@
 
 import { useEffect, useState, useTransition, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { addContributionCategory, deleteContributionCategory } from '@/app/actions/settings'
+import { addContributionCategory, deleteContributionCategory, setCategoryBillingKind } from '@/app/actions/settings'
 
-type Category = { id: string; name: string; type: string; system: boolean }
+type BillingKind = 'NONE' | 'MONTHLY' | 'ANNUAL'
+type Category = { id: string; name: string; type: string; system: boolean; billingKind?: BillingKind | string }
+
+const BILLING_LABEL: Record<BillingKind, string> = {
+  NONE: 'One-off / other',
+  MONTHLY: 'Monthly fee',
+  ANNUAL: 'Annual subscription',
+}
 
 export default function ContributionCategoriesManager({ categories }: { categories: Category[] }) {
   const router = useRouter()
   const [items, setItems] = useState(categories)
   const [name, setName] = useState('')
+  const [billingKind, setBillingKind] = useState<BillingKind>('NONE')
+  const [, startBilling] = useTransition()
+
+  function changeBilling(category: Category, next: BillingKind) {
+    setError('')
+    setItems((current) => current.map((item) => (item.id === category.id ? { ...item, billingKind: next } : item)))
+    startBilling(async () => {
+      try {
+        const formData = new FormData()
+        formData.set('id', category.id)
+        formData.set('billingKind', next)
+        await setCategoryBillingKind(formData)
+        setMessage(`“${category.name}” set to ${BILLING_LABEL[next].toLowerCase()}.`)
+        router.refresh()
+      } catch (err) {
+        setItems((current) => current.map((item) => (item.id === category.id ? category : item)))
+        setError(err instanceof Error ? err.message : 'Could not update category.')
+      }
+    })
+  }
   const [confirming, setConfirming] = useState<Category | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -26,7 +53,7 @@ export default function ContributionCategoriesManager({ categories }: { categori
     setError('')
 
     const tempId = `temp-${Date.now()}`
-    const optimistic: Category = { id: tempId, name: trimmed, type: 'BOTH', system: false }
+    const optimistic: Category = { id: tempId, name: trimmed, type: 'BOTH', system: false, billingKind }
     setItems((current) =>
       [...current, optimistic].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
     )
@@ -36,7 +63,9 @@ export default function ContributionCategoriesManager({ categories }: { categori
       try {
         const formData = new FormData()
         formData.set('name', trimmed)
+        formData.set('billingKind', billingKind)
         const created = await addContributionCategory(formData)
+        setBillingKind('NONE')
         setItems((current) =>
           current
             .map((item) => (item.id === tempId ? created : item))
@@ -92,6 +121,18 @@ export default function ContributionCategoriesManager({ categories }: { categori
                   {category.type === 'BOTH' ? 'Income & expense' : category.type.toLowerCase()}
                 </span>
               </span>
+              {!category.system && !category.id.startsWith('temp-') && (
+                <select
+                  aria-label={`Billing type for ${category.name}`}
+                  value={(category.billingKind as BillingKind) || 'NONE'}
+                  onChange={(event) => changeBilling(category, event.target.value as BillingKind)}
+                  className="h-8 rounded-lg border border-outline-variant bg-surface px-2 text-[11px]"
+                >
+                  {(Object.keys(BILLING_LABEL) as BillingKind[]).map((kind) => (
+                    <option key={kind} value={kind}>{BILLING_LABEL[kind]}</option>
+                  ))}
+                </select>
+              )}
               {category.system ? (
                 <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-[10px] font-semibold text-on-surface-variant">System</span>
               ) : (
@@ -110,6 +151,14 @@ export default function ContributionCategoriesManager({ categories }: { categori
           Add a category
           <span className="mt-1 block text-xs font-normal text-on-surface-variant">Use a short, clear label for income and expense records.</span>
           <input name="name" value={name} onChange={(event) => setName(event.target.value)} required minLength={2} maxLength={60} pattern="[A-Za-z0-9 ()&/,.'-]+" title="Use letters, numbers, spaces and basic punctuation only." placeholder="e.g. Member subscriptions" className="mt-3 w-full rounded-xl border border-outline-variant bg-surface px-3.5 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+        </label>
+        <label className="mt-3 block text-xs font-semibold text-on-surface-variant">
+          Counts towards membership standing as
+          <select value={billingKind} onChange={(event) => setBillingKind(event.target.value as BillingKind)} className="mt-1 block w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm">
+            {(Object.keys(BILLING_LABEL) as BillingKind[]).map((kind) => (
+              <option key={kind} value={kind}>{BILLING_LABEL[kind]}</option>
+            ))}
+          </select>
         </label>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button type="submit" disabled={isAdding} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-sm disabled:cursor-wait disabled:opacity-60">

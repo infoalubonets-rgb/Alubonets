@@ -15,7 +15,7 @@ import {
 const visibilitySchema = z.object({
   userId: z.string().min(1),
   visibleToMembers: z.boolean(),
-  allowedFields: z.array(z.enum(DIRECTORY_SAFE_FIELDS)).default(['fullName', 'role', 'familyBranch']),
+  allowedFields: z.array(z.enum(DIRECTORY_SAFE_FIELDS)).default(['fullName', 'role']),
   reviewAt: z.string().optional().nullable(),
 })
 
@@ -37,10 +37,13 @@ async function rolesWithFullDirectoryAccess(): Promise<string[]> {
 
 export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
   // Viewer identity comes from the session — never from a caller-supplied id.
-  const viewer = await requireActiveRole(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'])
+  const viewer = await requireActiveRole(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER', 'AUDITOR'])
   const fullAccessRoles = await rolesWithFullDirectoryAccess()
   const seesEveryone =
-    viewer.role === 'ADMIN' || viewer.isSuperAdmin || fullAccessRoles.includes(viewer.role)
+    viewer.role === 'ADMIN' ||
+    viewer.role === 'AUDITOR' ||
+    viewer.isSuperAdmin ||
+    fullAccessRoles.includes(viewer.role)
 
   const rows = await prisma.user.findMany({
     where: { status: 'ACTIVE' },
@@ -53,7 +56,7 @@ export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
       isPrincipal: true,
       principalMemberId: true,
       familyRelationship: true,
-      memberProfile: { select: { familyBranch: true, profession: true, skills: true, dateOfBirth: true } },
+      memberProfile: { select: { profession: true, skills: true, dateOfBirth: true } },
       profileVisibility: true,
       principal: { select: { id: true, fullName: true } },
     },
@@ -80,7 +83,7 @@ export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
 
     const configured = Array.isArray(visibility?.allowedFields)
       ? (visibility!.allowedFields as string[])
-      : ['fullName', 'role', 'familyBranch']
+      : ['fullName', 'role']
     // Staff with full access see every safe field; everyone else sees only what was approved.
     const allowed = new Set(seesEveryone ? [...DIRECTORY_SAFE_FIELDS] : configured)
 
@@ -91,7 +94,6 @@ export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
       principalName: row.principal?.fullName || null,
       isPrincipal: row.isPrincipal,
       role: allowed.has('role') ? row.role : null,
-      familyBranch: allowed.has('familyBranch') ? row.memberProfile?.familyBranch || null : null,
       profession: allowed.has('profession') ? row.memberProfile?.profession || null : null,
       skills: allowed.has('skills') ? row.memberProfile?.skills || null : null,
       location: allowed.has('location') ? row.location || null : null,

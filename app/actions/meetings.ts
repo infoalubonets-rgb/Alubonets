@@ -6,6 +6,7 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { TAGS, createMeeting, updateMeeting } from '@/lib/data/queries'
 import { prisma } from '@/lib/prisma'
 import { buildMeetingMinutesPdf, minutesFilename } from '@/lib/pdf/minutes'
+import { ATTENDANCE_RECORDS_INCLUDE } from '@/lib/meeting-attendance'
 import { createServerClient } from '@/lib/supabase-server'
 import { writeAudit } from '@/lib/audit'
 import { assertNotPast } from '@/lib/dates'
@@ -44,6 +45,36 @@ function parseNextMeeting(raw: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+const attendanceEntries = z
+  .array(z.object({ userId: z.string().min(1).max(64), status: z.enum(['PRESENT', 'APOLOGY', 'ABSENT']) }))
+  .max(2000)
+
+type AttendanceEntry = z.infer<typeof attendanceEntries>[number]
+
+/** Returns null when the picker was not used, so legacy text-only minutes stay untouched. */
+async function parseAttendanceRecords(raw: FormDataEntryValue | null): Promise<AttendanceEntry[] | null> {
+  if (typeof raw !== 'string' || !raw.trim()) return null
+  const entries = attendanceEntries.parse(JSON.parse(raw))
+  const byUser = new Map(entries.map((entry) => [entry.userId, entry.status]))
+  const existing = await prisma.user.findMany({ where: { id: { in: [...byUser.keys()] } }, select: { id: true } })
+  const valid = new Set(existing.map((user) => user.id))
+  return [...byUser].filter(([userId]) => valid.has(userId)).map(([userId, status]) => ({ userId, status }))
+}
+
+function countLines(text: string | null | undefined) {
+  return (text || '').split('\n').map((line) => line.trim()).filter(Boolean).length
+}
+
+async function saveAttendanceRecords(meetingId: string, records: AttendanceEntry[], actorId: string) {
+  await prisma.$transaction([
+    prisma.meetingAttendance.deleteMany({ where: { meetingId } }),
+    prisma.meetingAttendance.createMany({
+      data: records.map((record) => ({ meetingId, userId: record.userId, status: record.status, recordedById: actorId })),
+      skipDuplicates: true,
+    }),
+  ])
+}
+
 export async function actionCreateMeeting(formData: FormData) {
   const actor = await requireActiveRole(['SECRETARY', 'ADMIN'])
   const parsed = meetingFields.parse({
@@ -62,11 +93,14 @@ export async function actionCreateMeeting(formData: FormData) {
   })
 
   assertNotPast(parseNextMeeting(parsed.nextMeetingAt), 'Next meeting date')
+  const records = await parseAttendanceRecords(formData.get('attendanceRecords'))
 
   const meeting = await createMeeting({
     title: parsed.title.trim(),
     heldAt: new Date(parsed.heldAt),
-    attendance: parsed.attendance,
+    attendance: records
+      ? records.filter((record) => record.status === 'PRESENT').length + countLines(parsed.attendees)
+      : parsed.attendance,
     opening: emptyToNull(parsed.opening) ?? undefined,
     attendees: emptyToNull(parsed.attendees) ?? undefined,
     membersAbsent: emptyToNull(parsed.membersAbsent) ?? undefined,
@@ -79,6 +113,7 @@ export async function actionCreateMeeting(formData: FormData) {
     status: 'DRAFT',
     eventId: emptyToNull(parsed.eventId),
   })
+  if (records) await saveAttendanceRecords(meeting.id, records, actor.id)
 
   await writeAudit({
     userId: actor.id,
@@ -119,11 +154,14 @@ export async function actionUpdateMeeting(formData: FormData) {
   // value has to clear the bound.
   const nextMeetingAt = parseNextMeeting(parsed.nextMeetingAt)
   if (nextMeetingAt?.getTime() !== existing.nextMeetingAt?.getTime()) assertNotPast(nextMeetingAt, 'Next meeting date')
+  const records = await parseAttendanceRecords(formData.get('attendanceRecords'))
 
   const updated = await updateMeeting(id, {
     title: parsed.title.trim(),
     heldAt: new Date(parsed.heldAt),
-    attendance: parsed.attendance,
+    attendance: records
+      ? records.filter((record) => record.status === 'PRESENT').length + countLines(parsed.attendees)
+      : parsed.attendance,
     opening: emptyToNull(parsed.opening),
     attendees: emptyToNull(parsed.attendees),
     membersAbsent: emptyToNull(parsed.membersAbsent),
@@ -134,6 +172,7 @@ export async function actionUpdateMeeting(formData: FormData) {
     nextMeetingAt,
     eventId: emptyToNull(parsed.eventId),
   })
+  if (records) await saveAttendanceRecords(id, records, actor.id)
 
   await writeAudit({
     userId: actor.id,
@@ -156,6 +195,7 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
       agendaItems: { orderBy: { position: 'asc' } },
       actionPoints: { include: { owner: { select: { fullName: true } } } },
       decisions: { orderBy: { decidedAt: 'asc' } },
+      attendanceRecords: ATTENDANCE_RECORDS_INCLUDE,
     },
   })
   if (!meeting) throw new Error('Meeting not found')

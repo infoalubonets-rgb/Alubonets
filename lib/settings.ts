@@ -5,6 +5,7 @@ import { CONTACT_EMAIL } from '@/lib/constants'
 
 export const SETTING_KEYS = {
   contactDestinationEmail: 'contact_destination_email',
+  contactRecipients: 'contact_recipients',
   contactPublicEmail: 'contact_public_email',
   contactPublicPhone: 'contact_public_phone',
   financialApprovalThresholdKes: 'financial_approval_threshold_kes',
@@ -26,6 +27,13 @@ export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS]
 
 const validators: Record<SettingKey, z.ZodType<string>> = {
   [SETTING_KEYS.contactDestinationEmail]: z.string().email().or(z.literal('')),
+  [SETTING_KEYS.contactRecipients]: z
+    .string()
+    .max(2000)
+    .refine((v) => parseEmailList(v).every((email) => z.string().email().safeParse(email).success), {
+      message: 'Enter valid email addresses separated by commas.',
+    })
+    .transform((v) => parseEmailList(v).join(', ')),
   [SETTING_KEYS.contactPublicEmail]: z.string().email().or(z.literal('')),
   [SETTING_KEYS.contactPublicPhone]: z
     .string()
@@ -63,6 +71,17 @@ const defaults: Partial<Record<SettingKey, string>> = {
   [SETTING_KEYS.loanPolicyTitle]: 'Loan Policy',
   [SETTING_KEYS.welfareMinAmountKes]: '1000',
   [SETTING_KEYS.welfareMaxAmountKes]: '100000',
+}
+
+export function parseEmailList(value: string): string[] {
+  return Array.from(
+    new Set(
+      value
+        .split(/[,;\n]/)
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  )
 }
 
 export function validateSettingValue(key: SettingKey, value: string): string {
@@ -147,11 +166,13 @@ export async function getPublicContact() {
     SETTING_KEYS.contactPublicEmail,
     SETTING_KEYS.contactPublicPhone,
     SETTING_KEYS.contactDestinationEmail,
+    SETTING_KEYS.contactRecipients,
   ])
   const email = s[SETTING_KEYS.contactPublicEmail] || CONTACT_EMAIL
   const phone = s[SETTING_KEYS.contactPublicPhone] || ''
   const enquiryEmail = s[SETTING_KEYS.contactDestinationEmail] || email || CONTACT_EMAIL
-  return { email, phone, enquiryEmail }
+  const recipients = parseEmailList(s[SETTING_KEYS.contactRecipients] || '')
+  return { email, phone, enquiryEmail, recipients }
 }
 
 export async function getWelfarePolicy() {

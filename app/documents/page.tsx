@@ -20,12 +20,13 @@ export default async function DocumentsPage({
     'TREASURER',
     'ORGANIZER',
     'MEMBER',
+    'AUDITOR',
   ])
   await Promise.all([ensureDocumentCategories(), syncExpiredDocuments()])
   const { q = '', category = '', tag = '', page: pageRaw } = await searchParams
   const page = parsePage(pageRaw)
   const pageSize = 24
-  const canAdd = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || actor.role === 'ORGANIZER'
+  const canAdd = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
   const [documents, categories] = await Promise.all([
     prisma.document.findMany({
       where: {

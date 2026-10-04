@@ -1,10 +1,25 @@
-import { getPublicProjects } from '@/lib/data/queries'
+import { getMemberProjects } from '@/lib/data/queries'
 import ProjectCard from '@/components/content/ProjectCard'
+import MemberGate from '@/components/public/MemberGate'
+import { getMemberAccess } from '@/lib/auth/member-access'
 
 export const metadata = { title: 'Projects — Alubonets SHG' }
+export const dynamic = 'force-dynamic'
 
 export default async function ProjectsPage() {
-  const projects = await getPublicProjects()
+  const access = await getMemberAccess()
+  if (access.state !== 'paid') {
+    return (
+      <main className="flex-grow">
+        <div className="max-w-container-max mx-auto px-md py-xl md:px-lg">
+          {access.state === 'anonymous'
+            ? <MemberGate variant="login" what="Projects" returnTo="/projects" />
+            : <MemberGate variant="renew" what="Projects" reason={access.reason} />}
+        </div>
+      </main>
+    )
+  }
+  const projects = await getMemberProjects()
 
   return (
     <main className="flex-grow">

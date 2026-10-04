@@ -9,6 +9,7 @@ import { formatMonthKeys, hasChartData, monthKeyFromDate } from '@/lib/chart-lab
 import { todayInputValue } from '@/lib/dates'
 import { withDatabaseRetry } from '@/lib/database-retry'
 import { requireAdmin } from '@/lib/auth/session'
+import { getStandingSettings } from '@/lib/membership-standing-settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,8 +43,10 @@ export default async function AdminFinancePage({
     monthlyRows,
     byUser,
     members,
+    standingSettings,
+    standingGroups,
   ] = await withDatabaseRetry(() => Promise.all([
-    prisma.transactionCategory.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, type: true, code: true, active: true } }),
+    prisma.transactionCategory.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, type: true, code: true, active: true, billingKind: true } }),
     prisma.financialTransaction.findMany({
       where: { status: 'PENDING' },
       include: { createdBy: true },
@@ -56,6 +59,8 @@ export default async function AdminFinancePage({
     prisma.contribution.findMany({ where: contributionWhere, select: { amount: true, paidAt: true }, orderBy: { paidAt: 'asc' } }),
     prisma.contribution.groupBy({ by: ['userId'], where: contributionWhere, _sum: { amount: true }, _count: true, _max: { paidAt: true } }),
     prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true, email: true }, orderBy: { fullName: 'asc' } }),
+    getStandingSettings(),
+    prisma.user.groupBy({ by: ['standing'], where: { status: 'ACTIVE' }, _count: true }),
   ]))
 
   const monthlyMap = new Map<string, number>()
@@ -99,6 +104,18 @@ export default async function AdminFinancePage({
         <AdminFinanceClient
           approvalThreshold={setting?.value || '50000'}
           loanApplicationLimit={loanLimitSetting?.value || '50000'}
+          standingSettings={{
+            autoEnabled: standingSettings.autoEnabled,
+            monthlyFeeKes: standingSettings.monthlyFeeKes,
+            monthlyGraceDays: standingSettings.monthlyGraceDays,
+            annualFeeKes: standingSettings.annualFeeKes,
+            annualRenewalDays: standingSettings.annualRenewalDays,
+            effectiveFrom: standingSettings.effectiveFrom.toISOString().slice(0, 10),
+          }}
+          standingCounts={{
+            paidUp: standingGroups.find((g) => g.standing === 'PAID_UP')?._count ?? 0,
+            lapsed: standingGroups.find((g) => g.standing === 'LAPSED')?._count ?? 0,
+          }}
           categories={categories}
           pending={pending.map((tx) => ({
             id: tx.id,

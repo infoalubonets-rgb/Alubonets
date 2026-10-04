@@ -2,10 +2,13 @@ import type { Metadata } from 'next'
 import ValuesCarousel from '@/components/about/ValuesCarousel'
 import { COMMITTEE_HEADSHOT, HERO_IMAGE } from '@/lib/constants'
 import { prisma } from '@/lib/prisma'
+import { createServerClient } from '@/lib/supabase-server'
 
 export const metadata: Metadata = {
   title: 'About',
 }
+
+export const revalidate = 3600
 
 const VALUES_TAGS = [
   'Unity',
@@ -24,9 +27,79 @@ const COMMITTEE = [
   { name: 'Peter W.', role: 'Member Rep', alt: 'Member' },
 ]
 
+type CommitteeCard = {
+  name: string
+  role: string
+  alt: string
+  photoUrl: string | null
+  responsibilities: string[]
+  biography: string
+  details: string[]
+}
+
+async function memberPhotoUrl(path: string | null) {
+  if (!path) return null
+  if (path.startsWith('http')) return path
+  try {
+    const signed = await createServerClient().storage.from('member-avatars').createSignedUrl(path, 60 * 60 * 24)
+    return signed.data?.signedUrl ?? null
+  } catch {
+    return null
+  }
+}
+
+async function loadCommittee(): Promise<CommitteeCard[]> {
+  const managed = await prisma.committeeProfile.findMany({
+    where: { status: 'PUBLISHED' },
+    orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+    include: {
+      user: {
+        select: {
+          avatarUrl: true,
+          email: true,
+          phone: true,
+          location: true,
+          publicProfileFields: true,
+          memberProfile: { select: { profession: true } },
+        },
+      },
+    },
+  })
+  if (!managed.length) {
+    return COMMITTEE.map((member) => ({ ...member, photoUrl: null, responsibilities: [], biography: '', details: [] }))
+  }
+  return Promise.all(
+    managed.map(async (profile) => {
+      const allowed = new Set(profile.user?.publicProfileFields ?? [])
+      const user = profile.user
+      const details = user
+        ? [
+            allowed.has('profession') ? user.memberProfile?.profession : null,
+            allowed.has('location') ? user.location : null,
+            allowed.has('email') ? user.email : null,
+            allowed.has('phone') ? user.phone : null,
+          ].filter((value): value is string => Boolean(value))
+        : []
+      const photoUrl =
+        profile.photoUrl || (user && allowed.has('photo') ? await memberPhotoUrl(user.avatarUrl) : null)
+      return {
+        name: profile.name,
+        role: profile.position,
+        alt: profile.position,
+        photoUrl,
+        responsibilities: (profile.responsibilities || '')
+          .split('\n')
+          .map((line) => line.replace(/^[-•*]\s*/, '').trim())
+          .filter(Boolean),
+        biography: profile.biography,
+        details,
+      }
+    }),
+  )
+}
+
 export default async function AboutPage() {
-  const managedCommittee = await prisma.committeeProfile.findMany({ where: { status: 'PUBLISHED' }, orderBy: { displayOrder: 'asc' } })
-  const committee = managedCommittee.length ? managedCommittee.map((member) => ({ name: member.name, role: member.position, alt: member.position, photoUrl: member.photoUrl })) : COMMITTEE.map((member) => ({ ...member, photoUrl: null }))
+  const committee = await loadCommittee()
   return (
     <main className="flex-grow">
       <section className="relative overflow-hidden px-md py-xl sm:py-xxl md:px-lg">
@@ -159,23 +232,39 @@ export default async function AboutPage() {
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-md md:gap-lg">
-          {committee.map((member, index) => (
-            <div
-              key={member.name}
-              className="reveal flex w-36 flex-col items-center"
-              style={{ ['--reveal-delay' as string]: `${index * 70}ms` }}
-            >
-              <img
-                alt={member.alt}
-                className="mb-sm h-28 w-28 rounded-full border border-primary/15 object-cover"
-                src={member.photoUrl || COMMITTEE_HEADSHOT}
-              />
-              <h4 className="text-center font-label-bold text-[15px] text-primary">{member.name}</h4>
-              <span className="mt-xs text-center font-body-md text-[13px] text-primary/70">
-                {member.role}
-              </span>
-            </div>
-          ))}
+          {committee.map((member, index) => {
+            const rich = member.responsibilities.length > 0 || member.biography || member.details.length > 0
+            return (
+              <div
+                key={`${member.name}-${member.role}`}
+                className={`reveal flex flex-col items-center ${rich ? 'w-64' : 'w-36'}`}
+                style={{ ['--reveal-delay' as string]: `${index * 70}ms` }}
+              >
+                <img
+                  alt={member.alt}
+                  className="mb-sm h-28 w-28 rounded-full border border-primary/15 object-cover"
+                  src={member.photoUrl || COMMITTEE_HEADSHOT}
+                />
+                <h4 className="text-center font-label-bold text-[15px] text-primary">{member.name}</h4>
+                <span className="mt-xs text-center font-body-md text-[13px] text-primary/70">
+                  {member.role}
+                </span>
+                {member.details.length > 0 && (
+                  <p className="mt-xs text-center text-[12px] text-on-surface-variant">{member.details.join(' · ')}</p>
+                )}
+                {member.biography && (
+                  <p className="mt-sm text-center text-[13px] leading-relaxed text-on-surface-variant">{member.biography}</p>
+                )}
+                {member.responsibilities.length > 0 && (
+                  <ul className="mt-sm list-disc space-y-0.5 pl-5 text-left text-[13px] text-on-surface">
+                    {member.responsibilities.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )
+          })}
         </div>
       </section>
     </main>

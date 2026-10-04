@@ -26,7 +26,7 @@ export default async function OrganizerPage() {
   ]
 
   return (
-    <DashboardShell role="ORGANIZER" title="Organizer" nav={ORGANIZER_NAV}>
+    <DashboardShell role="ORGANIZER" title="Organizing Secretary" nav={ORGANIZER_NAV}>
       <div className="space-y-5 p-4 md:p-6 max-w-4xl mx-auto">
 
         {/* Stats */}

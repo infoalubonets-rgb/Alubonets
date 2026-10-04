@@ -1,5 +1,5 @@
-import { notFound } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import ModuleDisabled from '@/components/dashboard/ModuleDisabled'
 import { requireActiveRole } from '@/lib/auth/session'
 import { EXECUTIVE_NAV, LOANS_NAV_ITEMS, withOptionalNav } from '@/lib/dashboard/nav'
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
@@ -7,7 +7,7 @@ import { loanBalancesForIds, moneyNumber } from '@/lib/loans'
 import { prisma } from '@/lib/prisma'
 
 export default async function ExecutiveLoansPage() {
-  if (!(await isFeatureEnabled(FEATURE_FLAGS.loansEnabled))) notFound()
+  if (!(await isFeatureEnabled(FEATURE_FLAGS.loansEnabled))) return <ModuleDisabled module="Loans" />
   await requireActiveRole(['EXECUTIVE', 'ADMIN'])
   const loans = await prisma.loanApplication.findMany({
     where: { status: { in: ['APPROVED', 'DISBURSED', 'CLOSED'] } },

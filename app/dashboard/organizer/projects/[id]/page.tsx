@@ -4,6 +4,7 @@ import ProjectManagePanel from '@/components/projects/ProjectManagePanel'
 import { requireActiveRole } from '@/lib/auth/session'
 import { ORGANIZER_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
+import { getProjectFinancials } from '@/lib/project-status'
 
 export default async function OrganizerProjectManagePage({
   params,
@@ -12,7 +13,7 @@ export default async function OrganizerProjectManagePage({
 }) {
   await requireActiveRole(['ORGANIZER', 'ADMIN'])
   const { id } = await params
-  const [project, members, documents] = await Promise.all([
+  const [project, members, documents, financials] = await Promise.all([
     prisma.project.findUnique({
       where: { id },
       include: {
@@ -41,6 +42,7 @@ export default async function OrganizerProjectManagePage({
       orderBy: { uploadedAt: 'desc' },
       take: 100,
     }),
+    getProjectFinancials(id),
   ])
   if (!project) notFound()
 
@@ -48,6 +50,7 @@ export default async function OrganizerProjectManagePage({
     <DashboardShell role="ORGANIZER" title="Manage project" nav={ORGANIZER_NAV}>
       <ProjectManagePanel
         project={project}
+        financials={financials}
         members={members}
         documents={documents}
         manageBase="/dashboard/organizer/projects"

@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
 import { submitProjectComment } from '@/app/actions/projects'
 import { moneyNumber, projectFinanceVisibility } from '@/lib/projects'
+import { getMemberAccess } from '@/lib/auth/member-access'
+import MemberGate from '@/components/public/MemberGate'
+import { fundingProgress, getProjectFinancials } from '@/lib/project-status'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -33,19 +36,28 @@ export default async function ProjectDetailPage({ params }: Props) {
         orderBy: { createdAt: 'desc' },
         take: 50,
       },
-      investments: profile ? { select: { amount: true } } : false,
       milestones: { orderBy: { position: 'asc' } },
     },
   })
   if (!project) notFound()
-  if (!project.isPublic && profile?.status !== 'ACTIVE') notFound()
+  const access = await getMemberAccess()
+  if (access.state !== 'paid') {
+    return (
+      <main className="flex-grow">
+        <div className="mx-auto max-w-container-max px-md py-xl md:px-lg">
+          {access.state === 'anonymous'
+            ? <MemberGate variant="login" what="Projects" returnTo={`/projects/${project.id}`} />
+            : <MemberGate variant="renew" what="Projects" reason={access.reason} />}
+        </div>
+      </main>
+    )
+  }
 
   const status = STATUS_STYLES[project.status] ?? STATUS_STYLES.UPCOMING
   const visibility = projectFinanceVisibility(profile?.role)
-  const raised = Array.isArray(project.investments)
-    ? project.investments.reduce((sum, row) => sum + moneyNumber(row.amount), 0)
-    : 0
+  const { raised } = await getProjectFinancials(project.id)
   const target = moneyNumber(project.fundingTargetKes)
+  const percent = target > 0 ? fundingProgress(raised, target) ?? 0 : project.progress
 
   return (
     <main className="flex-grow bg-surface-container-lowest">
@@ -161,9 +173,11 @@ export default async function ProjectDetailPage({ params }: Props) {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Progress</p>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-outline-variant/30">
-                  <div className="h-full bg-primary" style={{ width: `${project.progress}%` }} />
+                  <div className="h-full bg-primary" style={{ width: `${percent}%` }} />
                 </div>
-                <p className="mt-1 text-sm font-medium">{project.progress}%</p>
+                <p className="mt-1 text-sm font-medium">
+                  {percent}%{target > 0 ? ' of the funding target raised' : ''}
+                </p>
               </div>
 
               {visibility !== 'public' && target > 0 && (

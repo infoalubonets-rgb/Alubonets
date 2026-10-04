@@ -5,6 +5,10 @@ import {
   processScheduledAnnouncements,
   retryFailedAnnouncementEmailsBatch,
 } from '@/app/actions/announcements'
+import { syncMembershipStanding } from '@/lib/membership-standing-sync'
+import { syncProjectStatuses } from '@/lib/project-status'
+import { revalidateTag } from 'next/cache'
+import { TAGS } from '@/lib/data/queries'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +18,7 @@ export const dynamic = 'force-dynamic'
  * - Event reminder emails
  * - Scheduled announcements
  * - Retry failed announcement emails (up to 3)
+ * - Membership standing (paid-up / lapsed)
  * Protect with Authorization: Bearer $CRON_SECRET (or ?secret=).
  */
 export async function GET(req: NextRequest) {
@@ -29,14 +34,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const [expiredDocuments, overdueActionPoints, eventReminders, scheduledAnnouncements, emailRetries] =
+  const [expiredDocuments, overdueActionPoints, eventReminders, scheduledAnnouncements, emailRetries, membershipStanding, projectStatuses] =
     await Promise.all([
       syncExpiredDocuments(),
       syncOverdueActionPoints(),
       processEventReminders(),
       processScheduledAnnouncements(),
       retryFailedAnnouncementEmailsBatch(),
+      syncMembershipStanding().catch((error) => ({ error: String(error) })),
+      syncProjectStatuses().catch((error) => ({ error: String(error) })),
     ])
+  if (!('error' in projectStatuses) && projectStatuses.updated > 0) revalidateTag(TAGS.projects)
 
   return NextResponse.json({
     ok: true,
@@ -45,6 +53,8 @@ export async function GET(req: NextRequest) {
     eventReminders,
     scheduledAnnouncements,
     emailRetries,
+    membershipStanding,
+    projectStatuses,
     at: new Date().toISOString(),
   })
 }

@@ -234,7 +234,7 @@ export async function submitEventRsvp(formData: FormData) {
 }
 
 export async function deleteEventFromMemberView(eventId: string) {
-  const actor = await requireActiveRole(['ADMIN', 'ORGANIZER'])
+  const actor = await requireActiveRole(['ADMIN', 'ORGANIZER', 'SECRETARY'])
   const canDeleteAny = actor.isSuperAdmin || actor.role === 'ADMIN'
   if (!canDeleteAny) {
     const creationLog = await prisma.auditLog.findFirst({

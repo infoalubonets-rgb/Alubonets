@@ -29,7 +29,6 @@ export default async function MemberFamilyPage() {
   const me = await prisma.user.findUnique({
     where: { id: actor.id },
     include: {
-      memberProfile: { select: { familyBranch: true } },
       principal: { select: { id: true, fullName: true } },
       attachedMembers: {
         orderBy: { fullName: 'asc' },
@@ -41,7 +40,7 @@ export default async function MemberFamilyPage() {
           familyRelationship: true,
           familyRegistrationState: true,
           phone: true,
-          memberProfile: { select: { dateOfBirth: true, familyBranch: true } },
+          memberProfile: { select: { dateOfBirth: true } },
           profileVisibility: { select: { visibleToMembers: true, allowedFields: true } },
           isPrincipal: true,
         },
@@ -78,7 +77,14 @@ export default async function MemberFamilyPage() {
     ? await prisma.user.findMany({
         where: { status: { in: ['ACTIVE', 'PENDING', 'INACTIVE'] } },
         orderBy: { fullName: 'asc' }, take: 500,
-        select: { id: true, fullName: true, email: true, phone: true, status: true, isPrincipal: true, principalMemberId: true, familyRelationship: true, principal: { select: { fullName: true } }, memberProfile: { select: { familyBranch: true } } },
+        select: { id: true, fullName: true, email: true, phone: true, status: true, isPrincipal: true, principalMemberId: true, familyRelationship: true, principal: { select: { fullName: true } } },
+      })
+    : []
+  const otherPrincipals = !canAdministerFamilies && me.isPrincipal
+    ? await prisma.user.findMany({
+        where: { isPrincipal: true, status: 'ACTIVE', id: { not: me.id } },
+        orderBy: { fullName: 'asc' },
+        select: { id: true, fullName: true },
       })
     : []
   const administrationPrincipals = administrationMembers
@@ -105,7 +111,6 @@ export default async function MemberFamilyPage() {
           status: m.status,
           registrationState: m.familyRegistrationState,
           phone: m.phone,
-          lineage: m.memberProfile?.familyBranch || null,
         })),
       ]
     : branchRootId
@@ -124,7 +129,6 @@ export default async function MemberFamilyPage() {
               familyRelationship: true,
               familyRegistrationState: true,
               phone: true,
-              memberProfile: { select: { familyBranch: true } },
             },
           })
           return siblings.map((m) => ({
@@ -139,8 +143,7 @@ export default async function MemberFamilyPage() {
             status: m.status,
             registrationState: m.familyRegistrationState,
             phone: m.phone,
-            lineage: m.memberProfile?.familyBranch || null,
-            isYou: m.id === me.id,
+              isYou: m.id === me.id,
           }))
         })()
       : [
@@ -152,7 +155,6 @@ export default async function MemberFamilyPage() {
             status: me.status,
             registrationState: me.familyRegistrationState,
             phone: me.phone,
-            lineage: null,
             isYou: true,
           },
         ]
@@ -160,12 +162,12 @@ export default async function MemberFamilyPage() {
   return (
     <DashboardShell role={actor.role} title={canAdministerFamilies ? 'Family Directory' : 'My Family / Branch'} nav={navForRole(actor.role)} hidePageHeading>
       {canAdministerFamilies && <FamilyAdministrationClient
-        members={administrationMembers.map((member) => ({ ...member, relationship: member.familyRelationship ? RELATIONSHIP_LABEL[member.familyRelationship] || member.familyRelationship : null, lineage: member.memberProfile?.familyBranch || null, principalName: member.principal?.fullName || null, principal: undefined, memberProfile: undefined, familyRelationship: undefined }))}
+        members={administrationMembers.map((member) => ({ ...member, relationship: member.familyRelationship ? RELATIONSHIP_LABEL[member.familyRelationship] || member.familyRelationship : null, principalName: member.principal?.fullName || null, principal: undefined, familyRelationship: undefined }))}
         principals={administrationPrincipals}
       />}
       {!canAdministerFamilies && <FamilyBranchClient
         isPrincipal={me.isPrincipal}
-        defaultLineage={me.memberProfile?.familyBranch || ''}
+        otherPrincipals={otherPrincipals}
         principalName={me.isPrincipal ? me.fullName : me.principal?.fullName || null}
         relationshipLabel={
           me.familyRelationship
@@ -195,7 +197,7 @@ export default async function MemberFamilyPage() {
                 visibleToMembers: Boolean(m.profileVisibility?.visibleToMembers),
                 allowedFields: Array.isArray(m.profileVisibility?.allowedFields)
                   ? (m.profileVisibility!.allowedFields as string[])
-                  : ['fullName', 'role', 'familyBranch'],
+                  : ['fullName', 'role'],
                 isChild,
               }
             })}

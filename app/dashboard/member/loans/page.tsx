@@ -1,5 +1,5 @@
-import { notFound } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import ModuleDisabled from '@/components/dashboard/ModuleDisabled'
 import LoanApplicationForm from '@/components/dashboard/LoanApplicationForm'
 import LoanHistoryTable from '@/components/dashboard/LoanHistoryTable'
 import LoanSubmitFeedback from '@/components/dashboard/LoanSubmitFeedback'
@@ -13,7 +13,7 @@ import { toDateInputValue, tomorrowInputValue } from '@/lib/dates'
 import { respondLoanGuarantor, submitLoanApplication } from '@/app/actions/loans'
 
 export default async function MemberLoansPage({ searchParams }: { searchParams: Promise<{ submitted?: string }> }) {
-  if (!(await isFeatureEnabled(FEATURE_FLAGS.loansEnabled))) notFound()
+  if (!(await isFeatureEnabled(FEATURE_FLAGS.loansEnabled))) return <ModuleDisabled module="Loans" />
   const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'])
   const policy = await getLoanPolicy()
   const feedback = await searchParams

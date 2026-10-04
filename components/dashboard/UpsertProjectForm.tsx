@@ -15,6 +15,16 @@ type ProjectRow = {
   isPublic?: boolean
   progress: number
   updatedAt: string
+  /** YYYY-MM-DD */
+  startDate?: string | null
+  endDate?: string | null
+}
+
+function statusFromDates(start: string, end: string): 'UPCOMING' | 'ONGOING' | 'COMPLETED' | null {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' })
+  if (end && end < today) return 'COMPLETED'
+  if (!start) return null
+  return start > today ? 'UPCOMING' : 'ONGOING'
 }
 
 type Props = {
@@ -95,6 +105,11 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
   const [status, setStatus]     = useState<'UPCOMING' | 'ONGOING' | 'COMPLETED'>(initial?.status ?? 'UPCOMING')
   const [isPublic, setIsPublic] = useState(initial?.isPublic !== false)
   const [progress, setProgress] = useState(initial?.progress ?? 0)
+  const [startDate, setStartDate] = useState(initial?.startDate ?? '')
+  const [endDate, setEndDate] = useState(initial?.endDate ?? '')
+  const [dateError, setDateError] = useState('')
+  const autoStatus = statusFromDates(startDate, endDate)
+  const effectiveStatus = autoStatus ?? status
 
   // image upload state
   const [uploadedUrl, setUploadedUrl]       = useState(initial?.imageUrl ?? '')
@@ -150,23 +165,32 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!title || !description) return
+    if (startDate && endDate && endDate < startDate) {
+      setDateError('The end date cannot be before the start date.')
+      return
+    }
+    setDateError('')
 
     onSuccess?.({
       id: existingId ?? `opt-${Date.now()}`,
       title,
       description,
-      status,
+      status: effectiveStatus,
       imageUrl: uploadedUrl || null,
       isPublic,
       progress,
       updatedAt: new Date().toISOString(),
+      startDate: startDate || null,
+      endDate: endDate || null,
     })
 
     const fd = new FormData()
     if (existingId) fd.set('id', existingId)
     fd.set('title', title)
     fd.set('description', description)
-    fd.set('status', status)
+    fd.set('status', effectiveStatus)
+    fd.set('startDate', startDate)
+    fd.set('endDate', endDate)
     fd.set('progress', String(progress))
     fd.set('isPublic', isPublic ? 'on' : 'off')
     if (uploadedUrl) fd.set('imageUrl', uploadedUrl)
@@ -199,15 +223,35 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
         <div className="space-y-1">
           <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Status</label>
           <select
-            name="status" value={status}
+            name="status" value={effectiveStatus}
+            disabled={Boolean(autoStatus)}
             onChange={(e) => handleStatusChange(e.target.value as typeof status)}
-            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-[13px] bg-surface text-on-surface focus:outline-none focus:border-primary"
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-[13px] bg-surface text-on-surface focus:outline-none focus:border-primary disabled:opacity-70"
           >
             <option value="UPCOMING">Upcoming</option>
             <option value="ONGOING">Ongoing</option>
             <option value="COMPLETED">Completed</option>
           </select>
+          {autoStatus && <p className="text-[11px] text-on-surface-variant">Set automatically from the dates.</p>}
         </div>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <div className="space-y-1">
+          <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Start date</label>
+          <input
+            type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-[13px] bg-surface text-on-surface focus:outline-none focus:border-primary"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">End date</label>
+          <input
+            type="date" value={endDate} min={startDate || undefined} onChange={(e) => setEndDate(e.target.value)}
+            className="w-full border border-outline-variant rounded-lg px-3 py-2 text-[13px] bg-surface text-on-surface focus:outline-none focus:border-primary"
+          />
+        </div>
+        {dateError && <p className="text-[11px] text-red-500 md:col-span-2">{dateError}</p>}
       </div>
 
       {/* Description */}
@@ -244,7 +288,7 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
       {/* Progress */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider">Progress</label>
+          <label className="text-[11px] font-semibold text-on-surface-variant uppercase tracking-wider" title="When the project has a funding target, progress follows money raised instead.">Progress</label>
           <span className="text-[13px] font-bold text-primary">{progress}%</span>
         </div>
         <input

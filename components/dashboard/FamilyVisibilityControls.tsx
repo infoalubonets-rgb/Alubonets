@@ -46,7 +46,7 @@ export default function FamilyVisibilityControls({ members }: { members: Attache
                     visibleToMembers: !member.visibleToMembers,
                     allowedFields: (member.allowedFields.length
                       ? member.allowedFields
-                      : ['fullName', 'role', 'familyBranch']) as typeof DIRECTORY_SAFE_FIELDS[number][],
+                      : ['fullName', 'role']) as typeof DIRECTORY_SAFE_FIELDS[number][],
                   })
                   router.refresh()
                 })

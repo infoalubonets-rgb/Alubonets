@@ -31,7 +31,7 @@ export const metadata = {
 export default async function TreasurerContributionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; q?: string; year?: string; purpose?: string; status?: string }>
+  searchParams: Promise<{ page?: string; q?: string; year?: string; purpose?: string; status?: string; member?: string }>
 }) {
   const sp = await searchParams
   const page = parsePage(sp.page)
@@ -40,19 +40,27 @@ export default async function TreasurerContributionsPage({
   const year = (sp.year || '').trim()
   const purpose = (sp.purpose || '').trim()
   const statusFilter = (sp.status || '').trim()
+  const memberId = (sp.member || '').trim()
   const yearStart = year ? new Date(`${year}-01-01T00:00:00.000Z`) : null
   const yearEnd = year ? new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`) : null
+  const [purposeKind, purposeId] = purpose.includes(':') ? purpose.split(':', 2) : ['', '']
+  const purposeFilter: Prisma.ContributionWhereInput | null = !purpose
+    ? null
+    : purposeKind === 'cat'
+      ? { categoryId: purposeId }
+      : purposeKind === 'campaign'
+        ? { campaignId: purposeId }
+        : purposeKind === 'project'
+          ? { projectId: purposeId }
+          : {
+              OR: [
+                { category: { contains: purpose, mode: 'insensitive' as const } },
+                { transactionCategory: { name: { contains: purpose, mode: 'insensitive' as const } } },
+              ],
+            }
   const andFilters: Prisma.ContributionWhereInput[] = [
-    ...(purpose
-      ? [
-          {
-            OR: [
-              { category: { contains: purpose, mode: 'insensitive' as const } },
-              { transactionCategory: { name: { contains: purpose, mode: 'insensitive' as const } } },
-            ],
-          },
-        ]
-      : []),
+    ...(purposeFilter ? [purposeFilter] : []),
+    ...(memberId ? [{ userId: memberId }] : []),
     ...(q
       ? [
           {
@@ -72,6 +80,13 @@ export default async function TreasurerContributionsPage({
     ...(yearStart && yearEnd ? { paidAt: { gte: yearStart, lt: yearEnd } } : {}),
     ...(andFilters.length ? { AND: andFilters } : {}),
   }
+
+  const [members, purposeCategories, purposeCampaigns, purposeProjects] = await Promise.all([
+    prisma.user.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, membershipNumber: true } }),
+    prisma.transactionCategory.findMany({ where: { type: { not: 'EXPENSE' } }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    prisma.contributionCampaign.findMany({ orderBy: { startsAt: 'desc' }, select: { id: true, title: true } }),
+    prisma.project.findMany({ orderBy: { title: 'asc' }, select: { id: true, title: true } }),
+  ])
 
   const [data, chart, analytics, mpesaContributions, failedPayments, contribTotal, recent, pendingRows] =
     await Promise.all([
@@ -93,7 +108,12 @@ export default async function TreasurerContributionsPage({
       prisma.contribution.count({ where: contributionWhere }),
       prisma.contribution.findMany({
         where: contributionWhere,
-        include: { user: { select: { fullName: true, email: true } } },
+        include: {
+          user: { select: { fullName: true, email: true } },
+          transactionCategory: { select: { name: true } },
+          campaign: { select: { title: true } },
+          project: { select: { title: true } },
+        },
         orderBy: { paidAt: 'desc' },
         skip: paginationSkip(page, pageSize),
         take: pageSize,
@@ -255,7 +275,30 @@ export default async function TreasurerContributionsPage({
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
-            <input name="purpose" defaultValue={purpose} placeholder="Purpose / category" className="rounded-lg border px-3 py-1.5 text-sm" />
+            <select name="member" defaultValue={memberId} className="rounded-lg border px-3 py-1.5 text-sm">
+              <option value="">All members</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.fullName}{member.membershipNumber ? ` (${member.membershipNumber})` : ''}
+                </option>
+              ))}
+            </select>
+            <select name="purpose" defaultValue={purpose} className="rounded-lg border px-3 py-1.5 text-sm">
+              <option value="">All purposes</option>
+              <optgroup label="Purposes">
+                {purposeCategories.map((category) => <option key={category.id} value={`cat:${category.id}`}>{category.name}</option>)}
+              </optgroup>
+              {purposeCampaigns.length > 0 && (
+                <optgroup label="Campaigns">
+                  {purposeCampaigns.map((campaign) => <option key={campaign.id} value={`campaign:${campaign.id}`}>{campaign.title}</option>)}
+                </optgroup>
+              )}
+              {purposeProjects.length > 0 && (
+                <optgroup label="Projects">
+                  {purposeProjects.map((project) => <option key={project.id} value={`project:${project.id}`}>{project.title}</option>)}
+                </optgroup>
+              )}
+            </select>
             <select name="status" defaultValue={statusFilter} className="rounded-lg border px-3 py-1.5 text-sm">
               <option value="">Confirmed / reconciled</option>
               <option value="PENDING">Pending</option>
@@ -269,6 +312,7 @@ export default async function TreasurerContributionsPage({
             <thead>
               <tr className="text-left text-on-surface-variant">
                 <th className="py-2">Member</th>
+                <th>Purpose</th>
                 <th>Amount</th>
                 <th>Method</th>
                 <th>Status</th>
@@ -281,6 +325,10 @@ export default async function TreasurerContributionsPage({
               {recent.map((c) => (
                 <tr key={c.id} className="border-t">
                   <td className="py-2">{c.user.fullName}</td>
+                  <td>
+                    {c.campaign?.title || c.project?.title || c.transactionCategory?.name || c.category || '—'}
+                    {c.contributionPeriod ? <span className="text-xs text-on-surface-variant"> · {c.contributionPeriod}</span> : null}
+                  </td>
                   <td>{c.amount.toLocaleString()}</td>
                   <td>{c.paymentMethod}</td>
                   <td>{c.status}</td>
@@ -307,7 +355,7 @@ export default async function TreasurerContributionsPage({
             pathname="/dashboard/treasurer/contributions"
             page={page}
             totalPages={totalPages(contribTotal, pageSize)}
-            params={{ q, year, purpose, status: statusFilter }}
+            params={{ q, year, purpose, status: statusFilter, member: memberId }}
           />
         </section>
       </div>

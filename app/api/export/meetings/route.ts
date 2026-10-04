@@ -12,6 +12,11 @@ import {
 } from 'docx'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
+import {
+  ATTENDANCE_RECORDS_INCLUDE,
+  attendanceLists,
+  type AttendanceRecordForExport,
+} from '@/lib/meeting-attendance'
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString('en-KE', {
@@ -70,6 +75,7 @@ function meetingSection(m: {
   minutes: string | null
   aob: string | null
   nextMeetingAt: Date | null
+  attendanceRecords?: AttendanceRecordForExport[]
 }) {
   const children: Paragraph[] = [
     // Meeting title
@@ -105,13 +111,14 @@ function meetingSection(m: {
     children.push(sectionHeading('Opening'), ...bodyPara(m.opening))
   }
 
-  const hasAttendance = m.attendees || m.membersApology || m.membersAbsent
-  if (hasAttendance) {
+  const attendance = attendanceLists(m)
+  if (attendance.present || attendance.apology || attendance.absent) {
+    const asList = (value: string) => value.split('\n').join(', ')
     children.push(
       sectionHeading('Attendance'),
-      ...labelValue('Present', m.attendees),
-      ...labelValue('Absent with apology', m.membersApology),
-      ...labelValue('Absent', m.membersAbsent),
+      ...labelValue('Present', asList(attendance.present)),
+      ...labelValue('Absent with apology', asList(attendance.apology)),
+      ...labelValue('Absent', asList(attendance.absent)),
     )
   }
 
@@ -146,7 +153,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const meetings = await prisma.meeting.findMany({ orderBy: { heldAt: 'desc' }, take: 50 })
+  const meetings = await prisma.meeting.findMany({
+    orderBy: { heldAt: 'desc' },
+    take: 50,
+    include: { attendanceRecords: ATTENDANCE_RECORDS_INCLUDE },
+  })
 
   const coverSection = {
     children: [

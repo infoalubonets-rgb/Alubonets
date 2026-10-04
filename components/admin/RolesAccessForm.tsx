@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   setMemberDashboardAccess,
   setMemberRole,
+  setPrincipalStatus,
   setSuperAdminFlag,
 } from '@/app/actions/members'
 import { ALL_ROLES, ROLE_LABEL, type Role } from '@/lib/auth/types'
@@ -16,6 +17,9 @@ export type RolesUser = {
   email: string
   role: Role
   isSuperAdmin: boolean
+  isPrincipal: boolean
+  attachedToPrincipal: boolean
+  active: boolean
   dashboardAccess: Role[]
 }
 
@@ -109,6 +113,10 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
 
   const toggleAccess = (r: Role) => {
     if (!role || r === role) return
+    if (r === 'ADMIN' && !actorIsSuperAdmin) {
+      setError('Only a Super Admin can grant or remove Admin access')
+      return
+    }
     setAccess((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]))
   }
 
@@ -119,6 +127,10 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
     }
     if (selected.isSuperAdmin) {
       setError('Super Admin accounts cannot be changed by other members')
+      return
+    }
+    if (selected.role === 'ADMIN' && !actorIsSuperAdmin) {
+      setError('Only a Super Admin can change an Admin account')
       return
     }
     setError('')
@@ -162,6 +174,33 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
       }
     })
   }
+
+  const togglePrincipal = () => {
+    if (!selected) return
+    setError('')
+    setOk('')
+    startTransition(async () => {
+      try {
+        await setPrincipalStatus({
+          userId: selected.id,
+          isPrincipal: !selected.isPrincipal,
+          reason: selected.isPrincipal ? 'Removed as Principal from Roles & access' : 'Made Principal from Roles & access',
+        })
+        setOk(selected.isPrincipal ? 'Principal status removed' : 'Member is now a Principal')
+        router.refresh()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not update Principal status')
+      }
+    })
+  }
+
+  const principalBlockedReason = !selected
+    ? ''
+    : !selected.isPrincipal && !selected.active
+      ? 'Only active members can be Principals'
+      : !selected.isPrincipal && selected.attachedToPrincipal
+        ? 'Attached to another Principal — transfer or detach first'
+        : ''
 
   const accountSummary = selected
     ? selected.fullName.split(' ')[0]
@@ -238,6 +277,36 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
             <span
               className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
                 selected.isSuperAdmin ? 'left-5' : 'left-0.5'
+              }`}
+            />
+          </button>
+        </div>
+      )}
+
+      {selected && (
+        <div className="flex items-center justify-between rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-3 shadow-[0_4px_12px_rgba(20,32,51,0.05)]">
+          <div>
+            <p className="font-label-bold text-sm text-on-surface">Principal member</p>
+            <p className="text-[11px] text-on-surface-variant">
+              {principalBlockedReason
+                || (selected.isPrincipal
+                  ? 'Heads a family branch — attached members inherit paid-up standing'
+                  : 'Make this member the head of a family branch')}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={pending || Boolean(principalBlockedReason)}
+            onClick={togglePrincipal}
+            title={selected.isPrincipal ? 'Remove Principal status' : 'Make Principal'}
+            className={`relative h-7 w-12 rounded-full transition-colors disabled:opacity-50 ${
+              selected.isPrincipal ? 'bg-secondary-container' : 'bg-outline-variant'
+            }`}
+            aria-pressed={selected.isPrincipal}
+          >
+            <span
+              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                selected.isPrincipal ? 'left-5' : 'left-0.5'
               }`}
             />
           </button>

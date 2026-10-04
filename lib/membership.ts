@@ -37,7 +37,7 @@ export const registrationSchema = z.object({
   location: requiredText('Location/address', 250),
   gender: z.enum(GENDERS),
   dateOfBirth: z.coerce.date().refine((date) => date < new Date(), 'Date of birth must be in the past'),
-  familyBranch: requiredText('Family branch', 120),
+  familyBranch: z.string().trim().max(120).optional().transform((value) => value || undefined),
   nextOfKinName: requiredText('Next of kin name', 120),
   nextOfKinPhone: requiredText('Next of kin phone', 40),
   nextOfKinRelationship: requiredText('Next-of-kin relationship', 80),

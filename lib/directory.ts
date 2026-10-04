@@ -1,7 +1,6 @@
 export const DIRECTORY_SAFE_FIELDS = [
   'fullName',
   'role',
-  'familyBranch',
   'profession',
   'skills',
   'location',
@@ -22,7 +21,6 @@ export type DirectoryMember = {
   principalName: string | null
   isPrincipal: boolean
   role: string | null
-  familyBranch: string | null
   profession: string | null
   skills: string | null
   location: string | null

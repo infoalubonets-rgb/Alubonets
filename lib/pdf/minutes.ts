@@ -7,12 +7,14 @@ import type {
   User,
 } from '@prisma/client'
 import { SITE_LOGO } from '@/lib/constants'
+import { attendanceLists, type AttendanceRecordForExport } from '@/lib/meeting-attendance'
 
 export type MeetingForPdf = Meeting & {
   recorder?: Pick<User, 'fullName' | 'email'> | null
   agendaItems?: MeetingAgendaItem[]
   actionPoints?: (MeetingActionPoint & { owner?: Pick<User, 'fullName'> | null })[]
   decisions?: MeetingDecision[]
+  attendanceRecords?: AttendanceRecordForExport[]
 }
 
 const PAGE_W = 595
@@ -182,16 +184,17 @@ export async function buildMeetingMinutesPdf(meeting: MeetingForPdf): Promise<Ui
   ctx.y -= 18
 
   // ── Attendance section ────────────────────────────────────────────────────
-  const hasAttendance = meeting.attendees || meeting.membersApology || meeting.membersAbsent
+  const attendance = attendanceLists(meeting)
+  const hasAttendance = attendance.present || attendance.apology || attendance.absent
   if (hasAttendance) {
     ensureSpace(ctx, 44)
     ctx.page.drawRectangle({ x: MX, y: ctx.y - 2, width: 3, height: 14, color: BRIGHT })
     ctx.page.drawText('ATTENDANCE', { x: MX + 9, y: ctx.y, size: 9, font: bold, color: NAVY })
     ctx.y -= 18
 
-    drawAttendanceRow(ctx, 'Present', meeting.attendees, DARK)
-    drawAttendanceRow(ctx, 'Absent with apology', meeting.membersApology, MUTED)
-    drawAttendanceRow(ctx, 'Absent', meeting.membersAbsent, MUTED)
+    drawAttendanceRow(ctx, 'Present', attendance.present, DARK)
+    drawAttendanceRow(ctx, 'Absent with apology', attendance.apology, MUTED)
+    drawAttendanceRow(ctx, 'Absent', attendance.absent, MUTED)
     ctx.y -= 6
   }
 

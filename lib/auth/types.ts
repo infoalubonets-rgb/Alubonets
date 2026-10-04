@@ -61,7 +61,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   EXECUTIVE: 'Executive Committee',
   TREASURER: 'Treasurer',
   SECRETARY: 'Secretary',
-  ORGANIZER: 'Organizer',
+  ORGANIZER: 'Organizing Secretary',
   MEMBER: 'Member',
   AUDITOR: 'Auditor (read-only)',
 }

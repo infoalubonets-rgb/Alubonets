@@ -3,6 +3,9 @@ import ProjectCard from '@/components/content/ProjectCard'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
+import MemberGate from '@/components/public/MemberGate'
+import { getMemberStanding } from '@/lib/membership-standing-sync'
+import { hasPaidUpAccess } from '@/lib/membership-standing'
 
 export default async function MemberProjectsPage() {
   const actor = await requireActiveRole([
@@ -13,6 +16,16 @@ export default async function MemberProjectsPage() {
     'ORGANIZER',
     'MEMBER',
   ])
+  const { standing, reason } = await getMemberStanding(actor.id)
+  if (!hasPaidUpAccess({ role: actor.role, isSuperAdmin: actor.isSuperAdmin, standing })) {
+    return (
+      <DashboardShell role={actor.role} title="Projects" nav={navForRole(actor.role)}>
+        <div className="p-4 md:p-6">
+          <MemberGate variant="renew" what="Projects" reason={reason} />
+        </div>
+      </DashboardShell>
+    )
+  }
   const projects = await prisma.project.findMany({
     orderBy: { updatedAt: 'desc' },
     select: {

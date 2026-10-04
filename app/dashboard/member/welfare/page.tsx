@@ -1,5 +1,6 @@
-import { notFound, redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import ModuleDisabled from '@/components/dashboard/ModuleDisabled'
 import WelfareHistoryTable from '@/components/dashboard/WelfareHistoryTable'
 import WelfareRequestForm from '@/components/dashboard/WelfareRequestForm'
 import WelfareSubmitFeedback from '@/components/dashboard/WelfareSubmitFeedback'
@@ -12,7 +13,7 @@ import { prisma } from '@/lib/prisma'
 
 export default async function MemberWelfarePage({ searchParams }: { searchParams: Promise<{ submitted?: string; error?: string }> }) {
   const welfareOn = await isFeatureEnabled(FEATURE_FLAGS.welfareEnabled)
-  if (!welfareOn) notFound()
+  if (!welfareOn) return <ModuleDisabled module="Welfare" />
   const profile = await getSessionProfile()
   if (!profile) redirect('/login')
   const feedback = await searchParams

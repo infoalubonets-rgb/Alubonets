@@ -6,12 +6,13 @@ import PaymentCategoryFields from '@/components/finance/PaymentCategoryFields'
 import { filterSelectableCategories } from '@/lib/payment-categories'
 
 export default async function ReconciliationPage() {
-  const [events, members, categories, campaigns, reconciled] = await Promise.all([
+  const [events, members, categories, campaigns, reconciled, projects] = await Promise.all([
     prisma.paymentEvent.findMany({ where:{status:'UNMATCHED'},orderBy:{receivedAt:'desc'} }),
     prisma.user.findMany({where:{status:'ACTIVE'},orderBy:{fullName:'asc'},select:{id:true,fullName:true,membershipNumber:true,phone:true}}),
     prisma.transactionCategory.findMany({where:{active:true},orderBy:{name:'asc'}}),
     prisma.contributionCampaign.findMany({where:{active:true},orderBy:{startsAt:'desc'}}),
     prisma.reconciliation.findMany({orderBy:{reconciledAt:'desc'},take:50,include:{transaction:true,paymentEvent:true,reconciledBy:true}}),
+    prisma.project.findMany({ where: { status: { not: 'COMPLETED' } }, orderBy: { title: 'asc' }, select: { id: true, title: true } }),
   ])
   const incomeCategories = filterSelectableCategories(categories, 'income')
 
@@ -38,11 +39,13 @@ export default async function ReconciliationPage() {
                       <option key={m.id} value={m.id}>{m.membershipNumber || '—'} · {m.fullName} · {m.phone || ''}</option>
                     ))}
                   </select>
-                  <PaymentCategoryFields categories={incomeCategories} kind="income" showDescription={false} />
-                  <select name="campaignId" className="rounded-lg border px-3 py-2">
-                    <option value="">No campaign</option>
-                    {campaigns.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-                  </select>
+                  <PaymentCategoryFields
+                    categories={incomeCategories}
+                    kind="income"
+                    showDescription={false}
+                    campaigns={campaigns.map((c) => ({ id: c.id, title: c.title, categoryId: c.categoryId }))}
+                    projects={projects}
+                  />
                   <input name="notes" required minLength={5} maxLength={1000} placeholder="Reconciliation notes" className="rounded-lg border px-3 py-2 md:col-span-2" />
                   <button className="w-fit rounded-full bg-primary px-4 py-2 text-on-primary">Match and reconcile</button>
                 </form>

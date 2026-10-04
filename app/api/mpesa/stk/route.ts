@@ -3,6 +3,7 @@ import { getSessionProfile } from '@/lib/auth/session'
 import { mpesaConfigured, stkPush } from '@/lib/mpesa/daraja'
 import { prisma } from '@/lib/prisma'
 import { writeAudit } from '@/lib/audit'
+import { resolveStkPurpose } from '@/lib/mpesa/purpose'
 
 export async function POST(req: NextRequest) {
   const profile = await getSessionProfile()
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest) {
   let phone = ''
   let amount = 0
   let userId = profile.id
+  let rawPurpose: Record<string, string | undefined> = {}
+  const pick = (value: unknown) => (value ? String(value) : undefined)
 
   if (contentType.includes('application/json')) {
     const body = await req.json()
@@ -39,6 +42,12 @@ export async function POST(req: NextRequest) {
     amount = Number(body.amount || 0)
     if (body.userId && (profile.role === 'ADMIN' || profile.role === 'TREASURER')) {
       userId = String(body.userId)
+    }
+    rawPurpose = {
+      categoryId: pick(body.categoryId),
+      campaignId: pick(body.campaignId),
+      projectId: pick(body.projectId),
+      contributionPeriod: pick(body.contributionPeriod),
     }
   } else {
     const form = await req.formData()
@@ -48,10 +57,26 @@ export async function POST(req: NextRequest) {
     if (formUser && (profile.role === 'ADMIN' || profile.role === 'TREASURER')) {
       userId = formUser
     }
+    rawPurpose = {
+      categoryId: pick(form.get('categoryId')),
+      campaignId: pick(form.get('campaignId')),
+      projectId: pick(form.get('projectId')),
+      contributionPeriod: pick(form.get('contributionPeriod')),
+    }
   }
 
   if (!phone || !amount) {
     return NextResponse.json({ error: 'phone and amount required' }, { status: 400 })
+  }
+
+  let purpose
+  try {
+    purpose = await resolveStkPurpose(rawPurpose)
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Invalid payment purpose' },
+      { status: 400 },
+    )
   }
 
   let result
@@ -79,6 +104,7 @@ export async function POST(req: NextRequest) {
       targetUserId: userId,
       phone,
       amount,
+      ...purpose,
     },
   })
 

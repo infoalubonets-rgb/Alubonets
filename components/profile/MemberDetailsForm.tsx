@@ -198,7 +198,6 @@ export default function MemberDetailsForm({ data }: { data: Details }) {
                   <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
                     {field('phone', 'Phone', 'tel')}
                     {field('location', 'Location / address')}
-                    {field('familyBranch', 'Family branch')}
                   </div>
                 </div>
 

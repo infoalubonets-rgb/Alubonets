@@ -12,6 +12,7 @@ import {
 } from 'docx'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
+import { ATTENDANCE_RECORDS_INCLUDE, attendanceLists } from '@/lib/meeting-attendance'
 
 function fmtDate(d: Date) {
   return d.toLocaleDateString('en-KE', {
@@ -77,6 +78,7 @@ export async function GET(
       agendaItems: { orderBy: { position: 'asc' } },
       actionPoints: { include: { owner: { select: { fullName: true } } } },
       decisions: { orderBy: { decidedAt: 'asc' } },
+      attendanceRecords: ATTENDANCE_RECORDS_INCLUDE,
     },
   })
   if (!meeting) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -133,13 +135,14 @@ export async function GET(
     children.push(sectionHeading('Opening'), ...bodyPara(meeting.opening))
   }
 
-  const hasAttendance = meeting.attendees || meeting.membersApology || meeting.membersAbsent
-  if (hasAttendance) {
+  const attendance = attendanceLists(meeting)
+  if (attendance.present || attendance.apology || attendance.absent) {
+    const asList = (value: string) => value.split('\n').join(', ')
     children.push(
       sectionHeading('Attendance'),
-      ...labelValue('Present', meeting.attendees),
-      ...labelValue('Absent with apology', meeting.membersApology),
-      ...labelValue('Absent', meeting.membersAbsent),
+      ...labelValue('Present', asList(attendance.present)),
+      ...labelValue('Absent with apology', asList(attendance.apology)),
+      ...labelValue('Absent', asList(attendance.absent)),
     )
   }
 

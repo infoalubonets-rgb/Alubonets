@@ -41,6 +41,9 @@ export async function createLedgerContribution(input: {
   description: string
   categoryId: string
   campaignId?: string | null
+  projectId?: string | null
+  /** YYYY-MM month a monthly fee covers; defaults to the payment month for monthly purposes. */
+  contributionPeriod?: string | null
   sourceAccountId: string
   paymentMethod: PaymentMethod
   providerReference?: string | null
@@ -53,7 +56,7 @@ export async function createLedgerContribution(input: {
   proofTitle?: string | null
 }) {
   const occurredAt = input.occurredAt || new Date()
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const period = await getOpenPeriod(occurredAt, tx)
     const source = await tx.financialAccount.findUniqueOrThrow({ where: { id: input.sourceAccountId } })
     if (input.providerReference) {
@@ -113,6 +116,9 @@ export async function createLedgerContribution(input: {
         category: category.name,
         categoryId: input.categoryId,
         campaignId: input.campaignId || null,
+        projectId: input.projectId || null,
+        contributionPeriod: input.contributionPeriod
+          || (category.billingKind === 'MONTHLY' ? occurredAt.toISOString().slice(0, 7) : null),
         sourceAccountId: input.sourceAccountId,
         paymentMethod: input.paymentMethod,
         mpesaRef: input.providerReference || null,
@@ -131,6 +137,24 @@ export async function createLedgerContribution(input: {
     if (input.campaignId) await refreshObligation(input.campaignId, input.userId, tx)
     return { contribution, financial }
   })
+  if (result.contribution.status === 'CONFIRMED' || result.contribution.status === 'RECONCILED') {
+    await recomputeStandingSafely(input.userId, input.actorId)
+  }
+  if (input.projectId) {
+    const { syncProjectFinancials } = await import('@/lib/project-status')
+    await syncProjectFinancials(input.projectId).catch(() => {})
+  }
+  return result
+}
+
+/** Standing must never block a payment from being recorded. */
+export async function recomputeStandingSafely(userId: string, actorId?: string) {
+  try {
+    const { recomputeMemberStanding } = await import('@/lib/membership-standing-sync')
+    await recomputeMemberStanding(userId, actorId)
+  } catch (error) {
+    console.error('[standing] recompute failed', error)
+  }
 }
 
 export async function accountBalances() {

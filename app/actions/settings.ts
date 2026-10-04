@@ -4,10 +4,10 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin } from '@/lib/auth/session'
+import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { FEATURE_FLAGS, setFeatureFlag } from '@/lib/feature-flags'
-import { SETTING_KEYS, setSetting, type SettingKey } from '@/lib/settings'
+import { SETTING_KEYS, setSetting, validateSettingValue, type SettingKey } from '@/lib/settings'
 import { isSystemCategoryCode, uniqueCategoryCode } from '@/lib/payment-categories'
 
 const CATEGORY_NAME_PATTERN = /^[A-Za-z0-9 ()&/,.'-]+$/
@@ -31,6 +31,7 @@ function refreshCategories() {
   revalidatePath('/financial-reports')
   revalidatePath('/dashboard/treasurer/ledger')
   revalidatePath('/dashboard/treasurer/reconciliation')
+  revalidatePath('/dashboard/treasurer/contributions')
 }
 
 export async function updateDirectoryFullAccessRoles(formData: FormData) {
@@ -89,10 +90,12 @@ export async function updateContactFinanceSettings(input: {
   publicEmail: string
   publicPhone: string
   enquiryEmail: string
+  recipients?: string
   approvalThreshold: string
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     const actor = await requireAdmin()
+    const recipients = validateSettingValue(SETTING_KEYS.contactRecipients, input.recipients ?? '')
     const data = z
       .object({
         publicEmail: z.string().trim().email('Enter a valid footer contact email.'),
@@ -128,6 +131,11 @@ export async function updateContactFinanceSettings(input: {
         update: { value: data.enquiryEmail, updatedBy: actor.id },
       }),
       prisma.appSetting.upsert({
+        where: { key: SETTING_KEYS.contactRecipients },
+        create: { key: SETTING_KEYS.contactRecipients, value: recipients, updatedBy: actor.id },
+        update: { value: recipients, updatedBy: actor.id },
+      }),
+      prisma.appSetting.upsert({
         where: { key: SETTING_KEYS.financialApprovalThresholdKes },
         create: {
           key: SETTING_KEYS.financialApprovalThresholdKes,
@@ -143,8 +151,9 @@ export async function updateContactFinanceSettings(input: {
       action: 'CONTACT_FINANCE_SETTINGS_UPDATE',
       entity: 'AppSetting',
       entityId: 'contact_finance',
-      newValue: data,
+      newValue: { ...data, recipients },
     })
+    revalidateTag('app-settings')
 
     // Avoid revalidating /admin/settings here — it remounts the modal and can strand the Save UI.
     revalidatePath('/admin/announcements')
@@ -393,8 +402,11 @@ export async function upsertMembershipClass(formData: FormData) {
   refreshSettings()
 }
 
+const billingKindSchema = z.enum(['NONE', 'MONTHLY', 'ANNUAL']).catch('NONE')
+
 export async function addContributionCategory(formData: FormData) {
-  const actor = await requireAdmin()
+  const actor = await requireActiveRole(['ADMIN', 'TREASURER'])
+  const billingKind = billingKindSchema.parse(formData.get('billingKind') || 'NONE')
   const name = z
     .string()
     .trim()
@@ -409,26 +421,46 @@ export async function addContributionCategory(formData: FormData) {
   if (duplicate) throw new Error('A category with this name already exists.')
   const code = await uniqueCategoryCode(name)
   const row = await prisma.transactionCategory.create({
-    data: { code, name, type: 'BOTH', active: true },
+    data: { code, name, type: billingKind === 'NONE' ? 'BOTH' : 'INCOME', active: true, billingKind },
   })
   await writeAudit({
     userId: actor.id,
     action: 'CONTRIBUTION_CATEGORY_UPSERT',
     entity: 'TransactionCategory',
     entityId: row.id,
-    newValue: { code: row.code, name: row.name },
+    newValue: { code: row.code, name: row.name, billingKind },
   })
   refreshCategories()
   return {
     id: row.id,
     name: row.name,
     type: row.type,
+    billingKind: row.billingKind,
     system: isSystemCategoryCode(row.code),
   }
 }
 
+/** Marks a purpose as the monthly fee or annual subscription used by membership standing. */
+export async function setCategoryBillingKind(formData: FormData) {
+  const actor = await requireActiveRole(['ADMIN', 'TREASURER'])
+  const id = z.string().min(1).parse(formData.get('id'))
+  const billingKind = billingKindSchema.parse(formData.get('billingKind'))
+  const category = await prisma.transactionCategory.findUniqueOrThrow({ where: { id } })
+  if (isSystemCategoryCode(category.code)) throw new Error('System categories cannot be changed.')
+  await prisma.transactionCategory.update({ where: { id }, data: { billingKind } })
+  await writeAudit({
+    userId: actor.id,
+    action: 'CONTRIBUTION_CATEGORY_BILLING_KIND',
+    entity: 'TransactionCategory',
+    entityId: id,
+    oldValue: { billingKind: category.billingKind },
+    newValue: { billingKind },
+  })
+  refreshCategories()
+}
+
 export async function deleteContributionCategory(formData: FormData) {
-  const actor = await requireAdmin()
+  const actor = await requireActiveRole(['ADMIN', 'TREASURER'])
   const id = z.string().min(1).parse(formData.get('id'))
   const category = await prisma.transactionCategory.findUniqueOrThrow({ where: { id } })
   if (isSystemCategoryCode(category.code)) throw new Error('System categories cannot be deleted.')
