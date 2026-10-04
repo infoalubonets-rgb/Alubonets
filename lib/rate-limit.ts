@@ -19,12 +19,12 @@ export async function enforceRateLimit(key: string, limit: number, windowMinutes
   }
 
   const attempts = existing.attempts + 1
-  await prisma.rateLimit.update({
+  const blockedUntil = attempts > limit ? new Date(now.getTime() + windowMs) : null
+  // Upsert: the row can be cleared (successful login, purge) between the read above and this write.
+  await prisma.rateLimit.upsert({
     where: { key },
-    data: {
-      attempts,
-      blockedUntil: attempts > limit ? new Date(now.getTime() + windowMs) : null,
-    },
+    create: { key, attempts: 1, windowStart: now },
+    update: { attempts, blockedUntil },
   })
   if (attempts > limit) throw new Error('Too many attempts. Please wait and try again.')
 }
