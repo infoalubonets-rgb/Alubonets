@@ -16,6 +16,7 @@ import {
   updateStandingSettings,
 } from '@/app/actions/finance'
 import { filterAdminManagedCategories, filterSelectableCategories } from '@/lib/payment-categories'
+import { annualExpiry, annualLastRenewalDay, monthLabel, upcomingMonthlyDeadlines } from '@/lib/membership-standing'
 
 type Category = { id: string; name: string; type: string; code: string; active: boolean; billingKind: string }
 type PendingTx = {
@@ -44,7 +45,6 @@ type Props = {
   approvalThreshold: string
   loanApplicationLimit: string
   standingSettings: StandingSettingsView
-  standingCounts: { paidUp: number; lapsed: number }
   categories: Category[]
   pending: PendingTx[]
   periods: Period[]
@@ -167,7 +167,107 @@ function SavableForm({
   )
 }
 
-export default function AdminFinanceClient({ approvalThreshold, loanApplicationLimit, standingSettings, standingCounts, categories, pending, periods, currentMonth, currentYear, today }: Props) {
+function parseDateInput(value: string) {
+  const date = new Date(`${value}T00:00:00Z`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function shortDate(date: Date) {
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
+
+function DeadlineNote({ children }: { children: ReactNode }) {
+  return (
+    <div className="mt-2 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-[12px] font-normal leading-5 text-on-surface">
+      {children}
+    </div>
+  )
+}
+
+function StandingSettingsForm({ settings, today }: { settings: StandingSettingsView; today: string }) {
+  const [monthlyFee, setMonthlyFee] = useState(String(settings.monthlyFeeKes))
+  const [graceDays, setGraceDays] = useState(String(settings.monthlyGraceDays))
+  const [annualFee, setAnnualFee] = useState(String(settings.annualFeeKes))
+  const [renewalDays, setRenewalDays] = useState(String(settings.annualRenewalDays))
+  const [effectiveFrom, setEffectiveFrom] = useState(settings.effectiveFrom)
+
+  const todayDate = parseDateInput(today) ?? new Date()
+  const fromDate = parseDateInput(effectiveFrom)
+  const grace = Math.min(120, Math.max(0, Math.floor(Number(graceDays) || 0)))
+  const renewal = Math.min(365, Math.max(0, Math.floor(Number(renewalDays) || 0)))
+  const annualFeeValue = Number(annualFee) || 0
+
+  const monthlyRows = fromDate ? upcomingMonthlyDeadlines(todayDate, grace, fromDate) : []
+  const firstAnnualExpiry = fromDate
+  const paidTodayExpiry = fromDate
+    ? annualExpiry([{ amount: annualFeeValue || 1, billingKind: 'ANNUAL', paidAt: todayDate }], annualFeeValue || 1, fromDate)
+    : null
+
+  return (
+    <SavableForm action={updateStandingSettings} submitLabel="Save standing rules" className="grid gap-4 rounded-xl border bg-surface-container-low p-4 sm:grid-cols-2">
+      <label className="flex items-center gap-2 text-sm font-semibold text-on-surface sm:col-span-2">
+        <input name="autoEnabled" type="checkbox" defaultChecked={settings.autoEnabled} className="h-4 w-4" />
+        Update standing automatically from payments
+      </label>
+      <label className="text-sm font-semibold text-on-surface">
+        Monthly fee (KES)
+        <input name="monthlyFeeKes" type="number" min="0" step="1" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+        <FieldHint>Paid under a purpose marked “Monthly”. 0 turns the monthly check off.</FieldHint>
+      </label>
+      <label className="text-sm font-semibold text-on-surface">
+        Monthly grace period (days)
+        <input name="monthlyGraceDays" type="number" min="0" max="120" value={graceDays} onChange={(e) => setGraceDays(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+        <FieldHint>A month’s fee is due by month end; the member lapses this many days into the next month.</FieldHint>
+        {monthlyRows.length > 0 && (
+          <DeadlineNote>
+            <p className="font-semibold">Last day to pay</p>
+            <ul className="mt-0.5">
+              {monthlyRows.map((row) => (
+                <li key={row.month.toISOString()}>
+                  {monthLabel(row.month)} fee → <b>{shortDate(row.lastDay)}</b>
+                </li>
+              ))}
+            </ul>
+            {(Number(monthlyFee) || 0) <= 0 && (
+              <p className="mt-1 text-on-surface-variant">Not enforced while the monthly fee is 0.</p>
+            )}
+          </DeadlineNote>
+        )}
+      </label>
+      <label className="text-sm font-semibold text-on-surface">
+        Annual subscription (KES)
+        <input name="annualFeeKes" type="number" min="0" step="1" value={annualFee} onChange={(e) => setAnnualFee(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+        <FieldHint>Paid under a purpose marked “Annual”. Covers 12 months from the payment date. 0 turns the annual check off.</FieldHint>
+      </label>
+      <label className="text-sm font-semibold text-on-surface">
+        Annual renewal window (days)
+        <input name="annualRenewalDays" type="number" min="0" max="365" value={renewalDays} onChange={(e) => setRenewalDays(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+        <FieldHint>Days after expiry before the member lapses.</FieldHint>
+        {firstAnnualExpiry && paidTodayExpiry && (
+          <DeadlineNote>
+            <p>
+              First payment (members counted from {shortDate(firstAnnualExpiry)}): last day <b>{shortDate(annualLastRenewalDay(firstAnnualExpiry, renewal))}</b>
+            </p>
+            <p className="mt-1">
+              Example: paid on {shortDate(todayDate)} → covered until {shortDate(new Date(paidTodayExpiry.getTime() - 86_400_000))}, last day to renew{' '}
+              <b>{shortDate(annualLastRenewalDay(paidTodayExpiry, renewal))}</b>
+            </p>
+            {annualFeeValue <= 0 && (
+              <p className="mt-1 text-on-surface-variant">Not enforced while the annual subscription is 0.</p>
+            )}
+          </DeadlineNote>
+        )}
+      </label>
+      <label className="text-sm font-semibold text-on-surface sm:col-span-2">
+        Count dues from
+        <input name="effectiveFrom" type="date" required value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+        <FieldHint>Months before this date are never charged. New members are charged from their approval date.</FieldHint>
+      </label>
+    </SavableForm>
+  )
+}
+
+export default function AdminFinanceClient({ approvalThreshold, loanApplicationLimit, standingSettings, categories, pending, periods, currentMonth, currentYear, today }: Props) {
   const router = useRouter()
   const [modal, setModal] = useState<ModalId>(null)
   const adminCategories = filterAdminManagedCategories(categories)
@@ -253,44 +353,7 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
       </FullScreenModal>
 
       <FullScreenModal open={modal === 'standing'} title={titles.standing} onClose={closeModal} size="compact">
-        <p className="text-sm leading-relaxed text-on-surface-variant">
-          Members who fall behind are marked <b>Lapsed</b>: they can still log in and see past events and the gallery, but not upcoming events or projects.
-          As soon as a confirmed payment covers what they owe, they become <b>Paid-up</b> again automatically.
-        </p>
-        <p className="mt-2 text-xs text-on-surface-variant">
-          Currently {standingCounts.paidUp} paid-up · {standingCounts.lapsed} lapsed. Leave a fee at 0 to switch that rule off.
-        </p>
-        <SavableForm action={updateStandingSettings} submitLabel="Save standing rules" className="mt-4 grid gap-4 rounded-xl border bg-surface-container-low p-4 sm:grid-cols-2">
-          <label className="flex items-center gap-2 text-sm font-semibold text-on-surface sm:col-span-2">
-            <input name="autoEnabled" type="checkbox" defaultChecked={standingSettings.autoEnabled} className="h-4 w-4" />
-            Update standing automatically from payments
-          </label>
-          <label className="text-sm font-semibold text-on-surface">
-            Monthly fee (KES)
-            <input name="monthlyFeeKes" type="number" min="0" step="1" defaultValue={standingSettings.monthlyFeeKes} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-            <FieldHint>Paid under a purpose marked “Monthly”.</FieldHint>
-          </label>
-          <label className="text-sm font-semibold text-on-surface">
-            Monthly grace period (days)
-            <input name="monthlyGraceDays" type="number" min="0" max="120" defaultValue={standingSettings.monthlyGraceDays} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-            <FieldHint>A month’s fee is due by month end; the member lapses this many days into the next month.</FieldHint>
-          </label>
-          <label className="text-sm font-semibold text-on-surface">
-            Annual subscription (KES)
-            <input name="annualFeeKes" type="number" min="0" step="1" defaultValue={standingSettings.annualFeeKes} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-            <FieldHint>Paid under a purpose marked “Annual”. Covers 12 months.</FieldHint>
-          </label>
-          <label className="text-sm font-semibold text-on-surface">
-            Annual renewal window (days)
-            <input name="annualRenewalDays" type="number" min="0" max="365" defaultValue={standingSettings.annualRenewalDays} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-            <FieldHint>Days after expiry before the member lapses.</FieldHint>
-          </label>
-          <label className="text-sm font-semibold text-on-surface sm:col-span-2">
-            Count dues from
-            <input name="effectiveFrom" type="date" required defaultValue={standingSettings.effectiveFrom} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-            <FieldHint>Months before this date are never charged. New members are charged from their approval date.</FieldHint>
-          </label>
-        </SavableForm>
+        <StandingSettingsForm settings={standingSettings} today={today} />
       </FullScreenModal>
 
       <FullScreenModal open={modal === 'categories'} title={titles.categories} onClose={closeModal}>

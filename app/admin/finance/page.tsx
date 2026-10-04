@@ -44,7 +44,6 @@ export default async function AdminFinancePage({
     byUser,
     members,
     standingSettings,
-    standingGroups,
   ] = await withDatabaseRetry(() => Promise.all([
     prisma.transactionCategory.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, type: true, code: true, active: true, billingKind: true } }),
     prisma.financialTransaction.findMany({
@@ -60,7 +59,6 @@ export default async function AdminFinancePage({
     prisma.contribution.groupBy({ by: ['userId'], where: contributionWhere, _sum: { amount: true }, _count: true, _max: { paidAt: true } }),
     prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true, email: true }, orderBy: { fullName: 'asc' } }),
     getStandingSettings(),
-    prisma.user.groupBy({ by: ['standing'], where: { status: 'ACTIVE' }, _count: true }),
   ]))
 
   const monthlyMap = new Map<string, number>()
@@ -111,10 +109,6 @@ export default async function AdminFinancePage({
             annualFeeKes: standingSettings.annualFeeKes,
             annualRenewalDays: standingSettings.annualRenewalDays,
             effectiveFrom: standingSettings.effectiveFrom.toISOString().slice(0, 10),
-          }}
-          standingCounts={{
-            paidUp: standingGroups.find((g) => g.standing === 'PAID_UP')?._count ?? 0,
-            lapsed: standingGroups.find((g) => g.standing === 'LAPSED')?._count ?? 0,
           }}
           categories={categories}
           pending={pending.map((tx) => ({
