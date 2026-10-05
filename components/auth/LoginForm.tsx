@@ -58,6 +58,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
       )
     } else if (err === 'inactive') {
       setError('Your account is not active. Contact an administrator.')
+    } else if (err === 'role_inactive') {
+      setError('Your role is currently inactive, so you cannot sign in. Please contact the administrator.')
     } else if (err === 'session_timeout') {
       setError('Your session expired after inactivity. Please sign in again.')
     } else if (err === 'oauth') {

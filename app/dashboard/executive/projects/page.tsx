@@ -1,7 +1,7 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { EXECUTIVE_NAV } from '@/lib/dashboard/nav'
 import { getActiveMembers, getOrganizerProjects } from '@/lib/data/queries'
-import OrganizerProjectsClient from '@/components/dashboard/OrganizerProjectsClient'
+import OrganizerProjectsClient, { NewProjectButton } from '@/components/dashboard/OrganizerProjectsClient'
 
 export default async function ExecutiveProjectsPage() {
   const [projects, members] = await Promise.all([
@@ -10,7 +10,7 @@ export default async function ExecutiveProjectsPage() {
   ])
 
   return (
-    <DashboardShell role="EXECUTIVE" title="Projects" nav={EXECUTIVE_NAV}>
+    <DashboardShell role="EXECUTIVE" title="Projects" nav={EXECUTIVE_NAV} pageAction={<NewProjectButton />}>
       <OrganizerProjectsClient
         projects={projects}
         members={members}

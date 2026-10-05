@@ -27,14 +27,15 @@ export default async function AdminPage() {
   const nav = await navWithLoans('ADMIN')
 
   const stats = [
-    { label: 'Total members',       value: data.totalMembers,                                    icon: 'group',                  href: '/admin/members',   color: 'bg-primary dark:bg-[#0c1e42]',           text: 'text-white', iconBg: 'bg-white/15' },
-    { label: 'Active',              value: data.activeMembers,                                   icon: 'verified_user',          href: '/admin/members',   color: 'bg-secondary-container dark:bg-[#c45e00]', text: 'text-white', iconBg: 'bg-white/15' },
+    { label: 'Total members',       value: data.totalMembers,                                    icon: 'group',                  href: '/admin/accounts',  color: 'bg-primary dark:bg-[#0c1e42]',           text: 'text-white', iconBg: 'bg-white/15' },
+    { label: 'Active',              value: data.activeMembers,                                   icon: 'verified_user',          href: '/admin/accounts',  color: 'bg-secondary-container dark:bg-[#c45e00]', text: 'text-white', iconBg: 'bg-white/15' },
     { label: 'Pending approval',    value: data.pendingMembers,                                  icon: 'pending_actions',        href: '/admin/approvals', color: 'bg-primary-container dark:bg-[#153060]',  text: 'text-white', iconBg: 'bg-white/15' },
     { label: 'Contributions (KES)', value: Math.round(data.totalContributions).toLocaleString(), icon: 'account_balance_wallet', href: null,               color: 'bg-secondary dark:bg-[#7a3a00]',          text: 'text-white', iconBg: 'bg-white/15' },
   ]
 
   const quickLinks = [
-    { label: 'Member registry', description: 'View or export the full member registry', icon: 'group', href: '/admin/members' },
+    { label: 'Accounts', description: 'Members, admins and every role', icon: 'manage_accounts', href: '/admin/accounts' },
+    { label: 'Today / Activities', description: 'What is happening today', icon: 'today', href: '/today' },
     { label: 'Approvals', description: `${data.pendingMembers} pending registration${data.pendingMembers === 1 ? '' : 's'}`, icon: 'pending_actions', href: '/admin/approvals', badge: data.pendingMembers > 0 ? data.pendingMembers : null },
     { label: 'Gallery queue', description: `${data.galleryQueue.length} awaiting publish`, icon: 'photo_library', href: '/admin/gallery-queue', badge: data.galleryQueue.length > 0 ? data.galleryQueue.length : null },
     { label: 'Roles & access', description: 'Assign primary role and dashboards', icon: 'admin_panel_settings', href: '/admin/roles' },

@@ -22,6 +22,8 @@ export async function POST() {
 export async function GET(req: Request) {
   await clearSession()
   const url = new URL(req.url)
-  const dest = url.searchParams.get('to') === 'admin' ? '/admin/login' : '/login'
-  return NextResponse.redirect(new URL(dest, url.origin), { status: 303 })
+  const dest = new URL(url.searchParams.get('to') === 'admin' ? '/admin/login' : '/login', url.origin)
+  const reason = url.searchParams.get('error')
+  if (reason === 'role_inactive') dest.searchParams.set('error', reason)
+  return NextResponse.redirect(dest, { status: 303 })
 }

@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireSessionProfile } from '@/lib/auth/session'
@@ -15,5 +16,6 @@ export async function markNotificationsRead(formData?: FormData) {
     },
     data: { readAt: new Date() },
   })
+  revalidatePath('/notifications')
   return { ok: true }
 }

@@ -38,6 +38,8 @@ enum BillingKind {
   NONE
   MONTHLY
   ANNUAL
+  /// Unused: Postgres cannot drop enum values; the app maps it to NONE.
+  OTHER
 }
 
 enum MeetingAttendanceStatus {
@@ -334,6 +336,8 @@ model User {
   standingCheckedAt          DateTime?
   standingOverride           MemberStanding?
   standingOverrideUntil      DateTime?
+  /// Admin removed contribution rights: the member owes no dues and follows their Principal's standing.
+  contributionExempt         Boolean                    @default(false)
   publicProfileFields        String[]                   @default([])
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
@@ -726,6 +730,10 @@ model FinancialTransaction {
   confirmedAt           DateTime?
   reconciledAt          DateTime?
   reversedAt            DateTime?
+  /// Recorded after its month had closed.
+  addedAfterClose       Boolean                @default(false)
+  /// Approved, reconciled, verified or reversed after its month had closed.
+  editedAfterClose      Boolean                @default(false)
   originalTransactionId String?
   originalTransaction   FinancialTransaction?  @relation("TransactionReversal", fields: [originalTransactionId], references: [id], onDelete: Restrict)
   reversingTransactions FinancialTransaction[] @relation("TransactionReversal")

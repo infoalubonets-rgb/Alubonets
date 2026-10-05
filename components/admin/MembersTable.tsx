@@ -4,17 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { setMemberStanding, setMemberStatus } from '@/app/actions/members'
+import { setContributionRights, setMemberStanding, setMemberStatus } from '@/app/actions/members'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
 
-function buildMembersHref(q: string, branch: string) {
+function buildMembersHref(q: string, branch: string, role = '') {
   const params = new URLSearchParams()
   const trimmed = q.trim()
   if (trimmed) params.set('q', trimmed)
   if (branch) params.set('branch', branch)
+  if (role) params.set('role', role)
   const qs = params.toString()
-  return qs ? `/admin/members?${qs}` : '/admin/members'
+  return qs ? `/admin/accounts?${qs}` : '/admin/accounts'
 }
+
+export type RoleTab = { value: string; label: string; count: number }
 
 export type MembersTableUser = {
   id: string
@@ -34,12 +37,16 @@ export type MembersTableUser = {
   standingReason: string | null
   standingOverride: 'PAID_UP' | 'LAPSED' | null
   standingOverrideUntil: string | null
+  contributionExempt: boolean
+  isMinor: boolean
 }
 
 type Props = {
   users: MembersTableUser[]
   branches?: string[]
-  filters?: { q: string; branch: string }
+  filters?: { q: string; branch: string; role?: string }
+  roleTabs?: RoleTab[]
+  pendingApprovals?: number
 }
 
 function statusStyles(status: string) {
@@ -60,7 +67,10 @@ function statusStyles(status: string) {
 export default function MembersTable({
   users,
   filters = { q: '', branch: '' },
+  roleTabs = [],
+  pendingApprovals = 0,
 }: Props) {
+  const roleFilter = filters.role ?? ''
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -93,12 +103,12 @@ export default function MembersTable({
 
   const applyFilters = useCallback(
     (nextQ: string, nextBranch: string) => {
-      const nextHref = buildMembersHref(nextQ, nextBranch)
-      const currentHref = buildMembersHref(filters.q, filters.branch)
+      const nextHref = buildMembersHref(nextQ, nextBranch, roleFilter)
+      const currentHref = buildMembersHref(filters.q, filters.branch, roleFilter)
       if (nextHref === currentHref) return
       router.push(nextHref)
     },
-    [filters.branch, filters.q, router],
+    [filters.branch, filters.q, roleFilter, router],
   )
 
   const scheduleFilters = useCallback(
@@ -147,6 +157,21 @@ export default function MembersTable({
     })
   }
 
+  const applyContributionRights = (canContribute: boolean) => {
+    if (!selected) return
+    setError('')
+    setOk('')
+    startTransition(async () => {
+      try {
+        await setContributionRights({ userId: selected.id, canContribute })
+        setOk(canContribute ? 'Contribution rights restored' : 'Contribution rights removed')
+        router.refresh()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not update contribution rights')
+      }
+    })
+  }
+
   const setStatus = (status: 'ACTIVE' | 'SUSPENDED' | 'DECEASED' | 'RESIGNED' | 'DISQUALIFIED' | 'INACTIVE') => {
     if (!selected) return
     setError('')
@@ -166,7 +191,7 @@ export default function MembersTable({
     <div className="space-y-4 pb-8 px-4 md:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3 xl:flex-nowrap">
         <div className="min-w-[220px] shrink-0">
-          <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">Member registry</h1>
+          <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">Accounts</h1>
           <p className="text-xs text-on-surface-variant dark:text-blue-200/60">Super Administrator</p>
         </div>
         <form
@@ -200,8 +225,41 @@ export default function MembersTable({
           <span className="material-symbols-outlined text-[17px]">download</span>
           Export
           </Link>
+          <Link
+            href="/admin/approvals"
+            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl bg-secondary-container px-3 text-xs font-bold text-white"
+          >
+            <span className="material-symbols-outlined text-[17px]">pending_actions</span>
+            Approvals
+            {pendingApprovals > 0 && (
+              <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] leading-none text-secondary">{pendingApprovals}</span>
+            )}
+          </Link>
         </form>
       </div>
+
+      {roleTabs.length > 0 && (
+        <nav aria-label="Filter accounts by role" className="flex flex-wrap gap-2">
+          {roleTabs.map((tab) => {
+            const active = tab.value === roleFilter
+            return (
+              <Link
+                key={tab.value || 'all'}
+                href={buildMembersHref(filters.q, filters.branch, tab.value)}
+                aria-current={active ? 'page' : undefined}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  active
+                    ? 'border-primary bg-primary text-on-primary'
+                    : 'border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-primary/40 hover:text-primary'
+                }`}
+              >
+                {tab.label}
+                <span className={`rounded-full px-1.5 text-[10px] leading-4 ${active ? 'bg-white/20' : 'bg-surface-container-high'}`}>{tab.count}</span>
+              </Link>
+            )
+          })}
+        </nav>
+      )}
 
       <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
         <div className="overflow-x-auto">
@@ -235,7 +293,7 @@ export default function MembersTable({
               {users.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-10 text-center text-on-surface-variant">
-                    No members found
+                    No accounts found
                   </td>
                 </tr>
               ) : (
@@ -379,6 +437,25 @@ export default function MembersTable({
                     <button type="button" disabled={pending} onClick={() => applyStanding('LAPSED')} className="h-9 rounded-lg border border-error/40 text-[11px] font-semibold text-error disabled:opacity-50">Mark lapsed</button>
                     <button type="button" disabled={pending || !selected.standingOverride} onClick={() => applyStanding('AUTO')} className="h-9 rounded-lg border border-outline-variant text-[11px] font-semibold disabled:opacity-40">Automatic</button>
                   </div>
+                  <label className="flex items-start justify-between gap-3 rounded-lg border border-outline-variant px-3 py-2.5">
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">Contribution rights</span>
+                      <span className="block text-[11px] text-on-surface-variant">
+                        {selected.isMinor
+                          ? 'Under 18 — follows their Principal’s standing.'
+                          : selected.contributionExempt
+                            ? 'Removed — follows their Principal’s standing.'
+                            : 'Pays their own dues — not affected by their Principal.'}
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4"
+                      checked={!selected.contributionExempt}
+                      disabled={pending}
+                      onChange={(e) => applyContributionRights(e.target.checked)}
+                    />
+                  </label>
                 </section>
                 <section className="pt-1 border-t border-outline-variant">
                   <p className="font-label-bold text-[12px] uppercase tracking-wide text-secondary mb-2">

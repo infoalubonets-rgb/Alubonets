@@ -3,6 +3,7 @@ import { getSessionProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { initialsFromName } from '@/lib/auth/helpers'
 import { logError } from '@/lib/logger'
+import { getDisabledRoles } from '@/lib/disabled-roles'
 
 export async function GET() {
   try {
@@ -40,6 +41,7 @@ export async function GET() {
         isSuperAdmin: profile.isSuperAdmin,
         dashboardAccess: profile.dashboardAccess,
         isPrincipal,
+        disabledRoles: await getDisabledRoles().catch(() => []),
       },
     })
   } catch (cause) {

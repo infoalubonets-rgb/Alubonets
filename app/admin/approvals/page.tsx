@@ -3,10 +3,15 @@ import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import ApprovalsTable, { type ApprovalApplicant } from '@/components/admin/ApprovalsTable'
 import { requireAdmin } from '@/lib/auth/session'
+import { assignableRoles, getDisabledRoles } from '@/lib/disabled-roles'
+import { ROLE_LABEL } from '@/lib/auth/types'
 
 export default async function AdminApprovalsPage() {
   // Only Admin / Super Admin may view applicant PII or approve/assign a Principal Member.
-  await requireAdmin()
+  const actor = await requireAdmin()
+  const roleOptions = assignableRoles(await getDisabledRoles())
+    .filter((role) => role !== 'ADMIN' || actor.isSuperAdmin)
+    .map((role) => ({ value: role, label: ROLE_LABEL[role] }))
   const [pending, principals] = await Promise.all([prisma.user.findMany({
     where: { status: 'PENDING', rejectedAt: null },
     orderBy: { createdAt: 'desc' },
@@ -53,7 +58,7 @@ export default async function AdminApprovalsPage() {
   return (
     <DashboardShell role="ADMIN" title="Approvals" nav={ADMIN_NAV}>
       <div className="p-4 md:p-6">
-        <ApprovalsTable applicants={applicants} principals={principals} />
+        <ApprovalsTable applicants={applicants} principals={principals} roleOptions={roleOptions} />
       </div>
     </DashboardShell>
   )

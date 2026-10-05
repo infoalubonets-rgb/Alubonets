@@ -87,7 +87,7 @@ Sign-off: ______________________  Role: __________
 ## 3.1 Admin
 ## Where to work
 - Overview: `/admin`
-- Members / approvals / roles: `/admin/members`, `/admin/approvals`, `/admin/roles`
+- Members / approvals / roles: `/admin/accounts` (with Approvals link), `/admin/approvals`, `/admin/roles` (under Settings)
 - Settings & feature flags: `/admin/settings`
 - Announcements templates & delivery: `/admin/announcements`
 - Loans approve queue (when enabled): `/admin/loans`
@@ -107,7 +107,7 @@ Sign-off: ______________________  Role: __________
 ## Where to work
 - Overview: `/dashboard/treasurer`
 - Contributions: `/dashboard/treasurer/contributions`
-- Ledger / reconciliation: `/dashboard/treasurer/ledger`, `/dashboard/treasurer/reconciliation`
+- Ledger / reconciliation: `/dashboard/treasurer/ledger`, per-row Reconcile on `/dashboard/treasurer/contributions`
 - Welfare: `/dashboard/treasurer/welfare`
 - Loans review (when enabled): `/dashboard/treasurer/loans`
 

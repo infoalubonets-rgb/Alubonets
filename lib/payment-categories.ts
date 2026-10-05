@@ -44,6 +44,24 @@ export function filterSelectableCategories<T extends { code: string; type: strin
   })
 }
 
+/** Campaign purposes for a self-help group, in display order; Other is always last. */
+export const CAMPAIGN_PURPOSE_NAMES = [
+  'Bereavement Support',
+  'Medical Emergency',
+  'Wedding Support',
+  'Education Support',
+  'Group Investment',
+] as const
+
+export function campaignPurposeCategories<T extends { id: string; name: string; active?: boolean }>(categories: T[]): T[] {
+  const active = categories.filter((category) => category.active !== false)
+  const purposes = CAMPAIGN_PURPOSE_NAMES.map((name) =>
+    active.find((category) => category.name.toLowerCase() === name.toLowerCase()),
+  ).filter((category): category is T => Boolean(category))
+  const other = active.find((category) => category.id === OTHER_CATEGORY_ID)
+  return other ? [...purposes, other] : purposes
+}
+
 export function filterAdminManagedCategories<T extends { code: string; active?: boolean }>(categories: T[]) {
   return categories.filter((category) => category.active !== false && !isSystemCategoryCode(category.code))
 }
@@ -72,7 +90,13 @@ export async function resolvePaymentCategory(input: {
   otherCategoryDescription?: string | null
   actorId: string
   projectId?: string | null
+  campaignId?: string | null
 }) {
+  if (input.campaignId) {
+    // A campaign's purpose was chosen by an admin when it was created (it may be Other).
+    const campaign = await prisma.contributionCampaign.findUniqueOrThrow({ where: { id: input.campaignId }, select: { categoryId: true } })
+    return { categoryId: campaign.categoryId, otherLabel: null as string | null }
+  }
   if (input.projectId) {
     await prisma.project.findUniqueOrThrow({ where: { id: input.projectId }, select: { id: true } })
     const category = await prisma.transactionCategory.findUniqueOrThrow({ where: { id: PROJECT_CATEGORY_ID } })

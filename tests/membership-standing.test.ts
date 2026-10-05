@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   annualExpiry,
+  annualLastRenewalDay,
+  isDependent,
+  resolveFamilyStanding,
+  upcomingAnnualRenewalDay,
+  upcomingMonthlyDeadlines,
   computeStanding,
   hasPaidUpAccess,
   monthlyDeadline,
@@ -10,11 +15,11 @@ import {
 } from '../lib/membership-standing'
 
 const settings = (overrides: Partial<StandingSettings> = {}): StandingSettings => ({
-  autoEnabled: true,
   monthlyFeeKes: 500,
   monthlyGraceDays: 15,
   annualFeeKes: 0,
   annualRenewalDays: 45,
+  annualDueDate: null,
   effectiveFrom: new Date('2026-09-01T00:00:00Z'),
   ...overrides,
 })
@@ -74,30 +79,27 @@ describe('computeStanding', () => {
     expect(result.standing).toBe('PAID_UP')
   })
 
-  it('lapses when the annual subscription is not renewed within the renewal window', () => {
+  it('charges annual subscriptions by calendar year with a renewal window from 1 January', () => {
     const s = settings({ monthlyFeeKes: 0, annualFeeKes: 1200, effectiveFrom: new Date('2025-01-01T00:00:00Z') })
     const payments = [annual(1200, '2025-03-01T00:00:00Z')]
-    expect(computeStanding(payments, member, s, new Date('2026-04-10T00:00:00Z')).standing).toBe('PAID_UP')
-    const late = computeStanding(payments, member, s, new Date('2026-04-20T00:00:00Z'))
+    expect(computeStanding(payments, member, s, new Date('2026-02-14T12:00:00Z')).standing).toBe('PAID_UP')
+    const late = computeStanding(payments, member, s, new Date('2026-02-16T00:00:00Z'))
     expect(late.standing).toBe('LAPSED')
-    expect(late.reason).toContain('Annual subscription')
-    expect(computeStanding(payments, member, { ...s, annualRenewalDays: 90 }, new Date('2026-04-20T00:00:00Z')).standing).toBe('PAID_UP')
+    expect(late.reason).toBe('2026 annual subscription unpaid')
+    expect(computeStanding([...payments, annual(1200, '2026-03-10T00:00:00Z')], member, s, new Date('2026-03-11T00:00:00Z')).standing).toBe('PAID_UP')
   })
 
-  it('extends annual coverage from the current expiry when renewed early', () => {
-    const expiry = annualExpiry([annual(1200, '2025-03-01T00:00:00Z'), annual(1200, '2026-02-01T00:00:00Z')], 1200, new Date('2025-01-01T00:00:00Z'))
-    expect(expiry.toISOString().startsWith('2027-03-01')).toBe(true)
+  it('starts annual dues the January after a mid-year start date', () => {
+    const s = settings({ monthlyFeeKes: 0, annualFeeKes: 1200, effectiveFrom: new Date('2026-10-01T00:00:00Z') })
+    expect(computeStanding([], member, s, new Date('2026-12-31T00:00:00Z')).standing).toBe('PAID_UP')
+    expect(computeStanding([], member, s, new Date('2027-02-16T00:00:00Z')).standing).toBe('LAPSED')
+    expect(annualExpiry([annual(600, '2026-12-01T00:00:00Z'), annual(600, '2027-01-05T00:00:00Z')], 1200, new Date('2026-10-01T00:00:00Z')).toISOString()).toBe('2028-01-01T00:00:00.000Z')
   })
 
   it('applies an Admin override until its end date', () => {
     const overridden = { ...member, override: 'PAID_UP' as const, overrideUntil: new Date('2026-11-01T00:00:00Z') }
     expect(computeStanding([], overridden, settings(), new Date('2026-10-20T00:00:00Z')).standing).toBe('PAID_UP')
     expect(computeStanding([], overridden, settings(), new Date('2026-11-02T00:00:00Z')).standing).toBe('LAPSED')
-  })
-
-  it('treats everyone as paid up when automatic standing is switched off', () => {
-    const result = computeStanding([], member, settings({ autoEnabled: false }), new Date('2027-01-20T00:00:00Z'))
-    expect(result.standing).toBe('PAID_UP')
   })
 })
 
@@ -106,5 +108,81 @@ describe('hasPaidUpAccess', () => {
     expect(hasPaidUpAccess({ role: 'ADMIN', standing: 'LAPSED' })).toBe(true)
     expect(hasPaidUpAccess({ role: 'MEMBER', isSuperAdmin: true, standing: 'LAPSED' })).toBe(true)
     expect(hasPaidUpAccess({ role: 'MEMBER', standing: 'LAPSED' })).toBe(false)
+  })
+})
+
+describe('deadline previews', () => {
+  const day = (iso: string) => new Date(`${iso}T00:00:00Z`)
+  const iso = (date: Date) => date.toISOString().slice(0, 10)
+
+  it('lists the last day to pay for upcoming monthly fees', () => {
+    const rows = upcomingMonthlyDeadlines(day('2026-10-04'), 15, day('2026-10-01'))
+    expect(rows.map((row) => [iso(row.month), iso(row.lastDay)])).toEqual([
+      ['2026-10-01', '2026-11-15'],
+      ['2026-11-01', '2026-12-15'],
+      ['2026-12-01', '2027-01-15'],
+    ])
+  })
+
+  it('rolls long grace periods across month lengths', () => {
+    const rows = upcomingMonthlyDeadlines(day('2026-10-04'), 45, day('2026-10-01'), 1)
+    expect(iso(rows[0].lastDay)).toBe('2026-12-15')
+  })
+
+  it('includes an earlier month that is still inside its grace period', () => {
+    const rows = upcomingMonthlyDeadlines(day('2026-10-04'), 15, day('2026-09-01'), 1)
+    expect([iso(rows[0].month), iso(rows[0].lastDay)]).toEqual(['2026-09-01', '2026-10-15'])
+  })
+
+  it('gives the last renewal day after an annual expiry', () => {
+    expect(iso(annualLastRenewalDay(day('2027-01-01'), 45))).toBe('2027-02-14')
+  })
+
+  it('keeps a picked monthly day, falling back to month end in short months', () => {
+    const rows = upcomingMonthlyDeadlines(day('2026-12-20'), 31, day('2026-10-01'), 3)
+    expect(rows.map((row) => iso(row.lastDay))).toEqual(['2026-12-31', '2027-01-31', '2027-02-28'])
+  })
+
+  it('uses a fixed yearly due date when one is set', () => {
+    const rule = { annualRenewalDays: 45, annualDueDate: '03-15' }
+    expect(iso(upcomingAnnualRenewalDay(day('2026-10-04'), rule, day('2026-10-01')))).toBe('2027-03-15')
+    expect(iso(upcomingAnnualRenewalDay(day('2027-03-16'), rule, day('2026-10-01')))).toBe('2028-03-15')
+    const s = settings({ monthlyFeeKes: 0, annualFeeKes: 1200, annualDueDate: '03-15', effectiveFrom: day('2026-10-01') })
+    expect(computeStanding([], member, s, new Date('2027-03-15T23:00:00Z')).standing).toBe('PAID_UP')
+    expect(computeStanding([], member, s, new Date('2027-03-16T01:00:00Z')).standing).toBe('LAPSED')
+  })
+
+  it('previews the next annual deadline as 45 days into the next charged January', () => {
+    expect(iso(upcomingAnnualRenewalDay(day('2026-10-04'), 45, day('2026-10-01')))).toBe('2027-02-14')
+    expect(iso(upcomingAnnualRenewalDay(day('2026-02-01'), 45, day('2025-01-01')))).toBe('2026-02-14')
+    expect(iso(upcomingAnnualRenewalDay(day('2026-03-01'), 45, day('2025-01-01')))).toBe('2027-02-14')
+  })
+})
+
+describe('family standing', () => {
+  const now = new Date('2026-10-04T00:00:00Z')
+  const lapsed = { standing: 'LAPSED' as const, reason: 'October 2026 monthly fee unpaid', monthlyArrearsKes: 500, annualExpiresAt: null }
+  const paid = { standing: 'PAID_UP' as const, reason: null, monthlyArrearsKes: 0, annualExpiresAt: null }
+
+  it('treats under-18s and members without contribution rights as dependents', () => {
+    expect(isDependent({ contributionExempt: false, dateOfBirth: new Date('2010-01-01T00:00:00Z') }, now)).toBe(true)
+    expect(isDependent({ contributionExempt: false, dateOfBirth: new Date('2008-10-03T00:00:00Z') }, now)).toBe(false)
+    expect(isDependent({ contributionExempt: true, dateOfBirth: null }, now)).toBe(true)
+    expect(isDependent({ contributionExempt: false, dateOfBirth: null }, now)).toBe(false)
+  })
+
+  it('keeps independent adults on their own payments whatever the Principal does', () => {
+    expect(resolveFamilyStanding(lapsed, { manual: false, dependent: false, principalStanding: 'PAID_UP' }).standing).toBe('LAPSED')
+    expect(resolveFamilyStanding(paid, { manual: false, dependent: false, principalStanding: 'LAPSED' }).standing).toBe('PAID_UP')
+  })
+
+  it('makes dependents follow their Principal', () => {
+    expect(resolveFamilyStanding(lapsed, { manual: false, dependent: true, principalStanding: 'PAID_UP' }).standing).toBe('PAID_UP')
+    expect(resolveFamilyStanding(paid, { manual: false, dependent: true, principalStanding: 'LAPSED' }).standing).toBe('LAPSED')
+    expect(resolveFamilyStanding(lapsed, { manual: false, dependent: true, principalStanding: null }).standing).toBe('PAID_UP')
+  })
+
+  it('lets a manual Admin setting win', () => {
+    expect(resolveFamilyStanding(lapsed, { manual: true, dependent: true, principalStanding: 'PAID_UP' }).standing).toBe('LAPSED')
   })
 })

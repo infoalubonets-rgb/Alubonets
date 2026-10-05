@@ -4,9 +4,25 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
-import { createLedgerContribution, getOpenPeriod, recomputeStandingSafely, refreshObligation, transactionNumber } from '@/lib/finance'
+import {
+  compareMonths,
+  createLedgerContribution,
+  currentAccountingMonth,
+  getPeriodForDate,
+  manuallyOpenedPeriodId,
+  markEditedAfterClose,
+  monthsWithData,
+  periodFields,
+  periodOpenBlocker,
+  recomputeStandingSafely,
+  refreshObligation,
+  setManuallyOpenedPeriod,
+  transactionNumber,
+  type MonthRef,
+} from '@/lib/finance'
 import { getStandingSettings, saveStandingSettings } from '@/lib/membership-standing-settings'
 import { syncMembershipStanding } from '@/lib/membership-standing-sync'
+import { ANNUAL_DUE_DATE_PATTERN } from '@/lib/membership-standing'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
 import { createSignedUpload } from '@/lib/upload-signed'
@@ -22,8 +38,83 @@ import {
 } from '@/lib/payment-categories'
 
 const refreshFinance = () => {
-  for (const path of ['/dashboard/treasurer/contributions','/dashboard/treasurer/ledger','/dashboard/treasurer/reconciliation','/dashboard/treasurer/reports','/contributions','/admin/finance']) revalidatePath(path)
+  for (const path of ['/dashboard/treasurer/contributions','/dashboard/treasurer/ledger','/dashboard/treasurer/reports','/contributions','/admin/finance']) revalidatePath(path)
   revalidateTag(TAGS.contributions)
+}
+
+/** Opens one month and closes every other; a past month is remembered so auto-close leaves it open. */
+async function openAccountingPeriod(actorId: string, target: MonthRef, current: MonthRef) {
+  const period = await getPeriodForDate(new Date(Date.UTC(target.year, target.month - 1, 1)))
+  const oldStatus = period.status
+  await prisma.$transaction(async (tx) => {
+    await tx.accountingPeriod.updateMany({
+      where: { status: 'OPEN', id: { not: period.id } },
+      data: { status: 'CLOSED', closedAt: new Date(), closedBy: actorId },
+    })
+    await tx.accountingPeriod.update({ where: { id: period.id }, data: { status: 'OPEN', closedAt: null, closedBy: null } })
+    await setManuallyOpenedPeriod(tx, compareMonths(target, current) < 0 ? period.id : null, actorId)
+  })
+  return { period, oldStatus }
+}
+
+const monthParamSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Pick a valid month.')
+
+export async function toggleAccountingPeriod(formData: FormData) {
+  const actor = await requireAdmin()
+  const [year, month] = monthParamSchema.parse(formData.get('month')).split('-').map(Number)
+  const target = { year, month }
+  const current = currentAccountingMonth()
+  const existing = await prisma.accountingPeriod.findUnique({ where: { year_month: { year, month } } })
+
+  let periodId: string
+  let oldStatus: string
+  let nextStatus: 'OPEN' | 'CLOSED'
+  if (existing?.status === 'OPEN') {
+    nextStatus = 'CLOSED'
+    oldStatus = existing.status
+    periodId = existing.id
+    await prisma.$transaction(async (tx) => {
+      await tx.accountingPeriod.update({
+        where: { id: existing.id },
+        data: { status: 'CLOSED', closedAt: new Date(), closedBy: actor.id },
+      })
+      if ((await manuallyOpenedPeriodId(tx)) === existing.id) await setManuallyOpenedPeriod(tx, null, actor.id)
+    })
+  } else {
+    // Guard here too: the UI hides the button, but a crafted request must not open a future or empty month.
+    const blocker = periodOpenBlocker(target, current, (await monthsWithData(year)).has(month))
+    if (blocker) throw new Error(blocker)
+    nextStatus = 'OPEN'
+    const opened = await openAccountingPeriod(actor.id, target, current)
+    periodId = opened.period.id
+    oldStatus = existing?.status ?? 'NONE'
+  }
+
+  await writeAudit({
+    userId: actor.id,
+    action: 'ACCOUNTING_PERIOD_STATUS_CHANGE',
+    entity: 'AccountingPeriod',
+    entityId: periodId,
+    oldValue: { status: oldStatus },
+    newValue: { status: nextStatus, year, month },
+  })
+  refreshFinance()
+}
+
+/** Leaves an old month and goes back to working in the current one. */
+export async function openCurrentAccountingPeriod() {
+  const actor = await requireAdmin()
+  const current = currentAccountingMonth()
+  const { period, oldStatus } = await openAccountingPeriod(actor.id, current, current)
+  await writeAudit({
+    userId: actor.id,
+    action: 'ACCOUNTING_PERIOD_STATUS_CHANGE',
+    entity: 'AccountingPeriod',
+    entityId: period.id,
+    oldValue: { status: oldStatus },
+    newValue: { status: 'OPEN', year: current.year, month: current.month },
+  })
+  refreshFinance()
 }
 
 export async function createContributionCategory(formData: FormData) {
@@ -132,6 +223,36 @@ export async function setContributionCampaignActive(formData: FormData) {
   refreshCampaigns(data.campaignId)
 }
 
+/**
+ * Deletes campaigns and their member targets. Campaigns with recorded payments are skipped so
+ * ledger records never lose their campaign link — deactivate those instead.
+ */
+export async function deleteContributionCampaigns(campaignIds: string[]) {
+  const actor = await requireActiveRole(['ADMIN', 'TREASURER'])
+  const ids = z.array(z.string().min(1)).min(1).max(200).parse(campaignIds)
+  const campaigns = await prisma.contributionCampaign.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, title: true, _count: { select: { contributions: true } } },
+  })
+  const deletable = campaigns.filter((campaign) => campaign._count.contributions === 0)
+  const skipped = campaigns.filter((campaign) => campaign._count.contributions > 0).map((campaign) => campaign.title)
+
+  if (deletable.length) {
+    await prisma.contributionCampaign.deleteMany({ where: { id: { in: deletable.map((campaign) => campaign.id) } } })
+    for (const campaign of deletable) {
+      await writeAudit({
+        userId: actor.id,
+        action: 'CONTRIBUTION_CAMPAIGN_DELETE',
+        entity: 'ContributionCampaign',
+        entityId: campaign.id,
+        oldValue: { title: campaign.title },
+      })
+    }
+  }
+  refreshCampaigns()
+  return { deleted: deletable.length, skipped }
+}
+
 export async function waiveCampaignObligation(formData: FormData) {
   const actor = await requireActiveRole(['ADMIN', 'TREASURER'])
   const data = z.object({
@@ -206,6 +327,7 @@ export async function recordLedgerContribution(formData: FormData) {
     otherCategoryDescription: data.otherCategoryDescription,
     actorId: actor.id,
     projectId: data.projectId,
+    campaignId: data.campaignId,
   })
   if (!otherLabel) {
     z.string().trim().min(2).max(500).parse(data.description)
@@ -287,10 +409,10 @@ export async function recordExpense(formData: FormData) {
   const threshold = Number((await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value || 50000)
   // Guide: Admin must not bypass finance approval merely because of system role.
   const approvalRequired = data.amount > threshold
-  const period = await getOpenPeriod(data.occurredAt)
+  const period = await getPeriodForDate(data.occurredAt)
   const transaction = await prisma.financialTransaction.create({
     data: {
-      transactionNumber: transactionNumber(), type: 'EXPENSE', status: approvalRequired ? 'PENDING' : 'CONFIRMED', amount: data.amount, description, occurredAt: data.occurredAt, categoryId, periodId: period.id, createdById: actor.id, approvedById: approvalRequired ? null : actor.id, confirmedAt: approvalRequired ? null : new Date(),
+      transactionNumber: transactionNumber(), type: 'EXPENSE', status: approvalRequired ? 'PENDING' : 'CONFIRMED', amount: data.amount, description, occurredAt: data.occurredAt, categoryId, ...periodFields(period), createdById: actor.id, approvedById: approvalRequired ? null : actor.id, confirmedAt: approvalRequired ? null : new Date(),
       entries: { create: [{ accountId: 'acct-expense', debit: data.amount, credit: 0, memo: data.purpose }, { accountId: data.sourceAccountId, debit: 0, credit: data.amount, memo: `Paid to ${data.payee}` }] },
       expense: { create: { payee: data.payee, purpose: data.purpose, approvalRequired, projectId: data.projectId ?? null } },
       supportingDocuments: { create: { title: evidence.evidenceTitle, fileUrl: evidence.evidencePath, mimeType: evidence.evidenceMimeType, uploadedById: actor.id } },
@@ -328,7 +450,7 @@ export async function recordWelfareDisbursement(formData: FormData) {
     evidenceMimeType: formData.get('evidenceMimeType'),
     evidenceTitle: formData.get('evidenceTitle'),
   })
-  const period = await getOpenPeriod(data.occurredAt)
+  const period = await getPeriodForDate(data.occurredAt)
   const category = await prisma.transactionCategory.findUniqueOrThrow({ where: { id: 'cat-welfare-disbursement' } })
   const threshold = Number((await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value || 50000)
   // Guide: Admin must not bypass finance approval merely because of system role.
@@ -343,7 +465,7 @@ export async function recordWelfareDisbursement(formData: FormData) {
         description: `Welfare payment to ${request.user.fullName}`,
         occurredAt: data.occurredAt,
         categoryId: category.id,
-        periodId: period.id,
+        ...periodFields(period),
         createdById: actor.id,
         approvedById: approvalRequired ? null : actor.id,
         confirmedAt: approvalRequired ? null : new Date(),
@@ -374,6 +496,7 @@ export async function approveFinancialTransaction(formData: FormData) {
   }
   const confirmed = await prisma.$transaction(async (tx) => {
     await tx.financialTransaction.update({ where: { id }, data: { status: 'CONFIRMED', approvedById: actor.id, confirmedAt: new Date() } })
+    await markEditedAfterClose(id, tx)
     const linked = await tx.contribution.findUnique({ where: { financialTransactionId: id } })
     if (linked && linked.status === 'PENDING') {
       await tx.contribution.update({ where: { id: linked.id }, data: { status: 'CONFIRMED', verifiedAt: new Date(), verifiedById: actor.id } })
@@ -419,7 +542,7 @@ export async function proposeReversal(formData: FormData) {
   const original = await prisma.financialTransaction.findUniqueOrThrow({ where: { id }, include: { entries: true } })
   if (!['CONFIRMED','RECONCILED'].includes(original.status)) throw new Error('Only confirmed or reconciled transactions can be reversed.')
   const reversal = await prisma.financialTransaction.create({
-    data: { transactionNumber: transactionNumber(), type: 'REVERSAL', status: 'PENDING', amount: original.amount, description: `Reversal of ${original.transactionNumber}`, occurredAt: new Date(), correctionReason: reason, periodId: (await getOpenPeriod(new Date())).id, createdById: actor.id, originalTransactionId: original.id, entries: { create: original.entries.map((entry) => ({ accountId: entry.accountId, debit: entry.credit, credit: entry.debit, memo: reason })) }, adjustment: { create: { reason, oldValue: { status: original.status }, newValue: { requestedStatus: 'REVERSED' } } } },
+    data: { transactionNumber: transactionNumber(), type: 'REVERSAL', status: 'PENDING', amount: original.amount, description: `Reversal of ${original.transactionNumber}`, occurredAt: new Date(), correctionReason: reason, ...periodFields(await getPeriodForDate(new Date())), createdById: actor.id, originalTransactionId: original.id, entries: { create: original.entries.map((entry) => ({ accountId: entry.accountId, debit: entry.credit, credit: entry.debit, memo: reason })) }, adjustment: { create: { reason, oldValue: { status: original.status }, newValue: { requestedStatus: 'REVERSED' } } } },
   })
   await writeAudit({ userId: actor.id, action: 'REVERSAL_PROPOSE', entity: 'FinancialTransaction', entityId: reversal.id, reason, oldValue: { originalId: id, status: original.status }, newValue: { reversalId: reversal.id, status: 'PENDING' }, meta: { originalId: id, reason } })
   refreshFinance()
@@ -437,6 +560,7 @@ export async function approveReversal(formData: FormData) {
   await prisma.$transaction([
     prisma.financialTransaction.update({ where: { id }, data: { status: 'CONFIRMED', approvedById: actor.id, confirmedAt: new Date() } }),
     prisma.financialTransaction.update({ where: { id: reversal.originalTransactionId }, data: { status: 'REVERSED', reversedAt: new Date() } }),
+    markEditedAfterClose(reversal.originalTransactionId),
     prisma.contribution.updateMany({ where: { financialTransactionId: reversal.originalTransactionId }, data: { status: 'REVERSED', correctionReason: reversal.correctionReason } }),
   ])
   const reversedContribution = await prisma.contribution.findUnique({ where: { financialTransactionId: reversal.originalTransactionId }, select: { userId: true } })
@@ -469,6 +593,7 @@ export async function reconcilePaymentEvent(formData: FormData) {
     otherCategoryDescription: data.otherCategoryDescription,
     actorId: actor.id,
     projectId: data.projectId,
+    campaignId: data.campaignId,
   })
   if (otherLabel) otherCategoryDescriptionSchema.parse(data.otherCategoryDescription)
   const event = await prisma.paymentEvent.findUniqueOrThrow({ where: { id: data.eventId } })
@@ -489,7 +614,7 @@ export async function reconcilePaymentEvent(formData: FormData) {
     occurredAt: event.receivedAt,
     status: 'RECONCILED',
   })
-  const period = await getOpenPeriod(event.receivedAt)
+  const period = await getPeriodForDate(event.receivedAt)
   await prisma.$transaction([
     prisma.paymentEvent.update({ where: { id: event.id }, data: { status: 'MATCHED', matchedUserId: data.userId, matchedContributionId: result.contribution.id } }),
     prisma.reconciliation.create({ data: { transactionId: result.financial.id, paymentEventId: event.id, periodId: period.id, notes: data.notes, reconciledById: actor.id } }),
@@ -499,21 +624,54 @@ export async function reconcilePaymentEvent(formData: FormData) {
   refreshFinance()
 }
 
-export async function closeAccountingPeriod(formData: FormData) {
-  const actor = await requireAdmin()
-  const id = z.string().min(1).parse(formData.get('id'))
-  const openPending = await prisma.financialTransaction.count({ where: { periodId: id, status: 'PENDING' } })
-  if (openPending) throw new Error('Resolve pending transactions before closing this period.')
-  await prisma.accountingPeriod.update({ where: { id }, data: { status: 'CLOSED', closedAt: new Date(), closedBy: actor.id } })
-  await writeAudit({ userId: actor.id, action: 'ACCOUNTING_PERIOD_CLOSE', entity: 'AccountingPeriod', entityId: id, reason: 'Accounting period closed', oldValue: { status: 'OPEN' }, newValue: { status: 'CLOSED' } })
-  refreshFinance()
-}
-
-export async function reopenAccountingPeriod(formData: FormData) {
-  const actor = await requireAdmin()
-  const id = z.string().min(1).parse(formData.get('id'))
-  await prisma.accountingPeriod.update({ where: { id }, data: { status: 'OPEN', closedAt: null, closedBy: null } })
-  await writeAudit({ userId: actor.id, action: 'ACCOUNTING_PERIOD_REOPEN', entity: 'AccountingPeriod', entityId: id, reason: 'Accounting period reopened', oldValue: { status: 'CLOSED' }, newValue: { status: 'OPEN' } })
+/** Marks a confirmed payment as matched to the bank / M-Pesa statement. */
+export async function reconcileContribution(formData: FormData) {
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const data = z.object({
+    id: z.string().min(1),
+    statementRef: z.string().trim().max(120).optional(),
+    notes: z.string().trim().min(5, 'Add a short reconciliation note (at least 5 characters).').max(1000),
+  }).parse({
+    id: formData.get('id'),
+    statementRef: formData.get('statementRef') || undefined,
+    notes: formData.get('notes'),
+  })
+  const contribution = await prisma.contribution.findUniqueOrThrow({
+    where: { id: data.id },
+    include: { financialTransaction: { select: { id: true, periodId: true, period: { select: { status: true } }, reconciliation: { select: { id: true } } } } },
+  })
+  if (contribution.status !== 'CONFIRMED') throw new Error('Only confirmed payments can be reconciled.')
+  const transaction = contribution.financialTransaction
+  const now = new Date()
+  await prisma.$transaction([
+    prisma.contribution.update({
+      where: { id: contribution.id },
+      data: {
+        status: 'RECONCILED',
+        reconciliationStatus: 'RECONCILED',
+        reconciledAt: now,
+        ...(data.statementRef ? { statementRef: data.statementRef } : {}),
+      },
+    }),
+    ...(transaction
+      ? [
+          prisma.financialTransaction.update({ where: { id: transaction.id }, data: { status: 'RECONCILED', reconciledAt: now } }),
+          markEditedAfterClose(transaction.id),
+          ...(transaction.reconciliation
+            ? []
+            : [prisma.reconciliation.create({ data: { transactionId: transaction.id, periodId: transaction.periodId, notes: data.notes, reconciledById: actor.id } })]),
+        ]
+      : []),
+  ])
+  await writeAudit({
+    userId: actor.id,
+    action: 'CONTRIBUTION_RECONCILE',
+    entity: 'Contribution',
+    entityId: contribution.id,
+    reason: data.notes,
+    oldValue: { status: contribution.status },
+    newValue: { status: 'RECONCILED', statementRef: data.statementRef ?? contribution.statementRef },
+  })
   refreshFinance()
 }
 
@@ -568,21 +726,21 @@ export async function updateStandingSettings(formData: FormData): Promise<{ ok: 
     const actor = await requireAdmin()
     const previous = await getStandingSettings()
     const data = z.object({
-      autoEnabled: z.enum(['true', 'false']),
       monthlyFeeKes: z.coerce.number().min(0).max(1_000_000),
-      monthlyGraceDays: z.coerce.number().int().min(0).max(120),
+      monthlyGraceDays: z.coerce.number().int().min(1, 'Pick a monthly deadline day from 1 to 28.').max(28, 'Pick a monthly deadline day from 1 to 28.'),
       annualFeeKes: z.coerce.number().min(0).max(10_000_000),
       annualRenewalDays: z.coerce.number().int().min(0).max(365),
+      annualDueDate: z.string().regex(ANNUAL_DUE_DATE_PATTERN).nullable(),
       effectiveFrom: z.coerce.date(),
     }).parse({
-      autoEnabled: formData.get('autoEnabled') === 'on' || formData.get('autoEnabled') === 'true' ? 'true' : 'false',
       monthlyFeeKes: formData.get('monthlyFeeKes') || 0,
       monthlyGraceDays: formData.get('monthlyGraceDays'),
       annualFeeKes: formData.get('annualFeeKes') || 0,
-      annualRenewalDays: formData.get('annualRenewalDays'),
-      effectiveFrom: formData.get('effectiveFrom'),
+      annualRenewalDays: formData.get('annualRenewalDays') ?? previous.annualRenewalDays,
+      annualDueDate: String(formData.get('annualDueDate') ?? '') || previous.annualDueDate,
+      effectiveFrom: previous.effectiveFrom,
     })
-    const next = { ...data, autoEnabled: data.autoEnabled === 'true' }
+    const next = data
     await saveStandingSettings(next, actor.id)
     await writeAudit({
       userId: actor.id,
@@ -594,7 +752,7 @@ export async function updateStandingSettings(formData: FormData): Promise<{ ok: 
     })
     const result = await syncMembershipStanding()
     refreshFinance()
-    revalidatePath('/admin/members')
+    revalidatePath('/admin/accounts')
     return { ok: true, lapsed: result.lapsed, reactivated: result.reactivated }
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'Could not save membership standing settings.')
@@ -636,6 +794,7 @@ export async function verifyContribution(formData: FormData) {
               approvedById: decision === 'verify' ? actor.id : null,
             },
           }),
+          markEditedAfterClose(contribution.financialTransactionId),
         ]
       : []),
   ])

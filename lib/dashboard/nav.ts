@@ -52,10 +52,14 @@ const FAMILY_NAV: NavItem = {
 const SUPPORT_CHAT_NAV: NavItem = { icon: 'support_agent', label: 'Support chat', href: '/support-chat' }
 
 export const ADMIN_NAV: NavItem[] = [
-  { icon: 'dashboard', label: 'Overview', href: '/admin' },
-  { icon: 'group', label: 'Members', href: '/admin/members' },
-  { icon: 'pending_actions', label: 'Approvals', href: '/admin/approvals' },
-  { icon: 'account_balance', label: 'Finance', href: '/admin/finance' },
+  { icon: 'dashboard', label: 'Overview', href: '/admin', children: [TODAY_NAV] },
+  { icon: 'manage_accounts', label: 'Accounts', href: '/admin/accounts', children: [
+    { icon: 'pending_actions', label: 'Approvals', href: '/admin/approvals' },
+  ] },
+  { icon: 'account_balance', label: 'Finance', href: '/admin/finance', children: [
+    // Admins are members too — their own contributions statement lives under Finance.
+    { ...CONTRIBUTIONS_NAV, label: 'Contributions' },
+  ] },
   { icon: 'work', label: 'Projects & events', href: '/dashboard/executive/projects', children: [
     EVENTS_VIEW_NAV,
     { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
@@ -67,14 +71,11 @@ export const ADMIN_NAV: NavItem[] = [
   { icon: 'folder_managed', label: 'Documents', href: '/documents/manage', children: [DOCUMENTS_VIEW_NAV] },
   { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
   { icon: 'contacts', label: 'Directory', href: '/directory' },
-  { icon: 'today', label: 'Today / Activities', href: '/today' },
-  // Admins are members too — keep their own family branch and statement reachable.
   FAMILY_NAV,
-  CONTRIBUTIONS_NAV,
   { icon: 'settings', label: 'Settings', href: '/admin/settings', children: [
+    { icon: 'admin_panel_settings', label: 'Roles & access', href: '/admin/roles' },
     { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
   ] },
-  { icon: 'admin_panel_settings', label: 'Roles & access', href: '/admin/roles' },
 ]
 
 export const EXECUTIVE_NAV: NavItem[] = [
@@ -114,7 +115,6 @@ export const TREASURER_NAV: NavItem[] = [
   { icon: 'payments', label: 'Member contributions', href: '/dashboard/treasurer/contributions' },
   { icon: 'account_balance', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
   { icon: 'flag', label: 'Campaigns', href: '/dashboard/treasurer/campaigns' },
-  { icon: 'rule', label: 'Reconciliation', href: '/dashboard/treasurer/reconciliation' },
   { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
   PROJECTS_VIEW_NAV,
   EVENTS_VIEW_NAV,

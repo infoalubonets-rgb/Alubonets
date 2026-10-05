@@ -16,6 +16,7 @@ import { publicErrorMessage } from '@/lib/safe-error'
 import { consumeMfaRecoveryCode } from '@/lib/mfa-recovery'
 import { writeAudit } from '@/lib/audit'
 import { verifyTotp } from '@/lib/mfa-totp'
+import { getDisabledRoles, isLockedOutByRole, roleInactiveMessage } from '@/lib/disabled-roles'
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
@@ -195,6 +196,14 @@ export async function POST(req: Request) {
       await supabase.auth.signOut()
       return NextResponse.json(
         { error: 'Your account is not active. Please contact the group administrator.' },
+        { status: 403 }
+      )
+    }
+
+    if (isLockedOutByRole(profile, await getDisabledRoles())) {
+      await supabase.auth.signOut()
+      return NextResponse.json(
+        { error: roleInactiveMessage(profile.role), code: 'ROLE_INACTIVE' },
         { status: 403 }
       )
     }

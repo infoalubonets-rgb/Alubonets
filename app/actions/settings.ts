@@ -9,6 +9,7 @@ import { writeAudit } from '@/lib/audit'
 import { FEATURE_FLAGS, setFeatureFlag } from '@/lib/feature-flags'
 import { SETTING_KEYS, setSetting, validateSettingValue, type SettingKey } from '@/lib/settings'
 import { isSystemCategoryCode, uniqueCategoryCode } from '@/lib/payment-categories'
+import { DISABLED_ROLES_SETTING, DISABLED_ROLES_TAG, parseDisabledRoles } from '@/lib/disabled-roles'
 
 const CATEGORY_NAME_PATTERN = /^[A-Za-z0-9 ()&/,.'-]+$/
 
@@ -30,7 +31,6 @@ function refreshCategories() {
   revalidatePath('/admin/finance')
   revalidatePath('/financial-reports')
   revalidatePath('/dashboard/treasurer/ledger')
-  revalidatePath('/dashboard/treasurer/reconciliation')
   revalidatePath('/dashboard/treasurer/contributions')
 }
 
@@ -488,24 +488,33 @@ export async function deleteContributionCategory(formData: FormData) {
   refreshCategories()
 }
 
-export async function setDisabledRoles(formData: FormData) {
+const TOGGLEABLE_ROLES = ['EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER', 'AUDITOR'] as const
+
+export async function setRoleActive(role: string, active: boolean) {
   const actor = await requireAdmin()
-  const roles = formData
-    .getAll('disabledRoles')
-    .map(String)
-    .filter((value) => value !== 'ADMIN' && ['EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER', 'AUDITOR'].includes(value))
-  const value = JSON.stringify(roles)
+  const parsed = z.enum(TOGGLEABLE_ROLES).safeParse(role)
+  if (!parsed.success) throw new Error('That role cannot be deactivated.')
+
+  const row = await prisma.appSetting.findUnique({ where: { key: DISABLED_ROLES_SETTING } })
+  const previous = parseDisabledRoles(row?.value)
+  const next = active
+    ? previous.filter((value) => value !== parsed.data)
+    : Array.from(new Set([...previous, parsed.data]))
+  const value = JSON.stringify(next)
   await prisma.appSetting.upsert({
-    where: { key: 'disabled_roles' },
-    create: { key: 'disabled_roles', value, updatedBy: actor.id },
+    where: { key: DISABLED_ROLES_SETTING },
+    create: { key: DISABLED_ROLES_SETTING, value, updatedBy: actor.id },
     update: { value, updatedBy: actor.id },
   })
   await writeAudit({
     userId: actor.id,
     action: 'ROLE_CATALOGUE_UPDATE',
     entity: 'AppSetting',
-    entityId: 'disabled_roles',
-    newValue: { disabledRoles: roles },
+    entityId: DISABLED_ROLES_SETTING,
+    oldValue: { disabledRoles: previous },
+    newValue: { role: parsed.data, active, disabledRoles: next },
   })
+  revalidateTag(DISABLED_ROLES_TAG)
   revalidatePath('/admin/roles')
+  return { disabledRoles: next }
 }

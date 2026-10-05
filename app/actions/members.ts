@@ -21,6 +21,7 @@ const approveSchema = z.object({
   identityVerified: z.boolean(),
   principalMemberId: z.string().min(1).optional(),
   familyRelationship: z.enum(['SPOUSE', 'CHILD', 'DEPENDENT', 'OTHER']).optional(),
+  role: z.enum(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER', 'AUDITOR']).default('MEMBER'),
 })
 
 export async function createBranchLineage(name: string) {
@@ -36,7 +37,7 @@ export async function createBranchLineage(name: string) {
     return a.localeCompare(b)
   })
   await prisma.appSetting.upsert({ where: { key: 'branch_lineages' }, create: { key: 'branch_lineages', value: JSON.stringify(next), updatedBy: actor.id }, update: { value: JSON.stringify(next), updatedBy: actor.id } })
-  revalidatePath('/admin/members')
+  revalidatePath('/admin/accounts')
 }
 
 export async function assignMemberBranch(userId: string, branch: string) {
@@ -44,7 +45,7 @@ export async function assignMemberBranch(userId: string, branch: string) {
   const clean = z.string().trim().min(1).max(80).parse(branch)
   await prisma.memberProfile.upsert({ where: { userId }, create: { userId, familyBranch: clean }, update: { familyBranch: clean } })
   await writeAudit({ userId: actor.id, action: 'MEMBER_LINEAGE_ASSIGN', entity: 'User', entityId: userId, meta: { lineage: clean } })
-  revalidatePath('/admin/members')
+  revalidatePath('/admin/accounts')
 }
 
 const roleSchema = z.object({
@@ -71,21 +72,24 @@ const superSchema = z.object({
 
 function revalidateAdmin() {
   revalidatePath('/admin')
-  revalidatePath('/admin/members')
+  revalidatePath('/admin/accounts')
   revalidatePath('/admin/approvals')
   revalidatePath('/admin/roles')
   revalidatePath('/admin/gallery-queue')
   revalidatePath('/admin/audit-logs')
 }
 
-export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
+export async function setMemberApproval(input: z.input<typeof approveSchema>) {
   const actor = await requireAdmin()
-  const { userId, approve, note, identityVerified, principalMemberId, familyRelationship } = approveSchema.parse(input)
+  const { userId, approve, note, identityVerified, principalMemberId, familyRelationship, role } = approveSchema.parse(input)
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) throw new Error('User not found')
   if (user.rejectedAt) throw new Error('This application was permanently rejected and cannot be reopened.')
   if (approve && !identityVerified) throw new Error('Confirm identity verification before approval.')
+  if (approve && user.isSuperAdmin) throw new Error('Super Admin accounts cannot be approved here.')
+  if (approve && role === 'ADMIN' && !actor.isSuperAdmin) throw new Error('Only a Super Admin can assign the Admin role')
+  if (approve && !(await isRoleActive(role as Role))) throw new Error('That role is currently deactivated.')
 
   let selectedPrincipal = null
   if (approve && !user.principalMemberId && !user.isPrincipal) {
@@ -141,6 +145,7 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
       where: { id: userId },
       data: {
         status,
+        role: role as Role,
         membershipNumber,
         approvalNotes: approve ? note : null,
         rejectionReason: approve ? null : note,
@@ -176,9 +181,10 @@ export async function setMemberApproval(input: z.infer<typeof approveSchema>) {
     entity: 'User',
     entityId: userId,
     reason: note || (approve ? 'Member approved' : 'Member rejected'),
-    oldValue: { status: user.status },
+    oldValue: { status: user.status, role: user.role },
     newValue: {
       status,
+      role: updated.role,
       membershipNumber: updated.membershipNumber,
       identityVerificationStatus: updated.identityVerificationStatus,
       principalMemberId: updated.principalMemberId,
@@ -357,6 +363,33 @@ export async function setMemberStanding(input: z.infer<typeof standingSchema>) {
     reason: mode === 'AUTO' ? 'Returned to automatic standing' : `Set to ${mode}${untilDate ? ` until ${until}` : ''}`,
     oldValue: { standing: target.standing, override: target.standingOverride, until: target.standingOverrideUntil },
     newValue: { override: mode === 'AUTO' ? null : mode, until: untilDate },
+  })
+  const { recomputeMemberStanding } = await import('@/lib/membership-standing-sync')
+  await recomputeMemberStanding(userId, actor.id)
+  revalidateAdmin()
+}
+
+const contributionRightsSchema = z.object({
+  userId: z.string().min(1),
+  canContribute: z.boolean(),
+})
+
+/** Removing contribution rights makes the member a dependent who follows their Principal's standing. */
+export async function setContributionRights(input: z.infer<typeof contributionRightsSchema>) {
+  const actor = await requireAdmin()
+  const { userId, canContribute } = contributionRightsSchema.parse(input)
+  const target = await prisma.user.findUnique({ where: { id: userId } })
+  if (!target) throw new Error('User not found')
+
+  await prisma.user.update({ where: { id: userId }, data: { contributionExempt: !canContribute } })
+  await writeAudit({
+    userId: actor.id,
+    action: 'MEMBER_CONTRIBUTION_RIGHTS',
+    entity: 'User',
+    entityId: userId,
+    reason: canContribute ? 'Contribution rights restored' : 'Contribution rights removed',
+    oldValue: { contributionExempt: target.contributionExempt },
+    newValue: { contributionExempt: !canContribute },
   })
   const { recomputeMemberStanding } = await import('@/lib/membership-standing-sync')
   await recomputeMemberStanding(userId, actor.id)

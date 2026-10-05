@@ -1,7 +1,14 @@
 import { prisma } from '@/lib/prisma'
 import { writeAudit } from '@/lib/audit'
 import { notifyUsers } from '@/lib/notifications'
-import { computeStanding, type Standing, type StandingPayment, type StandingSettings } from '@/lib/membership-standing'
+import {
+  computeStanding,
+  isDependent,
+  resolveFamilyStanding,
+  type Standing,
+  type StandingPayment,
+  type StandingSettings,
+} from '@/lib/membership-standing'
 import { getStandingSettings } from '@/lib/membership-standing-settings'
 
 type StandingUser = {
@@ -14,6 +21,8 @@ type StandingUser = {
   standingReason: string | null
   standingOverride: Standing | null
   standingOverrideUntil: Date | null
+  contributionExempt: boolean
+  memberProfile: { dateOfBirth: Date | null } | null
 }
 
 const userSelect = {
@@ -26,6 +35,8 @@ const userSelect = {
   standingReason: true,
   standingOverride: true,
   standingOverrideUntil: true,
+  contributionExempt: true,
+  memberProfile: { select: { dateOfBirth: true } },
 } as const
 
 async function paymentsByUser(userIds: string[]) {
@@ -77,12 +88,12 @@ async function applyResults(users: StandingUser[], settings: StandingSettings, a
   let reactivated = 0
   const unchanged: string[] = []
   for (const user of users) {
-    let result = own.get(user.id)!
-    const manual = user.standingOverride && (!user.standingOverrideUntil || user.standingOverrideUntil > now)
-    // Attached family members are covered while their Principal is paid up.
-    if (!manual && result.standing === 'LAPSED' && user.principalMemberId && principalStanding.get(user.principalMemberId) === 'PAID_UP') {
-      result = { ...result, standing: 'PAID_UP', reason: null }
-    }
+    const manual = Boolean(user.standingOverride && (!user.standingOverrideUntil || user.standingOverrideUntil > now))
+    const result = resolveFamilyStanding(own.get(user.id)!, {
+      manual,
+      dependent: isDependent({ contributionExempt: user.contributionExempt, dateOfBirth: user.memberProfile?.dateOfBirth ?? null }, now),
+      principalStanding: user.principalMemberId ? principalStanding.get(user.principalMemberId) ?? null : null,
+    })
     const expiredOverride = user.standingOverride && user.standingOverrideUntil && user.standingOverrideUntil <= now
     const changed = result.standing !== user.standing || result.reason !== user.standingReason
     if (!changed && !expiredOverride) {
@@ -145,7 +156,7 @@ export async function recomputeMemberStanding(userId: string, actorId?: string) 
   }
 }
 
-/** Nightly/hourly sweep over every active member. Principals run first so family members can inherit. */
+/** Nightly/hourly sweep over every active member. Principals run first so dependents can follow them. */
 export async function syncMembershipStanding() {
   const settings = await getStandingSettings()
   const users = await prisma.user.findMany({ where: { status: 'ACTIVE' }, select: userSelect })

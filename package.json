@@ -6,6 +6,7 @@
     "postinstall": "prisma generate",
     "predev": "node scripts/validate-env.mjs",
     "dev": "next dev -p 3001",
+    "dev:turbopack": "next dev --turbopack -p 3001",
     "prebuild": "node scripts/validate-env.mjs && prisma generate",
     "build": "next build",
     "start": "next start -p 3001",

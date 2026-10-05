@@ -6,6 +6,7 @@ import { createServerClient as createServiceClient } from '@/lib/supabase-server
 import type { AuthUser, Role } from './types'
 import { ROLE_HOME } from './types'
 import { isAppRole, toAuthUser } from './helpers'
+import { getDisabledRoles, isLockedOutByRole } from '@/lib/disabled-roles'
 import type { MemberStatus, User } from '@prisma/client'
 
 export type SessionProfile = AuthUser & {
@@ -71,6 +72,14 @@ function makeInitials(fullName: string) {
 }
 
 export async function getSessionProfile(): Promise<SessionProfile | null> {
+  const profile = await loadSessionProfile()
+  if (profile && isLockedOutByRole(profile, await getDisabledRoles())) {
+    redirect('/api/auth/logout?error=role_inactive')
+  }
+  return profile
+}
+
+async function loadSessionProfile(): Promise<SessionProfile | null> {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
 

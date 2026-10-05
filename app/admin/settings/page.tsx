@@ -43,6 +43,15 @@ export default async function AdminSettingsPage() {
   return (
     <DashboardShell role="ADMIN" title="Settings" nav={nav}>
       <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 md:p-6">
+        <Link
+          href="/admin/roles"
+          className="flex flex-col items-start gap-2 rounded-2xl border border-outline-variant/60 bg-surface p-5 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+        >
+          <span className="material-symbols-outlined text-2xl text-primary">admin_panel_settings</span>
+          <span className="font-h3 text-lg text-primary">Roles &amp; access</span>
+          <span className="text-xs text-on-surface-variant">Assign roles and dashboards, and turn roles on or off</span>
+        </Link>
+
         <SettingsSectionButton
           title="Feature flags"
           description="Enable or disable the loans and welfare modules"

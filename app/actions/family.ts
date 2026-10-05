@@ -47,7 +47,7 @@ async function requirePrincipal() {
 function revalidateFamily() {
   revalidatePath('/dashboard/member/family')
   revalidatePath('/dashboard/member')
-  revalidatePath('/admin/members')
+  revalidatePath('/admin/accounts')
 }
 
 export async function linkExistingFamilyMember(input: z.infer<typeof linkSchema>) {

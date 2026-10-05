@@ -1,16 +1,131 @@
 import { randomUUID } from 'crypto'
 import { Prisma, type PaymentMethod } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { appTodayInputValue } from '@/lib/dates'
 
 export const transactionNumber = () =>
   `FT-${new Date().toISOString().replace(/\D/g, '').slice(0, 14)}-${randomUUID().slice(0, 8).toUpperCase()}`
 
-export async function getOpenPeriod(date: Date, tx: Prisma.TransactionClient = prisma) {
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Days after month end before a month closes on its own. */
+export const PERIOD_GRACE_DAYS = 7
+
+/** When a month (1–12) closes automatically: 7 days after it ends. */
+export function periodAutoClosesAt(year: number, month: number) {
+  return new Date(Date.UTC(year, month, 1) + PERIOD_GRACE_DAYS * DAY_MS)
+}
+
+export type MonthRef = { year: number; month: number }
+
+/** The calendar month today falls in, in the group's timezone. */
+export function currentAccountingMonth(now = new Date()): MonthRef {
+  const [year, month] = appTodayInputValue(now).split('-').map(Number)
+  return { year, month }
+}
+
+export function compareMonths(a: MonthRef, b: MonthRef) {
+  return a.year - b.year || a.month - b.month
+}
+
+/**
+ * Why a month cannot be opened, or null when it can. The current month can always be opened;
+ * a future month never; a past month only when something was recorded in it.
+ */
+export function periodOpenBlocker(target: MonthRef, current: MonthRef, hasData: boolean) {
+  const order = compareMonths(target, current)
+  if (order > 0) return 'A future month has no data yet and cannot be opened.'
+  if (order < 0 && !hasData) return 'This month has no data, so there is nothing to open.'
+  return null
+}
+
+/** Months (1–12) of `year` with any ledger transaction or confirmed member contribution. */
+export async function monthsWithData(year: number) {
+  const [periods, contributions] = await Promise.all([
+    prisma.accountingPeriod.findMany({ where: { year, transactions: { some: {} } }, select: { month: true } }),
+    prisma.contribution.findMany({
+      where: {
+        status: { in: ['CONFIRMED', 'RECONCILED'] },
+        paidAt: { gte: new Date(Date.UTC(year, 0, 1)), lt: new Date(Date.UTC(year + 1, 0, 1)) },
+      },
+      select: { paidAt: true },
+    }),
+  ])
+  return new Set([...periods.map((period) => period.month), ...contributions.map((row) => row.paidAt.getUTCMonth() + 1)])
+}
+
+/** A past month an admin opened by hand; auto-close leaves it open until they switch back. */
+const MANUAL_OPEN_PERIOD_KEY = 'accounting_period_manual_open'
+
+export async function manuallyOpenedPeriodId(tx: Prisma.TransactionClient = prisma) {
+  const setting = await tx.appSetting.findUnique({ where: { key: MANUAL_OPEN_PERIOD_KEY } })
+  return setting?.value || null
+}
+
+export function setManuallyOpenedPeriod(tx: Prisma.TransactionClient, periodId: string | null, actorId: string) {
+  return periodId
+    ? tx.appSetting.upsert({
+        where: { key: MANUAL_OPEN_PERIOD_KEY },
+        create: { key: MANUAL_OPEN_PERIOD_KEY, value: periodId, updatedBy: actorId },
+        update: { value: periodId, updatedBy: actorId },
+      })
+    : tx.appSetting.deleteMany({ where: { key: MANUAL_OPEN_PERIOD_KEY } })
+}
+
+/** Closes every open month whose grace period has passed, except one an admin reopened by hand. */
+export async function autoClosePeriods(tx: Prisma.TransactionClient = prisma, now = new Date()) {
+  const keepOpen = await manuallyOpenedPeriodId(tx)
+  return tx.accountingPeriod.updateMany({
+    where: {
+      status: 'OPEN',
+      endsAt: { lt: new Date(now.getTime() - PERIOD_GRACE_DAYS * DAY_MS) },
+      ...(keepOpen ? { id: { not: keepOpen } } : {}),
+    },
+    data: { status: 'CLOSED', closedAt: now },
+  })
+}
+
+/**
+ * The accounting month a date falls in, created if missing and closed if its grace period has passed.
+ * Never blocks: entries in a closed month are allowed and tagged via `periodFields`.
+ */
+export async function getPeriodForDate(date: Date, tx: Prisma.TransactionClient = prisma) {
   const year = date.getUTCFullYear()
   const month = date.getUTCMonth() + 1
-  const period = await tx.accountingPeriod.findUnique({ where: { year_month: { year, month } } })
-  if (!period || period.status !== 'OPEN') throw new Error('The accounting period is closed or unavailable.')
+  let period =
+    (await tx.accountingPeriod.findUnique({ where: { year_month: { year, month } } })) ??
+    (await tx.accountingPeriod.upsert({
+      where: { year_month: { year, month } },
+      create: {
+        id: `period-${year}-${String(month).padStart(2, '0')}`,
+        year,
+        month,
+        startsAt: new Date(Date.UTC(year, month - 1, 1)),
+        endsAt: new Date(Date.UTC(year, month, 1) - 1),
+      },
+      update: {},
+    }))
+  if (
+    period.status === 'OPEN' &&
+    Date.now() >= periodAutoClosesAt(year, month).getTime() &&
+    period.id !== (await manuallyOpenedPeriodId(tx))
+  ) {
+    period = await tx.accountingPeriod.update({ where: { id: period.id }, data: { status: 'CLOSED', closedAt: new Date() } })
+  }
   return period
+}
+
+/** Period link for a new transaction, tagged when it lands in an already-closed month. */
+export function periodFields(period: { id: string; status: string }) {
+  return { periodId: period.id, addedAfterClose: period.status === 'CLOSED' }
+}
+
+/** Tags a transaction as changed after its month closed (no-op while the month is open). */
+export function markEditedAfterClose(transactionId: string, tx: Prisma.TransactionClient | typeof prisma = prisma) {
+  return tx.financialTransaction.updateMany({
+    where: { id: transactionId, period: { status: 'CLOSED' } },
+    data: { editedAfterClose: true },
+  })
 }
 
 export function accountCodeForMethod(method: PaymentMethod) {
@@ -57,7 +172,7 @@ export async function createLedgerContribution(input: {
 }) {
   const occurredAt = input.occurredAt || new Date()
   const result = await prisma.$transaction(async (tx) => {
-    const period = await getOpenPeriod(occurredAt, tx)
+    const period = await getPeriodForDate(occurredAt, tx)
     const source = await tx.financialAccount.findUniqueOrThrow({ where: { id: input.sourceAccountId } })
     if (input.providerReference) {
       const duplicate = await tx.financialTransaction.findUnique({ where: { providerReference: input.providerReference } })
@@ -79,7 +194,7 @@ export async function createLedgerContribution(input: {
         occurredAt,
         providerReference: input.providerReference || null,
         categoryId: input.categoryId,
-        periodId: period.id,
+        ...periodFields(period),
         createdById: input.actorId,
         confirmedAt: status === 'PENDING' || status === 'REJECTED' ? null : new Date(),
         entries: {

@@ -27,15 +27,19 @@ describe('withOptionalNav', () => {
     expect(withOptionalNav(MEMBER_NAV, null)).toEqual(MEMBER_NAV)
   })
 
-  it('inserts loans after finance href', () => {
+  it('adds loans as a related Finance page', () => {
     const nav = withOptionalNav(ADMIN_NAV, LOANS_NAV_ITEMS.admin, '/admin/finance')
-    const financeIdx = nav.findIndex((n) => n.href === '/admin/finance')
-    expect(nav[financeIdx + 1]?.href).toBe('/admin/loans')
+    const finance = nav.find((n) => n.href === '/admin/finance')
+    expect(finance?.children?.some((child) => child.href === '/admin/loans')).toBe(true)
   })
 
-  it('keeps the admin sidebar to 15 top-level sections', () => {
-    // 11 originally, plus Directory, Today/Activities, My Family and My contributions.
-    expect(ADMIN_NAV).toHaveLength(15)
+  it('keeps the admin sidebar to 11 top-level sections', () => {
+    // Approvals, Today, Contributions and Roles live as related pages of Accounts, Overview, Finance and Settings.
+    expect(ADMIN_NAV).toHaveLength(11)
+    const topLevel = ADMIN_NAV.map((item) => item.href)
+    for (const href of ['/admin/members', '/admin/approvals', '/today', '/contributions', '/admin/roles']) {
+      expect(topLevel).not.toContain(href)
+    }
   })
 
   it('keeps every former admin destination in a main section or related page', () => {
@@ -45,7 +49,8 @@ describe('withOptionalNav', () => {
     ])
     expect(adminHrefs).toEqual(expect.arrayContaining([
       '/admin',
-      '/admin/members',
+      '/admin/accounts',
+      '/today',
       '/meetings-reports',
       '/admin/approvals',
       '/admin/gallery-queue',

@@ -9,7 +9,7 @@ import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { requireLoansEnabled } from '@/lib/feature-flags'
 import { getLoanPolicy } from '@/lib/settings'
-import { getOpenPeriod, transactionNumber } from '@/lib/finance'
+import { getPeriodForDate, periodFields, transactionNumber } from '@/lib/finance'
 import { sendAnnouncement } from '@/lib/data/queries'
 import { sendBroadcastEmail } from '@/lib/email/resend'
 import { createServerClient } from '@/lib/supabase-server'
@@ -355,7 +355,7 @@ export async function recordLoanDisbursement(formData: FormData) {
   if (loan.ledgerLinks.length) throw new Error('Loan already has a disbursement recorded.')
   assertNotFuture(data.occurredAt, 'Disbursement date')
   const evidence = await uploadEvidence(actor.id, formData.get('evidence') as File)
-  const period = await getOpenPeriod(data.occurredAt)
+  const period = await getPeriodForDate(data.occurredAt)
   const category = await prisma.transactionCategory.findUniqueOrThrow({
     where: { id: 'cat-loan-disbursement' },
   })
@@ -375,7 +375,7 @@ export async function recordLoanDisbursement(formData: FormData) {
         description: `Loan disbursement to ${loan.applicant.fullName}`,
         occurredAt: data.occurredAt,
         categoryId: category.id,
-        periodId: period.id,
+        ...periodFields(period),
         createdById: actor.id,
         approvedById: approvalRequired ? null : actor.id,
         confirmedAt: approvalRequired ? null : new Date(),
@@ -457,7 +457,7 @@ export async function recordLoanRepayment(formData: FormData) {
   if (loan.status !== 'DISBURSED') throw new Error('Repayments require a disbursed loan.')
   assertNotFuture(data.occurredAt, 'Repayment date')
 
-  const period = await getOpenPeriod(data.occurredAt)
+  const period = await getPeriodForDate(data.occurredAt)
   const category = await prisma.transactionCategory.findUniqueOrThrow({
     where: { id: 'cat-loan-repayment' },
   })
@@ -472,7 +472,7 @@ export async function recordLoanRepayment(formData: FormData) {
         description: `Loan repayment from ${loan.applicant.fullName}`,
         occurredAt: data.occurredAt,
         categoryId: category.id,
-        periodId: period.id,
+        ...periodFields(period),
         createdById: actor.id,
         approvedById: actor.id,
         confirmedAt: new Date(),

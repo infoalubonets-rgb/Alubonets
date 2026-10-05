@@ -26,6 +26,22 @@ const STATUS_COLORS: Record<string, string> = {
   COMPLETED: 'bg-surface-container dark:bg-[#1a2d4f] text-on-surface-variant dark:text-blue-200/60',
 }
 
+const OPEN_NEW_PROJECT_EVENT = 'open-new-project'
+
+/** Rendered in the page header; the projects list below owns the create modal. */
+export function NewProjectButton() {
+  return (
+    <button
+      type="button"
+      onClick={() => window.dispatchEvent(new CustomEvent(OPEN_NEW_PROJECT_EVENT))}
+      className="flex items-center gap-2 rounded-xl bg-primary text-on-primary px-4 py-2 text-[13px] font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm"
+    >
+      <span className="material-symbols-outlined icon-fill" style={{ fontSize: 17 }}>add_circle</span>
+      New project
+    </button>
+  )
+}
+
 export default function OrganizerProjectsClient({
   projects: initialProjects,
   members,
@@ -43,7 +59,12 @@ export default function OrganizerProjectsClient({
 
   useEffect(() => { setLocalProjects(initialProjects) }, [initialProjects])
 
-  function openCreate() { setEditing(null); setOpen(true) }
+  useEffect(() => {
+    const onOpen = () => { setEditing(null); setOpen(true) }
+    window.addEventListener(OPEN_NEW_PROJECT_EVENT, onOpen)
+    return () => window.removeEventListener(OPEN_NEW_PROJECT_EVENT, onOpen)
+  }, [])
+
   function openEdit(p: ProjectRow) { setEditing(p); setOpen(true) }
   function closeModal() { setOpen(false); setEditing(null) }
 
@@ -70,19 +91,9 @@ export default function OrganizerProjectsClient({
   return (
     <div className="space-y-5 p-4 md:p-6 max-w-4xl mx-auto">
 
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[12px] text-on-surface-variant dark:text-blue-200/50">
-          {localProjects.length} project{localProjects.length !== 1 ? 's' : ''}
-        </p>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 rounded-xl bg-primary text-on-primary px-4 py-2 text-[13px] font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm"
-        >
-          <span className="material-symbols-outlined icon-fill" style={{ fontSize: 17 }}>add_circle</span>
-          New project
-        </button>
-      </div>
+      <p className="text-[12px] text-on-surface-variant dark:text-blue-200/50">
+        {localProjects.length} project{localProjects.length !== 1 ? 's' : ''}
+      </p>
 
       {/* Projects list */}
       {localProjects.length === 0 ? (

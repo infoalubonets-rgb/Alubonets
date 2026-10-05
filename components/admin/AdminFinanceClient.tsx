@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import FullScreenModal from '@/components/ui/FullScreenModal'
@@ -8,15 +9,15 @@ import CampaignForm from '@/components/finance/CampaignForm'
 import {
   approveFinancialTransaction,
   approveReversal,
-  closeAccountingPeriod,
   createContributionCategory,
-  reopenAccountingPeriod,
   updateApprovalThreshold,
   updateLoanApplicationLimit,
   updateStandingSettings,
+  toggleAccountingPeriod,
 } from '@/app/actions/finance'
-import { filterAdminManagedCategories, filterSelectableCategories } from '@/lib/payment-categories'
-import { annualExpiry, annualLastRenewalDay, monthLabel, upcomingMonthlyDeadlines } from '@/lib/membership-standing'
+import { campaignPurposeCategories, filterAdminManagedCategories } from '@/lib/payment-categories'
+import { upcomingAnnualRenewalDay, upcomingMonthlyDeadlines } from '@/lib/membership-standing'
+import { ACCOUNTING_PERIOD_CHANGED } from '@/components/dashboard/OldMonthPill'
 
 type Category = { id: string; name: string; type: string; code: string; active: boolean; billingKind: string }
 type PendingTx = {
@@ -28,16 +29,26 @@ type PendingTx = {
   correctionReason: string | null
   createdByName: string
 }
-type Period = { id: string; month: number; monthLabel: string; status: string }
+type Period = {
+  key: string
+  year: number
+  month: number
+  monthLabel: string
+  status: string
+  closesOn: string
+  hasData: boolean
+  /** False for future months and for past months with nothing recorded. */
+  canOpen: boolean
+}
 
 type ModalId = 'threshold' | 'standing' | 'categories' | 'campaigns' | 'transactions' | 'periods' | null
 
 export type StandingSettingsView = {
-  autoEnabled: boolean
   monthlyFeeKes: number
   monthlyGraceDays: number
   annualFeeKes: number
   annualRenewalDays: number
+  annualDueDate: string | null
   effectiveFrom: string
 }
 
@@ -49,7 +60,6 @@ type Props = {
   pending: PendingTx[]
   periods: Period[]
   currentMonth: number
-  currentYear: number
   today: string
 }
 
@@ -176,105 +186,139 @@ function shortDate(date: Date) {
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
-function DeadlineNote({ children }: { children: ReactNode }) {
-  return (
-    <div className="mt-2 rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-[12px] font-normal leading-5 text-on-surface">
-      {children}
-    </div>
-  )
+function NextDeadline({ date }: { date: Date }) {
+  return <p className="mt-1 text-[12px] font-semibold text-red-600">Next deadline: {shortDate(date)}</p>
+}
+
+function dateInputValue(date: Date) {
+  return date.toISOString().slice(0, 10)
 }
 
 function StandingSettingsForm({ settings, today }: { settings: StandingSettingsView; today: string }) {
-  const [monthlyFee, setMonthlyFee] = useState(String(settings.monthlyFeeKes))
-  const [graceDays, setGraceDays] = useState(String(settings.monthlyGraceDays))
-  const [annualFee, setAnnualFee] = useState(String(settings.annualFeeKes))
-  const [renewalDays, setRenewalDays] = useState(String(settings.annualRenewalDays))
-  const [effectiveFrom, setEffectiveFrom] = useState(settings.effectiveFrom)
-
   const todayDate = parseDateInput(today) ?? new Date()
-  const fromDate = parseDateInput(effectiveFrom)
-  const grace = Math.min(120, Math.max(0, Math.floor(Number(graceDays) || 0)))
-  const renewal = Math.min(365, Math.max(0, Math.floor(Number(renewalDays) || 0)))
-  const annualFeeValue = Number(annualFee) || 0
+  const savedFrom = parseDateInput(settings.effectiveFrom) ?? todayDate
+  const [monthlyFee, setMonthlyFee] = useState(String(settings.monthlyFeeKes))
+  const [annualFee, setAnnualFee] = useState(String(settings.annualFeeKes))
+  const [monthlyPick, setMonthlyPick] = useState(() =>
+    dateInputValue(upcomingMonthlyDeadlines(todayDate, settings.monthlyGraceDays, savedFrom, 1)[0].lastDay),
+  )
+  const [annualPick, setAnnualPick] = useState(() =>
+    dateInputValue(upcomingAnnualRenewalDay(todayDate, settings, savedFrom)),
+  )
 
-  const monthlyRows = fromDate ? upcomingMonthlyDeadlines(todayDate, grace, fromDate) : []
-  const firstAnnualExpiry = fromDate
-  const paidTodayExpiry = fromDate
-    ? annualExpiry([{ amount: annualFeeValue || 1, billingKind: 'ANNUAL', paidAt: todayDate }], annualFeeValue || 1, fromDate)
+  const fromDate = savedFrom
+  const monthlyDate = parseDateInput(monthlyPick)
+  const annualDate = parseDateInput(annualPick)
+  // Only the day of the monthly pick and the day + month of the annual pick are stored.
+  const graceDays = monthlyDate ? monthlyDate.getUTCDate() : settings.monthlyGraceDays
+  const annualDueDate = annualDate ? annualPick.slice(5) : settings.annualDueDate
+
+  const nextMonthly = fromDate ? upcomingMonthlyDeadlines(todayDate, graceDays, fromDate, 1)[0]?.lastDay : null
+  const nextAnnual = fromDate
+    ? upcomingAnnualRenewalDay(todayDate, { annualRenewalDays: settings.annualRenewalDays, annualDueDate }, fromDate)
     : null
 
   return (
-    <SavableForm action={updateStandingSettings} submitLabel="Save standing rules" className="grid gap-4 rounded-xl border bg-surface-container-low p-4 sm:grid-cols-2">
-      <label className="flex items-center gap-2 text-sm font-semibold text-on-surface sm:col-span-2">
-        <input name="autoEnabled" type="checkbox" defaultChecked={settings.autoEnabled} className="h-4 w-4" />
-        Update standing automatically from payments
-      </label>
+    <SavableForm action={updateStandingSettings} submitLabel="Save" className="grid gap-4 rounded-xl border bg-surface-container-low p-4 sm:grid-cols-2">
       <label className="text-sm font-semibold text-on-surface">
-        Monthly fee (KES)
+        Monthly contribution (KES)
         <input name="monthlyFeeKes" type="number" min="0" step="1" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-        <FieldHint>Paid under a purpose marked “Monthly”. 0 turns the monthly check off.</FieldHint>
       </label>
       <label className="text-sm font-semibold text-on-surface">
-        Monthly grace period (days)
-        <input name="monthlyGraceDays" type="number" min="0" max="120" value={graceDays} onChange={(e) => setGraceDays(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-        <FieldHint>A month’s fee is due by month end; the member lapses this many days into the next month.</FieldHint>
-        {monthlyRows.length > 0 && (
-          <DeadlineNote>
-            <p className="font-semibold">Last day to pay</p>
-            <ul className="mt-0.5">
-              {monthlyRows.map((row) => (
-                <li key={row.month.toISOString()}>
-                  {monthLabel(row.month)} fee → <b>{shortDate(row.lastDay)}</b>
-                </li>
-              ))}
-            </ul>
-            {(Number(monthlyFee) || 0) <= 0 && (
-              <p className="mt-1 text-on-surface-variant">Not enforced while the monthly fee is 0.</p>
-            )}
-          </DeadlineNote>
-        )}
+        Monthly contribution deadline
+        <input
+          type="date"
+          required
+          value={monthlyPick}
+          onChange={(e) => setMonthlyPick(e.target.value)}
+          className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal"
+        />
+        {/* Every month has a 28th; 29–31 would skip February. */}
+        {monthlyDate && monthlyDate.getUTCDate() > 28 && <FieldHint>Pick a day from 1 to 28 so it falls in every month.</FieldHint>}
+        <input type="hidden" name="monthlyGraceDays" value={graceDays} />
+        {nextMonthly && <NextDeadline date={nextMonthly} />}
       </label>
       <label className="text-sm font-semibold text-on-surface">
-        Annual subscription (KES)
+        Annual contribution (KES)
         <input name="annualFeeKes" type="number" min="0" step="1" value={annualFee} onChange={(e) => setAnnualFee(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-        <FieldHint>Paid under a purpose marked “Annual”. Covers 12 months from the payment date. 0 turns the annual check off.</FieldHint>
       </label>
       <label className="text-sm font-semibold text-on-surface">
-        Annual renewal window (days)
-        <input name="annualRenewalDays" type="number" min="0" max="365" value={renewalDays} onChange={(e) => setRenewalDays(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-        <FieldHint>Days after expiry before the member lapses.</FieldHint>
-        {firstAnnualExpiry && paidTodayExpiry && (
-          <DeadlineNote>
-            <p>
-              First payment (members counted from {shortDate(firstAnnualExpiry)}): last day <b>{shortDate(annualLastRenewalDay(firstAnnualExpiry, renewal))}</b>
-            </p>
-            <p className="mt-1">
-              Example: paid on {shortDate(todayDate)} → covered until {shortDate(new Date(paidTodayExpiry.getTime() - 86_400_000))}, last day to renew{' '}
-              <b>{shortDate(annualLastRenewalDay(paidTodayExpiry, renewal))}</b>
-            </p>
-            {annualFeeValue <= 0 && (
-              <p className="mt-1 text-on-surface-variant">Not enforced while the annual subscription is 0.</p>
-            )}
-          </DeadlineNote>
-        )}
-      </label>
-      <label className="text-sm font-semibold text-on-surface sm:col-span-2">
-        Count dues from
-        <input name="effectiveFrom" type="date" required value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
-        <FieldHint>Months before this date are never charged. New members are charged from their approval date.</FieldHint>
+        Annual contribution deadline
+        <input type="date" required value={annualPick} onChange={(e) => setAnnualPick(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+        <input type="hidden" name="annualDueDate" value={annualDueDate ?? ''} />
+        {nextAnnual && <NextDeadline date={nextAnnual} />}
       </label>
     </SavableForm>
   )
 }
 
-export default function AdminFinanceClient({ approvalThreshold, loanApplicationLimit, standingSettings, categories, pending, periods, currentMonth, currentYear, today }: Props) {
+function PeriodCard({ period, isCurrent, onToggle }: { period: Period; isCurrent: boolean; onToggle: (period: Period) => void }) {
+  const isOpen = period.status === 'OPEN'
+  // Future months and empty past months: nothing to open or view.
+  const noData = !isOpen && !period.canOpen
+  return (
+    <article
+      className={`rounded-lg p-3 transition ${isCurrent ? 'border-2 border-secondary-container bg-secondary-container/10' : 'border border-transparent bg-surface-container-low'} ${noData ? 'opacity-60' : ''}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <b>{period.monthLabel}</b>
+        {isCurrent && <span className="rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold text-on-primary">Current</span>}
+      </div>
+      <p className="mt-1 flex items-center gap-2 text-xs text-on-surface-variant">
+        {noData ? (
+          <span className="inline-flex rounded-full bg-surface-container px-2 py-0.5 text-[11px] font-bold text-on-surface-variant">No data</span>
+        ) : (
+          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${isOpen ? 'bg-green-100 text-green-800' : 'bg-surface-container text-on-surface-variant'}`}>
+            {isOpen ? 'Open' : 'Closed'}
+          </span>
+        )}
+        {isOpen && <span>Closes {period.closesOn}</span>}
+      </p>
+      {!noData && (
+        <div className="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onToggle(period)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold text-white ${isOpen ? 'bg-red-600 hover:bg-red-700' : 'bg-green-700 hover:bg-green-800'}`}
+          >
+            {isOpen ? 'Close month' : 'Open month'}
+          </button>
+          <Link href={`/admin/finance?month=${period.key}`} className="text-xs font-semibold text-primary underline">View month</Link>
+        </div>
+      )}
+    </article>
+  )
+}
+
+export default function AdminFinanceClient({ approvalThreshold, loanApplicationLimit, standingSettings, categories, pending, periods, currentMonth, today }: Props) {
   const router = useRouter()
   const [modal, setModal] = useState<ModalId>(null)
+  const [confirmPeriod, setConfirmPeriod] = useState<Period | null>(null)
+  const [periodPending, setPeriodPending] = useState(false)
+  const [periodError, setPeriodError] = useState('')
   const adminCategories = filterAdminManagedCategories(categories)
-  const campaignCategories = filterSelectableCategories(categories, 'income')
+  const campaignCategories = campaignPurposeCategories(categories)
 
   function closeModal() {
     setModal(null)
+  }
+
+  async function confirmPeriodToggle() {
+    if (!confirmPeriod || periodPending) return
+    setPeriodPending(true)
+    setPeriodError('')
+    try {
+      const formData = new FormData()
+      formData.set('month', confirmPeriod.key)
+      await toggleAccountingPeriod(formData)
+      setConfirmPeriod(null)
+      window.dispatchEvent(new Event(ACCOUNTING_PERIOD_CHANGED))
+      router.refresh()
+    } catch (error) {
+      setPeriodError(error instanceof Error ? error.message : 'Could not update the month. Try again.')
+    } finally {
+      setPeriodPending(false)
+    }
   }
 
   async function afterAction(action: (formData: FormData) => Promise<void>, formData: FormData) {
@@ -356,11 +400,8 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
         <StandingSettingsForm settings={standingSettings} today={today} />
       </FullScreenModal>
 
-      <FullScreenModal open={modal === 'categories'} title={titles.categories} onClose={closeModal}>
+      <FullScreenModal open={modal === 'categories'} title={titles.categories} onClose={closeModal} size="compact">
         <div className="space-y-5">
-          <p className="text-sm text-on-surface-variant">
-            Add categories treasurers can choose when recording a payment. If none fit, they can pick <b>Other</b> and write a short explanation.
-          </p>
           <ContributionCategoriesManager
             categories={categories.filter((category) => category.active).map((category) => ({
               id: category.id,
@@ -372,24 +413,25 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
           />
         </div>
       </FullScreenModal>
-      <FullScreenModal open={modal === 'campaigns'} title={titles.campaigns} onClose={closeModal}>
-        <p className="text-sm leading-relaxed text-on-surface-variant">
-          A campaign has an <b>overall target</b> for the society and, optionally, a <b>target per member</b> (e.g. “Contribution 3 — KES 5,000 each”).
-          Treasurers record payments against it by choosing the campaign as the payment purpose.{' '}
-          <a href="/dashboard/treasurer/campaigns" className="font-semibold text-primary underline">See progress, edit or waive members</a>.
-        </p>
-        <div className="mt-5">
-          <CampaignForm categories={campaignCategories} today={today} />
-        </div>
+      <FullScreenModal open={modal === 'campaigns'} title={titles.campaigns} onClose={closeModal} size="compact">
+        <CampaignForm categories={campaignCategories} today={today} />
+        <Link
+          href="/dashboard/treasurer/campaigns"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-primary/30 px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/5"
+        >
+          <span className="material-symbols-outlined text-[18px]">list</span>
+          View all campaigns
+        </Link>
       </FullScreenModal>
 
-      <FullScreenModal open={modal === 'transactions'} title={titles.transactions} onClose={closeModal}>
-        <p className="mb-4 text-sm text-on-surface-variant">
-          These ledger entries were submitted by the Treasurer (or exceed the approval threshold) and need your sign-off before they are final.
-        </p>
+      <FullScreenModal open={modal === 'transactions'} title={titles.transactions} onClose={closeModal} size="compact">
+        <p className="mb-4 text-sm text-on-surface-variant">Payments waiting for your approval.</p>
         <div className="space-y-3">
           {pending.length === 0 ? (
-            <p className="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">Nothing waiting — all caught up.</p>
+            <p className="flex items-center gap-2 rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
+              <span className="material-symbols-outlined text-[20px] text-emerald-600">check_circle</span>
+              Nothing to approve.
+            </p>
           ) : (
             pending.map((tx) => (
               <article key={tx.id} className="rounded-xl bg-surface-container-low p-4">
@@ -400,7 +442,7 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
                 {tx.correctionReason && <p className="mt-1 text-sm text-on-surface-variant">Reason: {tx.correctionReason}</p>}
                 <form action={(formData) => afterActionKeepOpen(tx.type === 'REVERSAL' ? approveReversal : approveFinancialTransaction, formData)} className="mt-3">
                   <input type="hidden" name="id" value={tx.id} />
-                  <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Approve transaction</button>
+                  <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Approve</button>
                 </form>
               </article>
             ))
@@ -409,38 +451,32 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
       </FullScreenModal>
 
       <FullScreenModal open={modal === 'periods'} title={titles.periods} onClose={closeModal}>
-        <p className="text-sm leading-relaxed text-on-surface-variant">
-          Each calendar month is an accounting period. While <b>open</b>, the Treasurer can record payments in that month.
-          After reconciliation, <b>close</b> the month to lock it. Reopen only if you need to fix something.
-        </p>
-        <p className="mt-2 text-xs text-on-surface-variant">{currentYear} · current month highlighted</p>
-        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {periods.map((period) => {
-            const isCurrent = period.month === currentMonth
-            const isOpen = period.status === 'OPEN'
-            return (
-              <div
-                key={period.id}
-                className={`rounded-lg p-3 ${isCurrent ? 'border-2 border-secondary-container bg-secondary-container/10' : 'bg-surface-container-low'}`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <b>{period.monthLabel}</b>
-                  {isCurrent && <span className="rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold text-on-primary">Current</span>}
-                </div>
-                <p className="mt-1">
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${isOpen ? 'bg-green-100 text-green-800' : 'bg-surface-container text-on-surface-variant'}`}>
-                    {isOpen ? 'Open — accepting entries' : 'Closed — locked'}
-                  </span>
-                </p>
-                <form action={(formData) => afterActionKeepOpen(isOpen ? closeAccountingPeriod : reopenAccountingPeriod, formData)}>
-                  <input type="hidden" name="id" value={period.id} />
-                  <button type="submit" className="mt-2 text-sm font-semibold text-primary underline">
-                    {isOpen ? 'Close period' : 'Reopen period'}
-                  </button>
-                </form>
-              </div>
-            )
-          })}
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          {periods.map((period) => (
+            <PeriodCard key={period.key} period={period} isCurrent={period.month === currentMonth} onToggle={setConfirmPeriod} />
+          ))}
+        </div>
+      </FullScreenModal>
+
+      <FullScreenModal
+        open={Boolean(confirmPeriod)}
+        title={`${confirmPeriod?.status === 'OPEN' ? 'Close' : 'Open'} ${confirmPeriod?.monthLabel ?? 'month'}?`}
+        onClose={() => !periodPending && setConfirmPeriod(null)}
+        size="compact"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-on-surface-variant">
+            {confirmPeriod?.status === 'OPEN'
+              ? `Are you sure you want to close ${confirmPeriod.monthLabel} ${confirmPeriod.year}? New or edited entries will be marked as changes made after closing.`
+              : `Are you sure you want to open ${confirmPeriod?.monthLabel} ${confirmPeriod?.year}? Any other open month will be closed automatically.`}
+          </p>
+          {periodError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{periodError}</p>}
+          <div className="flex flex-wrap justify-end gap-3">
+            <button type="button" disabled={periodPending} onClick={() => setConfirmPeriod(null)} className="rounded-full border px-4 py-2 text-sm font-semibold disabled:opacity-50">Cancel</button>
+            <button type="button" disabled={periodPending} onClick={confirmPeriodToggle} className={`rounded-full px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${confirmPeriod?.status === 'OPEN' ? 'bg-red-600' : 'bg-green-700'}`}>
+              {periodPending ? 'Updating…' : confirmPeriod?.status === 'OPEN' ? 'Yes, close month' : 'Yes, open month'}
+            </button>
+          </div>
         </div>
       </FullScreenModal>
     </>

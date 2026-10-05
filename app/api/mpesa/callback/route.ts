@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-import { createLedgerContribution, getOpenPeriod } from '@/lib/finance'
+import { createLedgerContribution, getPeriodForDate } from '@/lib/finance'
 
 type CallbackBody = {
   Body?: {
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
         sourceAccountId: 'acct-mpesa', paymentMethod: 'MPESA', providerReference,
         receivedBy: 'M-Pesa Daraja', actorId: targetUserId, status: 'RECONCILED',
       })
-      const period = await getOpenPeriod(new Date())
+      const period = await getPeriodForDate(new Date())
       await prisma.$transaction([
         prisma.paymentEvent.update({ where: { id: paymentEvent.id }, data: { status: 'MATCHED', matchedUserId: targetUserId, matchedContributionId: result.contribution.id } }),
         prisma.reconciliation.create({ data: { transactionId: result.financial.id, paymentEventId: paymentEvent.id, periodId: period.id, notes: 'Automatically matched from the initiating STK request.', reconciledById: targetUserId } }),

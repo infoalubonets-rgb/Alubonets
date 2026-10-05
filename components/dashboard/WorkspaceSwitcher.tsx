@@ -37,6 +37,7 @@ export default function WorkspaceSwitcher({ user }: Props) {
         {workspaces.map((role) => (
           <option key={role} value={role}>
             {ROLE_LABEL[role]}
+            {user.disabledRoles?.includes(role) ? ' (deactivated)' : ''}
           </option>
         ))}
       </select>

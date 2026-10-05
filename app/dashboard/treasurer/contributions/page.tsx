@@ -18,6 +18,9 @@ import { hasChartData } from '@/lib/chart-labels'
 import PaymentsModal from '@/components/dashboard/PaymentsModal'
 import PendingContributionVerify from '@/components/dashboard/PendingContributionVerify'
 import PaginationBar from '@/components/ui/PaginationBar'
+import ReconcilePaymentButton from '@/components/finance/ReconcilePaymentButton'
+import UnmatchedPayments from '@/components/finance/UnmatchedPayments'
+import { filterSelectableCategories } from '@/lib/payment-categories'
 import { prisma } from '@/lib/prisma'
 import type { Prisma, TransactionStatus } from '@prisma/client'
 import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
@@ -81,11 +84,13 @@ export default async function TreasurerContributionsPage({
     ...(andFilters.length ? { AND: andFilters } : {}),
   }
 
-  const [members, purposeCategories, purposeCampaigns, purposeProjects] = await Promise.all([
-    prisma.user.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, membershipNumber: true } }),
+  const [members, purposeCategories, purposeCampaigns, purposeProjects, unmatchedEvents, activeCategories] = await Promise.all([
+    prisma.user.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, membershipNumber: true, phone: true, status: true } }),
     prisma.transactionCategory.findMany({ where: { type: { not: 'EXPENSE' } }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-    prisma.contributionCampaign.findMany({ orderBy: { startsAt: 'desc' }, select: { id: true, title: true } }),
-    prisma.project.findMany({ orderBy: { title: 'asc' }, select: { id: true, title: true } }),
+    prisma.contributionCampaign.findMany({ orderBy: { startsAt: 'desc' }, select: { id: true, title: true, categoryId: true, active: true } }),
+    prisma.project.findMany({ orderBy: { title: 'asc' }, select: { id: true, title: true, status: true } }),
+    prisma.paymentEvent.findMany({ where: { status: 'UNMATCHED' }, orderBy: { receivedAt: 'desc' } }),
+    prisma.transactionCategory.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
   ])
 
   const [data, chart, analytics, mpesaContributions, failedPayments, contribTotal, recent, pendingRows] =
@@ -113,6 +118,9 @@ export default async function TreasurerContributionsPage({
           transactionCategory: { select: { name: true } },
           campaign: { select: { title: true } },
           project: { select: { title: true } },
+          financialTransaction: {
+            select: { reconciliation: { select: { notes: true, reconciledAt: true, reconciledBy: { select: { fullName: true } } } } },
+          },
         },
         orderBy: { paidAt: 'desc' },
         skip: paginationSkip(page, pageSize),
@@ -173,6 +181,22 @@ export default async function TreasurerContributionsPage({
             mpesaRef: row.mpesaRef,
             statementRef: row.statementRef,
           }))}
+        />
+
+        <UnmatchedPayments
+          events={unmatchedEvents.map((event) => ({
+            id: event.id,
+            provider: event.provider,
+            reference: event.providerReference,
+            amount: Number(event.amount),
+            phone: event.phone,
+            payerName: event.payerName,
+            receivedAt: event.receivedAt.toISOString(),
+          }))}
+          members={members.filter((m) => m.status === 'ACTIVE').map((m) => ({ id: m.id, fullName: m.fullName, membershipNumber: m.membershipNumber, phone: m.phone }))}
+          categories={filterSelectableCategories(activeCategories, 'income')}
+          campaigns={purposeCampaigns.filter((c) => c.active).map((c) => ({ id: c.id, title: c.title, categoryId: c.categoryId }))}
+          projects={purposeProjects.filter((p) => p.status !== 'COMPLETED').map((p) => ({ id: p.id, title: p.title }))}
         />
 
         {/* Payments modal trigger */}
@@ -318,6 +342,7 @@ export default async function TreasurerContributionsPage({
                 <th>Status</th>
                 <th>Ref</th>
                 <th>Date</th>
+                <th>Reconciliation</th>
                 <th>Receipt</th>
               </tr>
             </thead>
@@ -334,6 +359,30 @@ export default async function TreasurerContributionsPage({
                   <td>{c.status}</td>
                   <td>{c.mpesaRef || '—'}</td>
                   <td>{new Date(c.paidAt).toLocaleDateString()}</td>
+                  <td>
+                    <ReconcilePaymentButton
+                      payment={{
+                        id: c.id,
+                        memberName: c.user.fullName,
+                        amount: c.amount,
+                        paidAt: c.paidAt.toISOString(),
+                        method: c.paymentMethod,
+                        reference: c.mpesaRef,
+                        statementRef: c.statementRef,
+                        purpose: c.campaign?.title || c.project?.title || c.transactionCategory?.name || c.category || '—',
+                        status: c.status,
+                      }}
+                      reconciliation={
+                        c.financialTransaction?.reconciliation
+                          ? {
+                              notes: c.financialTransaction.reconciliation.notes,
+                              reconciledAt: c.financialTransaction.reconciliation.reconciledAt.toISOString(),
+                              reconciledBy: c.financialTransaction.reconciliation.reconciledBy.fullName,
+                            }
+                          : null
+                      }
+                    />
+                  </td>
                   <td>
                     <div className="flex items-center gap-2">
                       <a className="text-primary underline" href={`/api/pdf/receipt/${c.id}`}>

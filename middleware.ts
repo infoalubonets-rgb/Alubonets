@@ -35,6 +35,7 @@ function isProtectedPath(pathname: string) {
     || pathname.startsWith('/directory/')
     || pathname === '/today'
     || pathname.startsWith('/today/')
+    || pathname === '/notifications'
   )
 }
 

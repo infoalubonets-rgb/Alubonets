@@ -100,61 +100,88 @@ export default async function DocumentsPage({
             <span className="material-symbols-outlined text-[18px]">search</span>
           </button>
         </form>
-        <div className="grid gap-3 md:grid-cols-2">
-          {pageItems.map((document) => (
-            <article key={document.id} className="rounded-2xl border bg-surface p-5">
-              <div className="flex justify-between gap-3">
-                <div>
-                  <h2 className="font-h3 text-lg text-primary">{document.title}</h2>
-                  <p className="text-sm text-on-surface-variant">
-                    {document.categoryRecord?.name || document.category || 'Uncategorized'} · Version{' '}
-                    {document.version}.0 · {document.status}
-                  </p>
-                </div>
-                <span className="h-fit rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
-                  {document.accessLevel.replaceAll('_', ' ')}
-                </span>
-              </div>
-              {document.description && <p className="mt-3 text-sm">{document.description}</p>}
-              {!!document.tags?.length && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {document.tags.map((item) => (
-                    <a
-                      key={item}
-                      href={`/documents?tag=${encodeURIComponent(item)}`}
-                      className="rounded-full bg-surface-container px-2 py-0.5 text-[11px] text-on-surface-variant"
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead>
+                <tr className="text-left bg-surface-container-low border-b border-outline-variant">
+                  {['Document', 'Category', 'Version', 'Access', 'Published'].map((heading) => (
+                    <th
+                      key={heading}
+                      className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant"
                     >
-                      #{item}
-                    </a>
+                      {heading}
+                    </th>
                   ))}
-                </div>
-              )}
-              <p className="mt-2 text-xs text-on-surface-variant">
-                Published {document.uploadedAt.toLocaleDateString()} by {document.uploader.fullName}
-              </p>
-              {(document.mimeType || '').includes('pdf') && (
-                <iframe
-                  title={`Preview ${document.title}`}
-                  src={`/api/documents/${document.id}/download`}
-                  className="mt-3 h-48 w-full rounded-xl border bg-surface-container-low"
-                />
-              )}
-              <a
-                href={`/api/documents/${document.id}/download`}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex rounded-full bg-primary px-4 py-2 text-sm text-on-primary"
-              >
-                View document
-              </a>
-            </article>
-          ))}
+                  <th className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant text-right w-24">
+                    View
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-10 text-center text-on-surface-variant">
+                      No documents found.
+                    </td>
+                  </tr>
+                ) : (
+                  pageItems.map((document, i) => (
+                    <tr
+                      key={document.id}
+                      className={`border-t border-outline-variant/50 align-top hover:bg-primary/[0.03] transition-colors ${
+                        i % 2 === 1 ? 'bg-surface-container-low/40' : ''
+                      }`}
+                    >
+                      <td className="py-3.5 px-4">
+                        <p className="font-medium text-on-surface">{document.title}</p>
+                        {document.description && (
+                          <p className="mt-0.5 line-clamp-2 text-xs text-on-surface-variant">{document.description}</p>
+                        )}
+                        {!!document.tags?.length && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {document.tags.map((item) => (
+                              <a
+                                key={item}
+                                href={`/documents?tag=${encodeURIComponent(item)}`}
+                                className="rounded-full bg-surface-container px-2 py-0.5 text-[11px] text-on-surface-variant"
+                              >
+                                #{item}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-on-surface-variant">
+                        {document.categoryRecord?.name || document.category || 'Uncategorized'}
+                      </td>
+                      <td className="py-3.5 px-4 text-on-surface-variant">{document.version}.0</td>
+                      <td className="py-3.5 px-4">
+                        <span className="whitespace-nowrap rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">
+                          {document.accessLevel.replaceAll('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-on-surface-variant">
+                        <p className="whitespace-nowrap">{document.uploadedAt.toLocaleDateString()}</p>
+                        <p className="text-xs">by {document.uploader.fullName}</p>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <a
+                          href={`/api/documents/${document.id}/download`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex whitespace-nowrap rounded-full bg-primary px-3 py-1.5 text-xs text-on-primary"
+                        >
+                          View
+                        </a>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        {!pageItems.length && (
-          <p className="rounded-xl border border-dashed bg-surface p-8 text-center text-sm text-on-surface-variant">
-            No documents found.
-          </p>
-        )}
         <PaginationBar pathname="/documents" page={page} totalPages={pages} params={{ q, category, tag }} />
       </div>
     </DashboardShell>

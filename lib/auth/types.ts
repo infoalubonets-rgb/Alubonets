@@ -37,6 +37,8 @@ export type AuthUser = {
   dashboardAccess?: Role[]
   status?: string
   isPrincipal?: boolean
+  /** Roles currently switched off in the role catalogue. */
+  disabledRoles?: Role[]
 }
 
 export type JwtPayload = {
@@ -105,6 +107,7 @@ export function isSharedAuthenticatedPath(pathname: string): boolean {
     '/family',
     '/directory',
     '/today',
+    '/notifications',
   ]
   if (pathname === '/dashboard/member/family' || pathname.startsWith('/dashboard/member/family/')) {
     return true

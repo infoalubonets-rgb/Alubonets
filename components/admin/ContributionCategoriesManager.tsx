@@ -8,9 +8,13 @@ type BillingKind = 'NONE' | 'MONTHLY' | 'ANNUAL'
 type Category = { id: string; name: string; type: string; system: boolean; billingKind?: BillingKind | string }
 
 const BILLING_LABEL: Record<BillingKind, string> = {
-  NONE: 'One-off / other',
-  MONTHLY: 'Monthly fee',
-  ANNUAL: 'Annual subscription',
+  NONE: 'Other',
+  MONTHLY: 'Monthly',
+  ANNUAL: 'Annual',
+}
+
+function billingKindOf(category: Category): BillingKind {
+  return category.billingKind === 'MONTHLY' || category.billingKind === 'ANNUAL' ? category.billingKind : 'NONE'
 }
 
 export default function ContributionCategoriesManager({ categories }: { categories: Category[] }) {
@@ -83,17 +87,23 @@ export default function ContributionCategoriesManager({ categories }: { categori
 
   function removeCategory() {
     if (!confirming) return
+    const removed = confirming
+    // Optimistic: drop it from the list right away and delete on the server in the background.
     setError('')
+    setConfirming(null)
+    setItems((current) => current.filter((item) => item.id !== removed.id))
+    setMessage('“' + removed.name + '” deleted.')
     startDeleting(async () => {
       try {
         const formData = new FormData()
-        formData.set('id', confirming.id)
+        formData.set('id', removed.id)
         await deleteContributionCategory(formData)
-        setItems((current) => current.filter((item) => item.id !== confirming.id))
-        setMessage('“' + confirming.name + '” deleted.')
-        setConfirming(null)
         router.refresh()
       } catch (err) {
+        setItems((current) =>
+          [...current, removed].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+        )
+        setMessage('')
         setError(err instanceof Error ? err.message : 'Could not delete category. Try again.')
       }
     })
@@ -101,30 +111,22 @@ export default function ContributionCategoriesManager({ categories }: { categori
 
   return (
     <div className="space-y-5">
-      <div className="overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface-container-low">
-        <div className="flex items-center justify-between border-b border-outline-variant/50 px-4 py-3">
-          <div>
-            <h3 className="text-sm font-semibold text-on-surface">Available categories</h3>
-            <p className="mt-0.5 text-xs text-on-surface-variant">{items.length} categories</p>
-          </div>
-          <span className="material-symbols-outlined text-xl text-primary">category</span>
-        </div>
-        <ul className="max-h-72 divide-y divide-outline-variant/40 overflow-y-auto p-2">
+      <details className="group/list overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface-container-low">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-semibold text-on-surface [&::-webkit-details-marker]:hidden">
+          Categories ({items.length})
+          <span className="material-symbols-outlined text-xl text-on-surface-variant transition group-open/list:rotate-180">expand_more</span>
+        </summary>
+        <ul className="max-h-72 divide-y divide-outline-variant/40 overflow-y-auto border-t border-outline-variant/50 p-2">
           {items.map((category) => (
             <li key={category.id} className="group flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-surface">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                 <span className="material-symbols-outlined text-[18px]">{category.system ? 'verified_user' : 'label'}</span>
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-on-surface">{category.name}</span>
-                <span className="mt-0.5 block text-[11px] uppercase tracking-wide text-on-surface-variant">
-                  {category.type === 'BOTH' ? 'Income & expense' : category.type.toLowerCase()}
-                </span>
-              </span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-on-surface">{category.name}</span>
               {!category.system && !category.id.startsWith('temp-') && (
                 <select
                   aria-label={`Billing type for ${category.name}`}
-                  value={(category.billingKind as BillingKind) || 'NONE'}
+                  value={billingKindOf(category)}
                   onChange={(event) => changeBilling(category, event.target.value as BillingKind)}
                   className="h-8 rounded-lg border border-outline-variant bg-surface px-2 text-[11px]"
                 >
@@ -133,27 +135,24 @@ export default function ContributionCategoriesManager({ categories }: { categori
                   ))}
                 </select>
               )}
-              {category.system ? (
-                <span className="rounded-full bg-surface-container-high px-2.5 py-1 text-[10px] font-semibold text-on-surface-variant">System</span>
-              ) : (
-                <button type="button" onClick={() => { setError(''); setMessage(''); setConfirming(category) }} aria-label={'Delete ' + category.name} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30">
-                  <span className="material-symbols-outlined text-[17px]">delete</span>Delete
+              {!category.system && (
+                <button type="button" onClick={() => { setError(''); setMessage(''); setConfirming(category) }} aria-label={'Delete ' + category.name} title="Delete" className="grid h-9 w-9 place-items-center rounded-full text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30">
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
                 </button>
               )}
             </li>
           ))}
           {!items.length && <li className="px-4 py-8 text-center text-sm text-on-surface-variant">No categories yet.</li>}
         </ul>
-      </div>
+      </details>
 
       <form onSubmit={addCategory} className="rounded-2xl border border-outline-variant/60 bg-surface p-4">
         <label className="block text-sm font-semibold text-on-surface">
-          Add a category
-          <span className="mt-1 block text-xs font-normal text-on-surface-variant">Use a short, clear label for income and expense records.</span>
-          <input name="name" value={name} onChange={(event) => setName(event.target.value)} required minLength={2} maxLength={60} pattern="[A-Za-z0-9 ()&/,.'-]+" title="Use letters, numbers, spaces and basic punctuation only." placeholder="e.g. Member subscriptions" className="mt-3 w-full rounded-xl border border-outline-variant bg-surface px-3.5 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+          New category
+          <input name="name" value={name} onChange={(event) => setName(event.target.value)} required minLength={2} maxLength={60} pattern="[A-Za-z0-9 ()&/,.'-]+" title="Use letters, numbers, spaces and basic punctuation only." placeholder="e.g. Welfare" className="mt-2 w-full rounded-xl border border-outline-variant bg-surface px-3.5 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
         </label>
         <label className="mt-3 block text-xs font-semibold text-on-surface-variant">
-          Counts towards membership standing as
+          Type
           <select value={billingKind} onChange={(event) => setBillingKind(event.target.value as BillingKind)} className="mt-1 block w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm">
             {(Object.keys(BILLING_LABEL) as BillingKind[]).map((kind) => (
               <option key={kind} value={kind}>{BILLING_LABEL[kind]}</option>
@@ -162,7 +161,7 @@ export default function ContributionCategoriesManager({ categories }: { categori
         </label>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button type="submit" disabled={isAdding} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary shadow-sm disabled:cursor-wait disabled:opacity-60">
-            <span className="material-symbols-outlined text-[18px]">add</span>{isAdding ? 'Adding…' : 'Add category'}
+            <span className="material-symbols-outlined text-[18px]">add</span>{isAdding ? 'Adding…' : 'Add'}
           </button>
           {message && <p role="status" className="text-xs font-medium text-green-700">{message}</p>}
           {error && !confirming && <p role="alert" className="text-xs font-medium text-red-600">{error}</p>}

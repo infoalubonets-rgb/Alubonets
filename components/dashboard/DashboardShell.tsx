@@ -13,11 +13,12 @@ import {
 } from 'react'
 import { ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
 import { logoutRequest, meLookup, type AuthUser, type Role } from '@/lib/auth/client'
-import { ROLE_LABEL } from '@/lib/auth/types'
+import { ROLE_LABEL, roleForDashboardPath } from '@/lib/auth/types'
 import ThemeLoader from '@/components/ui/ThemeLoader'
 import DashboardNav from './DashboardNav'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import DashboardNotifications from './DashboardNotifications'
+import OldMonthPill from './OldMonthPill'
 import UploadProgressToast from '@/components/ui/UploadProgressToast'
 
 const EmailSendProgressBanner = dynamic(() => import('./EmailSendProgressBanner'), { ssr: false })
@@ -108,6 +109,7 @@ export default function DashboardShell({
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
   const [resizing, setResizing] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [notificationCount, setNotificationCount] = useState(0)
   const [paymentNotifCount, setPaymentNotifCount] = useState(0)
   const [supportUnread, setSupportUnread] = useState(0)
   const [supportBellCount, setSupportBellCount] = useState(0)
@@ -127,8 +129,12 @@ export default function DashboardShell({
       : role === 'MEMBER' && user?.isPrincipal
         ? 'Principal Member'
         : ROLE_LABEL[role]
+  const workspaceRole = roleForDashboardPath(pathname)
+  const deactivatedWorkspace =
+    workspaceRole && user?.disabledRoles?.includes(workspaceRole) ? workspaceRole : null
   const isOverviewPage = pathname === '/admin' || /^\/dashboard\/(member|treasurer|executive|secretary|organizer)$/.test(pathname)
-  const notificationTotal = unread + supportBellCount + paymentNotifCount
+  // notificationCount already includes unread announcements and every role to-do.
+  const notificationTotal = notificationCount + supportBellCount + paymentNotifCount
   const activeNavGroup = nav.reduce<{ item: NavItem; score: number } | null>((best, item) => {
     const score = [item, ...(item.children || [])].reduce((longest, candidate) => {
       const href = candidate.href
@@ -266,17 +272,25 @@ export default function DashboardShell({
     const fetchUnread = async () => {
       if (document.visibilityState !== 'visible') return
       try {
-        const res = await fetch('/api/announcements/unread')
-        if (!res.ok) return
-        const data = await res.json()
-        if (!cancelled) setUnread(data.count ?? 0)
+        const [announcementsRes, notificationsRes] = await Promise.all([
+          fetch('/api/announcements/unread'),
+          fetch('/api/notifications/count'),
+        ])
+        if (announcementsRes.ok) {
+          const data = await announcementsRes.json()
+          if (!cancelled) setUnread(data.count ?? 0)
+        }
+        if (notificationsRes.ok) {
+          const data = await notificationsRes.json()
+          if (!cancelled) setNotificationCount(data.count ?? 0)
+        }
       } catch {
-        // ignore — badge just keeps its last value
+        // ignore — badges just keep their last value
       }
     }
     fetchUnread()
     const id = window.setInterval(fetchUnread, 60_000)
-    const clearUnread = () => setUnread(0)
+    const clearUnread = () => { setUnread(0); fetchUnread() }
     window.addEventListener('announcements-read', clearUnread)
     window.addEventListener('new-announcement', fetchUnread)
     return () => {
@@ -546,7 +560,7 @@ export default function DashboardShell({
               </span>
             </button>
             <Link
-              href={supportBellCount > 0 ? '/support-chat' : '/announcements'}
+              href={supportBellCount > 0 ? '/support-chat' : '/notifications'}
               onClick={() => { setSupportBellCount(0); localStorage.removeItem('supportBellCount') }}
               className="relative flex h-11 w-11 items-center justify-center rounded-full text-on-surface-variant dark:text-blue-200/60 hover:bg-surface-container dark:hover:bg-[#111f36] hover:text-primary transition-colors"
               title="Notifications"
@@ -602,6 +616,25 @@ export default function DashboardShell({
         </header>
 
         <main ref={pageScrollRef} className="dashboard-page-scroll relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-3 sm:px-4 md:px-6 lg:px-lg pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:pt-4 space-y-4 sm:space-y-lg">
+          {deactivatedWorkspace && (
+            <div role="status" className="flex flex-col gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+              <p className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[20px]">block</span>
+                <span>
+                  The <b>{ROLE_LABEL[deactivatedWorkspace]}</b> role is deactivated. People with this role cannot sign in.
+                </span>
+              </p>
+              {(user?.isSuperAdmin || user?.role === 'ADMIN') && (
+                <Link
+                  href="/admin/roles?settings=1"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3.5 py-1.5 text-xs font-label-bold text-on-primary hover:opacity-90"
+                >
+                  <span className="material-symbols-outlined text-[16px]">settings</span>
+                  Activate role
+                </Link>
+              )}
+            </div>
+          )}
           {!hidePageHeading && (
             <div className="shrink-0 pt-1 sm:pt-2">
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2">
@@ -651,6 +684,7 @@ export default function DashboardShell({
         {supportUnread > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-6 min-w-6 place-items-center rounded-full border-2 border-white bg-primary px-1 text-[10px] font-bold text-white">+{supportUnread}</span>}
         <span className="pointer-events-none absolute right-16 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100 hidden sm:block">Chat with support</span>
       </Link>
+      {(user?.role === 'ADMIN' || user?.isSuperAdmin) && <OldMonthPill />}
       <DashboardNotifications />
       <UploadProgressToast />
     </div>

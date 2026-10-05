@@ -290,7 +290,7 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
             <p className="text-[11px] text-on-surface-variant">
               {principalBlockedReason
                 || (selected.isPrincipal
-                  ? 'Heads a family branch — attached members inherit paid-up standing'
+                  ? 'Heads a family branch — only dependents (under 18 or without contribution rights) follow their standing'
                   : 'Make this member the head of a family branch')}
             </p>
           </div>
@@ -446,6 +446,11 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
                           </span>
                           <span className="flex-1 font-medium text-[15px] text-on-surface">
                             {ROLE_LABEL[r]}
+                            {r !== 'ADMIN' && disabledRoles.includes(r) && (
+                              <span className="ml-2 text-[10px] uppercase tracking-wide text-error font-label-bold">
+                                Deactivated
+                              </span>
+                            )}
                           </span>
                           {role === r && (
                             <span className="material-symbols-outlined text-secondary-container text-[20px]">
@@ -464,16 +469,19 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
                   <p className="text-[11px] text-on-surface-variant px-1 pb-1">
                     Home role stays on. Tap others to grant or revoke extra dashboards.
                   </p>
-                  {ALL_ROLES.filter((r) => r === role || r === 'ADMIN' || !disabledRoles.includes(r)).map((r) => {
+                  {ALL_ROLES.map((r) => {
                     const checked = access.includes(r) || role === r
                     const locked = role === r
+                    const deactivated = r !== 'ADMIN' && disabledRoles.includes(r)
                     return (
                       <button
                         key={r}
                         type="button"
-                        disabled={locked}
+                        disabled={locked || (deactivated && !checked)}
                         onClick={() => toggleAccess(r)}
                         className={`w-full flex items-center gap-3 rounded-xl px-3 py-3 border transition-colors text-left disabled:cursor-default ${
+                          deactivated && !checked ? 'opacity-50' : ''
+                        } ${
                           checked
                             ? 'bg-secondary-container/12 border-secondary-container/40'
                             : 'bg-surface border-outline-variant hover:border-primary/30'
@@ -497,6 +505,11 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
                           {locked && (
                             <span className="text-[10px] uppercase tracking-wide text-secondary font-label-bold">
                               Home · always on
+                            </span>
+                          )}
+                          {deactivated && (
+                            <span className="block text-[10px] uppercase tracking-wide text-error font-label-bold">
+                              Deactivated
                             </span>
                           )}
                         </span>

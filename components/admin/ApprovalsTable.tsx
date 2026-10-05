@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { setMemberApproval } from '@/app/actions/members'
+import type { Role } from '@/lib/auth/types'
 
 export type ApprovalApplicant = {
   id: string
@@ -17,8 +18,17 @@ export type ApprovalApplicant = {
 }
 
 type PrincipalOption = { id: string; fullName: string; membershipNumber: string | null }
+type RoleOption = { value: Role; label: string }
 
-export default function ApprovalsTable({ applicants, principals }: { applicants: ApprovalApplicant[]; principals: PrincipalOption[] }) {
+export default function ApprovalsTable({
+  applicants,
+  principals,
+  roleOptions,
+}: {
+  applicants: ApprovalApplicant[]
+  principals: PrincipalOption[]
+  roleOptions: RoleOption[]
+}) {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -26,6 +36,7 @@ export default function ApprovalsTable({ applicants, principals }: { applicants:
   const [linkingPrincipal, setLinkingPrincipal] = useState(false)
   const [principalId, setPrincipalId] = useState('')
   const [relationship, setRelationship] = useState<'SPOUSE' | 'CHILD' | 'DEPENDENT' | 'OTHER'>('OTHER')
+  const [role, setRole] = useState<Role>('MEMBER')
   const [error, setError] = useState('')
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
   const [pending, startTransition] = useTransition()
@@ -46,6 +57,7 @@ export default function ApprovalsTable({ applicants, principals }: { applicants:
     setConfirmingReject(false)
     setLinkingPrincipal(false)
     setPrincipalId('')
+    setRole('MEMBER')
     setError('')
   }
 
@@ -72,6 +84,7 @@ export default function ApprovalsTable({ applicants, principals }: { applicants:
           approve,
           note: approve ? 'Approved via admin approvals' : 'Rejected via admin approvals',
           identityVerified: true,
+          role,
           ...link,
         })
         if (approve) close()
@@ -218,6 +231,23 @@ export default function ApprovalsTable({ applicants, principals }: { applicants:
                     <p className="text-sm text-error text-center bg-error-container/40 rounded-xl py-2 px-3">
                       {error}
                     </p>
+                  )}
+
+                  {!confirmingReject && (
+                    <label className="block text-xs font-bold text-on-surface-variant">
+                      Approve as
+                      <select
+                        value={role}
+                        onChange={(event) => setRole(event.target.value as Role)}
+                        disabled={pending}
+                        className="mt-1.5 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2.5 text-sm font-normal text-on-surface"
+                      >
+                        {roleOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <span className="mt-1 block font-normal">Everyone applies as a Member. Pick a higher role only if they need it.</span>
+                    </label>
                   )}
 
                   {confirmingReject ? (
