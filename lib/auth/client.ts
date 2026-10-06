@@ -10,7 +10,8 @@ const fetchOpts: RequestInit = {
 
 export async function loginRequest(email: string, password: string, mfaToken?: string) {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 25_000)
+  // The dev server compiles the login route on first use, which can take over a minute.
+  const timeout = window.setTimeout(() => controller.abort(), process.env.NODE_ENV === 'development' ? 120_000 : 25_000)
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',

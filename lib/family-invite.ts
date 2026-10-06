@@ -54,10 +54,12 @@ export async function markFamilyInviteAccepted(token: string, userId: string) {
     const member = await tx.user.findUniqueOrThrow({ where: { id: userId } })
     const acceptedAt = new Date()
     await tx.familyInvite.update({ where: { id: invite.id }, data: { acceptedAt } })
-    await tx.user.update({ where: { id: userId }, data: { familyRegistrationState: 'INVITED' } })
+    // An Admin-invited member is already active; keep the state registration gave them.
+    const toState = member.status === 'ACTIVE' ? member.familyRegistrationState : 'INVITED'
+    await tx.user.update({ where: { id: userId }, data: { familyRegistrationState: toState } })
     await tx.familyAccountTransition.create({ data: {
       memberId: userId, actorId: userId, inviteId: invite.id, type: 'INVITE_ACCEPTED',
-      fromState: member.familyRegistrationState, toState: 'INVITED',
+      fromState: member.familyRegistrationState, toState,
       reason: 'Attached member accepted the login invitation', occurredAt: acceptedAt,
     } })
     return invite

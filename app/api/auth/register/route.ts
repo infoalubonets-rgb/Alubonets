@@ -5,6 +5,7 @@ import { createServerClient as createServiceClient } from '@/lib/supabase-server
 import { prisma } from '@/lib/prisma'
 import { syncUserMetadata } from '@/lib/auth/session'
 import { toAuthUser } from '@/lib/auth/helpers'
+import { ROLE_HOME } from '@/lib/auth/types'
 import { POLICY_VERSION, registrationSchema, requestIp } from '@/lib/membership'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { COOKIE_NAME, registrationEmailIsVerified } from '@/lib/registration-email-verification'
@@ -56,6 +57,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invite does not match this email record.' }, { status: 400 })
     }
 
+    // An invite sent by an Admin pre-approves the account and keeps the role, principal and
+    // branch the Admin chose — the person goes straight in instead of waiting for approval.
+    const inviter = invite
+      ? await prisma.user.findUnique({ where: { id: invite.invitedById }, select: { role: true, isSuperAdmin: true } })
+      : null
+    const preApproved = Boolean(existing && inviter && (inviter.role === 'ADMIN' || inviter.isSuperAdmin))
+
     const admin = createServiceClient()
     const { data: created, error } = await admin.auth.admin.createUser({
       email,
@@ -84,16 +92,19 @@ export async function POST(req: Request) {
       fullName,
       phone: phone || existing?.phone,
       location: data.location,
-      role: 'MEMBER' as const,
-      status: 'PENDING' as const,
+      role: preApproved && existing ? existing.role : ('MEMBER' as const),
+      status: preApproved ? ('ACTIVE' as const) : ('PENDING' as const),
       isSuperAdmin: false,
-      dashboardAccess: [] as [],
+      dashboardAccess: preApproved && existing ? existing.dashboardAccess : ([] as []),
+      ...(preApproved ? { approvedAt: existing?.approvedAt ?? new Date() } : {}),
       ...(invite
         ? {
             principalMemberId: invite.user.principalMemberId,
             familyRelationship: invite.user.familyRelationship,
-            familyRegistrationState: 'INVITED' as const,
-            isPrincipal: false,
+            familyRegistrationState: !preApproved
+              ? ('INVITED' as const)
+              : invite.user.principalMemberId ? ('ACTIVE_ATTACHED' as const) : ('STANDARD' as const),
+            isPrincipal: preApproved && existing ? existing.isPrincipal : false,
           }
         : {}),
     }
@@ -177,8 +188,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       user: toAuthUser(profile),
-      redirectTo: '/pending',
-      status: 'PENDING',
+      redirectTo: preApproved ? ROLE_HOME[profile.role] : '/pending',
+      status: profile.status,
     })
   } catch (err) {
     logError('auth.registration.failed', err, { path: '/api/auth/register' })

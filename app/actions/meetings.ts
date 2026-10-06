@@ -12,6 +12,7 @@ import { writeAudit } from '@/lib/audit'
 import { assertNotPast } from '@/lib/dates'
 
 function revalidateMeetings() {
+  revalidatePath('/meetings-reports')
   revalidatePath('/dashboard/secretary')
   revalidatePath('/dashboard/secretary/meetings')
   revalidatePath('/dashboard/member')

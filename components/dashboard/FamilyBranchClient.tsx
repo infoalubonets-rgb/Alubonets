@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import ErrorDialog from '@/components/ui/ErrorDialog'
 import { friendlyError } from '@/lib/safe-error'
+import { familyMemberList, familyDetailView, type FamilyDetailMember } from '@/lib/family-details'
 import { todayInputValue } from '@/lib/dates'
 import {
   createAttachedMember,
@@ -31,16 +32,7 @@ type InviteRow = {
   acceptedAt: string | null
 }
 
-type BranchMember = {
-  id: string
-  fullName: string
-  email: string
-  relationship: string | null
-  status: string
-  registrationState: string
-  isYou?: boolean
-  phone?: string | null
-}
+type BranchMember = FamilyDetailMember
 
 export default function FamilyBranchClient({
   isPrincipal,
@@ -50,8 +42,11 @@ export default function FamilyBranchClient({
   pendingInvites,
   transitionHistory,
   otherPrincipals = [],
+  canManage = false,
 }: {
   isPrincipal: boolean
+  /** Adding, moving or removing branch members is for Admins; Principals only view their branch. */
+  canManage?: boolean
   otherPrincipals?: Array<{ id: string; fullName: string }>
   principalName: string | null
   relationshipLabel: string | null
@@ -172,14 +167,16 @@ export default function FamilyBranchClient({
     })
   }
 
-  const principal = members.find((member) => member.relationship === 'Principal' || (member.isYou && isPrincipal))
-  const attached = members.filter((member) => member.id !== principal?.id)
+  const { principal, attached } = familyMemberList(members)
+  const detailView = detailMember ? familyDetailView(detailMember, relationshipLabel) : null
 
   return (
     <div className="w-full space-y-3">
-      <div className="flex min-h-10 items-center justify-between gap-4">
-        <h1 className="font-h2 text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">My Family / Branch</h1>
-        {isPrincipal && (
+      {isPrincipal && canManage && <div className="flex min-h-10 items-center justify-between gap-4">
+        {isPrincipal && !canManage && (
+          <p className="text-xs text-on-surface-variant">To add or remove family members, ask an administrator.</p>
+        )}
+        {isPrincipal && canManage && (
           <button
             type="button"
             onClick={() => {
@@ -193,7 +190,7 @@ export default function FamilyBranchClient({
             Add family member
           </button>
         )}
-      </div>
+      </div>}
       <section className="mx-auto w-full max-w-6xl overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface shadow-[0_8px_24px_rgba(0,31,80,0.06)] dark:border-[#1a2d4f] dark:bg-[#0d1729]">
         <div className="p-4">
           {principal && (
@@ -211,6 +208,9 @@ export default function FamilyBranchClient({
                   </span>
                 </div>
               </div>
+              <button type="button" onClick={() => setDetailMember(principal)} aria-label={principal.isYou ? 'View my details' : `View Principal details for ${principal.fullName}`} title={principal.isYou ? 'My details' : 'Principal Member details'} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant text-primary transition hover:bg-primary/5">
+                <span className="material-symbols-outlined text-[18px]">visibility</span>
+              </button>
             </div>
           )}
 
@@ -233,7 +233,7 @@ export default function FamilyBranchClient({
                 <span className="rounded-full bg-surface-container px-2.5 py-1 text-[10px] font-semibold text-on-surface-variant dark:bg-[#111f36] dark:text-blue-200">
                   {member.relationship || 'Family member'}
                 </span>
-                {isPrincipal && !member.isYou && otherPrincipals.length > 0 && (
+                {isPrincipal && canManage && !member.isYou && otherPrincipals.length > 0 && (
                   <button
                     type="button"
                     onClick={() => { setTransferMember(member); setTransferTo(''); setTransferReason(''); setTransferError('') }}
@@ -255,7 +255,7 @@ export default function FamilyBranchClient({
               </div>
             )}
           </div>
-          {!principal && (
+          {!principal && !isPrincipal && (
             <p className="p-3 text-sm text-on-surface-variant">
               {principalName
                 ? `Principal Member: ${principalName}${relationshipLabel ? ` · ${relationshipLabel}` : ''}`
@@ -281,19 +281,17 @@ export default function FamilyBranchClient({
 
       {detailMember && (
         <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetailMember(null) }}>
-          <section role="dialog" aria-modal="true" aria-labelledby="member-details-title" className="w-full max-w-md rounded-t-2xl bg-surface p-5 shadow-2xl dark:bg-[#0d1729] sm:rounded-2xl">
+          <section role="dialog" aria-modal="true" aria-labelledby="member-details-title" className={`max-h-[90dvh] w-full overflow-y-auto rounded-t-2xl bg-surface p-5 shadow-2xl dark:bg-[#0d1729] sm:rounded-2xl ${detailMember.details ? 'max-w-2xl' : 'max-w-md'}`}>
             <div className="flex items-start justify-between gap-4">
-              <div><h2 id="member-details-title" className="font-h3 text-xl text-primary">Attached member details</h2><p className="mt-1 text-sm font-semibold">{detailMember.fullName}</p></div>
+              <div>
+                <h2 id="member-details-title" className="font-h3 text-xl text-primary">{detailView?.title}</h2>
+                <p className="mt-1 text-sm font-semibold">{detailMember.fullName}</p>
+                <p className="mt-1 text-[11px] text-on-surface-variant">{detailView?.description}</p>
+              </div>
               <button type="button" onClick={() => setDetailMember(null)} aria-label="Close member details" className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-surface-container"><span className="material-symbols-outlined">close</span></button>
             </div>
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-              {[
-                ['Relationship', detailMember.relationship || 'Family member'],
-                ['Email', detailMember.email],
-                ['Phone', detailMember.phone || 'Not provided'],
-                ['Membership status', detailMember.status],
-                ['Registration state', detailMember.registrationState.replaceAll('_', ' ')],
-              ].map(([label, value]) => <div key={label} className="rounded-lg bg-surface-container-low p-3"><dt className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">{label}</dt><dd className="mt-1 break-words text-sm">{value}</dd></div>)}
+              {detailView?.fields.map(([label, value]) => <div key={label} className="rounded-lg bg-surface-container-low p-3"><dt className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">{label}</dt><dd className="mt-1 break-words text-sm">{value}</dd></div>)}
             </dl>
             <button type="button" onClick={() => setDetailMember(null)} className="mt-5 w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-on-primary">Close</button>
           </section>
@@ -437,14 +435,14 @@ export default function FamilyBranchClient({
                   {pendingInvites.map((invite) => (
                     <li key={invite.id} className="flex items-center justify-between gap-3 rounded-lg bg-surface-container-low px-3 py-2 text-xs">
                       <span className="min-w-0 truncate">{invite.email} · expires {new Date(invite.expiresAt).toLocaleDateString()}</span>
-                      <button type="button" className="shrink-0 font-semibold text-error" onClick={() => startTransition(async () => {
+                      {canManage && <button type="button" className="shrink-0 font-semibold text-error" onClick={() => startTransition(async () => {
                         try {
                           await revokeFamilyInvite(invite.id)
                           router.refresh()
                         } catch (cause) {
                           setError(cause instanceof Error ? cause.message : 'Could not revoke invitation')
                         }
-                      })}>Revoke</button>
+                      })}>Revoke</button>}
                     </li>
                   ))}
                 </ul>

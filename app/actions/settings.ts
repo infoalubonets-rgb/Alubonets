@@ -34,32 +34,6 @@ function refreshCategories() {
   revalidatePath('/dashboard/treasurer/contributions')
 }
 
-export async function updateDirectoryFullAccessRoles(formData: FormData) {
-  const actor = await requireAdmin()
-  const roles = formData
-    .getAll('roles')
-    .map(String)
-    .map((value) => value.trim().toUpperCase())
-    .filter((value) =>
-      ['EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'AUDITOR'].includes(value),
-    )
-  const value = roles.join(',')
-  await prisma.appSetting.upsert({
-    where: { key: 'directory_full_access_roles' },
-    create: { key: 'directory_full_access_roles', value, updatedBy: actor.id },
-    update: { value, updatedBy: actor.id },
-  })
-  await writeAudit({
-    userId: actor.id,
-    action: 'DIRECTORY_FULL_ACCESS_UPDATE',
-    entity: 'AppSetting',
-    entityId: 'directory_full_access_roles',
-    newValue: { roles },
-  })
-  revalidatePath('/admin/settings')
-  revalidatePath('/directory')
-}
-
 const LOCKED_SETTING_KEYS: SettingKey[] = [SETTING_KEYS.brandingSiteName, SETTING_KEYS.brandingPrimaryHex]
 
 export async function updateAppSetting(formData: FormData) {

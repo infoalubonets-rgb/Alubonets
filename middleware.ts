@@ -1,3 +1,4 @@
+import { WORKSPACE_COOKIE, workspaceCookieValue, workspaceProfile } from '@/lib/auth/workspace'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import {
@@ -188,12 +189,41 @@ export async function middleware(req: NextRequest) {
     })
   }
 
-  const role = isAppRole(user.app_metadata?.role) ? user.app_metadata.role : null
+  const accountRole = isAppRole(user.app_metadata?.role) ? user.app_metadata.role : null
   const status = isMemberStatus(user.app_metadata?.status)
     ? user.app_metadata.status
     : null
-  const isSuperAdmin = Boolean(user.app_metadata?.isSuperAdmin)
-  const dashboardAccess = parseDashboardAccess(user.app_metadata?.dashboardAccess)
+  const accountSuperAdmin = Boolean(user.app_metadata?.isSuperAdmin)
+  const accountAccess = parseDashboardAccess(user.app_metadata?.dashboardAccess)
+  let role = accountRole
+  let isSuperAdmin = accountSuperAdmin
+  let dashboardAccess = accountAccess
+  if (accountRole) {
+    const account = {
+      id: String(user.app_metadata?.dbUserId || user.id), role: accountRole,
+      isSuperAdmin: accountSuperAdmin, dashboardAccess: accountAccess,
+    }
+    let preference = req.cookies.get(WORKSPACE_COOKIE)?.value
+    // Initialize old sessions from their current dashboard; subsequent navigation cannot
+    // silently restore the account's original privileges after a workspace switch.
+    if (!preference?.startsWith(`${account.id}:`)) {
+      const pathRole = roleForDashboardPath(pathname)
+      const initialRole = pathRole && allowedDashboards(account).includes(pathRole)
+        ? (pathRole === 'ADMIN' && accountSuperAdmin ? 'SUPER_ADMIN' : pathRole) : accountSuperAdmin ? 'SUPER_ADMIN' : accountRole
+      preference = workspaceCookieValue(account.id, initialRole)
+      const existingCookies = supabaseResponse.cookies.getAll()
+      req.cookies.set(WORKSPACE_COOKIE, preference)
+      supabaseResponse = NextResponse.next({ request: req })
+      existingCookies.forEach(cookie => supabaseResponse.cookies.set(cookie))
+      supabaseResponse.cookies.set(WORKSPACE_COOKIE, preference, {
+        httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/',
+      })
+    }
+    const effective = workspaceProfile(account, preference)
+    role = effective.role
+    isSuperAdmin = effective.isSuperAdmin
+    dashboardAccess = effective.dashboardAccess
+  }
 
   // Production hardening: never honor login-verification bypass outside development.
   const allowVerificationBypass =

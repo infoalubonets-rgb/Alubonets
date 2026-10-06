@@ -8,11 +8,19 @@ export const DIRECTORY_SAFE_FIELDS = [
 
 export type DirectorySafeField = (typeof DIRECTORY_SAFE_FIELDS)[number]
 
+/** Executive is a role someone can hold as their main role or alongside another (e.g. Secretary + Executive). */
+export function isExecutive(user: { role: string; dashboardAccess?: readonly string[] | null }) {
+  return user.role === 'EXECUTIVE' || (user.dashboardAccess ?? []).includes('EXECUTIVE')
+}
+
 /**
- * Roles allowed to see every active member regardless of individual visibility settings.
- * Admin and Super Admin always qualify; extra roles are opt-in from Admin → Settings.
+ * Admin, Super Admin, Auditor and executives open the Members page with full details. Other roles
+ * see members only where their work needs it — contributions (Treasurer), minutes attendance
+ * (Secretary), communications recipients (Organizing Secretary) — limited to name, email and phone.
  */
-export const DIRECTORY_FULL_ACCESS_SETTING = 'directory_full_access_roles'
+export function canViewMemberDirectory(user: { role: string; isSuperAdmin?: boolean | null; dashboardAccess?: readonly string[] | null }) {
+  return user.role === 'ADMIN' || user.role === 'AUDITOR' || Boolean(user.isSuperAdmin) || isExecutive(user)
+}
 
 export type DirectoryMember = {
   id: string
@@ -24,4 +32,34 @@ export type DirectoryMember = {
   profession: string | null
   skills: string | null
   location: string | null
+  isSuperAdmin: boolean
+  /** Executive as their main role or as a second role. */
+  isExecutive: boolean
+  /** Under 18, or a child/dependant with no date of birth on file. */
+  isMinor: boolean
+  /** Extra profile details — only for viewers with full directory access. */
+  details: {
+    membershipNumber: string | null
+    standing: string
+    joinedAt: string
+    age: number | null
+    gender: string | null
+    familyBranch: string | null
+    memberCategory: string | null
+    educationLevel: string | null
+    interests: string | null
+    mentorshipArea: string | null
+    attachedCount: number
+  } | null
+  /** Contact details — everyone allowed on the Members page. */
+  contact: { email: string; phone: string | null } | null
+  /** Account management fields — Admin and Super Admin only. */
+  account: {
+    status: string
+    standingReason: string | null
+    standingOverride: string | null
+    standingOverrideUntil: string | null
+    contributionExempt: boolean
+    about: { show: boolean; title: string | null; order: number; fields: string[] }
+  } | null
 }

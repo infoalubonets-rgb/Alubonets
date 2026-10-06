@@ -18,11 +18,11 @@ export default async function SecretaryPage() {
     { label: 'Documents',     value: data.documents.length,     icon: 'description',   from: 'from-[#001f50]', to: 'to-[#0a3070]' },
     { label: 'Meetings',      value: data.meetings.length,      icon: 'groups',         from: 'from-[#fe8015]', to: 'to-[#ff9c40]' },
     { label: 'Avg attendance',value: data.attendanceAvg,        icon: 'how_to_reg',     from: 'from-[#001f50]', to: 'to-[#153060]' },
-    { label: 'Announcements', value: data.announcements.length, icon: 'campaign',       from: 'from-[#fe8015]', to: 'to-[#c45e00]' },
+    { label: 'Notifications sent', value: data.announcements.length, icon: 'campaign',       from: 'from-[#fe8015]', to: 'to-[#c45e00]' },
   ]
 
   const quickLinks = [
-    { label: 'Announcements',  description: 'Publish and review notices',     icon: 'campaign',  href: '/announcements',                    orange: false },
+    { label: 'Communications',  description: 'Send notifications to members',     icon: 'campaign',  href: '/announcements',                    orange: false },
     { label: 'Meetings',       description: 'Minutes, attendance, exports',   icon: 'groups',    href: '/dashboard/secretary/meetings',      orange: true  },
     { label: 'Contributions',  description: 'View contribution records',      icon: 'payments',  href: '/contributions',                    orange: false },
   ]

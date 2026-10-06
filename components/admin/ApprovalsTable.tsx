@@ -36,7 +36,10 @@ export default function ApprovalsTable({
   const [linkingPrincipal, setLinkingPrincipal] = useState(false)
   const [principalId, setPrincipalId] = useState('')
   const [relationship, setRelationship] = useState<'SPOUSE' | 'CHILD' | 'DEPENDENT' | 'OTHER'>('OTHER')
-  const [role, setRole] = useState<Role>('MEMBER')
+  const defaultRole = roleOptions.find((option) => option.value === 'MEMBER')?.value ?? roleOptions[0]?.value ?? 'MEMBER'
+  const [role, setRole] = useState<Role>(defaultRole)
+  const roleLabel = roleOptions.find((option) => option.value === role)?.label ?? 'Member'
+  const canApprove = roleOptions.some((option) => option.value === role)
   const [error, setError] = useState('')
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
   const [pending, startTransition] = useTransition()
@@ -57,7 +60,7 @@ export default function ApprovalsTable({
     setConfirmingReject(false)
     setLinkingPrincipal(false)
     setPrincipalId('')
-    setRole('MEMBER')
+    setRole(defaultRole)
     setError('')
   }
 
@@ -246,7 +249,7 @@ export default function ApprovalsTable({
                           <option key={option.value} value={option.value}>{option.label}</option>
                         ))}
                       </select>
-                      <span className="mt-1 block font-normal">Everyone applies as a Member. Pick a higher role only if they need it.</span>
+                      <span className="mt-1 block font-normal">Choose the role this account will receive when approved.</span>
                     </label>
                   )}
 
@@ -290,7 +293,7 @@ export default function ApprovalsTable({
                       </label>
                       {principals.length === 0 && <p className="text-xs font-semibold text-error">No active Principal Members are available. Create or activate one before approving this account.</p>}
                       <div className="flex gap-2 pt-1">
-                        <button type="button" disabled={pending || !principalId} onClick={() => decide(true, { principalMemberId: principalId, familyRelationship: relationship })} className="rounded-lg bg-primary px-4 py-2 text-sm text-on-primary disabled:opacity-40">{pending ? 'Approving…' : 'Link and approve'}</button>
+                        <button type="button" disabled={pending || !principalId || !canApprove} onClick={() => decide(true, { principalMemberId: principalId, familyRelationship: relationship })} className="rounded-lg bg-primary px-4 py-2 text-sm text-on-primary disabled:opacity-40">{pending ? 'Approving…' : `Link and approve as ${roleLabel}`}</button>
                         <button type="button" disabled={pending} onClick={() => setLinkingPrincipal(false)} className="rounded-lg border border-outline-variant px-4 py-2 text-sm">Back</button>
                       </div>
                     </div>
@@ -298,11 +301,11 @@ export default function ApprovalsTable({
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={pending}
+                        disabled={pending || !canApprove}
                         onClick={() => selected.hasPrincipalLink ? decide(true) : setLinkingPrincipal(true)}
                         className="rounded-lg bg-primary px-4 py-2 text-sm text-on-primary disabled:opacity-50"
                       >
-                        Approve
+                        {pending ? 'Approving…' : `Approve as ${roleLabel}`}
                       </button>
                       <button
                         type="button"

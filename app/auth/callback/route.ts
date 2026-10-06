@@ -1,3 +1,4 @@
+import { WORKSPACE_COOKIE } from '@/lib/auth/workspace'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=oauth`)
   }
 
+  cookieStore.delete(WORKSPACE_COOKIE)
   const email = data.user.email
   if (!email) {
     await supabase.auth.signOut()

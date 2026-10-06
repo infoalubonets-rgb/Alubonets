@@ -43,7 +43,8 @@ const validators: Record<SettingKey, z.ZodType<string>> = {
       message: 'Enter a valid phone number.',
     }),
   [SETTING_KEYS.financialApprovalThresholdKes]: z.string().regex(/^\d+(\.\d{1,2})?$/),
-  [SETTING_KEYS.auditRetentionDays]: z.string().regex(/^\d+$/).refine((v) => Number(v) >= 30 && Number(v) <= 3650),
+  // 0 keeps audit logs forever; otherwise at least 90 days so a month's warning always comes first.
+  [SETTING_KEYS.auditRetentionDays]: z.string().regex(/^\d+$/).refine((v) => Number(v) === 0 || (Number(v) >= 90 && Number(v) <= 3650)),
   [SETTING_KEYS.brandingSiteName]: z.string().trim().min(2).max(80),
   [SETTING_KEYS.brandingPrimaryHex]: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   [SETTING_KEYS.loanMinAmountKes]: z.string().regex(/^\d{1,6}$/).refine((v) => Number(v) >= 0 && Number(v) <= 999_999),
@@ -61,7 +62,7 @@ const defaults: Partial<Record<SettingKey, string>> = {
   [SETTING_KEYS.contactPublicEmail]: CONTACT_EMAIL,
   [SETTING_KEYS.contactPublicPhone]: '',
   [SETTING_KEYS.financialApprovalThresholdKes]: '50000',
-  [SETTING_KEYS.auditRetentionDays]: '365',
+  [SETTING_KEYS.auditRetentionDays]: '0',
   [SETTING_KEYS.brandingSiteName]: 'Alubonets',
   [SETTING_KEYS.brandingPrimaryHex]: '#003366',
   [SETTING_KEYS.loanMinAmountKes]: '1300',

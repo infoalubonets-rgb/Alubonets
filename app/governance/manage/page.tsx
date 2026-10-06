@@ -6,8 +6,8 @@ import { navForRole } from '@/lib/dashboard/nav'
 import { getGovernanceRecordsDetailsForViewer, getResolutionsForViewer } from '@/lib/data/queries'
 
 export default async function ManageGovernancePage() {
-  // Only Admin and Secretary may create, upload, and manage governance proposals.
-  const actor = await requireActiveRole(['ADMIN', 'SECRETARY'])
+  // Admin, Secretary and Treasurer can create and upload proposals; only Admin approves them.
+  const actor = await requireActiveRole(['ADMIN', 'SECRETARY', 'TREASURER'])
   const [resolutions, proposals] = await Promise.all([
     getResolutionsForViewer(actor),
     getGovernanceRecordsDetailsForViewer(actor),
@@ -44,6 +44,7 @@ export default async function ManageGovernancePage() {
             details={proposals}
             canPublish={resolutions.canApprove}
             showVisibility
+            canManage
           />
         </section>
       </div>

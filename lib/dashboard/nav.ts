@@ -3,75 +3,57 @@ import type { Role } from '@/lib/auth/types'
 
 export type { NavItem }
 
-const CONTRIBUTIONS_NAV: NavItem = {
-  icon: 'payments',
-  label: 'Payments & Statements',
-  href: '/contributions',
-}
-const ANNOUNCEMENTS_NAV: NavItem = {
-  icon: 'campaign',
-  label: 'Announcements',
-  href: '/announcements',
-}
-const DIRECTORY_NAV: NavItem = {
-  icon: 'contacts',
-  label: 'Directory',
-  href: '/directory',
-}
-const TODAY_NAV: NavItem = {
-  icon: 'today',
-  label: 'Today / Activities',
-  href: '/today',
-}
-const PROJECTS_VIEW_NAV: NavItem = {
-  icon: 'work',
-  label: 'Projects & investments',
-  href: '/dashboard/member/projects',
-}
-const EVENTS_VIEW_NAV: NavItem = {
-  icon: 'event',
-  label: 'Events',
-  href: '/dashboard/member/events',
-}
-const MEETINGS_REPORTS_NAV: NavItem = {
-  icon: 'summarize',
-  label: 'Meetings & reports',
-  href: '/meetings-reports',
-}
-const DOCUMENTS_VIEW_NAV: NavItem = {
-  icon: 'folder',
-  label: 'Document repository',
-  href: '/documents',
-}
+/*
+ * Every role gets the same sidebar as the Administrator — same sections, same names, same
+ * order. A section a role can't use is simply left out, and each section opens that role's
+ * own page. Related pages (children) show as buttons in the page header, not the sidebar.
+ *
+ * Overview · Notifications · Members · Finance · Projects & events · Meetings & reports ·
+ * Communications · Documents · Governance · My Family · Settings
+ */
 
-const FAMILY_NAV: NavItem = {
-  icon: 'family_restroom',
-  label: 'My Family / Branch',
-  href: '/dashboard/member/family',
-}
+const ACTIVITIES_NAV: NavItem = { icon: 'today', label: 'Activities', href: '/today' }
+const CONTRIBUTIONS_NAV: NavItem = { icon: 'payments', label: 'Payments & statements', href: '/contributions' }
+const EVENTS_VIEW_NAV: NavItem = { icon: 'event', label: 'Events', href: '/dashboard/member/events' }
+const MANAGE_EVENTS_NAV: NavItem = { icon: 'edit_calendar', label: 'Manage events', href: '/dashboard/organizer/events' }
+const DOCUMENTS_VIEW_NAV: NavItem = { icon: 'folder', label: 'Document repository', href: '/documents' }
+const FINANCIAL_REPORTS_NAV: NavItem = { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' }
+
+/** Every role's inbox: new activities, role to-dos, payments and group notices. */
+const NOTIFICATIONS_NAV: NavItem = { icon: 'notifications', label: 'Notifications', href: '/notifications' }
+/** Kept for routing; the shell shows support chat as its own button, not a sidebar link. */
 const SUPPORT_CHAT_NAV: NavItem = { icon: 'support_agent', label: 'Support chat', href: '/support-chat' }
+const FAMILY_NAV: NavItem = { icon: 'family_restroom', label: 'My Family', href: '/dashboard/member/family' }
+const MEMBERS_NAV: NavItem = { icon: 'manage_accounts', label: 'Members', href: '/directory' }
+
+const overview = (href: string): NavItem => ({ icon: 'dashboard', label: 'Overview', href, children: [ACTIVITIES_NAV] })
+const finance = (href: string, children: NavItem[] = []): NavItem => ({ icon: 'account_balance', label: 'Finance', href, children })
+const projectsAndEvents = (href: string, children: NavItem[]): NavItem => ({ icon: 'work', label: 'Projects & events', href, children })
+const meetings = (href = '/meetings-reports'): NavItem => ({ icon: 'summarize', label: 'Meetings & reports', href })
+const communications = (href: string): NavItem => ({ icon: 'campaign', label: 'Communications', href })
+const documentsNav = (href: string, children: NavItem[] = []): NavItem => ({
+  icon: href === '/documents/manage' ? 'folder_managed' : 'folder',
+  label: 'Documents',
+  href,
+  children,
+})
+const governance = (href: string): NavItem => ({ icon: 'gavel', label: 'Governance', href })
 
 export const ADMIN_NAV: NavItem[] = [
-  { icon: 'dashboard', label: 'Overview', href: '/admin', children: [TODAY_NAV] },
-  { icon: 'manage_accounts', label: 'Accounts', href: '/admin/accounts', children: [
-    { icon: 'pending_actions', label: 'Approvals', href: '/admin/approvals' },
-  ] },
-  { icon: 'account_balance', label: 'Finance', href: '/admin/finance', children: [
-    // Admins are members too — their own contributions statement lives under Finance.
-    { ...CONTRIBUTIONS_NAV, label: 'Contributions' },
-  ] },
-  { icon: 'work', label: 'Projects & events', href: '/dashboard/executive/projects', children: [
+  overview('/admin'),
+  NOTIFICATIONS_NAV,
+  { ...MEMBERS_NAV, children: [{ icon: 'pending_actions', label: 'Approvals', href: '/admin/approvals' }] },
+  // Admins are members too — their own contributions statement lives under Finance.
+  finance('/admin/finance', [{ ...CONTRIBUTIONS_NAV, label: 'Contributions' }]),
+  projectsAndEvents('/dashboard/executive/projects', [
     EVENTS_VIEW_NAV,
     { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
-  ] },
-  MEETINGS_REPORTS_NAV,
-  { icon: 'campaign', label: 'Communications', href: '/admin/announcements', children: [
-    { icon: 'badge', label: 'About Us profiles', href: '/admin/committee' },
-  ] },
-  { icon: 'folder_managed', label: 'Documents', href: '/documents/manage', children: [DOCUMENTS_VIEW_NAV] },
-  { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
-  { icon: 'contacts', label: 'Directory', href: '/directory' },
-  FAMILY_NAV,
+  ]),
+  meetings(),
+  communications('/admin/announcements'),
+  documentsNav('/documents/manage', [DOCUMENTS_VIEW_NAV]),
+  governance('/governance/manage'),
+  { ...FAMILY_NAV, href: '/admin/family' },
   { icon: 'settings', label: 'Settings', href: '/admin/settings', children: [
     { icon: 'admin_panel_settings', label: 'Roles & access', href: '/admin/roles' },
     { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
@@ -79,19 +61,17 @@ export const ADMIN_NAV: NavItem[] = [
 ]
 
 export const EXECUTIVE_NAV: NavItem[] = [
-  { icon: 'dashboard', label: 'Overview', href: '/dashboard/executive' },
-  TODAY_NAV,
-  SUPPORT_CHAT_NAV,
-  { icon: 'work', label: 'Projects', href: '/dashboard/executive/projects' },
-  EVENTS_VIEW_NAV,
-  MEETINGS_REPORTS_NAV,
-  { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
-  { icon: 'gavel', label: 'Governance', href: '/governance' },
-  DOCUMENTS_VIEW_NAV,
-  DIRECTORY_NAV,
-  ANNOUNCEMENTS_NAV,
+  overview('/dashboard/executive'),
+  NOTIFICATIONS_NAV,
+  MEMBERS_NAV,
+  finance('/financial-reports', [CONTRIBUTIONS_NAV]),
+  projectsAndEvents('/dashboard/executive/projects', [EVENTS_VIEW_NAV]),
+  meetings(),
+  communications('/announcements'),
+  documentsNav('/documents'),
+  governance('/governance'),
   FAMILY_NAV,
-  CONTRIBUTIONS_NAV,
+  SUPPORT_CHAT_NAV,
 ]
 
 /**
@@ -99,79 +79,71 @@ export const EXECUTIVE_NAV: NavItem[] = [
  * Every destination here is a read view; the role has no create/edit routes.
  */
 export const AUDITOR_NAV: NavItem[] = [
-  { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
+  NOTIFICATIONS_NAV,
+  MEMBERS_NAV,
+  finance('/financial-reports'),
+  meetings(),
+  documentsNav('/documents'),
+  governance('/governance'),
   { icon: 'history', label: 'Activity logs', href: '/admin/audit-logs' },
-  MEETINGS_REPORTS_NAV,
-  { icon: 'gavel', label: 'Governance', href: '/governance' },
-  DOCUMENTS_VIEW_NAV,
-  DIRECTORY_NAV,
-  ANNOUNCEMENTS_NAV,
 ]
 
 export const TREASURER_NAV: NavItem[] = [
-  { icon: 'dashboard', label: 'Overview', href: '/dashboard/treasurer' },
-  TODAY_NAV,
-  SUPPORT_CHAT_NAV,
-  { icon: 'payments', label: 'Member contributions', href: '/dashboard/treasurer/contributions' },
-  { icon: 'account_balance', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
-  { icon: 'flag', label: 'Campaigns', href: '/dashboard/treasurer/campaigns' },
-  { icon: 'assessment', label: 'Financial reports', href: '/financial-reports' },
-  PROJECTS_VIEW_NAV,
-  EVENTS_VIEW_NAV,
-  MEETINGS_REPORTS_NAV,
-  DOCUMENTS_VIEW_NAV,
-  { icon: 'gavel', label: 'Governance', href: '/governance' },
-  { icon: 'savings', label: 'My contributions', href: '/contributions' },
+  overview('/dashboard/treasurer'),
+  NOTIFICATIONS_NAV,
+  finance('/dashboard/treasurer/contributions', [
+    { icon: 'account_balance', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
+    { icon: 'flag', label: 'Campaigns', href: '/dashboard/treasurer/campaigns' },
+    FINANCIAL_REPORTS_NAV,
+    { icon: 'savings', label: 'My contributions', href: '/contributions' },
+  ]),
+  projectsAndEvents('/dashboard/member/projects', [EVENTS_VIEW_NAV]),
+  meetings(),
+  documentsNav('/documents'),
+  governance('/governance'),
   FAMILY_NAV,
-  DIRECTORY_NAV,
-  ANNOUNCEMENTS_NAV,
+  SUPPORT_CHAT_NAV,
 ]
 
 export const SECRETARY_NAV: NavItem[] = [
-  { icon: 'dashboard', label: 'Overview', href: '/dashboard/secretary' },
-  TODAY_NAV,
-  SUPPORT_CHAT_NAV,
-  ANNOUNCEMENTS_NAV,
-  { icon: 'summarize', label: 'Minutes & reports', href: '/dashboard/secretary/meetings' },
-  { icon: 'edit_calendar', label: 'Manage events', href: '/dashboard/organizer/events', children: [EVENTS_VIEW_NAV] },
-  PROJECTS_VIEW_NAV,
-  { icon: 'gavel', label: 'Governance', href: '/governance/manage' },
-  { icon: 'folder_managed', label: 'Documents', href: '/documents/manage' },
-  DOCUMENTS_VIEW_NAV,
-  DIRECTORY_NAV,
+  overview('/dashboard/secretary'),
+  NOTIFICATIONS_NAV,
+  finance('/contributions'),
+  projectsAndEvents('/dashboard/member/projects', [MANAGE_EVENTS_NAV, EVENTS_VIEW_NAV]),
+  meetings('/dashboard/secretary/meetings'),
+  communications('/announcements'),
+  documentsNav('/documents/manage', [DOCUMENTS_VIEW_NAV]),
+  governance('/governance/manage'),
   FAMILY_NAV,
-  CONTRIBUTIONS_NAV,
+  SUPPORT_CHAT_NAV,
 ]
 
 export const ORGANIZER_NAV: NavItem[] = [
-  { icon: 'dashboard', label: 'Overview', href: '/dashboard/organizer' },
-  TODAY_NAV,
-  SUPPORT_CHAT_NAV,
-  { icon: 'event', label: 'Events', href: '/dashboard/organizer/events' },
-  { icon: 'photo_library', label: 'Gallery', href: '/dashboard/organizer/gallery' },
-  { icon: 'work', label: 'Projects', href: '/dashboard/organizer/projects' },
-  MEETINGS_REPORTS_NAV,
-  DOCUMENTS_VIEW_NAV,
-  { icon: 'gavel', label: 'Governance', href: '/governance' },
-  DIRECTORY_NAV,
+  overview('/dashboard/organizer'),
+  NOTIFICATIONS_NAV,
+  finance('/contributions'),
+  projectsAndEvents('/dashboard/organizer/projects', [
+    MANAGE_EVENTS_NAV,
+    { icon: 'photo_library', label: 'Gallery', href: '/dashboard/organizer/gallery' },
+  ]),
+  meetings(),
+  communications('/announcements'),
+  documentsNav('/documents'),
+  governance('/governance'),
   FAMILY_NAV,
-  ANNOUNCEMENTS_NAV,
-  CONTRIBUTIONS_NAV,
+  SUPPORT_CHAT_NAV,
 ]
 
 export const MEMBER_NAV: NavItem[] = [
-  { icon: 'home', label: 'Home', href: '/dashboard/member' },
-  TODAY_NAV,
-  SUPPORT_CHAT_NAV,
+  overview('/dashboard/member'),
+  NOTIFICATIONS_NAV,
+  finance('/contributions'),
+  projectsAndEvents('/dashboard/member/projects', [EVENTS_VIEW_NAV]),
+  meetings(),
+  documentsNav('/documents'),
+  governance('/governance'),
   FAMILY_NAV,
-  DIRECTORY_NAV,
-  ANNOUNCEMENTS_NAV,
-  CONTRIBUTIONS_NAV,
-  PROJECTS_VIEW_NAV,
-  EVENTS_VIEW_NAV,
-  MEETINGS_REPORTS_NAV,
-  { icon: 'gavel', label: 'Governance', href: '/governance' },
-  DOCUMENTS_VIEW_NAV,
+  SUPPORT_CHAT_NAV,
 ]
 
 export const LOANS_NAV_ITEMS = {

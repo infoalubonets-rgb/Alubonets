@@ -1,3 +1,4 @@
+import { WORKSPACE_COOKIE } from '@/lib/auth/workspace'
 export const dynamic = 'force-dynamic'
 
 import { NextResponse } from 'next/server'
@@ -172,6 +173,9 @@ export async function POST(req: Request) {
         },
       })
       .catch((cause) => logError('auth.login.event', cause, { email }))
+
+    const loginCookieStore = await cookies()
+    loginCookieStore.delete(WORKSPACE_COOKIE)
 
     if (profile.status === 'PENDING') {
       return NextResponse.json({

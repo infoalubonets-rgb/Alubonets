@@ -8,6 +8,7 @@ import {
   uploadRepositoryDocument,
 } from '@/app/actions/documents'
 import { uploadToSignedUrl } from '@/lib/upload-client'
+import { ROLE_LABEL } from '@/lib/auth/types'
 
 const ROLES = ['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
 
@@ -17,6 +18,9 @@ export const DOCUMENT_DESCRIPTION_MIN = 5
 
 const DOC_ACCEPT =
   '.pdf,.doc,.docx,.xls,.xlsx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv'
+
+const LABEL = 'flex flex-col gap-1.5 text-sm font-semibold text-on-surface'
+const FIELD = 'block w-full rounded-xl border border-outline-variant bg-surface px-3 py-2.5 text-sm font-normal'
 
 type Category = { id: string; name: string }
 
@@ -60,6 +64,9 @@ export default function AddDocumentModal({
   const [open, setOpen] = useState(false)
   const [description, setDescription] = useState('')
   const [error, setError] = useState('')
+  const [access, setAccess] = useState('MEMBERS')
+  const [fileName, setFileName] = useState('')
+  const [fileSize, setFileSize] = useState('')
   const remaining = DOCUMENT_DESCRIPTION_MAX - description.length
   const descriptionError = validateDescription(description)
 
@@ -67,6 +74,9 @@ export default function AddDocumentModal({
     setOpen(false)
     setError('')
     setDescription('')
+    setAccess('MEMBERS')
+    setFileName('')
+    setFileSize('')
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -146,74 +156,89 @@ export default function AddDocumentModal({
       </button>
 
       <FullScreenModal open={open} title="Add document" onClose={close} size="compact">
-        <form onSubmit={onSubmit} className="mx-auto grid w-full max-w-2xl gap-3 md:grid-cols-2">
-          <p className="text-sm text-on-surface-variant md:col-span-2">
-            Upload a PDF, Word, or Excel file. The file goes straight from your browser to storage so the page stays responsive.
-          </p>
-          <input
-            name="title"
-            required
-            minLength={2}
-            maxLength={180}
-            placeholder="Document title"
-            className="rounded-xl border px-3 py-2.5 md:col-span-2"
-          />
-          <select name="categoryId" required className="rounded-xl border px-3 py-2.5 md:col-span-2">
-            <option value="">Select category</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <input
-            name="tags"
-            placeholder="Tags (comma-separated, e.g. welfare, education)"
-            className="rounded-xl border px-3 py-2.5 md:col-span-2"
-          />
-          <label className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3 text-sm text-primary md:col-span-2">
-            <span className="font-label-bold">Choose PDF, Word, or Excel</span>
-            <span className="ml-2 text-xs text-on-surface-variant">Maximum 15 MB</span>
-            <input name="file" type="file" accept={DOC_ACCEPT} required className="mt-2 block w-full text-xs" />
+        <form onSubmit={onSubmit} className="mx-auto grid w-full max-w-2xl gap-4 sm:grid-cols-2">
+          <label className={`${LABEL} sm:col-span-2`}>
+            Title
+            <input name="title" required minLength={2} maxLength={180} className={FIELD} />
           </label>
-          <label className="space-y-1.5 text-sm font-semibold text-on-surface md:col-span-2">
-            Short description
+
+          <label className={LABEL}>
+            Category
+            <select name="categoryId" required defaultValue="" className={FIELD}>
+              <option value="" disabled>Choose…</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>{category.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className={LABEL}>
+            Who can see it
+            <select name="accessLevel" value={access} onChange={(e) => setAccess(e.target.value)} className={FIELD}>
+              <option value="MEMBERS">All members</option>
+              <option value="SELECTED_ROLES">Selected roles</option>
+              <option value="ADMIN_SECRETARY">Admin and Secretary</option>
+              <option value="PUBLIC">Public</option>
+            </select>
+          </label>
+
+          {access === 'SELECTED_ROLES' && (
+            <fieldset className="flex flex-wrap gap-2 sm:col-span-2">
+              <legend className="sr-only">Roles that can see it</legend>
+              {ROLES.map((role) => (
+                <label key={role} className="cursor-pointer">
+                  <input type="checkbox" name="allowedRoles" value={role} className="peer sr-only" />
+                  <span className="inline-flex rounded-full border border-outline-variant px-3 py-1.5 text-xs font-semibold text-on-surface-variant transition peer-checked:border-primary peer-checked:bg-primary peer-checked:text-on-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary/40">
+                    {ROLE_LABEL[role]}
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-outline-variant px-3 py-3 transition hover:border-primary/50 hover:bg-primary/[0.03] sm:col-span-2">
+            <span className="material-symbols-outlined text-[22px] text-primary">upload_file</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-on-surface">{fileName || 'Choose a file'}</span>
+              <span className="block text-xs text-on-surface-variant">{fileSize || 'PDF, Word or Excel · up to 15 MB'}</span>
+            </span>
+            <input
+              name="file"
+              type="file"
+              accept={DOC_ACCEPT}
+              required
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                setFileName(file?.name ?? '')
+                setFileSize(file ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : '')
+              }}
+            />
+          </label>
+
+          <label className={`${LABEL} sm:col-span-2`}>
+            <span className="flex justify-between">
+              <span>Description <span className="font-normal text-on-surface-variant">(optional)</span></span>
+              {remaining <= 40 && <span className={`font-normal ${remaining <= 20 ? 'text-amber-700' : 'text-on-surface-variant'}`}>{remaining} left</span>}
+            </span>
             <textarea
               name="description"
               value={description}
               onChange={(e) => setDescription(e.target.value.slice(0, DOCUMENT_DESCRIPTION_MAX))}
-              rows={3}
+              rows={2}
               maxLength={DOCUMENT_DESCRIPTION_MAX}
-              placeholder="Optional — brief note about this document"
-              className={`block w-full rounded-xl border px-3 py-2.5 font-normal ${
-                descriptionError ? 'border-error' : 'border-outline-variant'
-              }`}
+              className={`${FIELD} ${descriptionError ? 'border-error' : ''}`}
             />
-            <span className="flex justify-between text-[11px] font-semibold">
-              <span className={descriptionError ? 'text-error' : 'text-on-surface-variant'}>
-                {descriptionError || 'Optional. Keep it short.'}
-              </span>
-              <span className={remaining <= 20 ? 'text-amber-700' : 'text-on-surface-variant'}>
-                {remaining} left
-              </span>
-            </span>
+            {descriptionError && <span className="text-xs font-normal text-error">{descriptionError}</span>}
           </label>
-          <select name="accessLevel" className="rounded-xl border px-3 py-2.5">
-            <option value="MEMBERS">All approved members</option>
-            <option value="SELECTED_ROLES">Selected roles</option>
-            <option value="ADMIN_SECRETARY">Admin and Secretary only</option>
-            <option value="PUBLIC">Public</option>
-          </select>
-          <fieldset className="flex flex-wrap items-center gap-3 rounded-xl border px-3 py-2 text-xs">
-            {ROLES.map((role) => (
-              <label key={role}>
-                <input type="checkbox" name="allowedRoles" value={role} /> {role}
-              </label>
-            ))}
-          </fieldset>
+
+          <label className={`${LABEL} sm:col-span-2`}>
+            <span>Tags <span className="font-normal text-on-surface-variant">(optional, comma-separated)</span></span>
+            <input name="tags" className={FIELD} />
+          </label>
+
           <input type="hidden" name="status" value="PUBLISHED" />
-          {error && <p className="text-sm text-error md:col-span-2">{error}</p>}
-          <div className="flex flex-wrap justify-end gap-2 border-t border-outline-variant/60 pt-4 md:col-span-2">
+          {error && <p className="text-sm text-error sm:col-span-2">{error}</p>}
+          <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
             <button type="button" onClick={close} className="rounded-full border border-outline-variant px-4 py-2.5 text-sm font-semibold">
               Cancel
             </button>

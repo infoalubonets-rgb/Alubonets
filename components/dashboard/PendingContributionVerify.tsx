@@ -10,7 +10,9 @@ type PendingRow = {
   paidAt: string
   category: string | null
   memberName: string
+  membershipNumber: string | null
   memberEmail: string
+  memberPhone: string | null
   paymentMethod: string
   mpesaRef: string | null
   statementRef: string | null
@@ -56,7 +58,9 @@ export default function PendingContributionVerify({ rows }: { rows: PendingRow[]
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="font-semibold text-on-surface">{row.memberName}</p>
-                <p className="text-xs text-on-surface-variant">{row.memberEmail}</p>
+                <p className="text-xs text-on-surface-variant">
+                  {[row.membershipNumber, row.memberEmail, row.memberPhone].filter(Boolean).join(' · ')}
+                </p>
                 <p className="mt-1 text-sm">
                   KES {Math.round(row.amount).toLocaleString()} · {row.category || 'Uncategorized'} ·{' '}
                   {row.paymentMethod}

@@ -1,96 +1,159 @@
-import Link from 'next/link'
+import DashboardUserProvider from '@/components/dashboard/DashboardUserProvider'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
-import { requireSessionProfile } from '@/lib/auth/session'
+import { requireSessionProfile, getSessionUser } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
-import { getRoleAlerts, type RoleAlert } from '@/lib/role-alerts'
+import { getRoleAlerts } from '@/lib/role-alerts'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
-import { markNotificationsRead } from '@/app/actions/notifications'
+import { getNotificationsSeen, paymentsCountFrom, unseenAlertCount } from '@/lib/notification-seen'
+import { ClearReadButton, MarkAllReadButton } from '@/components/dashboard/NotificationActions'
+import NotificationsList, { type NotificationItem } from '@/components/dashboard/NotificationsList'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Notifications — Alubonets' }
 
+const formatDate = (date: Date) =>
+  date.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+
 export default async function NotificationsPage() {
   const actor = await requireSessionProfile()
   const role = actor.role as Role
-  const [alerts, notices] = await Promise.all([
+  const [alerts, notices, announcements, seen] = await Promise.all([
     getRoleAlerts({ id: actor.id, role, isSuperAdmin: actor.isSuperAdmin, dashboardAccess: actor.dashboardAccess as Role[] }),
     prisma.userNotification.findMany({ where: { userId: actor.id }, orderBy: { createdAt: 'desc' }, take: 50 }),
+    prisma.announcementReceipt.findMany({
+      where: { userId: actor.id, announcement: { status: 'SENT' } },
+      include: {
+        announcement: {
+          select: { id: true, title: true, content: true, imageUrl: true, publishedAt: true, author: { select: { fullName: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    }),
+    getNotificationsSeen(actor.id),
   ])
+  const seesPayments =
+    role === 'ADMIN' || role === 'TREASURER' || actor.isSuperAdmin || (actor.dashboardAccess ?? []).includes('TREASURER')
+  const paymentsFrom = paymentsCountFrom(seen)
+  const recentPayments = seesPayments
+    ? await prisma.auditLog.findMany({
+        where: { action: 'MPESA_STK_SUCCESS', createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        include: { user: { select: { fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      })
+    : []
+  const readPaymentIds = new Set(seen.paymentIds ?? [])
+  const paymentUnread = (payment: { id: string; createdAt: Date }) => payment.createdAt > paymentsFrom && !readPaymentIds.has(payment.id)
+  const unseenPayments = recentPayments.filter(paymentUnread).length
 
-  const alertsByRole = alerts.reduce<Map<Role, RoleAlert[]>>((groups, alert) => {
-    groups.set(alert.role, [...(groups.get(alert.role) ?? []), alert])
-    return groups
-  }, new Map())
   const unreadCount = notices.filter((notice) => !notice.readAt).length
+  const readCount = notices.length - unreadCount
+  // Anything still lighting up the header bell — "Mark all as read" clears all of it.
+  const bellCount = unreadCount + unseenAlertCount(alerts, seen) + unseenPayments + announcements.filter((receipt) => !receipt.readAt).length
+
+  const todos: NotificationItem[] = alerts.map((alert) => ({
+    id: alert.key,
+    kind: 'todo',
+    group: alert.informational ? 'notification' : 'todo',
+    icon: alert.icon,
+    title: alert.title,
+    summary: `${alert.description} (${alert.count}). Open the page to deal with ${alert.count === 1 ? 'it' : 'them'}.`,
+    date: null,
+    unread: alert.count > (seen.alerts[alert.key] ?? 0),
+    href: alert.href,
+    openLabel: `Go to ${alert.title.toLowerCase()}`,
+    count: alert.count,
+    details: [
+      { label: 'Waiting', value: String(alert.count) },
+      { label: 'Handled from', value: `${ROLE_LABEL[alert.role]} dashboard` },
+    ],
+  }))
+
+  const dated = [
+    ...recentPayments.map((payment) => {
+      const meta = (payment.meta ?? {}) as { amount?: number; receipt?: string; phone?: string }
+      const amount = `KES ${Math.round(meta.amount ?? 0).toLocaleString()}`
+      const from = payment.user?.fullName ?? 'a member'
+      return {
+        at: payment.createdAt,
+        item: {
+          id: payment.id,
+          kind: 'payment',
+          group: 'notification',
+          icon: 'payments',
+          title: `${amount} from ${from}`,
+          summary: meta.receipt ? `M-Pesa receipt ${meta.receipt}` : 'M-Pesa payment',
+          date: formatDate(payment.createdAt),
+          unread: paymentUnread(payment),
+          href: '/dashboard/treasurer/contributions',
+          details: [
+            { label: 'Amount', value: amount },
+            { label: 'From', value: from },
+            ...(meta.receipt ? [{ label: 'Receipt', value: meta.receipt }] : []),
+            ...(meta.phone ? [{ label: 'Phone', value: meta.phone }] : []),
+            { label: 'Received', value: formatDate(payment.createdAt) },
+          ],
+        } satisfies NotificationItem,
+      }
+    }),
+    ...announcements.map(({ announcement, readAt }) => ({
+      at: announcement.publishedAt,
+      item: {
+        id: announcement.id,
+        kind: 'announcement',
+        group: 'notification',
+        icon: 'notifications',
+        title: announcement.title,
+        summary: announcement.content,
+        date: formatDate(announcement.publishedAt),
+        unread: !readAt,
+        href: null,
+        imageUrl: announcement.imageUrl,
+        details: [
+          { label: 'From', value: announcement.author?.fullName ?? 'Alubonets' },
+          { label: 'Published', value: formatDate(announcement.publishedAt) },
+        ],
+      } satisfies NotificationItem,
+    })),
+    ...notices.map((notice) => ({
+      at: notice.createdAt,
+      item: {
+        id: notice.id,
+        kind: 'message',
+        group: 'notification',
+        icon: 'notifications',
+        title: notice.title,
+        summary: notice.body || 'No further details.',
+        date: formatDate(notice.createdAt),
+        unread: !notice.readAt,
+        href: notice.href,
+        details: [
+          { label: 'Received', value: formatDate(notice.createdAt) },
+          ...(notice.readAt ? [{ label: 'Read', value: formatDate(notice.readAt) }] : []),
+        ],
+      } satisfies NotificationItem,
+    })),
+  ]
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .map((entry) => entry.item)
 
   return (
-    <DashboardShell role={role} title="Notifications" nav={navForRole(role)}>
-      <div className="mx-auto max-w-4xl space-y-6">
-        <section className="space-y-3">
-          <h2 className="font-semibold text-on-surface">Needs your attention</h2>
-          {alerts.length === 0 ? (
-            <p className="rounded-2xl border border-outline-variant bg-surface p-5 text-sm text-on-surface-variant">
-              Nothing is waiting on you right now.
-            </p>
-          ) : (
-            [...alertsByRole].map(([alertRole, roleAlerts]) => (
-              <div key={alertRole} className="space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">{ROLE_LABEL[alertRole]}</p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {roleAlerts.map((alert) => (
-                    <Link
-                      key={alert.key}
-                      href={alert.href}
-                      className="group flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface p-4 transition hover:border-primary/40 hover:shadow-md"
-                    >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary-container/15 text-secondary">
-                        <span className="material-symbols-outlined icon-fill text-[20px]">{alert.icon}</span>
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-on-surface">{alert.title}</span>
-                        <span className="block truncate text-xs text-on-surface-variant">{alert.description}</span>
-                      </span>
-                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-bold text-white">{alert.count}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-semibold text-on-surface">Your notifications</h2>
-            {unreadCount > 0 && (
-              <form action={async () => { 'use server'; await markNotificationsRead() }}>
-                <button className="text-xs font-semibold text-primary hover:underline">Mark all as read ({unreadCount})</button>
-              </form>
-            )}
-          </div>
-          {notices.length === 0 ? (
-            <p className="rounded-2xl border border-outline-variant bg-surface p-5 text-sm text-on-surface-variant">No notifications yet.</p>
-          ) : (
-            <ul className="divide-y divide-outline-variant overflow-hidden rounded-2xl border border-outline-variant bg-surface">
-              {notices.map((notice) => (
-                <li key={notice.id} className={notice.readAt ? '' : 'bg-primary/[0.04]'}>
-                  <Link href={notice.href || '#'} className="flex items-start gap-3 px-4 py-3 hover:bg-primary/[0.03]">
-                    <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notice.readAt ? 'bg-transparent' : 'bg-secondary'}`} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-on-surface">{notice.title}</span>
-                      {notice.body && <span className="block text-xs text-on-surface-variant">{notice.body}</span>}
-                    </span>
-                    <span className="shrink-0 text-[11px] text-outline">
-                      {notice.createdAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+    <DashboardUserProvider user={await getSessionUser()}>
+    <DashboardShell
+      role={role}
+      title="Notifications"
+      nav={navForRole(role)}
+      pageAction={
+        <span className="flex items-center gap-2">
+          {readCount > 0 && <ClearReadButton readCount={readCount} />}
+          <MarkAllReadButton unreadCount={bellCount} />
+        </span>
+      }
+    >
+      <NotificationsList items={[...todos, ...dated]} />
     </DashboardShell>
+    </DashboardUserProvider>
   )
 }

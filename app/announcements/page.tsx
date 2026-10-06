@@ -12,7 +12,7 @@ import type { Prisma } from '@prisma/client'
 import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Announcements — Alubonets' }
+export const metadata = { title: 'Communications — Alubonets' }
 
 export default async function AnnouncementsPage({
   searchParams,
@@ -27,8 +27,10 @@ export default async function AnnouncementsPage({
   const page = parsePage((await searchParams).page)
   const pageSize = 20
   const canSend =
-    ['ADMIN', 'EXECUTIVE', 'ORGANIZER', 'SECRETARY', 'TREASURER'].includes(role) ||
+    ['ADMIN', 'EXECUTIVE', 'ORGANIZER', 'SECRETARY'].includes(role) ||
     (profile.isSuperAdmin ?? false)
+  // Notices are read on Notifications; this page is only for the roles that send them.
+  if (!canSend) redirect('/notifications')
   const showPaymentNotifs = ['TREASURER', 'ADMIN'].includes(role) || (profile.isSuperAdmin ?? false)
 
   const announcementWhere = {
@@ -59,7 +61,7 @@ export default async function AnnouncementsPage({
     canSend
       ? prisma.user.findMany({
           where: { status: 'ACTIVE', id: { not: profile.id } },
-          select: { id: true, fullName: true, email: true },
+          select: { id: true, fullName: true, email: true, phone: true },
           orderBy: { fullName: 'asc' },
         })
       : Promise.resolve([]),
@@ -74,7 +76,7 @@ export default async function AnnouncementsPage({
   ])
 
   return (
-    <DashboardShell role={role} title="Announcements" nav={navForRole(role)}>
+    <DashboardShell role={role} title="Communications" nav={navForRole(role)}>
       <MarkAnnouncementsRead />
       <div className="max-w-3xl mx-auto pb-10 space-y-6">
         {showPaymentNotifs && (

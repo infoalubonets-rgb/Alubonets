@@ -1,7 +1,11 @@
 'use client'
 
+import { switchWorkspace } from '@/app/actions/workspace'
 import { allowedDashboards, ROLE_HOME, ROLE_LABEL, roleForDashboardPath, type AuthUser, type Role } from '@/lib/auth/types'
 import { usePathname, useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
+
+const SUPER_ADMIN_OPTION = 'SUPER_ADMIN'
 
 type Props = {
   user: AuthUser
@@ -16,9 +20,17 @@ export default function WorkspaceSwitcher({ user }: Props) {
     dashboardAccess: user.dashboardAccess ?? [],
   })
 
+  const [switching, startSwitch] = useTransition()
+  const [error, setError] = useState('')
+  const [target, setTarget] = useState<string | null>(null)
   if (workspaces.length <= 1) return null
 
-  const currentRole = roleForDashboardPath(pathname) ?? user.role
+  const pathRole = user.activeWorkspace ?? roleForDashboardPath(pathname) ?? user.role
+  // The selected mode controls both the label and server permissions.
+  const currentRole = pathRole === 'ADMIN' && user.isSuperAdmin ? (user.activeSuperAdmin ? SUPER_ADMIN_OPTION : 'ADMIN') : pathRole
+  const options: string[] = user.isSuperAdmin
+    ? workspaces.flatMap((role) => (role === 'ADMIN' ? [SUPER_ADMIN_OPTION, 'ADMIN'] : [role]))
+    : workspaces
 
   return (
     <div className="flex items-center gap-1.5 rounded-lg border border-outline-variant/60 dark:border-[#1e3461] bg-surface-container dark:bg-[#111f36] px-2 py-1">
@@ -27,20 +39,46 @@ export default function WorkspaceSwitcher({ user }: Props) {
       </span>
       <select
         aria-label="Switch workspace"
-        className="bg-transparent text-[12px] font-label-bold text-on-surface dark:text-blue-50 focus:outline-none max-w-[140px]"
-        value={currentRole}
+        disabled={switching}
+        className="bg-transparent text-[12px] font-label-bold text-on-surface dark:text-blue-50 focus:outline-none max-w-[140px] disabled:opacity-60"
+        value={switching && target ? target : currentRole}
         onChange={(e) => {
-          const role = e.target.value as Role
-          router.push(ROLE_HOME[role])
+          const value = e.target.value
+          const go = (href: string) => {
+            setTarget(value)
+            setError('')
+            startSwitch(async () => {
+              try {
+                await switchWorkspace(value)
+                router.push(href)
+                router.refresh()
+              } catch (cause) {
+                setError(cause instanceof Error ? cause.message : 'Could not switch workspace.')
+                setTarget(null)
+              }
+            })
+          }
+          if (value === SUPER_ADMIN_OPTION || (value === 'ADMIN' && user.isSuperAdmin)) {
+            go(ROLE_HOME.ADMIN)
+            return
+          }
+          go(ROLE_HOME[value as Role])
         }}
       >
-        {workspaces.map((role) => (
-          <option key={role} value={role}>
-            {ROLE_LABEL[role]}
-            {user.disabledRoles?.includes(role) ? ' (deactivated)' : ''}
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option === SUPER_ADMIN_OPTION ? 'Super Administrator' : ROLE_LABEL[option as Role]}
+            {user.disabledRoles?.includes(option as Role) ? ' (deactivated)' : ''}
           </option>
         ))}
       </select>
+      {error && <span role="alert" className="text-xs text-error">{error}</span>}
+      {switching && (
+        <span className="flex items-center gap-1 text-[11px] font-semibold text-secondary" role="status">
+          <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>
+          Opening…
+        </span>
+      )}
     </div>
   )
 }

@@ -19,6 +19,14 @@ const testEmailOverride = () =>
   process.env.RESEND_TEST_EMAIL?.trim() ||
   (from().includes('onboarding@resend.dev') ? CONTACT_EMAIL : null)
 
+/**
+ * Where all email goes while in test mode, or null when emails reach their real recipients.
+ * Test mode ends once FROM_EMAIL uses a domain verified in Resend and RESEND_TEST_EMAIL is unset.
+ */
+export function emailTestModeRecipient() {
+  return getResend() ? testEmailOverride() : null
+}
+
 export function baseHtml(body: string) {
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#eef2f7;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
 <div style="max-width:600px;margin:32px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 8px 28px rgba(0,31,80,.12);">
@@ -174,11 +182,10 @@ ${ctaBlock}`)
     // so attachment sends go out one email at a time, a few in flight together.
     const CONCURRENCY = 5
     if (override) {
-      const names = members.map((m) => m.fullName).join(', ')
       const { error } = await resend.emails.send({
         from: from(),
         to: override,
-        subject: `[TEST — would go to ${members.length} member(s): ${names}] ${subject}`,
+        subject,
         html: html('members'),
         attachments,
       })
@@ -202,11 +209,10 @@ ${ctaBlock}`)
     // No domain yet — send one combined email per chunk to the override address
     for (let i = 0; i < members.length; i += 100) {
       const chunk = members.slice(i, i + 100)
-      const names = chunk.map((m) => m.fullName).join(', ')
       const { error } = await resend.emails.send({
         from: from(),
         to: override,
-        subject: `[TEST — would go to ${chunk.length} member(s): ${names}] ${subject}`,
+        subject,
         html: html('members'),
       })
       for (const m of chunk) await record({ userId: m.id, ok: !error, error: error?.message })
@@ -296,7 +302,7 @@ ${ctaBlock}`)
     const { error } = await resend.emails.send({
       from: from(),
       to,
-      subject: override ? `[TEST — for ${email}] ${subject}` : subject,
+      subject,
       html: html('there'),
       attachments,
     })

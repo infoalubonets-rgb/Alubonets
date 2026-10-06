@@ -227,9 +227,6 @@ export default function ContactInboxRows({ messages: initialMessages }: { messag
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-h3 text-lg text-primary">Contact inbox</h2>
-          <p className="mt-0.5 text-xs text-on-surface-variant">
-            Public contact form messages land here and are emailed with the Alubonets enquiry template.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{unread} unread</span>

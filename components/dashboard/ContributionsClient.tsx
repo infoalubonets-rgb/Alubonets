@@ -50,10 +50,13 @@ export default function ContributionsClient({
   userId,
   familyMembers = [],
   canSubmitPayment = false,
+  ownerLabel = 'You',
 }: {
   contributions: Contribution[]
   userId: string
   familyMembers?: FamilyMember[]
+  /** Name shown for the main person — another member's name when finance staff view their page. */
+  ownerLabel?: string
   /** Only the Treasurer records payments; members simply see what was recorded for them. */
   canSubmitPayment?: boolean
 }) {
@@ -67,8 +70,8 @@ export default function ContributionsClient({
   const [viewingId, setViewingId] = useState(userId)
 
   const people = useMemo(
-    () => [{ id: userId, fullName: 'You', contributions }, ...familyMembers],
-    [userId, contributions, familyMembers],
+    () => [{ id: userId, fullName: ownerLabel, contributions }, ...familyMembers],
+    [userId, ownerLabel, contributions, familyMembers],
   )
   const viewing = people.find((p) => p.id === viewingId) ?? people[0]
   const viewingContributions = viewing.contributions

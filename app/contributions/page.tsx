@@ -9,6 +9,9 @@ import type { Role } from '@/lib/auth/types'
 import ContributionsClient from '@/components/dashboard/ContributionsClient'
 import OfficialPaymentDestination from '@/components/dashboard/OfficialPaymentDestination'
 import { getActiveFinanceDestination } from '@/app/actions/finance'
+import { canViewAllFinances } from '@/lib/finance-access'
+import ContributionTabs from '@/components/dashboard/ContributionTabs'
+import MemberContributionsTable, { type MemberContributionRow } from '@/components/dashboard/MemberContributionsTable'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'My contributions' }
@@ -47,12 +50,65 @@ function getAttachedMembers(principalId: string) {
   )()
 }
 
-export default async function ContributionsPage() {
+/** One row per member: confirmed totals, pending checks and last payment. */
+async function getMemberContributionRows(): Promise<MemberContributionRow[]> {
+  const [members, paid, pending] = await Promise.all([
+    prisma.user.findMany({
+      where: { status: { not: 'PENDING' } },
+      select: { id: true, fullName: true, membershipNumber: true, status: true, standing: true },
+      orderBy: { fullName: 'asc' },
+    }),
+    prisma.contribution.groupBy({
+      by: ['userId'],
+      where: { status: { in: ['CONFIRMED', 'RECONCILED'] } },
+      _sum: { amount: true },
+      _count: true,
+      _max: { paidAt: true },
+    }),
+    prisma.contribution.groupBy({ by: ['userId'], where: { status: 'PENDING' }, _count: true }),
+  ])
+  const paidBy = new Map(paid.map((row) => [row.userId, row]))
+  const pendingBy = new Map(pending.map((row) => [row.userId, row._count]))
+  return members.map((member) => {
+    const totals = paidBy.get(member.id)
+    return {
+      id: member.id,
+      fullName: member.fullName,
+      membershipNumber: member.membershipNumber,
+      status: member.status,
+      standing: member.standing,
+      payments: totals?._count ?? 0,
+      totalPaid: Number(totals?._sum.amount ?? 0),
+      pending: pendingBy.get(member.id) ?? 0,
+      lastPaidAt: totals?._max.paidAt?.toISOString() ?? null,
+    }
+  })
+}
+
+export default async function ContributionsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const profile = await getSessionProfile()
   if (!profile) redirect('/login?next=/contributions')
   if (profile.status === 'SUSPENDED') redirect('/login?error=suspended')
 
   const role = profile.role as Role
+  const seesAll = canViewAllFinances(profile)
+  const title = seesAll ? 'Contributions' : 'My contributions'
+
+  if (seesAll && (await searchParams).tab === 'members') {
+    const rows = await getMemberContributionRows()
+    return (
+      <DashboardShell
+        role={role}
+        title={title}
+        nav={navForRole(role)}
+        pageAction={<ContributionTabs active="members" />}
+      >
+        <div className="space-y-4 pt-4">
+          <MemberContributionsTable rows={rows} />
+        </div>
+      </DashboardShell>
+    )
+  }
   let contributions
   let destination = null as Awaited<ReturnType<typeof getActiveFinanceDestination>>
   let familyMembers: {
@@ -89,7 +145,12 @@ export default async function ContributionsPage() {
   } catch (error) {
     console.error('Could not load member contributions', error)
     return (
-      <DashboardShell role={role} title="My contributions" nav={navForRole(role)}>
+      <DashboardShell
+        role={role}
+        title={title}
+        nav={navForRole(role)}
+        pageAction={seesAll ? <ContributionTabs active="mine" /> : undefined}
+      >
         <section className="mx-auto mt-8 max-w-xl rounded-2xl border border-error/30 bg-surface p-6 text-center">
           <span className="material-symbols-outlined text-4xl text-error">cloud_off</span>
           <h2 className="mt-2 font-h3 text-xl text-primary">Contributions are temporarily unavailable</h2>
@@ -104,7 +165,12 @@ export default async function ContributionsPage() {
     )
   }
   return (
-    <DashboardShell role={role} title="My contributions" nav={navForRole(role)}>
+    <DashboardShell
+      role={role}
+      title={title}
+      nav={navForRole(role)}
+      pageAction={seesAll ? <ContributionTabs active="mine" /> : undefined}
+    >
       <div className="mx-auto max-w-3xl space-y-4 pb-4 pt-4 px-4 md:px-0">
         <OfficialPaymentDestination destination={destination} />
         {role === 'TREASURER' && (

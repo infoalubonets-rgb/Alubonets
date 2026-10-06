@@ -20,7 +20,7 @@ export default async function TreasurerLoansPage() {
     take: 100,
   })
   const balances = await loanBalancesForIds(loans.map((l) => l.id))
-  const nav = withOptionalNav(TREASURER_NAV, LOANS_NAV_ITEMS.treasurer, '/dashboard/treasurer/welfare')
+  const nav = withOptionalNav(TREASURER_NAV, LOANS_NAV_ITEMS.treasurer, '/financial-reports')
 
   return (
     <DashboardShell role="TREASURER" title="Loans" nav={nav}>

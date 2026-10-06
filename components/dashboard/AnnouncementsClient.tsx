@@ -19,7 +19,7 @@ type Announcement = {
   receipts: { readAt: Date | null }[]
 }
 
-type MemberOption = { id: string; fullName: string; email: string }
+type MemberOption = { id: string; fullName: string; email: string; phone?: string | null }
 
 export default function AnnouncementsClient({
   announcements,

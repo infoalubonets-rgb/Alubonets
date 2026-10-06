@@ -1,8 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { allowedDashboards, type Role } from '@/lib/auth/types'
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
-import { getUnreadAnnouncementCount } from '@/lib/data/queries'
-
 export type RoleAlert = {
   key: string
   role: Role
@@ -11,6 +9,8 @@ export type RoleAlert = {
   description: string
   count: number
   href: string
+  /** Something to know about rather than act on (shown under Notifications, not To-dos). */
+  informational?: boolean
 }
 
 type AlertUser = { id: string; role: Role; isSuperAdmin?: boolean; dashboardAccess?: Role[] | null }
@@ -47,7 +47,6 @@ function alertSpecs(user: AlertUser, flags: { loans: boolean; welfare: boolean }
     { key: 'organizer-gallery', role: 'ORGANIZER', icon: 'photo_library', title: 'Gallery queue', description: 'Photos waiting to be published', href: '/dashboard/organizer/gallery', count: () => prisma.galleryPhoto.count({ where: { isPublic: false } }) },
     { key: 'organizer-comments', role: 'ORGANIZER', icon: 'forum', title: 'Project comments', description: 'Comments waiting for moderation', href: '/dashboard/organizer/projects', count: () => prisma.projectComment.count({ where: { status: 'PENDING' } }) },
 
-    { key: 'member-announcements', role: 'MEMBER', icon: 'campaign', title: 'Unread announcements', description: 'Notices you have not opened yet', href: '/announcements', count: () => getUnreadAnnouncementCount(user.id) },
     ...(flags.loans
       ? [{ key: 'member-guarantor', role: 'MEMBER' as const, icon: 'handshake', title: 'Guarantor requests', description: 'Members asking you to guarantee their loan', href: '/dashboard/member/loans', count: () => prisma.loanGuarantor.count({ where: { userId: user.id, status: 'PENDING' } }) }]
       : []),

@@ -4,6 +4,7 @@ import { createTargetedAnnouncement, retryFailedAnnouncementEmails } from '@/app
 import { updateContactDestination } from '@/app/actions/contact'
 import AssignedContactInbox from '@/components/admin/AssignedContactInbox'
 import CommunicationsAdminRoot from '@/components/admin/CommunicationsAdminRoot'
+import { emailTestModeRecipient } from '@/lib/email/resend'
 import { CONTACT_EMAIL } from '@/lib/constants'
 
 export default async function AdminAnnouncementsPage() {
@@ -48,6 +49,7 @@ export default async function AdminAnnouncementsPage() {
       members={members}
       totalSent={totalSent}
       totalFailed={totalFailed}
+      emailTestRecipient={emailTestModeRecipient()}
       contactInbox={
         actor.isSuperAdmin ? (
           <AssignedContactInbox adminId={actor.id} isSuperAdmin />

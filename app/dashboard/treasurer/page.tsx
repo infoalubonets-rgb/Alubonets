@@ -28,7 +28,7 @@ export default async function TreasurerPage() {
   const quickLinks = [
     { label: 'Contributions & Payments', description: 'Record contributions, M-Pesa payments, receipts', icon: 'payments', href: '/dashboard/treasurer/contributions' },
     { label: 'Welfare', description: `${data.pendingWelfare.length} pending review${data.pendingWelfare.length === 1 ? '' : 's'}`, icon: 'volunteer_activism', href: '/dashboard/treasurer/welfare', badge: data.pendingWelfare.length > 0 ? data.pendingWelfare.length : null },
-    { label: 'Announcements', description: 'Group announcements & payment notifications', icon: 'campaign', href: '/announcements' },
+    { label: 'Notifications', description: 'Payments received and group notices', icon: 'notifications', href: '/notifications' },
   ]
 
   return (

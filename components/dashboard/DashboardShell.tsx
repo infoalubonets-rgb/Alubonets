@@ -15,10 +15,13 @@ import { ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
 import { logoutRequest, meLookup, type AuthUser, type Role } from '@/lib/auth/client'
 import { ROLE_LABEL, roleForDashboardPath } from '@/lib/auth/types'
 import ThemeLoader from '@/components/ui/ThemeLoader'
+import { navForRole } from '@/lib/dashboard/nav'
 import DashboardNav from './DashboardNav'
+import { useDashboardUser } from './DashboardUserProvider'
 import WorkspaceSwitcher from './WorkspaceSwitcher'
 import DashboardNotifications from './DashboardNotifications'
 import OldMonthPill from './OldMonthPill'
+import { NOTIFICATIONS_ALL_READ_EVENT, NOTIFICATIONS_READ_EVENT } from './NotificationActions'
 import UploadProgressToast from '@/components/ui/UploadProgressToast'
 
 const EmailSendProgressBanner = dynamic(() => import('./EmailSendProgressBanner'), { ssr: false })
@@ -41,6 +44,8 @@ type Props = {
   /** Hide sibling page pills in the header (e.g. Document repository). */
   hideRelatedLinks?: boolean
   pageAction?: ReactNode
+  /** Shown centred on the same row as the page title (e.g. search and filters). */
+  pageCenter?: ReactNode
 }
 
 function LiveDateBadge() {
@@ -93,17 +98,21 @@ function getDesktopServerSnapshot() {
 }
 
 export default function DashboardShell({
-  role,
+  role: pageRole,
   title,
-  nav,
+  nav: pageNav,
   children,
   hidePageHeading = false,
   hideRelatedLinks = false,
   pageAction,
+  pageCenter,
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const initialUser = useDashboardUser()
+  const [user, setUser] = useState<AuthUser | null>(initialUser)
+  const role = user?.activeWorkspace ?? pageRole
+  const nav = role === pageRole ? pageNav : navForRole(role)
   const [isDark, setIsDark] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH)
@@ -122,14 +131,11 @@ export default function DashboardShell({
   const isDesktop = useSyncExternalStore(subscribeDesktop, getDesktopSnapshot, getDesktopServerSnapshot)
   const pageScrollRef = useRef<HTMLElement>(null)
   const [pageScrollbar, setPageScrollbar] = useState({ visible: false, top: 0, height: 0 })
-  const displayRole = user?.isSuperAdmin
-    ? 'Super Administrator'
-    : user?.role === 'ADMIN'
-      ? 'Administrator'
-      : role === 'MEMBER' && user?.isPrincipal
-        ? 'Principal Member'
-        : ROLE_LABEL[role]
   const workspaceRole = roleForDashboardPath(pathname)
+  const roleLabel = (value: Role) => (value === 'MEMBER' && user?.isPrincipal ? 'Principal Member' : ROLE_LABEL[value])
+  // The sidebar and overview name the workspace you are in — the role whose pages and menu are
+  // showing (e.g. Secretary after switching). The profile at the top right keeps your own role.
+  const displayRole = role === 'ADMIN' && user?.activeSuperAdmin ? 'Super Administrator' : roleLabel(role)
   const deactivatedWorkspace =
     workspaceRole && user?.disabledRoles?.includes(workspaceRole) ? workspaceRole : null
   const isOverviewPage = pathname === '/admin' || /^\/dashboard\/(member|treasurer|executive|secretary|organizer)$/.test(pathname)
@@ -220,13 +226,11 @@ export default function DashboardShell({
     const fetchPaymentCount = async () => {
       if (document.visibilityState !== 'visible') return
       try {
-        // Check localStorage for when the user last viewed notifications
-        const lastSeen = Number(localStorage.getItem('treasurer-notif-seen-ts') || '0')
+        // The server already leaves out payments the user marked as read.
         const res = await fetch('/api/treasurer/payment-count')
         if (!res.ok || cancelled) return
         const { count } = await res.json() as { count: number }
-        // Only show badge if there are payments newer than last-seen timestamp
-        if (!cancelled) setPaymentNotifCount(lastSeen ? count : count)
+        if (!cancelled) setPaymentNotifCount(count)
       } catch {}
     }
 
@@ -235,10 +239,12 @@ export default function DashboardShell({
     // Clear badge when user views the notifications page
     const onViewed = () => setPaymentNotifCount(0)
     window.addEventListener('payment-notifications-viewed', onViewed)
+    window.addEventListener(NOTIFICATIONS_READ_EVENT, fetchPaymentCount)
     return () => {
       cancelled = true
       clearInterval(id)
       window.removeEventListener('payment-notifications-viewed', onViewed)
+      window.removeEventListener(NOTIFICATIONS_READ_EVENT, fetchPaymentCount)
     }
   }, [role])
 
@@ -291,13 +297,24 @@ export default function DashboardShell({
     fetchUnread()
     const id = window.setInterval(fetchUnread, 60_000)
     const clearUnread = () => { setUnread(0); fetchUnread() }
+    // "Mark all as read" empties the bell and the sidebar badge straight away.
+    const clearAll = () => {
+      setNotificationCount(0)
+      setPaymentNotifCount(0)
+      setSupportBellCount(0)
+      localStorage.removeItem('supportBellCount')
+    }
+    window.addEventListener(NOTIFICATIONS_ALL_READ_EVENT, clearAll)
     window.addEventListener('announcements-read', clearUnread)
     window.addEventListener('new-announcement', fetchUnread)
+    window.addEventListener(NOTIFICATIONS_READ_EVENT, fetchUnread)
     return () => {
       cancelled = true
       window.clearInterval(id)
       window.removeEventListener('announcements-read', clearUnread)
       window.removeEventListener('new-announcement', fetchUnread)
+      window.removeEventListener(NOTIFICATIONS_READ_EVENT, fetchUnread)
+      window.removeEventListener(NOTIFICATIONS_ALL_READ_EVENT, clearAll)
     }
   }, [pathname])
 
@@ -308,6 +325,15 @@ export default function DashboardShell({
     setIsDark(dark)
     document.documentElement.classList.toggle('dark', dark)
   }, [])
+
+  useEffect(() => {
+    if (initialUser) {
+      setUser(initialUser)
+      const hour = new Date().getHours()
+      const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+      setWelcome(`${greeting}, ${initialUser.fullName.split(' ')[0]}`)
+    }
+  }, [initialUser])
 
   useEffect(() => {
     let cancelled = false
@@ -402,7 +428,7 @@ export default function DashboardShell({
       className="dashboard-shell h-[100dvh] flex overflow-hidden bg-background text-on-background dark:bg-[#071426] dark:text-blue-50"
       style={shellStyle}
     >
-      {(role === 'ADMIN' || user?.isSuperAdmin) && pathname.startsWith('/admin/announcements') && (
+      {role === 'ADMIN' && (
         <EmailSendProgressBanner onActiveChange={setEmailsSending} />
       )}
 
@@ -455,6 +481,8 @@ export default function DashboardShell({
             const children = item.children?.map(addBadges)
             if ((item.href === '/announcements' || item.href === '/admin/announcements') && unread > 0)
               return { ...item, children, badge: String(unread) }
+            if (item.href === '/notifications' && notificationTotal > 0)
+              return { ...item, children, badge: String(notificationTotal) }
             if (item.href === '/dashboard/treasurer/notifications' && paymentNotifCount > 0)
               return { ...item, children, badge: String(paymentNotifCount) }
             return children ? { ...item, children } : item
@@ -538,7 +566,7 @@ export default function DashboardShell({
             </button>
             <div className="min-w-0 hidden sm:block">
               <p className="truncate text-[13px] font-label-bold leading-tight text-on-surface dark:text-blue-50">
-                {welcome}
+                {welcome || (user ? `Welcome, ${user.fullName.split(' ')[0]}` : '')}
               </p>
             </div>
           </div>
@@ -568,7 +596,7 @@ export default function DashboardShell({
               <span className="material-symbols-outlined" style={{ fontSize: 20 }}>
                 notifications
               </span>
-              {notificationTotal > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-secondary px-1 text-center text-[9px] font-bold leading-[18px] text-white shadow-sm">+{notificationTotal}</span>}
+              {notificationTotal > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-secondary px-1 text-center text-[9px] font-bold leading-[18px] text-white shadow-sm">{notificationTotal > 99 ? '99+' : notificationTotal}</span>}
             </Link>
 
             {user ? (
@@ -583,13 +611,7 @@ export default function DashboardShell({
                       {user?.fullName}
                     </p>
                     <p className="text-[10px] text-on-surface-variant">
-                      {user?.isSuperAdmin
-                        ? 'Super Administrator'
-                        : user?.role === 'ADMIN'
-                          ? 'Administrator'
-                          : user?.role === 'MEMBER' && user.isPrincipal
-                            ? 'Principal Member'
-                            : user?.role && ROLE_LABEL[user.role]}
+                      {displayRole}
                     </p>
                   </div>
                   <div className="h-9 w-9 rounded-full border-2 border-white dark:border-[#1e3461] bg-primary text-on-primary flex items-center justify-center font-label-bold text-[12px] shadow-sm">
@@ -624,7 +646,7 @@ export default function DashboardShell({
                   The <b>{ROLE_LABEL[deactivatedWorkspace]}</b> role is deactivated. People with this role cannot sign in.
                 </span>
               </p>
-              {(user?.isSuperAdmin || user?.role === 'ADMIN') && (
+              {role === 'ADMIN' && (
                 <Link
                   href="/admin/roles?settings=1"
                   className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3.5 py-1.5 text-xs font-label-bold text-on-primary hover:opacity-90"
@@ -637,11 +659,16 @@ export default function DashboardShell({
           )}
           {!hidePageHeading && (
             <div className="shrink-0 pt-1 sm:pt-2">
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2">
+              <div className={pageCenter
+                ? 'flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] xl:items-center xl:gap-4'
+                : 'flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2'}>
                 <div className="min-w-0">
                   <h1 className="font-h2 text-[22px] sm:text-[26px] md:text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
                   {isOverviewPage && <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>}
                 </div>
+                {pageCenter && <div className="flex min-w-0 justify-center">{pageCenter}</div>}
+                {(pageAction || (!hideRelatedLinks && relatedPageLinks.length > 0)) && (
+                <div className="flex w-full sm:w-auto shrink-0 flex-wrap items-center gap-2 sm:ml-auto sm:justify-end xl:justify-self-end">
                 {pageAction && <div className="w-full sm:w-auto shrink-0">{pageAction}</div>}
                 {!hideRelatedLinks && relatedPageLinks.length > 0 && (
                   <nav aria-label={`Related ${activeNavGroup?.label} pages`} className="flex w-full sm:w-auto shrink-0 flex-wrap items-center gap-2 sm:justify-end">
@@ -660,6 +687,8 @@ export default function DashboardShell({
                       )
                     })}
                   </nav>
+                )}
+                </div>
                 )}
               </div>
             </div>
@@ -684,7 +713,7 @@ export default function DashboardShell({
         {supportUnread > 0 && <span className="absolute -right-1.5 -top-1.5 grid h-6 min-w-6 place-items-center rounded-full border-2 border-white bg-primary px-1 text-[10px] font-bold text-white">+{supportUnread}</span>}
         <span className="pointer-events-none absolute right-16 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white opacity-0 shadow-lg transition group-hover:opacity-100 hidden sm:block">Chat with support</span>
       </Link>
-      {(user?.role === 'ADMIN' || user?.isSuperAdmin) && <OldMonthPill />}
+      {role === 'ADMIN' && <OldMonthPill />}
       <DashboardNotifications />
       <UploadProgressToast />
     </div>

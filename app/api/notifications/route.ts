@@ -94,7 +94,7 @@ export async function GET() {
           title: `KES ${Math.round(amount).toLocaleString()} from ${a.user?.fullName ?? 'a member'}`,
           description: meta.receipt || meta.phone || 'M-Pesa payment received',
           imageUrl: null,
-          href: '/dashboard/treasurer/notifications',
+          href: '/notifications',
           createdAt: new Date(a.createdAt).toISOString(),
           readAt: null as string | null,
         }

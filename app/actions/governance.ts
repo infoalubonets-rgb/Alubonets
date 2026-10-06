@@ -179,7 +179,7 @@ const refreshResolutions = () => {
   revalidatePath('/governance/manage')
 }
 
-const RESOLUTION_CREATOR_ROLES = ['ADMIN', 'SECRETARY'] as const
+const RESOLUTION_CREATOR_ROLES = ['ADMIN', 'SECRETARY', 'TREASURER'] as const
 
 const RESOLUTION_DOC_EXTS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'] as const
 
@@ -230,6 +230,63 @@ export async function createResolution(formData: FormData) {
   await writeAudit({ userId: actor.id, action: 'RESOLUTION_CREATE', entity: 'Resolution', entityId: resolution.id, newValue: { title } })
   refreshResolutions()
   return { id: resolution.id, title: resolution.title }
+}
+
+const categorySchema = z.enum(GOVERNANCE_CATEGORIES.map((item) => item.value) as [string, ...string[]])
+
+export async function updateResolution(formData: FormData) {
+  const actor = await requireActiveRole([...RESOLUTION_CREATOR_ROLES])
+  const id = z.string().min(1).parse(formData.get('id'))
+  const title = z.string().trim().min(3).max(200).parse(formData.get('title'))
+  const body = z.string().trim().min(5).max(6000).parse(formData.get('body'))
+  const category = categorySchema.parse(formData.get('category') || 'RESOLUTION')
+  const reason = z.string().trim().min(3, 'Give a short reason for the change').max(500).parse(formData.get('reason'))
+
+  const old = await prisma.resolution.findUniqueOrThrow({ where: { id }, select: { title: true, body: true, category: true } })
+  if (old.title === title && old.body === body && old.category === category) {
+    throw new Error('Nothing changed — edit the title, category or text first.')
+  }
+  await prisma.resolution.update({ where: { id }, data: { title, body, category } })
+  await writeAudit({
+    userId: actor.id,
+    action: 'RESOLUTION_UPDATE',
+    entity: 'Resolution',
+    entityId: id,
+    reason,
+    oldValue: old,
+    newValue: { title, body, category },
+  })
+  refreshResolutions()
+  revalidatePath(`/governance/${id}`)
+}
+
+export async function deleteResolution(formData: FormData) {
+  const actor = await requireActiveRole([...RESOLUTION_CREATOR_ROLES])
+  const id = z.string().min(1).parse(formData.get('id'))
+  const reason = z.string().trim().min(3, 'Give a short reason for deleting').max(500).parse(formData.get('reason'))
+
+  const old = await prisma.resolution.findUniqueOrThrow({
+    where: { id },
+    select: { title: true, body: true, category: true, status: true, resultsPublished: true, createdAt: true, _count: { select: { responses: true } } },
+  })
+  await prisma.resolution.delete({ where: { id } })
+  await writeAudit({
+    userId: actor.id,
+    action: 'RESOLUTION_DELETE',
+    entity: 'Resolution',
+    entityId: id,
+    reason,
+    oldValue: {
+      title: old.title,
+      body: old.body,
+      category: old.category,
+      status: old.status,
+      resultsPublished: old.resultsPublished,
+      createdAt: old.createdAt.toISOString(),
+      responses: old._count.responses,
+    },
+  })
+  refreshResolutions()
 }
 
 export async function decideResolution(formData: FormData) {
@@ -310,7 +367,7 @@ export async function voteResolution(formData: FormData) {
 
   const resolution = await prisma.resolution.findUniqueOrThrow({ where: { id: resolutionId } })
   if (resolution.status !== 'APPROVED') throw new Error('This resolution is not open for responses.')
-  const canSee = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || resolution.visibleToRoles.includes(actor.role)
+  const canSee = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || actor.role === 'TREASURER' || resolution.visibleToRoles.includes(actor.role)
   if (!canSee) throw new Error('This resolution is not visible to your role.')
   if (anonymous && !resolution.allowAnonymous) throw new Error('Anonymous responses are not allowed for this proposal.')
   if (comment && !resolution.allowComments) throw new Error('Comments are not allowed for this proposal.')

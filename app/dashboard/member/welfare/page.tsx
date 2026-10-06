@@ -45,7 +45,7 @@ export default async function MemberWelfarePage({ searchParams }: { searchParams
   const requestedTotal = requests.reduce((total, request) => total + Number(request.amount || 0), 0)
   const money = new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 })
 
-  const nav = withOptionalNav(navForRole('MEMBER'), WELFARE_NAV_ITEMS.member, '/meetings-reports')
+  const nav = withOptionalNav(navForRole('MEMBER'), WELFARE_NAV_ITEMS.member, '/contributions')
 
   return (
     <DashboardShell role="MEMBER" title="Welfare" nav={nav}>

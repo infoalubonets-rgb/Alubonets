@@ -12,6 +12,7 @@ import {
   type NavItem,
 } from '../lib/dashboard/nav'
 import { isSharedAuthenticatedPath } from '../lib/auth/types'
+import { canViewMemberDirectory } from '../lib/directory'
 import {
   buildPageHref,
   parsePage,
@@ -21,6 +22,26 @@ import {
 } from '../lib/pagination'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+
+describe('unified sidebar', () => {
+  const adminOrder = ADMIN_NAV.map((item) => item.label)
+  const roles = ['EXECUTIVE', 'AUDITOR', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
+
+  it.each(roles)('%s uses the Administrator section names in the same order', (role) => {
+    const labels = navForRole(role)
+      .filter((item) => item.href !== '/support-chat')
+      .map((item) => (item.label === 'Activity logs' ? 'Settings' : item.label))
+    const positions = labels.map((label) => adminOrder.indexOf(label))
+    expect(positions.every((p) => p >= 0)).toBe(true)
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
+  })
+
+  it('places optional Loans and Welfare inside Finance', () => {
+    const nav = withOptionalNav(MEMBER_NAV, LOANS_NAV_ITEMS.member, '/contributions')
+    expect(nav.map((item) => item.label)).not.toContain('Loans')
+    expect(nav.find((item) => item.label === 'Finance')?.children?.map((c) => c.label)).toContain('Loans')
+  })
+})
 
 describe('withOptionalNav', () => {
   it('returns nav unchanged when item is null', () => {
@@ -34,7 +55,7 @@ describe('withOptionalNav', () => {
   })
 
   it('keeps the admin sidebar to 11 top-level sections', () => {
-    // Approvals, Today, Contributions and Roles live as related pages of Accounts, Overview, Finance and Settings.
+    // Approvals, Today, Contributions and Roles live as related pages of Members, Overview, Finance and Settings.
     expect(ADMIN_NAV).toHaveLength(11)
     const topLevel = ADMIN_NAV.map((item) => item.href)
     for (const href of ['/admin/members', '/admin/approvals', '/today', '/contributions', '/admin/roles']) {
@@ -49,7 +70,7 @@ describe('withOptionalNav', () => {
     ])
     expect(adminHrefs).toEqual(expect.arrayContaining([
       '/admin',
-      '/admin/accounts',
+      '/directory',
       '/today',
       '/meetings-reports',
       '/admin/approvals',
@@ -65,16 +86,34 @@ describe('withOptionalNav', () => {
       '/admin/announcements',
       '/admin/settings',
       '/admin/audit-logs',
-      '/dashboard/member/family',
+      '/admin/family',
       '/contributions',
     ]))
   })
 })
 
 describe('navForRole', () => {
+  it('shows the Members page only to Admin, Auditor and executives', () => {
+    const hasMembers = (nav: NavItem[]) => nav.some((item) => item.href === '/directory')
+    for (const role of ['ADMIN', 'AUDITOR', 'EXECUTIVE'] as const) {
+      expect(hasMembers(navForRole(role))).toBe(true)
+    }
+    for (const role of ['TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const) {
+      expect(hasMembers(navForRole(role))).toBe(false)
+    }
+    expect(canViewMemberDirectory({ role: 'TREASURER' })).toBe(false)
+    expect(canViewMemberDirectory({ role: 'MEMBER', isSuperAdmin: true })).toBe(true)
+    expect(canViewMemberDirectory({ role: 'AUDITOR' })).toBe(true)
+    // A Secretary who also holds Executive as a second role counts as an executive.
+    expect(canViewMemberDirectory({ role: 'SECRETARY', dashboardAccess: ['EXECUTIVE'] })).toBe(true)
+    expect(canViewMemberDirectory({ role: 'SECRETARY', dashboardAccess: ['TREASURER'] })).toBe(false)
+  })
+
   it('returns role-specific nav', () => {
     expect(navForRole('TREASURER')[0]?.href).toBe('/dashboard/treasurer')
     expect(navForRole('MEMBER').some((n) => n.href === '/dashboard/member')).toBe(true)
+    expect(navForRole('MEMBER').find(n => n.label === 'My Family')?.href).toBe('/dashboard/member/family')
+    expect(navForRole('ADMIN').find(n => n.label === 'My Family')?.href).toBe('/admin/family')
     // Members reach the read/vote governance page, but never the manage console.
     expect(navForRole('MEMBER').some((n) => n.href === '/governance')).toBe(true)
     expect(navForRole('MEMBER').some((n) => n.href === '/governance/manage')).toBe(false)

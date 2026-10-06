@@ -9,7 +9,6 @@ import type { Role } from '@/lib/auth/types'
 import AccountSecurity from '@/components/profile/AccountSecurity'
 import PrivilegedMfaPanel from '@/components/profile/PrivilegedMfaPanel'
 import MemberDetailsForm from '@/components/profile/MemberDetailsForm'
-import PublicProfileFieldsForm from '@/components/profile/PublicProfileFieldsForm'
 import { createServerClient } from '@/lib/supabase-server'
 import { PRIVILEGED_MFA_ROLES } from '@/lib/mfa-totp'
 
@@ -42,7 +41,7 @@ export default async function ProfilePage() {
     avatarUrl = signed.data?.signedUrl ?? null
   }
 
-  const role = user.role as Role
+  const role = profile.role as Role
 
   return (
     <DashboardShell role={role} title="My profile" nav={navForRole(role)}>
@@ -80,7 +79,6 @@ export default async function ProfilePage() {
         educationLevel: user.memberProfile?.educationLevel ?? 'SECONDARY',
       }} />
       <div className="mx-auto mt-4 max-w-lg pb-12">
-        <PublicProfileFieldsForm initial={user.publicProfileFields} />
         <AccountSecurity />
         <PrivilegedMfaPanel
           enabled={user.mfaEnabled}

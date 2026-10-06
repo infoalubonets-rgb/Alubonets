@@ -31,7 +31,7 @@ export type MeetingEditorValues = {
 
 type EventOption = { id: string; title: string; startsAt: string }
 type AttendanceStatus = 'PRESENT' | 'APOLOGY' | 'ABSENT'
-type MemberOption = { id: string; fullName: string }
+type MemberOption = { id: string; fullName: string; email?: string | null; phone?: string | null }
 export type AttendanceRecord = { userId: string; status: AttendanceStatus }
 
 const STATUS_LABEL: Record<AttendanceStatus, string> = {
@@ -100,7 +100,10 @@ export default function MeetingMinutesEditor({
     markedIds.filter((id) => marks[id] === status).map((id) => memberName.get(id) || 'Member')
   const suggestions = memberQuery.trim()
     ? members
-        .filter((m) => !marks[m.id] && m.fullName.toLowerCase().includes(memberQuery.trim().toLowerCase()))
+        .filter((m) => {
+          const query = memberQuery.trim().toLowerCase()
+          return !marks[m.id] && (m.fullName.toLowerCase().includes(query) || (m.email ?? '').toLowerCase().includes(query))
+        })
         .slice(0, 8)
     : []
   const updateMarks = (next: Record<string, AttendanceStatus>) => {
@@ -346,7 +349,7 @@ export default function MeetingMinutesEditor({
                     <input
                       value={memberQuery}
                       onChange={(e) => setMemberQuery(e.target.value)}
-                      placeholder="Search members to add…"
+                      placeholder="Search members by name or email…"
                       className={INPUT}
                     />
                     {suggestions.length > 0 && (
@@ -361,7 +364,10 @@ export default function MeetingMinutesEditor({
                               }}
                               className="block w-full px-3 py-2 text-left text-[13px] hover:bg-surface-container"
                             >
-                              {member.fullName}
+                              <span className="block">{member.fullName}</span>
+                              {(member.email || member.phone) && (
+                                <span className="block text-[11px] text-on-surface-variant">{[member.email, member.phone].filter(Boolean).join(' · ')}</span>
+                              )}
                             </button>
                           </li>
                         ))}

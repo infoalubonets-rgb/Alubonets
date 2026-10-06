@@ -10,6 +10,8 @@ import { TAGS, sendAnnouncement } from '@/lib/data/queries'
 import { canModerateProjectComments, isProjectManager } from '@/lib/projects'
 import { assertNotFuture, assertNotPast } from '@/lib/dates'
 import { deriveProjectStatus, syncProjectFinancials } from '@/lib/project-status'
+import { createSignedUpload } from '@/lib/upload-signed'
+import { newRepositoryDocumentPath, verifyUploadedObject } from '@/lib/document-upload'
 
 function refreshProject(projectId?: string) {
   revalidatePath('/projects')
@@ -40,14 +42,14 @@ export async function updateProjectFinance(formData: FormData) {
       budgetKes: z.coerce.number().min(0),
       fundingTargetKes: z.coerce.number().min(0),
       actualExpenditureKes: z.coerce.number().min(0),
-      reason: z.string().trim().min(3).max(500),
+      reason: z.string().trim().max(500).optional(),
     })
     .parse({
       projectId: formData.get('projectId'),
       budgetKes: formData.get('budgetKes'),
       fundingTargetKes: formData.get('fundingTargetKes'),
       actualExpenditureKes: formData.get('actualExpenditureKes'),
-      reason: formData.get('reason'),
+      reason: formData.get('reason') || undefined,
     })
   const old = await prisma.project.findUniqueOrThrow({ where: { id: data.projectId } })
   const updated = await prisma.project.update({
@@ -426,6 +428,66 @@ export async function linkProjectDocument(formData: FormData) {
     entityId: link.id,
     newValue: data,
   })
+  refreshProject(data.projectId)
+}
+
+/** Browser uploads straight to Storage; call before uploadProjectDocument with storagePath. */
+export async function requestProjectDocumentUploadUrl(formData: FormData) {
+  await requireManager()
+  const fileName = z.string().min(1).parse(formData.get('fileName'))
+  const { groupId, path } = newRepositoryDocumentPath(fileName)
+  const signed = await createSignedUpload('documents', path)
+  return { ...signed, groupId }
+}
+
+/** Adds the uploaded file to the document repository and links it to the project. */
+export async function uploadProjectDocument(formData: FormData) {
+  const actor = await requireManager()
+  const data = z
+    .object({
+      projectId: z.string().min(1),
+      title: z.string().trim().min(2).max(180),
+      storagePath: z.string().min(1),
+      versionGroupId: z.string().min(1),
+    })
+    .parse({
+      projectId: formData.get('projectId'),
+      title: formData.get('title'),
+      storagePath: formData.get('storagePath'),
+      versionGroupId: formData.get('versionGroupId'),
+    })
+  await prisma.project.findUniqueOrThrow({ where: { id: data.projectId }, select: { id: true } })
+  const file = await verifyUploadedObject(data.storagePath, data.versionGroupId)
+  const category = await prisma.documentCategory.upsert({
+    where: { name: 'Projects' },
+    create: { name: 'Projects' },
+    update: {},
+  })
+  const document = await prisma.document.create({
+    data: {
+      title: data.title,
+      categoryId: category.id,
+      category: category.name,
+      accessLevel: 'MEMBERS',
+      status: 'PUBLISHED',
+      storagePath: file.path,
+      fileUrl: `storage://documents/${file.path}`,
+      mimeType: file.mimeType,
+      uploadedBy: actor.id,
+      versionGroupId: data.versionGroupId,
+      projectLinks: { create: { projectId: data.projectId } },
+    },
+  })
+  await writeAudit({
+    userId: actor.id,
+    action: 'PROJECT_DOCUMENT_UPLOAD',
+    entity: 'Document',
+    entityId: document.id,
+    newValue: { projectId: data.projectId, title: data.title, category: category.name },
+  })
+  revalidatePath('/documents')
+  revalidatePath('/documents/manage')
+  revalidateTag(TAGS.documents)
   refreshProject(data.projectId)
 }
 

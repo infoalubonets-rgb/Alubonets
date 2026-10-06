@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import ModuleDisabled from '@/components/dashboard/ModuleDisabled'
 import { requireActiveRole } from '@/lib/auth/session'
+import { canRecordPayments } from '@/lib/finance-access'
 import { TREASURER_NAV, LOANS_NAV_ITEMS, withOptionalNav } from '@/lib/dashboard/nav'
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
 import { loanOutstandingKes, moneyNumber } from '@/lib/loans'
@@ -20,7 +21,9 @@ export default async function TreasurerLoanDetailPage({
   params: Promise<{ id: string }>
 }) {
   if (!(await isFeatureEnabled(FEATURE_FLAGS.loansEnabled))) return <ModuleDisabled module="Loans" />
-  await requireActiveRole(['TREASURER', 'ADMIN'])
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  // Only the Treasurer records a disbursement or repayment.
+  const canRecord = canRecordPayments(actor)
   const { id } = await params
   const loan = await prisma.loanApplication.findUnique({
     where: { id },
@@ -58,7 +61,7 @@ export default async function TreasurerLoanDetailPage({
     loanOutstandingKes(loan.id),
   ])
 
-  const nav = withOptionalNav(TREASURER_NAV, LOANS_NAV_ITEMS.treasurer, '/dashboard/treasurer/welfare')
+  const nav = withOptionalNav(TREASURER_NAV, LOANS_NAV_ITEMS.treasurer, '/financial-reports')
   const profile = loan.applicant.memberProfile
 
   return (
@@ -109,7 +112,7 @@ export default async function TreasurerLoanDetailPage({
               </section>
             )}
 
-            {loan.status === 'APPROVED' && (
+            {canRecord && loan.status === 'APPROVED' && (
               <section className="rounded-2xl border bg-surface p-5">
                 <h2 className="font-h3 text-lg text-primary">Record disbursement</h2>
                 <form action={recordLoanDisbursement} className="mt-3 grid gap-2 md:grid-cols-2">
@@ -145,7 +148,7 @@ export default async function TreasurerLoanDetailPage({
               </section>
             )}
 
-            {loan.status === 'DISBURSED' && (
+            {canRecord && loan.status === 'DISBURSED' && (
               <section className="rounded-2xl border bg-surface p-5">
                 <h2 className="font-h3 text-lg text-primary">
                   Record repayment · outstanding KES {outstanding.toLocaleString()}

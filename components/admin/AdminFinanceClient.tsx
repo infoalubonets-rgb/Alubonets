@@ -450,8 +450,8 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
         </div>
       </FullScreenModal>
 
-      <FullScreenModal open={modal === 'periods'} title={titles.periods} onClose={closeModal}>
-        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      <FullScreenModal open={modal === 'periods'} title={titles.periods} onClose={closeModal} size="wide">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {periods.map((period) => (
             <PeriodCard key={period.key} period={period} isCurrent={period.month === currentMonth} onToggle={setConfirmPeriod} />
           ))}

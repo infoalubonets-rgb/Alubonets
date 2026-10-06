@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react'
 import { actionSendAnnouncement, actionUploadAnnouncementImage } from '@/app/actions/domain'
 
-type MemberOption = { id: string; fullName: string; email: string }
+type MemberOption = { id: string; fullName: string; email: string; phone?: string | null }
 
 function MemberSearchModal({
   members,
@@ -91,7 +91,7 @@ function MemberSearchModal({
                     {m.fullName}
                   </p>
                   <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50 truncate">
-                    {m.email}
+                    {[m.email, m.phone].filter(Boolean).join(' · ')}
                   </p>
                 </div>
                 {selected.has(m.id) && (
@@ -196,6 +196,7 @@ export default function AnnouncementComposer({
     if (finalImageUrl) formData.set('imageUrl', finalImageUrl)
 
     startTransition(async () => {
+      if (formData.get('sendEmail') === 'on') window.dispatchEvent(new Event('email-send-started'))
       await actionSendAnnouncement(formData)
       window.dispatchEvent(new Event('new-announcement'))
       formRef.current?.reset()

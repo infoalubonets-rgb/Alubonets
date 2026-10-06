@@ -19,13 +19,15 @@ export default async function AdminAuditLogsPage({
     from?: string
     to?: string
     page?: string
+    flagged?: string
   }>
 }) {
   const actor = await requireActiveRole(['ADMIN', 'AUDITOR'])
   const role = (actor.isSuperAdmin ? 'ADMIN' : actor.role) as Role
   const nav = role === 'ADMIN' ? ADMIN_NAV : navForRole(role)
 
-  const { from = '', to = '', page: pageRaw } = await searchParams
+  const { from = '', to = '', page: pageRaw, flagged = '' } = await searchParams
+  const onlyFlagged = flagged === '1'
   const page = parsePage(pageRaw)
   const pageSize = 50
   const createdAt =
@@ -38,9 +40,10 @@ export default async function AdminAuditLogsPage({
 
   const where = {
     ...(createdAt ? { createdAt } : {}),
+    ...(onlyFlagged ? { outsideRole: true } : {}),
   }
 
-  const [total, logs, loginEvents] = await Promise.all([
+  const [total, logs, loginEvents, flaggedCount] = await Promise.all([
     prisma.auditLog.count({ where }),
     prisma.auditLog.findMany({
       where,
@@ -54,6 +57,7 @@ export default async function AdminAuditLogsPage({
       take: 40,
       include: { user: { select: { fullName: true, email: true } } },
     }),
+    prisma.auditLog.count({ where: { ...(createdAt ? { createdAt } : {}), outsideRole: true } }),
   ])
 
   const targets = await resolveAuditTargets(logs)
@@ -80,6 +84,7 @@ export default async function AdminAuditLogsPage({
             className="rounded-lg border px-3 py-2 text-sm"
           />
           <div className="flex flex-wrap gap-2">
+            {onlyFlagged && <input type="hidden" name="flagged" value="1" />}
             <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">
               Filter
             </button>
@@ -88,7 +93,18 @@ export default async function AdminAuditLogsPage({
             </a>
           </div>
         </form>
-        <p className="text-xs text-on-surface-variant">{total} matching log(s)</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-xs text-on-surface-variant">{total} matching log(s)</p>
+          <a
+            href={`/admin/audit-logs?${new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}), ...(onlyFlagged ? {} : { flagged: '1' }) })}`}
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
+              onlyFlagged ? 'bg-red-600 text-white' : 'border border-red-300 text-red-700 hover:bg-red-50'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[14px]">warning</span>
+            {onlyFlagged ? 'Showing only outside-role changes — show all' : `Outside-role changes (${flaggedCount})`}
+          </a>
+        </div>
       </div>
 
       <AuditLogsTable
@@ -111,6 +127,10 @@ export default async function AdminAuditLogsPage({
             targetKind: resolved?.kind ?? row.entity ?? '—',
             targetLabel: resolved?.label ?? (row.entity ? `${row.entity} (removed)` : '—'),
             targetSubtitle: resolved?.subtitle ?? null,
+            actorRole: row.actorRole,
+            outsideRole: row.outsideRole,
+            actorSecondaryRoles: row.actorSecondaryRoles,
+            actingRole: row.actingRole,
           }
         })}
       />
@@ -118,7 +138,7 @@ export default async function AdminAuditLogsPage({
         pathname="/admin/audit-logs"
         page={page}
         totalPages={pages}
-        params={{ from, to }}
+        params={{ from, to, ...(onlyFlagged ? { flagged: '1' } : {}) }}
       />
 
       <section className="mt-8 rounded-2xl border bg-surface p-5">

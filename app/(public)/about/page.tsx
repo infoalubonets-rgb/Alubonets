@@ -32,8 +32,6 @@ type CommitteeCard = {
   role: string
   alt: string
   photoUrl: string | null
-  responsibilities: string[]
-  biography: string
   details: string[]
 }
 
@@ -49,50 +47,40 @@ async function memberPhotoUrl(path: string | null) {
 }
 
 async function loadCommittee(): Promise<CommitteeCard[]> {
-  const managed = await prisma.committeeProfile.findMany({
-    where: { status: 'PUBLISHED' },
-    orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
-    include: {
-      user: {
-        select: {
-          avatarUrl: true,
-          email: true,
-          phone: true,
-          location: true,
-          publicProfileFields: true,
-          memberProfile: { select: { profession: true } },
-        },
-      },
+  // Executives only appear once an Admin switches "Show on About page" on in Members.
+  const executives = await prisma.user.findMany({
+    where: { status: 'ACTIVE', showOnAbout: true, OR: [{ role: 'EXECUTIVE' }, { dashboardAccess: { has: 'EXECUTIVE' } }] },
+    orderBy: [{ aboutOrder: 'asc' }, { fullName: 'asc' }],
+    select: {
+      id: true,
+      fullName: true,
+      aboutTitle: true,
+      avatarUrl: true,
+      email: true,
+      phone: true,
+      location: true,
+      publicProfileFields: true,
+      memberProfile: { select: { profession: true } },
     },
   })
-  if (!managed.length) {
-    return COMMITTEE.map((member) => ({ ...member, photoUrl: null, responsibilities: [], biography: '', details: [] }))
+  if (!executives.length) {
+    return COMMITTEE.map((member) => ({ ...member, photoUrl: null, details: [] }))
   }
   return Promise.all(
-    managed.map(async (profile) => {
-      const allowed = new Set(profile.user?.publicProfileFields ?? [])
-      const user = profile.user
-      const details = user
-        ? [
-            allowed.has('profession') ? user.memberProfile?.profession : null,
-            allowed.has('location') ? user.location : null,
-            allowed.has('email') ? user.email : null,
-            allowed.has('phone') ? user.phone : null,
-          ].filter((value): value is string => Boolean(value))
-        : []
-      const photoUrl =
-        profile.photoUrl || (user && allowed.has('photo') ? await memberPhotoUrl(user.avatarUrl) : null)
+    executives.map(async (user) => {
+      const allowed = new Set(user.publicProfileFields)
+      const role = user.aboutTitle || 'Executive Committee'
       return {
-        name: profile.name,
-        role: profile.position,
-        alt: profile.position,
-        photoUrl,
-        responsibilities: (profile.responsibilities || '')
-          .split('\n')
-          .map((line) => line.replace(/^[-•*]\s*/, '').trim())
-          .filter(Boolean),
-        biography: profile.biography,
-        details,
+        name: user.fullName,
+        role,
+        alt: `${user.fullName}, ${role}`,
+        photoUrl: allowed.has('photo') ? await memberPhotoUrl(user.avatarUrl) : null,
+        details: [
+          allowed.has('profession') ? user.memberProfile?.profession : null,
+          allowed.has('location') ? user.location : null,
+          allowed.has('email') ? user.email : null,
+          allowed.has('phone') ? user.phone : null,
+        ].filter((value): value is string => Boolean(value)),
       }
     }),
   )
@@ -233,11 +221,11 @@ export default async function AboutPage() {
         </div>
         <div className="flex flex-wrap justify-center gap-md md:gap-lg">
           {committee.map((member, index) => {
-            const rich = member.responsibilities.length > 0 || member.biography || member.details.length > 0
+            const rich = member.details.length > 0
             return (
               <div
                 key={`${member.name}-${member.role}`}
-                className={`reveal flex flex-col items-center ${rich ? 'w-64' : 'w-36'}`}
+                className={`reveal flex flex-col items-center ${rich ? 'w-56' : 'w-36'}`}
                 style={{ ['--reveal-delay' as string]: `${index * 70}ms` }}
               >
                 <img
@@ -249,19 +237,9 @@ export default async function AboutPage() {
                 <span className="mt-xs text-center font-body-md text-[13px] text-primary/70">
                   {member.role}
                 </span>
-                {member.details.length > 0 && (
-                  <p className="mt-xs text-center text-[12px] text-on-surface-variant">{member.details.join(' · ')}</p>
-                )}
-                {member.biography && (
-                  <p className="mt-sm text-center text-[13px] leading-relaxed text-on-surface-variant">{member.biography}</p>
-                )}
-                {member.responsibilities.length > 0 && (
-                  <ul className="mt-sm list-disc space-y-0.5 pl-5 text-left text-[13px] text-on-surface">
-                    {member.responsibilities.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                )}
+                {member.details.map((detail) => (
+                  <p key={detail} className="mt-xs break-all text-center text-[12px] text-on-surface-variant">{detail}</p>
+                ))}
               </div>
             )
           })}

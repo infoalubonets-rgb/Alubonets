@@ -8,7 +8,8 @@ type Props = {
   title: string
   onClose: () => void
   children: ReactNode
-  size?: 'full' | 'compact'
+  /** `full` has a fixed height; `compact` and `wide` shrink to fit their content. */
+  size?: 'full' | 'compact' | 'wide'
 }
 
 export default function FullScreenModal({ open, title, onClose, children, size = 'full' }: Props) {
@@ -46,7 +47,9 @@ export default function FullScreenModal({ open, title, onClose, children, size =
       <div className={`flex w-full flex-col overflow-hidden border border-outline-variant/60 bg-surface shadow-2xl dark:bg-[#0a1628] ${
         size === 'compact'
           ? 'max-h-[90dvh] max-w-2xl rounded-t-3xl sm:rounded-3xl'
-          : 'h-[min(96dvh,920px)] max-w-5xl rounded-t-3xl sm:rounded-3xl'
+          : size === 'wide'
+            ? 'max-h-[90dvh] max-w-5xl rounded-t-3xl sm:rounded-3xl'
+            : 'h-[min(96dvh,920px)] max-w-5xl rounded-t-3xl sm:rounded-3xl'
       }`}>
         <header className="flex shrink-0 items-center gap-2 border-b border-outline-variant/70 px-3 py-3 sm:px-4">
           <button

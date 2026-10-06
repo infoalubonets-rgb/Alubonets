@@ -7,8 +7,9 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { ageOn } from '@/lib/profile-privacy'
 import {
-  DIRECTORY_FULL_ACCESS_SETTING,
   DIRECTORY_SAFE_FIELDS,
+  canViewMemberDirectory,
+  isExecutive,
   type DirectoryMember,
 } from '@/lib/directory'
 
@@ -27,77 +28,103 @@ function isChildDependent(relationship: string | null | undefined, dob: Date | n
   return false
 }
 
-async function rolesWithFullDirectoryAccess(): Promise<string[]> {
-  const row = await prisma.appSetting.findUnique({ where: { key: DIRECTORY_FULL_ACCESS_SETTING } })
-  return (row?.value || '')
-    .split(',')
-    .map((value) => value.trim().toUpperCase())
-    .filter(Boolean)
-}
-
 export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
   // Viewer identity comes from the session — never from a caller-supplied id.
   const viewer = await requireActiveRole(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER', 'AUDITOR'])
-  const fullAccessRoles = await rolesWithFullDirectoryAccess()
-  const seesEveryone =
-    viewer.role === 'ADMIN' ||
-    viewer.role === 'AUDITOR' ||
-    viewer.isSuperAdmin ||
-    fullAccessRoles.includes(viewer.role)
+  if (!canViewMemberDirectory(viewer)) {
+    throw new Error('Only Admin, Super Admin, Auditor and executives can open the member list.')
+  }
+  const isAdmin = viewer.role === 'ADMIN' || viewer.isSuperAdmin
 
   const rows = await prisma.user.findMany({
-    where: { status: 'ACTIVE' },
+    // Admins manage every account here, so they also see pending, suspended and former members.
+    where: isAdmin ? {} : { status: 'ACTIVE' },
     orderBy: { fullName: 'asc' },
     select: {
       id: true,
       fullName: true,
+      email: true,
+      phone: true,
       location: true,
       role: true,
+      status: true,
+      isSuperAdmin: true,
+      dashboardAccess: true,
+      membershipNumber: true,
+      standing: true,
+      standingReason: true,
+      standingOverride: true,
+      standingOverrideUntil: true,
+      contributionExempt: true,
+      showOnAbout: true,
+      aboutTitle: true,
+      aboutOrder: true,
+      publicProfileFields: true,
+      approvedAt: true,
+      createdAt: true,
       isPrincipal: true,
       principalMemberId: true,
       familyRelationship: true,
-      memberProfile: { select: { profession: true, skills: true, dateOfBirth: true } },
+      memberProfile: {
+        select: {
+          profession: true,
+          skills: true,
+          dateOfBirth: true,
+          gender: true,
+          familyBranch: true,
+          memberCategory: true,
+          educationLevel: true,
+          interests: true,
+          mentorshipArea: true,
+        },
+      },
       profileVisibility: true,
       principal: { select: { id: true, fullName: true } },
+      _count: { select: { attachedMembers: true } },
     },
   })
 
-  const now = new Date()
-
-  return rows.flatMap((row): DirectoryMember[] => {
+  return rows.map((row): DirectoryMember => {
     const child = isChildDependent(row.familyRelationship, row.memberProfile?.dateOfBirth)
-    const visibility = row.profileVisibility
-    // Consent lapses once its review date passes — an expired opt-in stops publishing.
-    const consentExpired = visibility?.reviewAt ? visibility.reviewAt <= now : false
-    const optedIn = Boolean(visibility?.visibleToMembers) && !consentExpired
-
-    const visible = seesEveryone
-      ? true
-      : child
-        // Children/dependants never appear for ordinary viewers, whatever the flag says.
-        ? false
-        : row.isPrincipal || optedIn
-
-    // Hidden members are omitted entirely — no name, relationship or branch summary leaks.
-    if (!visible && row.id !== viewer.id) return []
-
-    const configured = Array.isArray(visibility?.allowedFields)
-      ? (visibility!.allowedFields as string[])
-      : ['fullName', 'role']
-    // Staff with full access see every safe field; everyone else sees only what was approved.
-    const allowed = new Set(seesEveryone ? [...DIRECTORY_SAFE_FIELDS] : configured)
-
-    return [{
+    return {
       id: row.id,
-      fullName: allowed.has('fullName') ? row.fullName : 'Member',
+      fullName: row.fullName,
       relationship: row.familyRelationship,
       principalName: row.principal?.fullName || null,
       isPrincipal: row.isPrincipal,
-      role: allowed.has('role') ? row.role : null,
-      profession: allowed.has('profession') ? row.memberProfile?.profession || null : null,
-      skills: allowed.has('skills') ? row.memberProfile?.skills || null : null,
-      location: allowed.has('location') ? row.location || null : null,
-    }]
+      role: row.role,
+      profession: row.memberProfile?.profession || null,
+      skills: row.memberProfile?.skills || null,
+      location: row.location || null,
+      isSuperAdmin: row.isSuperAdmin,
+      isExecutive: isExecutive(row),
+      isMinor: child || (row.memberProfile?.dateOfBirth ? ageOn(row.memberProfile.dateOfBirth) < 18 : false),
+      details: {
+            membershipNumber: row.membershipNumber,
+            standing: row.standing,
+            joinedAt: (row.approvedAt ?? row.createdAt).toISOString(),
+            age: row.memberProfile?.dateOfBirth ? ageOn(row.memberProfile.dateOfBirth) : null,
+            gender: row.memberProfile?.gender ?? null,
+            familyBranch: row.memberProfile?.familyBranch ?? null,
+            memberCategory: row.memberProfile?.memberCategory ?? null,
+            educationLevel: row.memberProfile?.educationLevel ?? null,
+            interests: row.memberProfile?.interests ?? null,
+            mentorshipArea: row.memberProfile?.mentorshipArea ?? null,
+            attachedCount: row._count.attachedMembers,
+          },
+      // Auditors see contact details read-only; account controls stay with Admins.
+      contact: { email: row.email, phone: row.phone },
+      account: isAdmin
+        ? {
+            status: row.status,
+            standingReason: row.standingReason,
+            standingOverride: row.standingOverride,
+            standingOverrideUntil: row.standingOverrideUntil?.toISOString() ?? null,
+            contributionExempt: row.contributionExempt,
+            about: { show: row.showOnAbout, title: row.aboutTitle, order: row.aboutOrder, fields: row.publicProfileFields },
+          }
+        : null,
+    }
   })
 }
 

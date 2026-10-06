@@ -152,7 +152,7 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
                 className="inline-flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-low px-3.5 py-2 text-secondary font-label-bold text-[11px] tracking-[0.08em] uppercase shadow-[0_2px_8px_rgba(0,31,80,0.06)] hover:border-secondary-container/50 hover:bg-secondary-container/10 transition-all"
               >
                 <span className="material-symbols-outlined text-[17px]">family_restroom</span>
-                My Family / Branch
+                My Family
               </Link>
             </div>
             <button

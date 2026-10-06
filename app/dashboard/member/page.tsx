@@ -82,18 +82,14 @@ export default async function MemberPage() {
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-h3 text-base text-primary">Today’s activities</h2>
             <Link href="/today" className="text-xs font-semibold text-primary underline">
-              Open feed
+              All activities
             </Link>
           </div>
           <ul className="mt-3 space-y-2">
             {todayActivities.slice(0, 3).map((activity) => (
               <li key={activity.id} className="text-sm">
                 <span className="font-semibold text-on-surface">{activity.title}</span>
-                <span className="text-on-surface-variant">
-                  {' · '}
-                  {new Date(activity.startsAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
-                  {activity.venue ? ` · ${activity.venue}` : ''}
-                </span>
+                {activity.subtitle && <span className="text-on-surface-variant">{' · '}{activity.subtitle}</span>}
               </li>
             ))}
             {!todayActivities.length && (
@@ -181,15 +177,16 @@ export default async function MemberPage() {
           </Link>
         </div>
 
-        {/* Announcements + Events */}
+        {/* Latest notifications + Events */}
         <div className="grid md:grid-cols-2 gap-4">
           <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4">
             <div className="flex items-center gap-2 mb-3">
-              <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>campaign</span>
-              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Announcements</h2>
+              <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>notifications</span>
+              <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Notifications</h2>
+              <Link href="/notifications" className="ml-auto text-[12px] font-semibold text-primary hover:underline">View all</Link>
             </div>
             {announcements.length === 0 ? (
-              <p className="text-[13px] text-on-surface-variant dark:text-blue-200/50">No announcements yet.</p>
+              <p className="text-[13px] text-on-surface-variant dark:text-blue-200/50">No notifications yet.</p>
             ) : (
               <ul className="space-y-3">
                 {announcements.map((a) => (

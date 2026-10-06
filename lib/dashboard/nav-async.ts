@@ -29,10 +29,10 @@ export async function navWithLoans(role: Role): Promise<NavItem[]> {
       case 'MEMBER':
       case 'SECRETARY':
       case 'ORGANIZER':
-        base = withOptionalNav(base, WELFARE_NAV_ITEMS.member, '/meetings-reports')
+        base = withOptionalNav(base, WELFARE_NAV_ITEMS.member, '/contributions')
         break
       default:
-        base = withOptionalNav(base, WELFARE_NAV_ITEMS.member, '/meetings-reports')
+        base = withOptionalNav(base, WELFARE_NAV_ITEMS.member, '/contributions')
     }
   }
   if (!loansOn) return base

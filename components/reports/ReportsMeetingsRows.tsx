@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
+import RecordDeletionControls, { RecordSelection, DeleteRecordButton, type DeletableRecord } from '@/components/documents/RecordDeletionControls'
 import FullScreenModal from '@/components/ui/FullScreenModal'
 import { setSelectedDocumentStatus } from '@/app/actions/documents'
 import { useReportsFilter } from './ReportsFilterContext'
@@ -315,14 +316,18 @@ export default function ReportsMeetingsRows({ reports, meetings }: { reports: Re
 
   return (
     <section className="space-y-3">
+      <RecordDeletionControls records={visible.filter(row => row.type === 'REPORT' || row.meeting.status === 'DRAFT').map(row => ({ id: row.type === 'REPORT' ? row.report.id : row.meeting.id, kind: row.type === 'REPORT' ? 'DOCUMENT' : 'MEETING', title: row.type === 'REPORT' ? row.report.title : row.meeting.title }))}>
       <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface">
         {visible.map((row) => {
           const item = row.type === 'MEETING' ? row.meeting : row.report
+          const removable = row.type === 'REPORT' || row.meeting.status === 'DRAFT'
+          const record: DeletableRecord = { id: item.id, kind: row.type === 'REPORT' ? 'DOCUMENT' : 'MEETING', title: item.title }
           return (
             <div
               key={`${row.type}-${item.id}`}
               className="flex flex-wrap items-center gap-3 border-b border-outline-variant/60 px-4 py-3 last:border-b-0 sm:px-5"
             >
+              {removable && <RecordSelection record={record} />}
               <span
                 className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
                   row.type === 'MEETING' ? 'bg-primary/10 text-primary' : 'bg-secondary-container/15 text-secondary'
@@ -349,6 +354,7 @@ export default function ReportsMeetingsRows({ reports, meetings }: { reports: Re
               >
                 <span className="material-symbols-outlined text-[19px]">visibility</span>
               </button>
+              {removable && <DeleteRecordButton record={record} />}
               {row.type === 'REPORT' && (
                 <form action={setSelectedDocumentStatus}>
                   <input type="hidden" name="singleId" value={row.report.id} />
@@ -370,6 +376,8 @@ export default function ReportsMeetingsRows({ reports, meetings }: { reports: Re
           </p>
         )}
       </div>
+
+      </RecordDeletionControls>
 
       <FullScreenModal
         open={Boolean(selected)}

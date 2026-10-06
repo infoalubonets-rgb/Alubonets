@@ -18,10 +18,6 @@ export default async function ExecutiveProjectManagePage({
       where: { id },
       include: {
         responsibles: { include: { user: { select: { id: true, fullName: true } } } },
-        comments: {
-          include: { author: { select: { fullName: true } } },
-          orderBy: { createdAt: 'desc' },
-        },
         investments: {
           include: { user: { select: { fullName: true } } },
           orderBy: { investedAt: 'desc' },
@@ -54,7 +50,6 @@ export default async function ExecutiveProjectManagePage({
         members={members}
         documents={documents}
         manageBase="/dashboard/executive/projects"
-        canModerate
       />
     </DashboardShell>
   )

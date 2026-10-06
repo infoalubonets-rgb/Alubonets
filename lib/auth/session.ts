@@ -1,3 +1,5 @@
+import { cache } from 'react'
+import { WORKSPACE_COOKIE, selectedWorkspaceMode, selectedWorkspace, workspaceProfile } from './workspace'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
@@ -7,6 +9,7 @@ import type { AuthUser, Role } from './types'
 import { ROLE_HOME } from './types'
 import { isAppRole, toAuthUser } from './helpers'
 import { getDisabledRoles, isLockedOutByRole } from '@/lib/disabled-roles'
+import { canRecordPayments } from '@/lib/finance-access'
 import type { MemberStatus, User } from '@prisma/client'
 
 export type SessionProfile = AuthUser & {
@@ -71,7 +74,7 @@ function makeInitials(fullName: string) {
   return fullName.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase()
 }
 
-export async function getSessionProfile(): Promise<SessionProfile | null> {
+export async function getAccountProfile(): Promise<SessionProfile | null> {
   const profile = await loadSessionProfile()
   if (profile && isLockedOutByRole(profile, await getDisabledRoles())) {
     redirect('/api/auth/logout?error=role_inactive')
@@ -79,7 +82,17 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
   return profile
 }
 
-async function loadSessionProfile(): Promise<SessionProfile | null> {
+/** All page/action authorization uses only the selected workspace. */
+export async function getSessionProfile(): Promise<SessionProfile | null> {
+  const account = await getAccountProfile()
+  if (!account) return null
+  const store = await cookies()
+  const profile = workspaceProfile(account, store.get(WORKSPACE_COOKIE)?.value)
+  if (isLockedOutByRole(profile, await getDisabledRoles())) redirect('/api/auth/logout?error=role_inactive')
+  return profile
+}
+
+const loadSessionProfile = cache(async (): Promise<SessionProfile | null> => {
   const cookieStore = await cookies()
   const supabase = createClient(cookieStore)
 
@@ -154,7 +167,7 @@ async function loadSessionProfile(): Promise<SessionProfile | null> {
     principalMemberId: profile.principalMemberId ?? null,
     isPrincipal: profile.isPrincipal ?? false,
   }
-}
+})
 
 export async function requireSessionProfile() {
   const profile = await getSessionProfile()
@@ -174,6 +187,16 @@ export async function requireActiveRole(roles?: Role[]) {
   redirect(ROLE_HOME[profile.role])
 }
 
+/**
+ * Strictly the Treasurer, for recording payments and proposing reversals. Unlike
+ * `requireActiveRole(['TREASURER'])`, Admin and Super Admin do not pass.
+ */
+export async function requireTreasurer() {
+  const profile = await requireActiveRole(['TREASURER'])
+  if (!canRecordPayments(profile)) throw new Error('Only the Treasurer can record or reverse payments.')
+  return profile
+}
+
 export async function requireAdmin() {
   const profile = await requireActiveRole(['ADMIN'])
   if (profile.role !== 'ADMIN' && !profile.isSuperAdmin) redirect(ROLE_HOME[profile.role])
@@ -188,8 +211,9 @@ export async function clearSessionCookie() {}
 export async function setSessionCookie(_user: AuthUser) { return '' }
 
 export async function getSessionUser(): Promise<AuthUser | null> {
-  const profile = await getSessionProfile()
+  const profile = await getAccountProfile()
   if (!profile || profile.status !== 'ACTIVE') return null
+  const store = await cookies()
   return {
     id: profile.id,
     email: profile.email,
@@ -198,6 +222,9 @@ export async function getSessionUser(): Promise<AuthUser | null> {
     initials: profile.initials,
     isSuperAdmin: profile.isSuperAdmin,
     dashboardAccess: profile.dashboardAccess,
+    isPrincipal: profile.isPrincipal,
     status: profile.status,
+    activeWorkspace: selectedWorkspace(profile, store.get(WORKSPACE_COOKIE)?.value),
+    activeSuperAdmin: selectedWorkspaceMode(profile, store.get(WORKSPACE_COOKIE)?.value) === 'SUPER_ADMIN',
   }
 }

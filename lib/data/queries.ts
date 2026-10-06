@@ -461,7 +461,7 @@ export const getContributionAnalytics = unstable_cache(
 
 export async function getResolutionsForViewer(actor: { id: string; role: Role; isSuperAdmin?: boolean }) {
   const canApprove = actor.role === 'ADMIN' || Boolean(actor.isSuperAdmin)
-  const fullDetail = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || Boolean(actor.isSuperAdmin)
+  const fullDetail = actor.role === 'ADMIN' || actor.role === 'SECRETARY' || actor.role === 'TREASURER' || Boolean(actor.isSuperAdmin)
 
   const [pendingRaw, approvedRaw] = await Promise.all([
     canApprove
@@ -533,7 +533,7 @@ export async function getResolutionsForViewer(actor: { id: string; role: Role; i
 }
 
 function canViewGovernanceRecords(actor: { role: Role }) {
-  return actor.role === 'ADMIN' || actor.role === 'SECRETARY' || actor.role === 'AUDITOR'
+  return actor.role === 'ADMIN' || actor.role === 'SECRETARY' || actor.role === 'TREASURER' || actor.role === 'AUDITOR'
 }
 
 function governanceRecordWhere(actor: { role: Role }) {

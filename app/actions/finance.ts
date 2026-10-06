@@ -3,7 +3,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
+import { requireActiveRole, requireAdmin, requireTreasurer } from '@/lib/auth/session'
 import {
   compareMonths,
   createLedgerContribution,
@@ -293,7 +293,7 @@ export async function restoreCampaignObligation(formData: FormData) {
 }
 
 export async function recordLedgerContribution(formData: FormData) {
-  const actor = await requireActiveRole(['TREASURER','ADMIN'])
+  const actor = await requireTreasurer()
   const raw = {
     userId: formData.get('userId'),
     amount: formData.get('amount'),
@@ -364,7 +364,7 @@ export async function recordLedgerContribution(formData: FormData) {
 
 /** Step 1 of a fast upload: authorize, then hand back a signed URL for a direct browser→Supabase upload. */
 export async function requestEvidenceUploadUrl(formData: FormData) {
-  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const actor = await requireTreasurer()
   const fileName = z.string().min(1).parse(formData.get('fileName'))
   const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${actor.id}/${Date.now()}-${crypto.randomUUID()}-${safe}`
@@ -372,7 +372,7 @@ export async function requestEvidenceUploadUrl(formData: FormData) {
 }
 
 export async function recordExpense(formData: FormData) {
-  const actor = await requireActiveRole(['TREASURER','ADMIN'])
+  const actor = await requireTreasurer()
   const data = z.object({
     amount: z.coerce.number().positive(),
     description: z.string().trim().max(500).optional(),
@@ -428,7 +428,7 @@ export async function recordExpense(formData: FormData) {
 
 export async function recordWelfareDisbursement(formData: FormData) {
   await requireWelfareEnabled()
-  const actor = await requireActiveRole(['TREASURER','ADMIN'])
+  const actor = await requireTreasurer()
   const data = z.object({
     welfareRequestId: z.string().min(1),
     amount: z.coerce.number().positive(),
@@ -536,7 +536,7 @@ export async function approveFinancialTransaction(formData: FormData) {
 }
 
 export async function proposeReversal(formData: FormData) {
-  const actor = await requireActiveRole(['TREASURER','ADMIN'])
+  const actor = await requireTreasurer()
   const id = z.string().min(1).parse(formData.get('id'))
   const reason = z.string().trim().min(5).max(1000).parse(formData.get('reason'))
   const original = await prisma.financialTransaction.findUniqueOrThrow({ where: { id }, include: { entries: true } })
@@ -570,7 +570,7 @@ export async function approveReversal(formData: FormData) {
 }
 
 export async function reconcilePaymentEvent(formData: FormData) {
-  const actor = await requireActiveRole(['TREASURER','ADMIN'])
+  const actor = await requireTreasurer()
   const data = z.object({
     eventId: z.string().min(1),
     userId: z.string().min(1),
@@ -752,7 +752,7 @@ export async function updateStandingSettings(formData: FormData): Promise<{ ok: 
     })
     const result = await syncMembershipStanding()
     refreshFinance()
-    revalidatePath('/admin/accounts')
+    revalidatePath('/directory')
     return { ok: true, lapsed: result.lapsed, reactivated: result.reactivated }
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : 'Could not save membership standing settings.')

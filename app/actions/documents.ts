@@ -9,10 +9,10 @@ import { createServerClient } from '@/lib/supabase-server'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
 import { createSignedUpload } from '@/lib/upload-signed'
-
-const DOC_EXTS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'] as const
+import { DOC_EXTS, newRepositoryDocumentPath, verifyUploadedObject } from '@/lib/document-upload'
 
 const refresh = () => {
+  revalidatePath('/meetings-reports')
   revalidatePath('/documents')
   revalidatePath('/documents/manage')
   revalidatePath('/dashboard/member')
@@ -34,45 +34,6 @@ async function upload(_actorId: string, file: File, groupId: string, version: nu
   return { path, mimeType: file.type || 'application/octet-stream' }
 }
 
-const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024
-
-/**
- * Confirms a browser-uploaded object really exists at the path we issued, and reports its
- * true size and content type from Storage. The client sends only a path; its claimed
- * mime type and the existence of the file are never taken on trust.
- */
-async function verifyUploadedObject(storagePath: string, expectedGroupId: string) {
-  const prefix = `repository/${expectedGroupId}/`
-  if (!storagePath.startsWith(prefix) || storagePath.includes('..')) {
-    throw new Error('That upload does not belong to this document.')
-  }
-  const objectName = storagePath.slice(prefix.length)
-  if (!objectName || objectName.includes('/')) {
-    throw new Error('That upload does not belong to this document.')
-  }
-  const extension = objectName.split('.').pop()?.toLowerCase()
-  if (!extension || !(DOC_EXTS as readonly string[]).includes(extension)) {
-    throw new Error('Only PDF, Word, Excel, or CSV files are allowed.')
-  }
-
-  const { data, error } = await createServerClient()
-    .storage.from('documents')
-    .list(prefix.replace(/\/$/, ''), { search: objectName, limit: 100 })
-  if (error) throw new Error(`Could not verify the upload: ${error.message}`)
-
-  const object = data?.find((entry) => entry.name === objectName)
-  if (!object) throw new Error('The uploaded file could not be found. Please upload it again.')
-
-  const size = Number(object.metadata?.size ?? 0)
-  if (size <= 0) throw new Error('The uploaded file is empty. Please upload it again.')
-  if (size > MAX_DOCUMENT_BYTES) throw new Error('Document must be 15 MB or smaller.')
-
-  return {
-    path: storagePath,
-    mimeType: String(object.metadata?.mimetype || 'application/octet-stream'),
-  }
-}
-
 function roles(formData: FormData) {
   return formData.getAll('allowedRoles').map(String) as Role[]
 }
@@ -89,13 +50,7 @@ export async function createDocumentCategory(formData: FormData) {
 export async function requestRepositoryDocumentUploadUrl(formData: FormData) {
   await requireActiveRole(['ADMIN', 'SECRETARY'])
   const fileName = z.string().min(1).parse(formData.get('fileName'))
-  const extension = fileName.split('.').pop()?.toLowerCase()
-  if (!extension || !(DOC_EXTS as readonly string[]).includes(extension)) {
-    throw new Error('Only PDF, Word, Excel, or CSV files are allowed.')
-  }
-  const groupId = crypto.randomUUID()
-  const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const path = `repository/${groupId}/v1-${crypto.randomUUID()}-${safe}`
+  const { groupId, path } = newRepositoryDocumentPath(fileName)
   const signed = await createSignedUpload('documents', path)
   return { ...signed, groupId }
 }

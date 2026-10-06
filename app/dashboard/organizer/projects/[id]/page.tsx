@@ -18,10 +18,6 @@ export default async function OrganizerProjectManagePage({
       where: { id },
       include: {
         responsibles: { include: { user: { select: { id: true, fullName: true } } } },
-        comments: {
-          include: { author: { select: { fullName: true } } },
-          orderBy: { createdAt: 'desc' },
-        },
         investments: {
           include: { user: { select: { fullName: true } } },
           orderBy: { investedAt: 'desc' },

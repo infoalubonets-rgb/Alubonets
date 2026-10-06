@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import type { Role } from '@/lib/auth/types'
 import { requireAdmin } from '@/lib/auth/session'
 import { getDisabledRoles } from '@/lib/disabled-roles'
+import { canRemoveSuperAdmin, grantMap } from '@/lib/super-admin'
 
 export default async function AdminRolesPage({
   searchParams,
@@ -22,6 +23,14 @@ export default async function AdminRolesPage({
     where: { status: { in: ['ACTIVE', 'PENDING', 'SUSPENDED'] } },
     orderBy: { fullName: 'asc' },
   })
+
+  const grants = grantMap(
+    await prisma.user.findMany({
+      where: { OR: [{ isSuperAdmin: true }, { superAdminGrantedById: { not: null } }] },
+      select: { id: true, superAdminGrantedById: true },
+    }),
+  )
+  const nameById = new Map(users.map((u) => [u.id, u.fullName]))
 
   const holderCounts: Partial<Record<Role, number>> = {}
   for (const u of users) {
@@ -65,6 +74,11 @@ export default async function AdminRolesPage({
             email: u.email,
             role: u.role as Role,
             isSuperAdmin: u.isSuperAdmin,
+            canRemoveSuper:
+              u.isSuperAdmin && !!actor.isSuperAdmin && canRemoveSuperAdmin(actor.id, u.id, grants),
+            superGrantedByName: u.superAdminGrantedById
+              ? nameById.get(u.superAdminGrantedById) ?? 'another Super Admin'
+              : null,
             isPrincipal: u.isPrincipal,
             attachedToPrincipal: Boolean(u.principalMemberId),
             active: u.status === 'ACTIVE',

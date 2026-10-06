@@ -14,7 +14,7 @@ export default async function EditMeetingPage({
     prisma.meeting.findUnique({
       where: { id },
       include: {
-        attendanceRecords: { include: { user: { select: { id: true, fullName: true } } } },
+        attendanceRecords: { include: { user: { select: { id: true, fullName: true, email: true, phone: true } } } },
         invitations: { select: { userId: true } },
       },
     }),
@@ -24,7 +24,7 @@ export default async function EditMeetingPage({
       orderBy: { startsAt: 'desc' },
       take: 100,
     }),
-    prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true }, orderBy: { fullName: 'asc' } }),
+    prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true, email: true, phone: true }, orderBy: { fullName: 'asc' } }),
   ])
   if (!meeting) notFound()
   const members = new Map(activeMembers.map((member) => [member.id, member]))

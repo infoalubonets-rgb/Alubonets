@@ -41,13 +41,18 @@ async function requirePrincipal() {
   if (!me?.isPrincipal || me.status !== 'ACTIVE') {
     throw new Error('Only an active Principal Member can manage a family branch')
   }
+  // Principals see their branch but cannot change it; adding or removing members is for Admins.
+  if (me.role !== 'ADMIN' && !me.isSuperAdmin) {
+    throw new Error('Only an administrator can add or remove family members. Ask an admin to update your branch.')
+  }
   return me
 }
 
 function revalidateFamily() {
+  revalidatePath('/admin/family')
   revalidatePath('/dashboard/member/family')
   revalidatePath('/dashboard/member')
-  revalidatePath('/admin/accounts')
+  revalidatePath('/directory')
 }
 
 export async function linkExistingFamilyMember(input: z.infer<typeof linkSchema>) {

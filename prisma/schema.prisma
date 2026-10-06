@@ -313,6 +313,8 @@ model User {
   role                       Role                       @default(MEMBER)
   status                     MemberStatus               @default(PENDING)
   isSuperAdmin               Boolean                    @default(false)
+  /// Who made this account Super Admin — only they (or someone above them) can remove it. Null = founding Super Admin.
+  superAdminGrantedById      String?
   dashboardAccess            Role[]                     @default([])
   avatarUrl                  String?
   membershipNumber           String?                    @unique
@@ -338,7 +340,12 @@ model User {
   standingOverrideUntil      DateTime?
   /// Admin removed contribution rights: the member owes no dues and follows their Principal's standing.
   contributionExempt         Boolean                    @default(false)
+  /// Details an Admin chose to show on the public About page (photo, profession, location, email, phone).
   publicProfileFields        String[]                   @default([])
+  /// Executives only appear on the public About page once an Admin switches this on.
+  showOnAbout                Boolean                    @default(false)
+  aboutTitle                 String?
+  aboutOrder                 Int                        @default(0)
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
 
@@ -1570,11 +1577,20 @@ model AuditLog {
   reason    String?
   ipAddress String?
   userAgent String?
+  /// The actor's primary role when this was written (Super Admin is recorded as ADMIN).
+  actorRole   String?
+  /// Done outside the actor's primary role, through extra dashboard access — shown in red.
+  outsideRole Boolean  @default(false)
+  /// The actor's secondary roles (extra dashboard access) when this was written.
+  actorSecondaryRoles String[] @default([])
+  /// The role this change was made as — primary, or the secondary role that allowed it.
+  actingRole  String?
   createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
   @@index([entity, entityId])
+  @@index([outsideRole, createdAt])
   @@map("audit_logs")
 }
 
@@ -1650,7 +1666,11 @@ model ProfileVisibility {
 model DailyActivity {
   id                  String    @id @default(cuid())
   title               String
+  subtitle            String?
   body                String?
+  imageUrl            String?
+  /// When members were emailed about it; null if email was not sent.
+  emailSentAt         DateTime?
   activityType        String    @default("GENERAL")
   startsAt            DateTime  @default(now())
   endsAt              DateTime?

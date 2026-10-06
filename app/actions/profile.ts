@@ -78,22 +78,6 @@ export async function updateMyMemberDetails(input: z.infer<typeof memberDetailsS
   revalidatePath('/profile')
 }
 
-export async function updateMyPublicProfileFields(fields: string[]) {
-  const session = await requireSessionProfile()
-  const { sanitizePublicProfileFields } = await import('@/lib/public-profile')
-  const publicProfileFields = sanitizePublicProfileFields(z.array(z.string().max(40)).max(20).parse(fields))
-  await prisma.user.update({ where: { id: session.id }, data: { publicProfileFields } })
-  await writeAudit({
-    userId: session.id,
-    action: 'PUBLIC_PROFILE_FIELDS_UPDATE',
-    entity: 'User',
-    entityId: session.id,
-    newValue: { publicProfileFields },
-  })
-  revalidatePath('/profile')
-  revalidatePath('/about')
-}
-
 export async function updateMyAvatarPath(path: string) {
   const session = await requireSessionProfile()
   const value = z.string().max(500).parse(path)

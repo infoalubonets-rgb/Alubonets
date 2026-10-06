@@ -17,6 +17,9 @@ export type RolesUser = {
   email: string
   role: Role
   isSuperAdmin: boolean
+  /** The viewer granted this Super Admin (directly or further up the chain), so they may remove it. */
+  canRemoveSuper?: boolean
+  superGrantedByName?: string | null
   isPrincipal: boolean
   attachedToPrincipal: boolean
   active: boolean
@@ -42,13 +45,16 @@ const ROLE_ICON: Record<Role, string> = {
   AUDITOR: 'policy',
 }
 
-export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRoles = [] }: Props) {
+export default function RolesAccessForm({ users, actorIsSuperAdmin, actorId, disabledRoles = [] }: Props) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [modal, setModal] = useState<ModalKind>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [role, setRole] = useState<Role | null>(null)
   const [access, setAccess] = useState<Role[]>([])
+  // The switches only change these drafts; nothing is sent until "Save changes".
+  const [makeSuper, setMakeSuper] = useState(false)
+  const [principal, setPrincipal] = useState(false)
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
   const [query, setQuery] = useState('')
@@ -69,6 +75,8 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
     setRole(selected.role)
     const extras = Array.isArray(selected.dashboardAccess) ? selected.dashboardAccess : []
     setAccess(Array.from(new Set<Role>([selected.role, ...extras])))
+    setMakeSuper(selected.isSuperAdmin)
+    setPrincipal(selected.isPrincipal)
   }, [selected])
 
   const filteredUsers = useMemo(() => {
@@ -95,6 +103,8 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
     setRole(u.role)
     const extras = Array.isArray(u.dashboardAccess) ? u.dashboardAccess : []
     setAccess(Array.from(new Set<Role>([u.role, ...extras])))
+    setMakeSuper(u.isSuperAdmin)
+    setPrincipal(u.isPrincipal)
     setError('')
     setOk('')
     closeModal()
@@ -120,31 +130,54 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
     setAccess((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]))
   }
 
+  const superLocked = Boolean(selected?.isSuperAdmin && makeSuper)
+
   const save = () => {
     if (!selected || !role) {
       setError('Select an account and a role first')
       return
     }
-    if (selected.isSuperAdmin) {
-      setError('Super Admin accounts cannot be changed by other members')
+    if (superLocked) {
+      setError('Switch off Super Admin first to change this account')
       return
     }
     if (selected.role === 'ADMIN' && !actorIsSuperAdmin) {
       setError('Only a Super Admin can change an Admin account')
       return
     }
+    const superRevoked = selected.isSuperAdmin && !makeSuper
+    // Removing Super Admin leaves a plain Admin, so compare the draft against that.
+    const baseRole: Role = superRevoked ? 'ADMIN' : selected.role
+    const savedAccess = new Set<Role>(superRevoked ? ['ADMIN'] : [selected.role, ...(selected.dashboardAccess ?? [])])
+    const draftAccess = new Set<Role>([role, ...access])
+    const roleChanged = role !== baseRole
+    const accessChanged = savedAccess.size !== draftAccess.size || [...draftAccess].some((r) => !savedAccess.has(r))
+    const principalChanged = principal !== selected.isPrincipal
+    const superGranted = makeSuper && !selected.isSuperAdmin
+    if (!superRevoked && !roleChanged && !accessChanged && !principalChanged && !superGranted) {
+      setError('')
+      setOk('Nothing to save — no changes made')
+      return
+    }
     setError('')
     setOk('')
     startTransition(async () => {
       try {
-        if (role !== selected.role) {
-          await setMemberRole({ userId: selected.id, role })
+        if (superRevoked) await setSuperAdminFlag({ userId: selected.id, isSuperAdmin: false })
+        if (roleChanged) await setMemberRole({ userId: selected.id, role })
+        if (roleChanged || accessChanged) {
+          await setMemberDashboardAccess({ userId: selected.id, dashboardAccess: [...draftAccess] })
         }
-        await setMemberDashboardAccess({
-          userId: selected.id,
-          dashboardAccess: access,
-        })
-        setOk('Access updated')
+        if (principalChanged) {
+          await setPrincipalStatus({
+            userId: selected.id,
+            isPrincipal: principal,
+            reason: principal ? 'Made Principal from Roles & access' : 'Removed as Principal from Roles & access',
+          })
+        }
+        // Last: role and access edits are refused while an account is Super Admin.
+        if (superGranted) await setSuperAdminFlag({ userId: selected.id, isSuperAdmin: true })
+        setOk('Changes saved')
         router.refresh()
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not save')
@@ -154,45 +187,61 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
 
   const toggleSuper = () => {
     if (!selected || !actorIsSuperAdmin) return
-    // Existing Super Admins cannot be revoked — only grant to others.
-    if (selected.isSuperAdmin) {
-      setError('Super Admin cannot be removed by any other member')
+    if (selected.isSuperAdmin && !selected.canRemoveSuper) {
+      setError(superBlockedReason)
       return
     }
     setError('')
     setOk('')
-    startTransition(async () => {
-      try {
-        await setSuperAdminFlag({
-          userId: selected.id,
-          isSuperAdmin: true,
-        })
-        setOk('Super Admin granted')
-        router.refresh()
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not update Super Admin')
+    if (selected.isSuperAdmin) {
+      const removing = makeSuper
+      setMakeSuper(!removing)
+      if (removing) {
+        setRole('ADMIN')
+        setAccess(['ADMIN'])
+      } else {
+        setRole(selected.role)
+        setAccess(Array.from(new Set<Role>([selected.role, ...(selected.dashboardAccess ?? [])])))
       }
-    })
+      return
+    }
+    setMakeSuper((value) => !value)
   }
 
+  const superBlockedReason = !selected?.isSuperAdmin
+    ? ''
+    : selected.id === actorId
+      ? 'You cannot remove your own Super Admin access'
+      : selected.superGrantedByName
+        ? `Only ${selected.superGrantedByName}, who granted it, or someone above them can remove this`
+        : 'Founding Super Admin — cannot be removed'
+
   const togglePrincipal = () => {
-    if (!selected) return
-    setError('')
+    if (!selected || principalBlockedReason) return
     setOk('')
-    startTransition(async () => {
-      try {
-        await setPrincipalStatus({
-          userId: selected.id,
-          isPrincipal: !selected.isPrincipal,
-          reason: selected.isPrincipal ? 'Removed as Principal from Roles & access' : 'Made Principal from Roles & access',
-        })
-        setOk(selected.isPrincipal ? 'Principal status removed' : 'Member is now a Principal')
-        router.refresh()
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not update Principal status')
-      }
-    })
+    setPrincipal((value) => !value)
   }
+
+  const alsoExecutive = Boolean(role && role !== 'EXECUTIVE' && access.includes('EXECUTIVE'))
+  const executiveToggleShown = Boolean(selected && !superLocked && role && role !== 'EXECUTIVE' && role !== 'ADMIN')
+
+  const toggleExecutive = () => {
+    setOk('')
+    toggleAccess('EXECUTIVE')
+  }
+
+  const hasChanges = Boolean(
+    selected && role && (
+      role !== selected.role ||
+      principal !== selected.isPrincipal ||
+      makeSuper !== selected.isSuperAdmin ||
+      (() => {
+        const saved = new Set<Role>([selected.role, ...(selected.dashboardAccess ?? [])])
+        const draft = new Set<Role>([role, ...access])
+        return saved.size !== draft.size || [...draft].some((r) => !saved.has(r))
+      })()
+    ),
+  )
 
   const principalBlockedReason = !selected
     ? ''
@@ -239,18 +288,18 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
           icon="badge"
           filled={!!role}
           open={modal === 'role'}
-          disabled={!selected || selected.isSuperAdmin}
-          onClick={() => selected && !selected.isSuperAdmin && setModal('role')}
+          disabled={!selected || superLocked}
+          onClick={() => selected && !superLocked && setModal('role')}
         />
         <SelectorBubble
           label="Access"
-          summary={selected?.isSuperAdmin ? 'All dashboards' : accessSummary}
+          summary={superLocked ? 'All dashboards' : accessSummary}
           description="Choose dashboards"
           icon="dashboard"
           filled={!!role && accessCount > 0}
           open={modal === 'access'}
-          disabled={!selected || !role || selected.isSuperAdmin}
-          onClick={() => selected && role && !selected.isSuperAdmin && setModal('access')}
+          disabled={!selected || !role || superLocked}
+          onClick={() => selected && role && !superLocked && setModal('access')}
         />
       </div>
 
@@ -260,23 +309,62 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
             <p className="font-label-bold text-sm text-on-surface">Super Admin</p>
             <p className="text-[11px] text-on-surface-variant">
               {selected.isSuperAdmin
-                ? 'Highest authority — cannot be removed by other members'
-                : 'Grant full access across every workspace'}
+                ? makeSuper
+                  ? selected.canRemoveSuper
+                    ? 'You granted this — switch off to remove it'
+                    : superBlockedReason
+                  : 'Will be removed when you save — they stay an Admin, and you can change their role'
+                : makeSuper
+                  ? 'Will become Super Admin when you save — you can remove it again later'
+                  : 'Grant full access across every workspace'}
             </p>
           </div>
           <button
             type="button"
-            disabled={pending || selected.isSuperAdmin}
+            disabled={pending || (selected.isSuperAdmin && !selected.canRemoveSuper)}
             onClick={toggleSuper}
-            title={selected.isSuperAdmin ? 'Super Admin cannot be removed' : 'Grant Super Admin'}
-            className={`relative h-7 w-12 rounded-full transition-colors disabled:opacity-50 ${
-              selected.isSuperAdmin ? 'bg-secondary-container' : 'bg-outline-variant'
+            title={
+              selected.isSuperAdmin
+                ? selected.canRemoveSuper ? 'Remove Super Admin' : superBlockedReason
+                : 'Grant Super Admin'
+            }
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+              makeSuper ? 'bg-secondary-container' : 'bg-outline-variant'
             }`}
-            aria-pressed={selected.isSuperAdmin}
+            aria-pressed={makeSuper}
           >
             <span
               className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                selected.isSuperAdmin ? 'left-5' : 'left-0.5'
+                makeSuper ? 'left-5' : 'left-0.5'
+              }`}
+            />
+          </button>
+        </div>
+      )}
+
+      {executiveToggleShown && selected && role && (
+        <div className="flex items-center justify-between rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-3 shadow-[0_4px_12px_rgba(20,32,51,0.05)]">
+          <div>
+            <p className="font-label-bold text-sm text-on-surface">Also an Executive (second role)</p>
+            <p className="text-[11px] text-on-surface-variant">
+              {alsoExecutive
+                ? `${ROLE_LABEL[role]} and Executive — opens both dashboards and sees members in full`
+                : `Keep them as ${ROLE_LABEL[role]} and add the Executive dashboard`}
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={toggleExecutive}
+            title={alsoExecutive ? 'Remove Executive second role' : 'Add Executive as a second role'}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+              alsoExecutive ? 'bg-secondary-container' : 'bg-outline-variant'
+            }`}
+            aria-pressed={alsoExecutive}
+          >
+            <span
+              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                alsoExecutive ? 'left-5' : 'left-0.5'
               }`}
             />
           </button>
@@ -289,8 +377,8 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
             <p className="font-label-bold text-sm text-on-surface">Principal member</p>
             <p className="text-[11px] text-on-surface-variant">
               {principalBlockedReason
-                || (selected.isPrincipal
-                  ? 'Heads a family branch — only dependents (under 18 or without contribution rights) follow their standing'
+                || (principal
+                  ? 'Heads a family branch. Children under 18, and members with contribution rights switched off, pay no dues of their own — they are paid-up whenever this Principal is.'
                   : 'Make this member the head of a family branch')}
             </p>
           </div>
@@ -298,15 +386,15 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
             type="button"
             disabled={pending || Boolean(principalBlockedReason)}
             onClick={togglePrincipal}
-            title={selected.isPrincipal ? 'Remove Principal status' : 'Make Principal'}
-            className={`relative h-7 w-12 rounded-full transition-colors disabled:opacity-50 ${
-              selected.isPrincipal ? 'bg-secondary-container' : 'bg-outline-variant'
+            title={principal ? 'Remove Principal status' : 'Make Principal'}
+            className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+              principal ? 'bg-secondary-container' : 'bg-outline-variant'
             }`}
-            aria-pressed={selected.isPrincipal}
+            aria-pressed={principal}
           >
             <span
               className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                selected.isPrincipal ? 'left-5' : 'left-0.5'
+                principal ? 'left-5' : 'left-0.5'
               }`}
             />
           </button>
@@ -324,13 +412,16 @@ export default function RolesAccessForm({ users, actorIsSuperAdmin, disabledRole
         </p>
       )}
 
+      {hasChanges && !pending && (
+        <p className="text-center text-[12px] font-semibold text-secondary">You have unsaved changes — press Save changes to apply them.</p>
+      )}
       <button
         type="button"
-        disabled={!selected || !role || pending || selected.isSuperAdmin}
+        disabled={!selected || !role || pending || superLocked}
         onClick={save}
         className="w-full h-12 rounded-full bg-secondary-container text-on-primary font-label-bold text-[15px] hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-45 disabled:cursor-not-allowed shadow-md"
       >
-        {pending ? 'Saving…' : selected?.isSuperAdmin ? 'Protected Super Admin' : 'Save changes'}
+        {pending ? 'Saving…' : superLocked ? 'Super Admin — switch off to edit' : 'Save changes'}
       </button>
 
       {/* Portal so overlay covers sidebar + top nav (not clipped by main overflow) */}

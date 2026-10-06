@@ -37,6 +37,9 @@ export type AuthUser = {
   dashboardAccess?: Role[]
   status?: string
   isPrincipal?: boolean
+  /** Role selected for page data and operation permissions. */
+  activeWorkspace?: Role
+  activeSuperAdmin?: boolean
   /** Roles currently switched off in the role catalogue. */
   disabledRoles?: Role[]
 }

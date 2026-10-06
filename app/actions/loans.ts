@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { requireActiveRole, requireAdmin } from '@/lib/auth/session'
+import { requireActiveRole, requireAdmin, requireTreasurer } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { requireLoansEnabled } from '@/lib/feature-flags'
 import { getLoanPolicy } from '@/lib/settings'
@@ -333,7 +333,7 @@ export async function decideLoanApplication(formData: FormData) {
 
 export async function recordLoanDisbursement(formData: FormData) {
   await requireLoansEnabled()
-  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const actor = await requireTreasurer()
   const data = z
     .object({
       loanId: z.string().min(1),
@@ -434,7 +434,7 @@ export async function recordLoanDisbursement(formData: FormData) {
 
 export async function recordLoanRepayment(formData: FormData) {
   await requireLoansEnabled()
-  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  const actor = await requireTreasurer()
   const data = z
     .object({
       loanId: z.string().min(1),

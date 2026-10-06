@@ -21,7 +21,17 @@ export type AuditLogRow = {
   targetKind: string
   targetLabel: string
   targetSubtitle: string | null
+  /** Primary role when written; null for entries made before this was recorded. */
+  actorRole: string | null
+  /** Done outside the actor's primary role — shown in red. */
+  outsideRole: boolean
+  /** Extra dashboard access the actor held when this was written. */
+  actorSecondaryRoles: string[]
+  /** The role this change was made as. */
+  actingRole: string | null
 }
+
+const roleName = (role: string | null) => (role ? ROLE_LABEL[role as Role] ?? role : 'Unknown role')
 
 const PAGE_SIZE = 25
 
@@ -183,15 +193,28 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
                 slice.map((row, i) => (
                   <tr
                     key={row.id}
-                    className={`border-t border-outline-variant/50 hover:bg-primary/[0.03] ${
-                      i % 2 === 1 ? 'bg-surface-container-low/40' : ''
+                    className={`border-t border-outline-variant/50 ${
+                      row.outsideRole
+                        ? 'bg-red-50 text-red-900 shadow-[inset_4px_0_0_#dc2626] hover:bg-red-100 dark:bg-red-500/10 dark:text-red-100'
+                        : `hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`
                     }`}
                   >
                     <td className="whitespace-nowrap px-4 py-2.5 text-[12px] text-on-surface-variant">
                       {new Date(row.createdAt).toLocaleString()}
                     </td>
-                    <td className="max-w-[140px] truncate px-4 py-2.5 font-medium text-on-surface">
-                      {row.user?.fullName ?? 'System / removed user'}
+                    <td className="max-w-[180px] px-4 py-2.5">
+                      <p className={`truncate font-medium ${row.outsideRole ? 'text-red-800 dark:text-red-200' : 'text-on-surface'}`}>
+                        {row.user?.fullName ?? 'System / removed user'}
+                      </p>
+                      {row.actorRole && !row.outsideRole && (
+                        <p className="truncate text-[11px] text-on-surface-variant">{roleName(row.actorRole)}</p>
+                      )}
+                      {row.outsideRole && (
+                        <span className="mt-0.5 inline-flex items-center gap-0.5 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white" title="Done through extra access, not their primary role">
+                          <span className="material-symbols-outlined text-[12px]">warning</span>
+                          Outside role · {roleName(row.actorRole)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
                       <span className="inline-flex rounded-full bg-primary/8 px-2 py-0.5 text-[11px] font-label-bold text-primary">
@@ -274,11 +297,45 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
               </div>
 
               <div className="space-y-4 p-5">
+                {selected.outsideRole && (
+                  <p className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-100">
+                    <span className="material-symbols-outlined text-[20px]">warning</span>
+                    Done outside this person’s primary role ({roleName(selected.actorRole)}), through extra dashboard access. Check that it was expected.
+                  </p>
+                )}
                 <DetailBlock
                   label="Done by"
                   value={selected.user?.fullName ?? 'System / removed user'}
-                  hint={selected.user?.email ?? null}
+                  hint={[selected.user?.email, selected.actorRole ? `Primary role: ${roleName(selected.actorRole)}` : null].filter(Boolean).join(' · ') || null}
                 />
+                {selected.actorRole && (
+                  <div className="rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5">
+                    <p className="font-label-bold text-[10px] uppercase tracking-wide text-on-surface-variant">Roles when this was done</p>
+                    <dl className="mt-1.5 space-y-1.5 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-on-surface-variant">Primary role</dt>
+                        <dd className="text-right font-medium text-on-surface">{roleName(selected.actorRole)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-on-surface-variant">Secondary roles</dt>
+                        <dd className="text-right font-medium text-on-surface">
+                          {selected.actorSecondaryRoles.length ? selected.actorSecondaryRoles.map(roleName).join(', ') : 'None'}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-on-surface-variant">Change made as</dt>
+                        <dd className={`text-right font-bold ${selected.outsideRole ? 'text-red-700 dark:text-red-300' : 'text-on-surface'}`}>
+                          {selected.actingRole
+                            ? `${roleName(selected.actingRole)}${selected.outsideRole ? ' (secondary role)' : ''}`
+                            : selected.outsideRole ? 'No role covering this — review it' : roleName(selected.actorRole)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                )}
+                {!selected.actorRole && selected.user && (
+                  <p className="text-xs text-on-surface-variant">Roles were not recorded for entries made before this feature.</p>
+                )}
                 <DetailBlock
                   label="About"
                   value={selected.targetLabel}
@@ -339,7 +396,7 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
                 )}
 
                 <p className="text-xs text-on-surface-variant">
-                  Audit records cannot be deleted here. Retention purge removes only aged rows.
+                  Audit records can never be edited or deleted from the app.
                 </p>
               </div>
             </div>

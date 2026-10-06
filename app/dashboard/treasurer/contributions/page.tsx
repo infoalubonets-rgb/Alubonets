@@ -22,6 +22,8 @@ import ReconcilePaymentButton from '@/components/finance/ReconcilePaymentButton'
 import UnmatchedPayments from '@/components/finance/UnmatchedPayments'
 import { filterSelectableCategories } from '@/lib/payment-categories'
 import { prisma } from '@/lib/prisma'
+import { requireActiveRole } from '@/lib/auth/session'
+import { canRecordPayments } from '@/lib/finance-access'
 import type { Prisma, TransactionStatus } from '@prisma/client'
 import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
 
@@ -36,6 +38,9 @@ export default async function TreasurerContributionsPage({
 }: {
   searchParams: Promise<{ page?: string; q?: string; year?: string; purpose?: string; status?: string; member?: string }>
 }) {
+  const actor = await requireActiveRole(['TREASURER'])
+  // Matching an M-Pesa payment records it, so only the Treasurer gets those controls.
+  const canRecord = canRecordPayments(actor)
   const sp = await searchParams
   const page = parsePage(sp.page)
   const pageSize = 25
@@ -129,7 +134,7 @@ export default async function TreasurerContributionsPage({
       prisma.contribution.findMany({
         where: { status: 'PENDING' },
         include: {
-          user: { select: { fullName: true, email: true } },
+          user: { select: { fullName: true, membershipNumber: true, email: true, phone: true } },
           transactionCategory: { select: { name: true } },
         },
         orderBy: { paidAt: 'desc' },
@@ -176,14 +181,21 @@ export default async function TreasurerContributionsPage({
             paidAt: row.paidAt.toISOString(),
             category: row.transactionCategory?.name || row.category,
             memberName: row.user.fullName,
+            membershipNumber: row.user.membershipNumber,
             memberEmail: row.user.email,
+            memberPhone: row.user.phone,
             paymentMethod: row.paymentMethod,
             mpesaRef: row.mpesaRef,
             statementRef: row.statementRef,
           }))}
         />
 
-        <UnmatchedPayments
+        {!canRecord && unmatchedEvents.length > 0 && (
+          <p className="rounded-2xl border border-outline-variant bg-surface p-4 text-sm text-on-surface-variant">
+            {unmatchedEvents.length} M-Pesa payment{unmatchedEvents.length === 1 ? ' is' : 's are'} waiting to be matched. Only the Treasurer can match them.
+          </p>
+        )}
+        {canRecord && <UnmatchedPayments
           events={unmatchedEvents.map((event) => ({
             id: event.id,
             provider: event.provider,
@@ -197,7 +209,7 @@ export default async function TreasurerContributionsPage({
           categories={filterSelectableCategories(activeCategories, 'income')}
           campaigns={purposeCampaigns.filter((c) => c.active).map((c) => ({ id: c.id, title: c.title, categoryId: c.categoryId }))}
           projects={purposeProjects.filter((p) => p.status !== 'COMPLETED').map((p) => ({ id: p.id, title: p.title }))}
-        />
+        />}
 
         {/* Payments modal trigger */}
         <div className="flex items-center gap-3">

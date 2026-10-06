@@ -1,3 +1,4 @@
+import RecordDeletionControls, { RecordSelection, DeleteRecordButton } from '@/components/documents/RecordDeletionControls'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import AddDocumentModal from '@/components/documents/AddDocumentModal'
 import { requireActiveRole } from '@/lib/auth/session'
@@ -26,7 +27,7 @@ export default async function DocumentsPage({
   const { q = '', category = '', tag = '', page: pageRaw } = await searchParams
   const page = parsePage(pageRaw)
   const pageSize = 24
-  const canAdd = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
+  const canAdd = actor.isSuperAdmin || actor.role === 'ADMIN' || actor.role === 'SECRETARY'
   const [documents, categories] = await Promise.all([
     prisma.document.findMany({
       where: {
@@ -100,11 +101,13 @@ export default async function DocumentsPage({
             <span className="material-symbols-outlined text-[18px]">search</span>
           </button>
         </form>
+        <RecordDeletionControls enabled={canAdd} records={pageItems.map(document => ({ id: document.id, kind: 'DOCUMENT' as const, title: document.title }))}>
         <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="text-left bg-surface-container-low border-b border-outline-variant">
+                  {canAdd && <th className="px-4 py-3"><span className="sr-only">Select document</span></th>}
                   {['Document', 'Category', 'Version', 'Access', 'Published'].map((heading) => (
                     <th
                       key={heading}
@@ -114,14 +117,14 @@ export default async function DocumentsPage({
                     </th>
                   ))}
                   <th className="py-3 px-4 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant text-right w-24">
-                    View
+                    {canAdd ? 'Actions' : 'View'}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {pageItems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-on-surface-variant">
+                    <td colSpan={canAdd ? 7 : 6} className="py-10 text-center text-on-surface-variant">
                       No documents found.
                     </td>
                   </tr>
@@ -133,6 +136,7 @@ export default async function DocumentsPage({
                         i % 2 === 1 ? 'bg-surface-container-low/40' : ''
                       }`}
                     >
+                      {canAdd && <td className="py-3.5 px-4"><RecordSelection record={{ id: document.id, kind: 'DOCUMENT', title: document.title }} /></td>}
                       <td className="py-3.5 px-4">
                         <p className="font-medium text-on-surface">{document.title}</p>
                         {document.description && (
@@ -166,6 +170,7 @@ export default async function DocumentsPage({
                         <p className="text-xs">by {document.uploader.fullName}</p>
                       </td>
                       <td className="py-3.5 px-4 text-right">
+                        <div className="flex justify-end gap-2">
                         <a
                           href={`/api/documents/${document.id}/download`}
                           target="_blank"
@@ -174,6 +179,8 @@ export default async function DocumentsPage({
                         >
                           View
                         </a>
+                        {canAdd && <DeleteRecordButton record={{ id: document.id, kind: 'DOCUMENT', title: document.title }} />}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -182,6 +189,7 @@ export default async function DocumentsPage({
             </table>
           </div>
         </div>
+        </RecordDeletionControls>
         <PaginationBar pathname="/documents" page={page} totalPages={pages} params={{ q, category, tag }} />
       </div>
     </DashboardShell>

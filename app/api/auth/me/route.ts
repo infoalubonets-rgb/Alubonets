@@ -1,5 +1,7 @@
+import { cookies } from 'next/headers'
+import { WORKSPACE_COOKIE, selectedWorkspaceMode, selectedWorkspace } from '@/lib/auth/workspace'
 import { NextResponse } from 'next/server'
-import { getSessionProfile } from '@/lib/auth/session'
+import { getAccountProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { initialsFromName } from '@/lib/auth/helpers'
 import { logError } from '@/lib/logger'
@@ -7,7 +9,7 @@ import { getDisabledRoles } from '@/lib/disabled-roles'
 
 export async function GET() {
   try {
-    const profile = await getSessionProfile()
+    const profile = await getAccountProfile()
     if (!profile) {
       return NextResponse.json({ user: null }, { status: 401 })
     }
@@ -40,12 +42,14 @@ export async function GET() {
         status: profile.status,
         isSuperAdmin: profile.isSuperAdmin,
         dashboardAccess: profile.dashboardAccess,
+        activeWorkspace: selectedWorkspace(profile, (await cookies()).get(WORKSPACE_COOKIE)?.value),
+    activeSuperAdmin: selectedWorkspaceMode(profile, (await cookies()).get(WORKSPACE_COOKIE)?.value) === 'SUPER_ADMIN',
         isPrincipal,
         disabledRoles: await getDisabledRoles().catch(() => []),
       },
     })
   } catch (cause) {
     logError('auth.me.failed', cause)
-    return NextResponse.json({ user: null }, { status: 401 })
+    return NextResponse.json({ error: 'Account details are temporarily unavailable' }, { status: 503 })
   }
 }

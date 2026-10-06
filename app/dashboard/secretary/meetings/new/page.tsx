@@ -11,7 +11,7 @@ export default async function NewMeetingPage() {
       orderBy: { startsAt: 'desc' },
       take: 100,
     }),
-    prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true }, orderBy: { fullName: 'asc' } }),
+    prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true, fullName: true, email: true, phone: true }, orderBy: { fullName: 'asc' } }),
   ])
 
   return (

@@ -13,30 +13,22 @@ import { isSystemCategoryCode } from '@/lib/payment-categories'
 import { FEATURE_FLAGS, getFeatureFlags } from '@/lib/feature-flags'
 import { SETTING_KEYS, getSettings } from '@/lib/settings'
 import { CONTACT_EMAIL } from '@/lib/constants'
-import DirectoryFullAccessForm from '@/components/admin/DirectoryFullAccessForm'
 import {
   updateAppSetting,
   updateWelfareAmountLimits,
   updateLoanAmountLimits,
   updateLoanPolicy,
 } from '@/app/actions/settings'
-import { DIRECTORY_FULL_ACCESS_SETTING } from '@/lib/directory'
-
 export default async function AdminSettingsPage() {
   await requireAdmin()
-  const [flags, settings, txCats, nav, financeDestination, fundRule, directoryAccess] = await Promise.all([
+  const [flags, settings, txCats, nav, financeDestination, fundRule] = await Promise.all([
     getFeatureFlags(),
     getSettings(Object.values(SETTING_KEYS)),
     prisma.transactionCategory.findMany({ where: { active: true }, orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], take: 80 }),
     navWithLoans('ADMIN'),
     prisma.financeSettingVersion.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' } }),
     prisma.fundAllocationRule.findFirst({ where: { active: true }, orderBy: { version: 'desc' } }),
-    prisma.appSetting.findUnique({ where: { key: DIRECTORY_FULL_ACCESS_SETTING } }),
   ])
-  const directoryFullAccessRoles = (directoryAccess?.value || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
   const loansOn = Boolean(flags[FEATURE_FLAGS.loansEnabled])
   const welfareOn = Boolean(flags[FEATURE_FLAGS.welfareEnabled])
 
@@ -88,9 +80,14 @@ export default async function AdminSettingsPage() {
         <SettingsSectionButton title="Audit retention" description="How long activity logs are kept" icon="history">
           <AppSettingForm
             settingKey={SETTING_KEYS.auditRetentionDays}
-            label="Retention days"
-            defaultValue={settings[SETTING_KEYS.auditRetentionDays] || '365'}
+            label="Retention days (0 = keep forever)"
+            defaultValue={settings[SETTING_KEYS.auditRetentionDays] || '0'}
           />
+          <p className="mt-2 text-xs text-on-surface-variant">
+            Audit logs can never be edited or deleted by anyone. With 0 they are kept forever. If you set a
+            period (90–3650 days), older entries are removed daily and admins are notified 30 days before any
+            entry is due, so there is time to export them or raise the period.
+          </p>
           <p className="mt-3 text-sm">
             <Link href="/admin/audit-logs" className="text-primary underline">
               View activity logs
@@ -169,14 +166,6 @@ export default async function AdminSettingsPage() {
             </div>
           </SettingsSectionButton>
         )}
-
-        <SettingsSectionButton
-          title="Directory privacy"
-          description="Who may see the full member list (children stay hidden by default)"
-          icon="visibility"
-        >
-          <DirectoryFullAccessForm selectedRoles={directoryFullAccessRoles} />
-        </SettingsSectionButton>
 
         <SettingsSectionButton
           title="Contribution / transaction categories"

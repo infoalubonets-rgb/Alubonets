@@ -23,12 +23,12 @@ export default async function MeetingsReportsPage() {
     'MEMBER',
     'AUDITOR',
   ])
-  const canManage = actor.role === 'ADMIN' || actor.role === 'SECRETARY'
+  const canManage = actor.isSuperAdmin || actor.role === 'ADMIN' || actor.role === 'SECRETARY'
 
   if (canManage) {
     const [reports, meetings] = await Promise.all([
       prisma.document.findMany({
-        where: { category: 'Reports' },
+        where: { category: 'Reports', status: { not: 'ARCHIVED' } },
         include: { uploader: { select: { fullName: true } } },
         orderBy: { uploadedAt: 'desc' },
       }),

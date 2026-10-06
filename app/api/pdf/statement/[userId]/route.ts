@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PDFDocument, StandardFonts, rgb, type PDFImage } from 'pdf-lib'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
+import { canViewAllFinances } from '@/lib/finance-access'
 import { SITE_LOGO } from '@/lib/constants'
 
 // Module-level logo cache so warm lambda instances skip the network entirely
@@ -32,9 +33,7 @@ export async function GET(
   // A Principal Member may also pull statements for the members attached to their branch.
   const canView =
     profile.id === userId ||
-    profile.role === 'ADMIN' ||
-    profile.role === 'TREASURER' ||
-    profile.role === 'AUDITOR' ||
+    canViewAllFinances(profile) ||
     user.principalMemberId === profile.id
   if (!canView) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const { fullName, email } = user

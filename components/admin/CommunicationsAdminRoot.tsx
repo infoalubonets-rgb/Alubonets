@@ -32,6 +32,8 @@ type Props = {
   totalSent: number
   totalFailed: number
   contactInbox?: ReactNode
+  /** Set while email is in test mode: every email goes only to this address. */
+  emailTestRecipient?: string | null
 }
 
 export default function CommunicationsAdminRoot({
@@ -45,6 +47,7 @@ export default function CommunicationsAdminRoot({
   totalSent,
   totalFailed,
   contactInbox,
+  emailTestRecipient = null,
 }: Props) {
   const [modal, setModal] = useState<null | 'send' | 'history'>(null)
   const [historyBadge, setHistoryBadge] = useState(announcements.length)
@@ -121,6 +124,8 @@ export default function CommunicationsAdminRoot({
     }
     setAttachmentError('')
     setModal(null)
+    // Show the sending progress banner straight away.
+    window.dispatchEvent(new Event('email-send-started'))
   }
 
   function resetSendForm() {
@@ -186,12 +191,20 @@ export default function CommunicationsAdminRoot({
           <StatCard icon="mark_email_read" label="Emails delivered" value={String(totalSent)} />
           <StatCard icon="error" label="Emails failed" value={String(totalFailed)} accent={totalFailed > 0 ? 'red' : 'default'} />
         </section>
+        {emailTestRecipient && (
+          <p role="alert" className="flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+            <span className="material-symbols-outlined text-[20px]">warning</span>
+            <span>
+              Until the group’s email domain is added, emails are delivered to {emailTestRecipient} only, not to each member.
+            </span>
+          </p>
+        )}
         {contactInbox}
       </div>
 
       {modal === 'send' && (
         <Modal title="Send notification" icon="send" onClose={() => setModal(null)}>
-          <form action={createAction} onSubmit={handleComposeSubmit} className="mx-auto flex max-w-lg flex-col gap-4">
+          <form action={createAction} onSubmit={handleComposeSubmit} className="flex flex-col gap-4">
             <label className="text-sm font-semibold text-on-surface">
               Subject
               <input name="title" required placeholder="Notification subject" className="mt-1.5 block w-full rounded-xl border border-outline-variant px-3 py-2.5 text-sm" />
@@ -370,7 +383,7 @@ function Modal({ title, icon, onClose, children }: { title: string; icon: string
             </span>
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5">{children}</div>
+        <div className="flex-1 overflow-y-auto p-4">{children}</div>
       </div>
     </div>
   )

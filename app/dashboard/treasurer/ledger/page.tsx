@@ -8,8 +8,13 @@ import RecordContributionForm from '@/components/finance/RecordContributionForm'
 import { filterSelectableCategories, isSystemCategoryCode } from '@/lib/payment-categories'
 import ContributionCategoriesManager from '@/components/admin/ContributionCategoriesManager'
 import { appTodayInputValue } from '@/lib/dates'
+import { requireActiveRole } from '@/lib/auth/session'
+import { canRecordPayments } from '@/lib/finance-access'
 
 export default async function LedgerPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+  const actor = await requireActiveRole(['TREASURER'])
+  // Admins can open the ledger to review it, but only the Treasurer records or reverses payments.
+  const canRecord = canRecordPayments(actor)
   const sp = await searchParams
   // ?month=YYYY-MM shows only that month's transactions.
   const monthMatch = /^(\d{4})-(\d{2})$/.exec(sp.month ?? '')
@@ -29,6 +34,13 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
 
   return <DashboardShell role="TREASURER" title="Financial ledger" nav={TREASURER_NAV}><div className="space-y-6 p-4 md:p-6">
     <section className="grid gap-3 md:grid-cols-3">{balances.filter((a)=>a.type==='ASSET').map((a)=><div key={a.id} className="rounded-xl border bg-surface p-4"><p className="text-xs uppercase">{a.name}</p><b>KES {a.balance.toLocaleString()}</b></div>)}</section>
+    {!canRecord && (
+      <p className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface p-4 text-sm text-on-surface-variant">
+        <span className="material-symbols-outlined text-[20px]">lock</span>
+        View only. Only the Treasurer can record payments, expenses or reversals.
+      </p>
+    )}
+    {canRecord && <>
     <section className="rounded-2xl border bg-surface p-5">
       <h2 className="font-h3 text-xl text-primary">Record member contribution</h2>
       <p className="mt-1 text-xs text-on-surface-variant">Every payment needs a purpose. Choose a campaign or project to count the payment towards its target. Historical payments can be backdated.</p>
@@ -45,6 +57,7 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
       <h2 className="font-h3 text-xl text-primary">Record expense</h2>
       <RecordExpenseForm categories={expenseCategories} accounts={accounts} projects={projects} today={today} />
     </section>
+    </>}
     <section className="rounded-2xl border bg-surface p-5">
       <h2 className="font-h3 text-xl text-primary">Payment purposes</h2>
       <p className="mt-1 text-xs text-on-surface-variant">Add purposes the Treasurer can pick. Mark the monthly fee and annual subscription purposes so membership standing is calculated correctly.</p>
@@ -56,6 +69,6 @@ export default async function LedgerPage({ searchParams }: { searchParams: Promi
         />
       </div>
     </section>
-    <section className="rounded-2xl border bg-surface p-5"><h2 className="font-h3 text-xl text-primary">Immutable transaction history</h2><div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead><tr><th>Number</th><th>Date</th><th>Type</th><th>Status</th><th>Category</th><th>Amount</th><th>Correction</th></tr></thead><tbody>{transactions.map((tx)=><tr key={tx.id} className="border-t"><td>{tx.transactionNumber}</td><td>{tx.occurredAt.toLocaleDateString()}</td><td>{tx.type}</td><td>{tx.status}{tx.addedAfterClose&&<span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Added after close</span>}{tx.editedAfterClose&&<span className="ml-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">Edited after close</span>}</td><td>{tx.category?.name||'—'}</td><td>KES {Number(tx.amount).toLocaleString()}</td><td>{['CONFIRMED','RECONCILED'].includes(tx.status)&&<form action={proposeReversal} className="flex gap-1"><input type="hidden" name="id" value={tx.id}/><input name="reason" required minLength={5} placeholder="Correction reason" className="w-36 rounded border px-2"/><button className="text-error underline">Propose reversal</button></form>}</td></tr>)}</tbody></table></div></section>
+    <section className="rounded-2xl border bg-surface p-5"><h2 className="font-h3 text-xl text-primary">Immutable transaction history</h2><div className="mt-3 overflow-x-auto"><table className="w-full text-sm"><thead><tr><th>Number</th><th>Date</th><th>Type</th><th>Status</th><th>Category</th><th>Amount</th><th>Correction</th></tr></thead><tbody>{transactions.map((tx)=><tr key={tx.id} className="border-t"><td>{tx.transactionNumber}</td><td>{tx.occurredAt.toLocaleDateString()}</td><td>{tx.type}</td><td>{tx.status}{tx.addedAfterClose&&<span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Added after close</span>}{tx.editedAfterClose&&<span className="ml-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-800">Edited after close</span>}</td><td>{tx.category?.name||'—'}</td><td>KES {Number(tx.amount).toLocaleString()}</td><td>{canRecord&&['CONFIRMED','RECONCILED'].includes(tx.status)&&<form action={proposeReversal} className="flex gap-1"><input type="hidden" name="id" value={tx.id}/><input name="reason" required minLength={5} placeholder="Correction reason" className="w-36 rounded border px-2"/><button className="text-error underline">Propose reversal</button></form>}</td></tr>)}</tbody></table></div></section>
   </div></DashboardShell>
 }
