@@ -9,14 +9,17 @@ type Props = {
   icon: string
   label: string
   title: string
-  size?: 'full' | 'compact'
+  size?: 'full' | 'compact' | 'wide'
   /** Show the label as visible text next to the icon, instead of an icon-only circular button. */
   showText?: boolean
+  variant?: 'default' | 'primary' | 'orange'
+  /** Open on first render, e.g. when a link points straight at this section. */
+  defaultOpen?: boolean
   children: ReactNode | ((api: CloseApi) => ReactNode)
 }
 
-export default function IconModalButton({ icon, label, title, size = 'compact', showText = false, children }: Props) {
-  const [open, setOpen] = useState(false)
+export default function IconModalButton({ icon, label, title, size = 'compact', showText = false, variant = 'default', defaultOpen = false, children }: Props) {
+  const [open, setOpen] = useState(defaultOpen)
   const close = () => setOpen(false)
   const reopen = () => setOpen(true)
 
@@ -28,7 +31,11 @@ export default function IconModalButton({ icon, label, title, size = 'compact', 
         title={label}
         aria-label={label}
         className={
-          showText
+          showText && variant === 'orange'
+            ? 'inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-secondary-container px-4 text-xs font-semibold text-on-primary shadow-[0_3px_10px_rgba(254,128,21,0.22)] transition hover:opacity-90'
+            : showText && variant === 'primary'
+            ? 'inline-flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-3.5 text-xs font-semibold text-on-primary shadow-[0_3px_10px_rgba(0,31,80,0.18)] transition hover:bg-secondary-container'
+            : showText
             ? 'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-4 text-sm font-semibold text-primary shadow-[0_3px_10px_rgba(0,31,80,0.12)] transition hover:border-primary hover:bg-primary hover:text-on-primary'
             : 'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-primary shadow-[0_3px_10px_rgba(0,31,80,0.12)] transition hover:border-primary hover:bg-primary hover:text-on-primary'
         }

@@ -2,19 +2,22 @@ import { redirect } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
-import { getSessionProfile } from '@/lib/auth/session'
+import { getSessionProfile, getAccountProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { TAGS } from '@/lib/data/queries'
 import type { Role } from '@/lib/auth/types'
 import ContributionsClient from '@/components/dashboard/ContributionsClient'
-import PaymentDetailsButton from '@/components/dashboard/PaymentDetailsButton'
-import { getActiveFinanceDestination } from '@/app/actions/finance'
-import { canViewAllFinances } from '@/lib/finance-access'
+import { canRecordContributions, canRecordPayments, canViewAllFinances } from '@/lib/finance-access'
+import AddContributionButton from '@/components/finance/AddContributionButton'
+import ImportContributionsButton from '@/components/finance/ImportContributionsButton'
 import ContributionTabs from '@/components/dashboard/ContributionTabs'
 import MemberContributionsTable, { type MemberContributionRow } from '@/components/dashboard/MemberContributionsTable'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'My contributions' }
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams
+  return { title: tab === 'members' ? 'Member contributions' : 'My contributions' }
+}
 
 function getUserContributions(userId: string) {
   return unstable_cache(
@@ -95,22 +98,29 @@ export default async function ContributionsPage({ searchParams }: { searchParams
   const title = seesAll ? 'Contributions' : 'My contributions'
 
   if (seesAll && (await searchParams).tab === 'members') {
+    const account = await getAccountProfile()
     const rows = await getMemberContributionRows()
     return (
       <DashboardShell
         role={role}
         title={title}
         nav={navForRole(role)}
-        pageAction={<ContributionTabs active="members" />}
+        pageAction={
+          <div className="flex flex-wrap items-center gap-2">
+            <AddContributionButton />
+            {account && canRecordContributions(account) && <ImportContributionsButton />}
+            <ContributionTabs active="members" />
+          </div>
+        }
       >
         <div className="space-y-4 pt-4">
-          <MemberContributionsTable rows={rows} />
+          {/* Only the Treasurer can correct a payment amount (audited). */}
+          <MemberContributionsTable rows={rows} canEditAmounts={canRecordPayments(profile)} />
         </div>
       </DashboardShell>
     )
   }
   let contributions
-  let destination = null as Awaited<ReturnType<typeof getActiveFinanceDestination>>
   let familyMembers: {
     id: string
     fullName: string
@@ -124,13 +134,11 @@ export default async function ContributionsPage({ searchParams }: { searchParams
   }[] = []
   try {
     const attached = await getAttachedMembers(profile.id)
-    const [ownContributions, attachedContributions, financeDestination] = await Promise.all([
+    const [ownContributions, attachedContributions] = await Promise.all([
       getUserContributions(profile.id),
       Promise.all(attached.map((member) => getUserContributions(member.id))),
-      getActiveFinanceDestination(),
     ])
     contributions = ownContributions
-    destination = financeDestination
     familyMembers = attached.map((member, index) => ({
       id: member.id,
       fullName: member.fullName,
@@ -164,41 +172,13 @@ export default async function ContributionsPage({ searchParams }: { searchParams
       </DashboardShell>
     )
   }
-  const paymentDetails = destination && {
-    bankName: destination.bankName,
-    accountName: destination.accountName,
-    accountNumber: destination.accountNumber,
-    paybillOrTill: destination.paybillOrTill,
-    branchName: destination.branchName,
-    mpesaType: destination.mpesaType,
-    mpesaNumber: destination.mpesaNumber,
-    mpesaAccount: destination.mpesaAccount,
-    mpesaName: destination.mpesaName,
-    notes: destination.notes,
-  }
   return (
     <DashboardShell
       role={role}
       title={title}
       nav={navForRole(role)}
-      pageAction={
-        <div className="flex flex-wrap items-center gap-2">
-          <PaymentDetailsButton destination={paymentDetails} />
-          {seesAll && <ContributionTabs active="mine" />}
-        </div>
-      }
+      pageAction={seesAll ? <ContributionTabs active="mine" /> : undefined}
     >
-      {role === 'TREASURER' && (
-        <div className="mx-auto max-w-3xl pb-4 pt-4 px-4 md:px-0">
-          <p className="rounded-2xl border border-outline-variant bg-surface p-4 text-sm text-on-surface-variant">
-            Only the Treasurer records payments. Open the{' '}
-            <a href="/dashboard/treasurer/ledger" className="font-semibold text-primary underline">
-              financial ledger
-            </a>{' '}
-            to add a contribution for a member.
-          </p>
-        </div>
-      )}
       <ContributionsClient
         contributions={contributions.map((c) => ({
           id: c.id,

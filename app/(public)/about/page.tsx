@@ -32,6 +32,8 @@ type CommitteeCard = {
   role: string
   alt: string
   photoUrl: string | null
+  responsibilities: string[]
+  biography: string
   details: string[]
 }
 
@@ -46,48 +48,94 @@ async function memberPhotoUrl(path: string | null) {
   }
 }
 
+const profileUserSelect = {
+  avatarUrl: true,
+  email: true,
+  phone: true,
+  location: true,
+  publicProfileFields: true,
+  memberProfile: { select: { profession: true } },
+} as const
+
+type ProfileUser = {
+  avatarUrl: string | null
+  email: string
+  phone: string | null
+  location: string | null
+  publicProfileFields: string[]
+  memberProfile: { profession: string | null } | null
+}
+
+/** Only the details the member allowed on their public profile. */
+function publicDetails(user: ProfileUser | null) {
+  if (!user) return []
+  const allowed = new Set(user.publicProfileFields)
+  return [
+    allowed.has('profession') ? user.memberProfile?.profession : null,
+    allowed.has('location') ? user.location : null,
+    allowed.has('email') ? user.email : null,
+    allowed.has('phone') ? user.phone : null,
+  ].filter((value): value is string => Boolean(value))
+}
+
+async function allowedPhoto(user: ProfileUser | null) {
+  return user && user.publicProfileFields.includes('photo') ? memberPhotoUrl(user.avatarUrl) : null
+}
+
 async function loadCommittee(): Promise<CommitteeCard[]> {
-  // Executives only appear once an Admin switches "Show on About page" on in Members.
+  // 1. Profiles an Admin published from Communications → About Us profiles.
+  const published = await prisma.committeeProfile.findMany({
+    where: { status: 'PUBLISHED' },
+    orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+    include: { user: { select: profileUserSelect } },
+  })
+  if (published.length) {
+    return Promise.all(
+      published.map(async (profile) => ({
+        name: profile.name,
+        role: profile.position,
+        alt: `${profile.name}, ${profile.position}`,
+        photoUrl: profile.photoUrl || (await allowedPhoto(profile.user)),
+        responsibilities: (profile.responsibilities || '')
+          .split('\n')
+          .map((line) => line.replace(/^[-•*]\s*/, '').trim())
+          .filter(Boolean),
+        biography: profile.biography,
+        details: publicDetails(profile.user),
+      })),
+    )
+  }
+
+  // 2. Executives switched on with "Show on About page" in Members.
   const executives = await prisma.user.findMany({
     where: { status: 'ACTIVE', showOnAbout: true, OR: [{ role: 'EXECUTIVE' }, { dashboardAccess: { has: 'EXECUTIVE' } }] },
     orderBy: [{ aboutOrder: 'asc' }, { fullName: 'asc' }],
-    select: {
-      id: true,
-      fullName: true,
-      aboutTitle: true,
-      avatarUrl: true,
-      email: true,
-      phone: true,
-      location: true,
-      publicProfileFields: true,
-      memberProfile: { select: { profession: true } },
-    },
+    select: { fullName: true, aboutTitle: true, ...profileUserSelect },
   })
-  if (!executives.length) {
-    return COMMITTEE.map((member) => ({ ...member, photoUrl: null, details: [] }))
+  if (executives.length) {
+    return Promise.all(
+      executives.map(async (user) => {
+        const role = user.aboutTitle || 'Executive Committee'
+        return {
+          name: user.fullName,
+          role,
+          alt: `${user.fullName}, ${role}`,
+          photoUrl: await allowedPhoto(user),
+          responsibilities: [],
+          biography: '',
+          details: publicDetails(user),
+        }
+      }),
+    )
   }
-  return Promise.all(
-    executives.map(async (user) => {
-      const allowed = new Set(user.publicProfileFields)
-      const role = user.aboutTitle || 'Executive Committee'
-      return {
-        name: user.fullName,
-        role,
-        alt: `${user.fullName}, ${role}`,
-        photoUrl: allowed.has('photo') ? await memberPhotoUrl(user.avatarUrl) : null,
-        details: [
-          allowed.has('profession') ? user.memberProfile?.profession : null,
-          allowed.has('location') ? user.location : null,
-          allowed.has('email') ? user.email : null,
-          allowed.has('phone') ? user.phone : null,
-        ].filter((value): value is string => Boolean(value)),
-      }
-    }),
-  )
+
+  // 3. Placeholders until leadership confirms names.
+  return COMMITTEE.map((member) => ({ ...member, photoUrl: null, responsibilities: [], biography: '', details: [] }))
 }
 
 export default async function AboutPage() {
   const committee = await loadCommittee()
+  const placeholders = committee.length === COMMITTEE.length && committee.every((member, i) => member.name === COMMITTEE[i].name)
   return (
     <main className="flex-grow">
       <section className="relative overflow-hidden px-md py-xl sm:py-xxl md:px-lg">
@@ -216,16 +264,17 @@ export default async function AboutPage() {
         <div className="reveal mx-auto mb-lg max-w-2xl text-center">
           <h2 className="mb-sm font-h2 text-h2-mobile text-primary md:text-h2">Executive Committee</h2>
           <p className="font-body-md text-[15px] leading-relaxed text-on-surface">
-            The Alubonets Self-Help Group is guided by an executive committee that provides leadership, coordination, and oversight. Official names, ranks, and photographs will be added once leadership confirms them.
+            The Alubonets Self-Help Group is guided by an executive committee that provides leadership, coordination, and oversight.
+            {placeholders && ' Official names, ranks, and photographs will be added once leadership confirms them.'}
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-md md:gap-lg">
           {committee.map((member, index) => {
-            const rich = member.details.length > 0
+            const rich = member.responsibilities.length > 0 || Boolean(member.biography) || member.details.length > 0
             return (
               <div
                 key={`${member.name}-${member.role}`}
-                className={`reveal flex flex-col items-center ${rich ? 'w-56' : 'w-36'}`}
+                className={`reveal flex flex-col items-center ${rich ? 'w-64' : 'w-36'}`}
                 style={{ ['--reveal-delay' as string]: `${index * 70}ms` }}
               >
                 <img
@@ -240,6 +289,16 @@ export default async function AboutPage() {
                 {member.details.map((detail) => (
                   <p key={detail} className="mt-xs break-all text-center text-[12px] text-on-surface-variant">{detail}</p>
                 ))}
+                {member.biography && (
+                  <p className="mt-sm text-center text-[13px] leading-relaxed text-on-surface-variant">{member.biography}</p>
+                )}
+                {member.responsibilities.length > 0 && (
+                  <ul className="mt-sm list-disc space-y-0.5 pl-5 text-left text-[13px] text-on-surface">
+                    {member.responsibilities.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )
           })}

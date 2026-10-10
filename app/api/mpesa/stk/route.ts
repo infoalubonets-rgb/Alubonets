@@ -4,6 +4,7 @@ import { mpesaConfigured, stkPush } from '@/lib/mpesa/daraja'
 import { prisma } from '@/lib/prisma'
 import { writeAudit } from '@/lib/audit'
 import { resolveStkPurpose } from '@/lib/mpesa/purpose'
+import { amountError } from '@/lib/money-limits'
 
 export async function POST(req: NextRequest) {
   const profile = await getSessionProfile()
@@ -68,6 +69,8 @@ export async function POST(req: NextRequest) {
   if (!phone || !amount) {
     return NextResponse.json({ error: 'phone and amount required' }, { status: 400 })
   }
+  const invalidAmount = amountError(String(amount))
+  if (invalidAmount) return NextResponse.json({ error: invalidAmount }, { status: 400 })
 
   let purpose
   try {

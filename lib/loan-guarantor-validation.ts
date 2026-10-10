@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { LOAN_GUARANTOR_LIMITS } from '@/lib/loan-guarantor-limits'
+import { amountKes } from '@/lib/money-limits'
 
 function words(value: string) {
   return value.trim().split(/\s+/).filter(Boolean)
@@ -95,7 +96,7 @@ export const externalGuarantorSchema = z.object({
 })
 
 export const loanApplicationBodySchema = z.object({
-  amountKes: z.coerce.number().positive(),
+  amountKes: amountKes('Loan amount'),
   purpose: z.string().trim().min(LOAN_GUARANTOR_LIMITS.purpose.min).max(LOAN_GUARANTOR_LIMITS.purpose.max),
   dueAt: z.coerce.date(),
   installmentNotes: z.string().trim().min(LOAN_GUARANTOR_LIMITS.installmentNotes.min).max(LOAN_GUARANTOR_LIMITS.installmentNotes.max),

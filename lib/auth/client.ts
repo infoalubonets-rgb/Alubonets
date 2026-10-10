@@ -8,7 +8,7 @@ const fetchOpts: RequestInit = {
   cache: 'no-store',
 }
 
-export async function loginRequest(email: string, password: string, mfaToken?: string) {
+export async function loginRequest(email: string, password: string) {
   const controller = new AbortController()
   // The dev server compiles the login route on first use, which can take over a minute.
   const timeout = window.setTimeout(() => controller.abort(), process.env.NODE_ENV === 'development' ? 120_000 : 25_000)
@@ -16,22 +16,19 @@ export async function loginRequest(email: string, password: string, mfaToken?: s
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, ...(mfaToken ? { mfaToken } : {}) }),
+      body: JSON.stringify({ email, password }),
       signal: controller.signal,
       ...fetchOpts,
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      const err = new Error(data.error || 'Invalid credentials') as Error & { requiresMfa?: boolean }
-      err.requiresMfa = Boolean(data.requiresMfa)
-      throw err
+      throw new Error(data.error || 'Invalid credentials')
     }
     return data as {
       user: AuthUser
       redirectTo: string
       status?: string
       requiresVerification?: boolean
-      requiresMfa?: boolean
     }
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {

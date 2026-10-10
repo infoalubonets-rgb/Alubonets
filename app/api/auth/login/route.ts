@@ -1,7 +1,7 @@
 import { WORKSPACE_COOKIE } from '@/lib/auth/workspace'
 export const dynamic = 'force-dynamic'
 
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { z } from 'zod'
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
@@ -14,15 +14,12 @@ import { requestIp } from '@/lib/membership'
 import { verificationStillValid } from '@/lib/email-verification'
 import { logError } from '@/lib/logger'
 import { publicErrorMessage } from '@/lib/safe-error'
-import { consumeMfaRecoveryCode } from '@/lib/mfa-recovery'
 import { writeAudit } from '@/lib/audit'
-import { verifyTotp } from '@/lib/mfa-totp'
 import { getDisabledRoles, isLockedOutByRole, roleInactiveMessage } from '@/lib/disabled-roles'
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   password: z.string().min(1).max(200),
-  mfaToken: z.string().trim().min(6).max(20).optional(),
 })
 
 async function recordFailedLogin(email: string, userId?: string) {
@@ -38,6 +35,24 @@ async function recordFailedLogin(email: string, userId?: string) {
   })
 }
 
+type Profile = NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>
+
+/** The JWT already carries app_metadata, so the Supabase admin round trip is only needed when it is stale. */
+function metadataInSync(profile: Profile, current: Record<string, unknown> | undefined) {
+  if (!current) return false
+  const expected: Record<string, unknown> = {
+    role: profile.role,
+    status: profile.status,
+    isSuperAdmin: profile.isSuperAdmin,
+    dashboardAccess: profile.dashboardAccess,
+    dbUserId: profile.id,
+    fullName: profile.fullName,
+    isPrincipal: profile.isPrincipal,
+    principalMemberId: profile.principalMemberId,
+  }
+  return Object.entries(expected).every(([key, value]) => JSON.stringify(current[key] ?? null) === JSON.stringify(value ?? null))
+}
+
 export async function POST(req: Request) {
   try {
     const json = await req.json().catch(() => null)
@@ -51,23 +66,19 @@ export async function POST(req: Request) {
     // per-account key below still protects a single account from a targeted brute force.
     const ipRateKey = `login-ip:${ipAddress || 'unknown'}`
     const rateKey = `login:${ipAddress || 'unknown'}:${email}`
-    try {
-      await enforceRateLimit(ipRateKey, 20, 15)
-      await enforceRateLimit(rateKey, 5, 15)
-    } catch (cause) {
-      logError('auth.login.rate_limit_failed', cause, { email, ipAddress })
-      return NextResponse.json({ error: publicErrorMessage(cause, 'Too many attempts. Please wait and try again.') }, { status: 429 })
+    // The database is a long round trip away, so independent lookups run side by side.
+    const [rateLimitError, precheck] = await Promise.all([
+      Promise.all([enforceRateLimit(ipRateKey, 20, 15), enforceRateLimit(rateKey, 5, 15)]).then(
+        () => null,
+        (cause: unknown) => cause ?? new Error('rate limit'),
+      ),
+      prisma.user.findUnique({ where: { email } }),
+    ])
+    if (rateLimitError) {
+      logError('auth.login.rate_limit_failed', rateLimitError, { email, ipAddress })
+      return NextResponse.json({ error: publicErrorMessage(rateLimitError, 'Too many attempts. Please wait and try again.') }, { status: 429 })
     }
 
-    const precheck = await prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        lockedUntil: true,
-        mfaEnabled: true,
-        mfaSecret: true,
-      },
-    })
     if (precheck?.lockedUntil && precheck.lockedUntil > new Date()) {
       return NextResponse.json(
         {
@@ -96,21 +107,20 @@ export async function POST(req: Request) {
           { status: 401 }
         )
       }
-      const knownProfile = await prisma.user.findUnique({
-        where: { email },
-        select: { id: true },
-      })
-      await recordFailedLogin(email, knownProfile?.id)
-      await prisma.loginEvent.create({
-        data: {
-          userId: knownProfile?.id,
-          email,
-          success: false,
-          reason: 'INVALID_CREDENTIALS',
-          ipAddress,
-          userAgent: req.headers.get('user-agent'),
-        },
-      })
+      const knownProfile = precheck
+      await Promise.all([
+        recordFailedLogin(email, knownProfile?.id),
+        prisma.loginEvent.create({
+          data: {
+            userId: knownProfile?.id,
+            email,
+            success: false,
+            reason: 'INVALID_CREDENTIALS',
+            ipAddress,
+            userAgent: req.headers.get('user-agent'),
+          },
+        }),
+      ])
       if (!knownProfile) {
         return NextResponse.json(
           {
@@ -126,11 +136,14 @@ export async function POST(req: Request) {
       )
     }
 
-    let profile = await prisma.user.findFirst({
-      where: {
-        OR: [{ authUserId: data.user.id }, { email: parsed.data.email }],
-      },
-    })
+    let profile =
+      precheck && (precheck.authUserId === data.user.id || !precheck.authUserId)
+        ? precheck
+        : await prisma.user.findFirst({
+            where: {
+              OR: [{ authUserId: data.user.id }, { email: parsed.data.email }],
+            },
+          })
 
     if (!profile) {
       await supabase.auth.signOut()
@@ -148,39 +161,45 @@ export async function POST(req: Request) {
     }
 
     // Don't block sign-in on a slow Supabase metadata sync
-    try {
-      await Promise.race([
-        syncUserMetadata(profile),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('metadata sync timeout')), 6_000),
-        ),
-      ])
-    } catch (cause) {
-      logError('auth.login.metadata_sync', cause, { userId: profile.id })
+    if (!metadataInSync(profile, data.user.app_metadata)) {
+      try {
+        await Promise.race([
+          syncUserMetadata(profile),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('metadata sync timeout')), 6_000),
+          ),
+        ])
+      } catch (cause) {
+        logError('auth.login.metadata_sync', cause, { userId: profile.id })
+      }
     }
 
-    void clearRateLimit(rateKey).catch((cause) =>
-      logError('auth.login.clear_rate_limit', cause, { email }),
+    after(() =>
+      clearRateLimit(rateKey).catch((cause) => logError('auth.login.clear_rate_limit', cause, { email })),
     )
     const signedInUserId = profile.id
+    const userAgent = req.headers.get('user-agent')
+    // Bookkeeping writes run after the response is sent so they don't hold up sign-in.
     const recordSuccessfulLogin = () =>
-      prisma.loginEvent
-        .create({
-          data: {
-            userId: signedInUserId,
-            email,
-            success: true,
-            ipAddress,
-            userAgent: req.headers.get('user-agent'),
-          },
-        })
-        .catch((cause) => logError('auth.login.event', cause, { email }))
+      after(() =>
+        prisma.loginEvent
+          .create({
+            data: {
+              userId: signedInUserId,
+              email,
+              success: true,
+              ipAddress,
+              userAgent,
+            },
+          })
+          .catch((cause) => logError('auth.login.event', cause, { email })),
+      )
 
     const loginCookieStore = await cookies()
     loginCookieStore.delete(WORKSPACE_COOKIE)
 
     if (profile.status === 'PENDING') {
-      await recordSuccessfulLogin()
+      recordSuccessfulLogin()
       return NextResponse.json({
         user: toAuthUser(profile),
         redirectTo: '/pending',
@@ -215,48 +234,19 @@ export async function POST(req: Request) {
       )
     }
 
-    if (profile.mfaEnabled && profile.mfaSecret) {
-      if (!parsed.data.mfaToken) {
-        await supabase.auth.signOut()
-        return NextResponse.json({
-          requiresMfa: true,
-          error: 'Enter the authenticator code or a recovery code for this privileged account.',
-        }, { status: 401 })
-      }
-      const totpOk = verifyTotp(profile.mfaSecret, parsed.data.mfaToken)
-      const remaining = totpOk ? null : consumeMfaRecoveryCode(profile.mfaRecoveryCodes, parsed.data.mfaToken)
-      if (!totpOk && remaining == null) {
-        await supabase.auth.signOut()
-        await recordFailedLogin(email, profile.id)
-        return NextResponse.json({ error: 'Invalid authenticator or recovery code.' }, { status: 401 })
-      }
-      if (remaining != null) {
-        await prisma.user.update({
-          where: { id: profile.id },
-          data: { mfaRecoveryCodes: remaining },
-        })
-        await writeAudit({
-          userId: profile.id,
-          action: 'MFA_RECOVERY_USED',
-          entity: 'User',
-          entityId: profile.id,
-        })
-      }
-    }
+    recordSuccessfulLogin()
 
-    await recordSuccessfulLogin()
-
-    if (profile.failedLoginCount > 0 || profile.lockedUntil) {
-      await prisma.user.update({
-        where: { id: profile.id },
-        data: { failedLoginCount: 0, lockedUntil: null, lastActiveAt: new Date() },
-      })
-    } else {
-      await prisma.user.update({
-        where: { id: profile.id },
-        data: { lastActiveAt: new Date() },
-      }).catch(() => undefined)
-    }
+    const clearLockout = profile.failedLoginCount > 0 || Boolean(profile.lockedUntil)
+    after(() =>
+      prisma.user
+        .update({
+          where: { id: signedInUserId },
+          data: clearLockout
+            ? { failedLoginCount: 0, lockedUntil: null, lastActiveAt: new Date() }
+            : { lastActiveAt: new Date() },
+        })
+        .catch((cause) => logError('auth.login.last_active', cause, { email })),
+    )
 
     if (!(process.env.NODE_ENV !== 'production' && process.env.BYPASS_LOGIN_VERIFICATION === 'true')) {
       const cookieStoreForVerification = await cookies()

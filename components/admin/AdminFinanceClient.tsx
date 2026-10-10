@@ -222,7 +222,7 @@ function StandingSettingsForm({ settings, today }: { settings: StandingSettingsV
     <SavableForm action={updateStandingSettings} submitLabel="Save" className="grid gap-4 rounded-xl border bg-surface-container-low p-4 sm:grid-cols-2">
       <label className="text-sm font-semibold text-on-surface">
         Monthly contribution (KES)
-        <input name="monthlyFeeKes" type="number" min="0" step="1" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+        <input name="monthlyFeeKes" type="number" min="0" max="999999" step="1" value={monthlyFee} onChange={(e) => setMonthlyFee(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
       </label>
       <label className="text-sm font-semibold text-on-surface">
         Monthly contribution deadline
@@ -240,7 +240,7 @@ function StandingSettingsForm({ settings, today }: { settings: StandingSettingsV
       </label>
       <label className="text-sm font-semibold text-on-surface">
         Annual contribution (KES)
-        <input name="annualFeeKes" type="number" min="0" step="1" value={annualFee} onChange={(e) => setAnnualFee(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+        <input name="annualFeeKes" type="number" min="0" max="999999" step="1" value={annualFee} onChange={(e) => setAnnualFee(e.target.value)} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
       </label>
       <label className="text-sm font-semibold text-on-surface">
         Annual contribution deadline
@@ -336,7 +336,7 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
     threshold: 'Financial limits',
     standing: 'Membership standing',
     categories: 'Payment categories',
-    campaigns: 'Contribution campaigns',
+    campaigns: 'Campaigns',
     transactions: 'Pending transactions',
     periods: 'Accounting periods',
   }
@@ -378,7 +378,7 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
           >
             <label className="text-sm font-semibold text-on-surface">
               Large transaction approval threshold (KES)
-              <input name="amount" type="number" min="1" defaultValue={approvalThreshold} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
+              <input name="amount" type="number" min="1" max="999999" defaultValue={approvalThreshold} className="mt-2 block w-full rounded-lg border px-3 py-2 font-normal" />
               <FieldHint>Expenses or disbursements above this amount require approval. Contributions are not limited.</FieldHint>
             </label>
           </SavableForm>

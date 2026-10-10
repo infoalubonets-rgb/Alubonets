@@ -3,7 +3,6 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
-import { submitProjectComment } from '@/app/actions/projects'
 import { moneyNumber, projectFinanceVisibility } from '@/lib/projects'
 import { getMemberAccess } from '@/lib/auth/member-access'
 import MemberGate from '@/components/public/MemberGate'
@@ -30,12 +29,6 @@ export default async function ProjectDetailPage({ params }: Props) {
     where: { id },
     include: {
       updates: { orderBy: { publishedAt: 'desc' }, take: 20 },
-      comments: {
-        where: { status: 'PUBLISHED' },
-        include: { author: { select: { fullName: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-      },
       milestones: { orderBy: { position: 'asc' } },
     },
   })
@@ -126,41 +119,7 @@ export default async function ProjectDetailPage({ params }: Props) {
               </section>
             )}
 
-            <section className="space-y-3">
-              <h2 className="font-h3 text-xl text-primary">Comments</h2>
-              {project.comments.map((c) => (
-                <article key={c.id} className="rounded-2xl border bg-surface p-4 text-sm">
-                  <b>{c.author.fullName}</b>
-                  <p className="mt-1 whitespace-pre-line">{c.body}</p>
-                </article>
-              ))}
-              {!project.comments.length && (
-                <p className="text-sm text-on-surface-variant">No published comments yet.</p>
-              )}
-              {profile?.status === 'ACTIVE' ? (
-                <form action={submitProjectComment} className="rounded-2xl border bg-surface p-4 space-y-2">
-                  <input type="hidden" name="projectId" value={project.id} />
-                  <textarea
-                    name="body"
-                    required
-                    minLength={2}
-                    placeholder="Share a comment (pending moderation)"
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
-                    rows={3}
-                  />
-                  <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">
-                    Submit comment
-                  </button>
-                </form>
-              ) : (
-                <p className="text-sm">
-                  <Link href="/login" className="text-primary underline">
-                    Sign in
-                  </Link>{' '}
-                  as an active member to comment.
-                </p>
-              )}
-            </section>
+
           </div>
 
           <aside>

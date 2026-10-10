@@ -23,8 +23,6 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   const [mode, setMode] = useState<'signin' | 'register'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mfaToken, setMfaToken] = useState('')
-  const [needsMfa, setNeedsMfa] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
@@ -97,7 +95,6 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
       const { user, redirectTo, status, requiresVerification } = await loginRequest(
         email,
         password,
-        needsMfa ? mfaToken : undefined,
       )
       if (status === 'PENDING') {
         if (admin) {
@@ -118,15 +115,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
       } else {
         router.push(redirectTo || homeForRole(user.role))
       }
-      router.refresh()
     } catch (err) {
-      const mfaRequired = Boolean((err as Error & { requiresMfa?: boolean })?.requiresMfa)
-      if (mfaRequired) {
-        setNeedsMfa(true)
-        setError('Enter the authenticator code for this account.')
-      } else {
-        setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
-      }
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -234,24 +224,6 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   </button>
                 </div>
               </div>
-              {mode === 'signin' && needsMfa && (
-                <div>
-                  <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">
-                    Authenticator or recovery code
-                  </label>
-                  <input
-                    type="text"
-                    autoComplete="one-time-code"
-                    value={mfaToken}
-                    onChange={(e) => setMfaToken(e.target.value)}
-                    required
-                    minLength={6}
-                    maxLength={20}
-                    placeholder="6-digit code or recovery code"
-                    className="w-full px-md py-[10px] bg-surface border border-secondary-container rounded-lg text-on-surface font-body-md text-[14px]"
-                  />
-                </div>
-              )}
               {mode === 'register' && (
                 <div>
                   <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs text-[13px]">

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { recordExpense, requestEvidenceUploadUrl } from '@/app/actions/finance'
 import { uploadToSignedUrl } from '@/lib/upload-client'
 import PaymentCategoryFields from '@/components/finance/PaymentCategoryFields'
+import { MAX_AMOUNT_KES, amountError } from '@/lib/money-limits'
+import { readableError } from '@/lib/form-errors'
 
 type Category = { id: string; name: string }
 type Account = { id: string; name: string }
@@ -28,11 +30,16 @@ export default function RecordExpenseForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    const amountProblem = amountError(formData.get('amount'))
+    if (amountProblem) {
+      setError(amountProblem)
+      return
+    }
     setError('')
     setPending(true)
     try {
-      const form = event.currentTarget
-      const formData = new FormData(form)
       const evidenceFile = formData.get('evidence') as File | null
       if (!evidenceFile || !evidenceFile.size) throw new Error('A supporting document is required for every expense.')
 
@@ -51,7 +58,7 @@ export default function RecordExpenseForm({
       setFormKey((key) => key + 1)
       router.refresh()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not record this expense. Try again.')
+      setError(readableError(cause, 'Could not record this expense. Try again.'))
     } finally {
       setPending(false)
     }
@@ -59,9 +66,9 @@ export default function RecordExpenseForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 grid gap-2 md:grid-cols-3">
-      <input name="amount" type="number" min="1" required disabled={pending} placeholder="Amount KES" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
-      <input name="payee" required disabled={pending} placeholder="Payee" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
-      <input name="purpose" required disabled={pending} placeholder="Purpose" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
+      <input name="amount" type="number" min="1" max={MAX_AMOUNT_KES} step="0.01" required disabled={pending} placeholder="Amount KES (max 999,999)" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
+      <input name="payee" required minLength={2} maxLength={160} disabled={pending} placeholder="Payee" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
+      <input name="purpose" required minLength={2} maxLength={500} disabled={pending} placeholder="Purpose" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
       <PaymentCategoryFields key={formKey} categories={categories} kind="expense" projects={projects} descriptionPlaceholder="Short note about this expense" />
       <select name="sourceAccountId" required disabled={pending} className="rounded-lg border px-3 py-2 disabled:opacity-60">
         {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}

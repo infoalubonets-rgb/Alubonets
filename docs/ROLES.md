@@ -58,9 +58,6 @@ Two account flags sit on top of the role:
 - Only **Active** accounts can use dashboards. Pending, suspended, resigned, deceased, disqualified and inactive accounts are blocked.
 - Admins suspend, restore or close accounts from the eye pop-up on the Members page. Super Admin accounts cannot be suspended. [`setMemberStatus`]
 
-### Two-factor sign-in (MFA)
-- Admin, Treasurer, Secretary and Executive (and Super Admin) can switch on authenticator-app sign-in from their profile. [`PRIVILEGED_MFA_ROLES` in `lib/mfa-totp.ts`]
-
 ---
 
 ## 3. Who can see member details
@@ -103,7 +100,7 @@ Each table describes the **selected workspace**. Other roles assigned to the sam
 | --- | --- | --- | --- |
 | Administrator | Members | Approve/reject applicants; suspend, restore or close accounts; set standing and contribution rights; export members | Cannot grant Admin authority or suspend a Super Admin. |
 | Administrator | Roles and family | Assign main/second roles; manage Principal status, family links and role catalogue | Admin grants need Super Admin mode; Admin role cannot be disabled. |
-| Administrator | Public About page | Choose executives, titles, order and public fields | Details are hidden until explicitly published. |
+| Administrator | Public About page | Communications → About Us profiles: link executives to member records; set display name, title, responsibilities, biography, photo URL and display order; publish or keep as draft. Members → "Show on About page" is the fallback when nothing is published. | Only published profiles appear publicly. Linked members choose which extra details (photo, profession, location, contacts) are shown. |
 | Administrator | Finance oversight | Read all finances; verify/reconcile payments; approve ledger entries/reversals; manage campaigns/categories | Cannot approve their own entries. Recording money requires switching to Treasurer. |
 | Administrator | Finance settings | Manage periods, thresholds, standing, allocations and payment destination | Closed-period and maker-checker safeguards apply. |
 | Administrator | Loans | Review applications and make final decisions | Loans must be enabled. Disbursement/repayment recording requires Treasurer mode. |
@@ -196,7 +193,8 @@ Each table describes the **selected workspace**. Other roles assigned to the sam
 - Only **active** members can be made Principal. Admins do this from **Family → Principals** (or the Roles page). Making an attached member a Principal takes them out of their current branch.
 - **Demoting** a Principal leaves everyone attached to them with no Principal (each one is logged as removed from the branch).
 - **Family → Link members** links one or many members to a Principal at once; members already in another branch are transferred.
-- A Principal can invite or add attached members, transfer them to another Principal (with a reason), and see their branch's payments.
+- A Principal can invite or add attached members and see their branch's payments.
+- Only an **Admin or Super Admin** can transfer a member from one Principal to another (with a reason). Each transfer is recorded in branch history and the audit log.
 - A Principal sees the **full details** of members attached to them (membership number, date of birth, gender, location, profession, education, branch, standing, contribution rights, join date, emergency contact).
 - **Standing:** dependants follow their Principal's standing — anyone under 18, or anyone whose contribution rights an Admin has removed. Attached adults with contribution rights pay their own dues and keep their own standing.
 

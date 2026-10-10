@@ -1,14 +1,14 @@
 'use server'
 
 import { revalidatePath, revalidateTag } from 'next/cache'
-import { after } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
-import { TAGS, sendAnnouncement } from '@/lib/data/queries'
-import { canModerateProjectComments, isProjectManager } from '@/lib/projects'
+import { TAGS } from '@/lib/data/queries'
+import { isProjectManager } from '@/lib/projects'
 import { assertNotFuture, assertNotPast } from '@/lib/dates'
+import { amountKes, amountKesOrZero } from '@/lib/money-limits'
 import { deriveProjectStatus, syncProjectFinancials } from '@/lib/project-status'
 import { createSignedUpload } from '@/lib/upload-signed'
 import { newRepositoryDocumentPath, verifyUploadedObject } from '@/lib/document-upload'
@@ -39,9 +39,9 @@ export async function updateProjectFinance(formData: FormData) {
   const data = z
     .object({
       projectId: z.string().min(1),
-      budgetKes: z.coerce.number().min(0),
-      fundingTargetKes: z.coerce.number().min(0),
-      actualExpenditureKes: z.coerce.number().min(0),
+      budgetKes: amountKesOrZero('Budget'),
+      fundingTargetKes: amountKesOrZero('Funding target'),
+      actualExpenditureKes: amountKesOrZero('Actual expenditure'),
       reason: z.string().trim().max(500).optional(),
     })
     .parse({
@@ -163,114 +163,13 @@ export async function removeProjectResponsible(formData: FormData) {
   refreshProject(row.projectId)
 }
 
-export async function submitProjectComment(formData: FormData) {
-  const actor = await requireActiveRole([
-    'ADMIN',
-    'EXECUTIVE',
-    'TREASURER',
-    'SECRETARY',
-    'ORGANIZER',
-    'MEMBER',
-  ])
-  const data = z
-    .object({
-      projectId: z.string().min(1),
-      body: z.string().trim().min(2).max(2000),
-    })
-    .parse({
-      projectId: formData.get('projectId'),
-      body: formData.get('body'),
-    })
-  const project = await prisma.project.findUniqueOrThrow({
-    where: { id: data.projectId },
-    include: { responsibles: { select: { userId: true } } },
-  })
-  const comment = await prisma.projectComment.create({
-    data: {
-      projectId: data.projectId,
-      authorId: actor.id,
-      body: data.body,
-      status: 'PENDING',
-    },
-  })
-  await writeAudit({
-    userId: actor.id,
-    action: 'PROJECT_COMMENT_CREATE',
-    entity: 'ProjectComment',
-    entityId: comment.id,
-    newValue: { projectId: data.projectId, status: 'PENDING' },
-  })
-
-  const notifyIds = [
-    ...new Set(project.responsibles.map((r) => r.userId).filter((id) => id !== actor.id)),
-  ]
-  if (notifyIds.length) {
-    after(async () => {
-      try {
-        await sendAnnouncement({
-          authorId: actor.id,
-          title: `New comment pending on ${project.title}`,
-          content: `${actor.fullName} submitted a comment awaiting moderation.`,
-          broadcast: false,
-          includeSelf: false,
-          memberIds: notifyIds,
-        })
-      } catch (e) {
-        console.error(e)
-      }
-    })
-  }
-
-  refreshProject(data.projectId)
-}
-
-export async function moderateProjectComment(formData: FormData) {
-  const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE'])
-  if (!canModerateProjectComments(actor.role) && !actor.isSuperAdmin) {
-    throw new Error('Forbidden')
-  }
-  const data = z
-    .object({
-      id: z.string().min(1),
-      status: z.enum(['PUBLISHED', 'HIDDEN', 'REJECTED', 'PENDING']),
-      moderationNote: z.string().trim().max(500).optional(),
-      reason: z.string().trim().min(3).max(500),
-    })
-    .parse({
-      id: formData.get('id'),
-      status: formData.get('status'),
-      moderationNote: formData.get('moderationNote') || undefined,
-      reason: formData.get('reason'),
-    })
-  const old = await prisma.projectComment.findUniqueOrThrow({ where: { id: data.id } })
-  const updated = await prisma.projectComment.update({
-    where: { id: data.id },
-    data: {
-      status: data.status,
-      moderationNote: data.moderationNote ?? null,
-      moderatedById: actor.id,
-      moderatedAt: new Date(),
-    },
-  })
-  await writeAudit({
-    userId: actor.id,
-    action: 'PROJECT_COMMENT_MODERATE',
-    entity: 'ProjectComment',
-    entityId: data.id,
-    reason: data.reason,
-    oldValue: { status: old.status },
-    newValue: { status: updated.status, moderationNote: updated.moderationNote },
-  })
-  refreshProject(old.projectId)
-}
-
 export async function recordProjectInvestment(formData: FormData) {
   const actor = await requireManager()
   const data = z
     .object({
       projectId: z.string().min(1),
       userId: z.string().min(1),
-      amount: z.coerce.number().positive(),
+      amount: amountKes(),
       investedAt: z.coerce.date().optional(),
       notes: z.string().trim().max(500).optional(),
     })

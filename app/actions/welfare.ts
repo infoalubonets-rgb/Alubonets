@@ -8,6 +8,7 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
 import { getWelfarePolicy } from '@/lib/settings'
+import { amountKes } from '@/lib/money-limits'
 import { requireWelfareEnabled } from '@/lib/feature-flags'
 import { sendWelfareStatusEmail } from '@/lib/email/resend'
 import { notifyRoleHolders, notifyUsers } from '@/lib/notifications'
@@ -28,7 +29,7 @@ export async function actionCreateWelfare(formData: FormData) {
   const actor = await requireActiveRole(['MEMBER', 'ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER'])
   const parsed = z.object({
     description: z.string().trim().min(3).max(2000),
-    amount: z.coerce.number().positive(),
+    amount: amountKes(),
     beneficiaryName: z.string().trim().max(120).optional().or(z.literal('')),
     supportType: z.string().trim().max(80).optional().or(z.literal('')),
     categoryId: z.string().optional().or(z.literal('')),

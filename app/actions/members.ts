@@ -412,6 +412,50 @@ export async function setAboutProfile(input: z.input<typeof aboutProfileSchema>)
   revalidatePath('/directory')
 }
 
+/** Saves the About page selection for many executives at once (Members → Executives). */
+export async function setAboutProfiles(input: z.input<typeof aboutProfileSchema>[]) {
+  const actor = await requireAdmin()
+  const entries = z.array(aboutProfileSchema).max(200).parse(input)
+  const targets = await prisma.user.findMany({ where: { id: { in: entries.map((entry) => entry.userId) } } })
+  const byId = new Map(targets.map((target) => [target.id, target]))
+
+  let changed = 0
+  for (const entry of entries) {
+    const target = byId.get(entry.userId)
+    if (!target) throw new Error('Member not found')
+    if (entry.showOnAbout && !isExecutive(target)) {
+      throw new Error(`${target.fullName} is no longer an executive, so they cannot appear on the About page.`)
+    }
+    const fields = sanitizePublicProfileFields(entry.fields)
+    const title = entry.aboutTitle || null
+    const same =
+      target.showOnAbout === entry.showOnAbout &&
+      target.aboutTitle === title &&
+      target.aboutOrder === entry.aboutOrder &&
+      target.publicProfileFields.length === fields.length &&
+      fields.every((field) => target.publicProfileFields.includes(field))
+    if (same) continue
+
+    await prisma.user.update({
+      where: { id: target.id },
+      data: { showOnAbout: entry.showOnAbout, aboutTitle: title, aboutOrder: entry.aboutOrder, publicProfileFields: fields },
+    })
+    await writeAudit({
+      userId: actor.id,
+      action: 'ABOUT_PROFILE_UPDATE',
+      entity: 'User',
+      entityId: target.id,
+      oldValue: { showOnAbout: target.showOnAbout, aboutTitle: target.aboutTitle, aboutOrder: target.aboutOrder, fields: target.publicProfileFields },
+      newValue: { showOnAbout: entry.showOnAbout, aboutTitle: title, aboutOrder: entry.aboutOrder, fields },
+    })
+    changed += 1
+  }
+
+  revalidatePath('/about')
+  revalidatePath('/directory')
+  return { changed }
+}
+
 export async function setContributionRights(input: z.infer<typeof contributionRightsSchema>) {
   const actor = await requireAdmin()
   const { userId, canContribute } = contributionRightsSchema.parse(input)

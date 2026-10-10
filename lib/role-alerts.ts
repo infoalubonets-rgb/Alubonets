@@ -29,7 +29,7 @@ function alertSpecs(user: AlertUser, flags: { loans: boolean; welfare: boolean }
 
     { key: 'treasurer-verify', role: 'TREASURER', icon: 'fact_check', title: 'Payments to verify', description: 'Recorded payments waiting for a second check', href: '/dashboard/treasurer/contributions', count: () => prisma.contribution.count({ where: { status: 'PENDING', NOT: { financialTransaction: { is: { createdById: user.id } } } } }) },
     { key: 'treasurer-unmatched', role: 'TREASURER', icon: 'call_split', title: 'Unmatched M-Pesa payments', description: 'Payments that need to be matched to a member', href: '/dashboard/treasurer/contributions', count: () => prisma.paymentEvent.count({ where: { status: 'UNMATCHED' } }) },
-    { key: 'treasurer-ledger', role: 'TREASURER', icon: 'account_balance', title: 'Ledger entries to approve', description: 'Entries and reversals waiting for approval', href: '/dashboard/treasurer/ledger', count: () => prisma.financialTransaction.count({ where: { status: 'PENDING', createdById: { not: user.id } } }) },
+    { key: 'treasurer-ledger', role: 'TREASURER', icon: 'account_balance', title: 'Ledger entries to approve', description: 'Entries and reversals waiting for approval', href: '/dashboard/treasurer/ledger#approvals', count: () => prisma.financialTransaction.count({ where: { status: 'PENDING', createdById: { not: user.id } } }) },
     ...(flags.loans
       ? [{ key: 'treasurer-loans', role: 'TREASURER' as const, icon: 'request_quote', title: 'Loan applications', description: 'New applications waiting for treasurer review', href: '/dashboard/treasurer/loans', count: () => prisma.loanApplication.count({ where: { status: 'SUBMITTED' } }) }]
       : []),
@@ -45,7 +45,6 @@ function alertSpecs(user: AlertUser, flags: { loans: boolean; welfare: boolean }
     { key: 'secretary-drafts', role: 'SECRETARY', icon: 'edit_note', title: 'Draft minutes', description: 'Minutes not yet submitted for approval', href: '/dashboard/secretary/meetings', count: () => prisma.meeting.count({ where: { status: { in: ['DRAFT', 'NOTICE'] }, heldAt: { lt: new Date() } } }) },
 
     { key: 'organizer-gallery', role: 'ORGANIZER', icon: 'photo_library', title: 'Gallery queue', description: 'Photos waiting to be published', href: '/dashboard/organizer/gallery', count: () => prisma.galleryPhoto.count({ where: { isPublic: false } }) },
-    { key: 'organizer-comments', role: 'ORGANIZER', icon: 'forum', title: 'Project comments', description: 'Comments waiting for moderation', href: '/dashboard/organizer/projects', count: () => prisma.projectComment.count({ where: { status: 'PENDING' } }) },
 
     ...(flags.loans
       ? [{ key: 'member-guarantor', role: 'MEMBER' as const, icon: 'handshake', title: 'Guarantor requests', description: 'Members asking you to guarantee their loan', href: '/dashboard/member/loans', count: () => prisma.loanGuarantor.count({ where: { userId: user.id, status: 'PENDING' } }) }]

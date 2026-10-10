@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { canRecordPayments, canViewAllFinances } from '../lib/finance-access'
+import { canRecordPayments, canViewAllFinances, canRecordContributions, canRecordContributionFor } from '../lib/finance-access'
+
+describe('contribution account permissions', () => {
+  it('allows Treasurer self and other contributions', () => {
+    const treasurer = { id: 't', role: 'TREASURER' }
+    expect(canRecordContributionFor(treasurer, 't')).toBe(true)
+    expect(canRecordContributionFor(treasurer, 'member')).toBe(true)
+  })
+  it('allows Super Admin for others only', () => {
+    const admin = { id: 'a', role: 'ADMIN', isSuperAdmin: true }
+    expect(canRecordContributions(admin)).toBe(true)
+    expect(canRecordContributionFor(admin, 'a')).toBe(false)
+    expect(canRecordContributionFor(admin, 'member')).toBe(true)
+    expect(canRecordContributionFor({ ...admin, role: 'TREASURER' }, 'a')).toBe(false)
+  })
+  it('rejects normal Admin and workspace access alone', () => {
+    for (const role of ['ADMIN', 'MEMBER', 'AUDITOR', 'SECRETARY', 'EXECUTIVE', 'ORGANIZER']) {
+      const actor = { id: 'a', role, dashboardAccess: ['TREASURER'] }
+      expect(canRecordContributions(actor)).toBe(false)
+      expect(canRecordContributionFor(actor, 'member')).toBe(false)
+    }
+  })
+})
 
 describe('who sees every member’s contributions', () => {
   it('allows Admin, Super Admin, Treasurer and Auditor', () => {

@@ -35,7 +35,7 @@ export default function MpesaStkForm() {
       }}
     >
       <input name="phone" placeholder="2547XXXXXXXX" required className="border rounded-lg px-3 py-2" />
-      <input name="amount" type="number" placeholder="Amount" required className="border rounded-lg px-3 py-2" />
+      <input name="amount" type="number" min={1} max={999999} placeholder="Amount" required className="border rounded-lg px-3 py-2" />
       <input name="userId" placeholder="Member user id (optional)" className="border rounded-lg px-3 py-2" />
       <button
         type="submit"

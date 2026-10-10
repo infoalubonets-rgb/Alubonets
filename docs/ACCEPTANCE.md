@@ -107,7 +107,8 @@ Sign-off: ______________________  Role: __________
 ## Where to work
 - Overview: `/dashboard/treasurer`
 - Contributions: `/dashboard/treasurer/contributions`
-- Ledger / reconciliation: `/dashboard/treasurer/ledger`, per-row Reconcile on `/dashboard/treasurer/contributions`
+- Financial ledger: `/dashboard/treasurer/ledger` — account balances, money in/out, approvals, filterable transaction history with reversals; Record contribution, Record expense and Payment purposes buttons
+- Reconciliation: per-row Reconcile in Recent contributions on `/dashboard/treasurer/contributions`
 - Welfare: `/dashboard/treasurer/welfare`
 - Loans review (when enabled): `/dashboard/treasurer/loans`
 

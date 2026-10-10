@@ -9,6 +9,7 @@ import { writeAudit } from '@/lib/audit'
 import { FEATURE_FLAGS, setFeatureFlag } from '@/lib/feature-flags'
 import { SETTING_KEYS, setSetting, validateSettingValue, type SettingKey } from '@/lib/settings'
 import { isSystemCategoryCode, uniqueCategoryCode } from '@/lib/payment-categories'
+import { amountKes, amountKesOrZero } from '@/lib/money-limits'
 import { DISABLED_ROLES_SETTING, DISABLED_ROLES_TAG, parseDisabledRoles } from '@/lib/disabled-roles'
 
 const CATEGORY_NAME_PATTERN = /^[A-Za-z0-9 ()&/,.'-]+$/
@@ -30,8 +31,8 @@ function refreshCategories() {
   revalidatePath('/admin/settings')
   revalidatePath('/admin/finance')
   revalidatePath('/financial-reports')
-  revalidatePath('/dashboard/treasurer/ledger')
   revalidatePath('/dashboard/treasurer/contributions')
+  revalidatePath('/dashboard/treasurer/ledger')
 }
 
 const LOCKED_SETTING_KEYS: SettingKey[] = [SETTING_KEYS.brandingSiteName, SETTING_KEYS.brandingPrimaryHex]
@@ -149,8 +150,8 @@ export async function updateContactFinanceSettings(input: {
 export async function updateWelfareAmountLimits(formData: FormData) {
   const actor = await requireAdmin()
   const limits = z.object({
-    min: z.coerce.number().min(0),
-    max: z.coerce.number().positive(),
+    min: amountKesOrZero('Minimum request'),
+    max: amountKes('Maximum request'),
   }).refine((value) => value.max >= value.min, {
     message: 'Maximum welfare amount must be greater than or equal to the minimum.',
   }).parse({ min: formData.get('min'), max: formData.get('max') })
@@ -180,7 +181,7 @@ export async function updateWelfareAmountLimits(formData: FormData) {
 export async function updateLoanAmountLimits(formData: FormData) {
   const actor = await requireAdmin()
   const limits = z.object({
-    min: z.coerce.number().min(0),
+    min: amountKesOrZero('Minimum amount'),
     max: z.coerce.number().min(100).max(999_999),
   }).refine((value) => value.max >= value.min, {
     message: 'Maximum loan amount must be greater than or equal to the minimum.',

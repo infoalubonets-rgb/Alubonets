@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getSessionProfile } from '@/lib/auth/session'
 import { getRecentItems, getOldAnnouncementsCount, getPastEventsCount, getOldGalleryCount } from '@/lib/data/queries'
 import { prisma } from '@/lib/prisma'
+import { noticeAudienceWhere } from '@/lib/notification-audience'
+import type { Role } from '@/lib/auth/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +40,7 @@ export async function GET() {
             })
           : Promise.resolve([]),
         prisma.userNotification.findMany({
-          where: { userId: profile.id, readAt: null },
+          where: { userId: profile.id, readAt: null, ...noticeAudienceWhere(profile.role as Role) },
           orderBy: { createdAt: 'desc' },
           take: 30,
         }),

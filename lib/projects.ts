@@ -4,10 +4,6 @@ export function isProjectManager(role: Role) {
   return role === 'ADMIN' || role === 'EXECUTIVE' || role === 'ORGANIZER'
 }
 
-export function canModerateProjectComments(role: Role) {
-  return role === 'ADMIN' || role === 'EXECUTIVE'
-}
-
 export function canSeeFullProjectFinance(role: Role) {
   return isProjectManager(role)
 }

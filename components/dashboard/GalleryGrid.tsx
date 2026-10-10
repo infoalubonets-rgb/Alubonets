@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { GALLERY_GRID_SIZES, gallerySrcSet } from '@/lib/gallery-image'
 
 export type GalleryPhotoRow = {
   id: string
@@ -79,7 +80,7 @@ function GalleryCard({
 
       {/* Image */}
       <div
-        className="relative aspect-square cursor-pointer overflow-hidden"
+        className="relative aspect-square cursor-pointer overflow-hidden bg-surface-container-low dark:bg-[#071426]"
         onClick={onViewDetails}
         role="button"
         tabIndex={0}
@@ -87,8 +88,12 @@ function GalleryCard({
       >
         <img
           src={photo.url}
+          srcSet={gallerySrcSet(photo.url)}
+          sizes={GALLERY_GRID_SIZES}
           alt={photo.caption || 'Gallery photo'}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
         />
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center">

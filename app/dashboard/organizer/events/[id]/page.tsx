@@ -126,7 +126,7 @@ export default async function OrganizerEventManagePage({
                 </option>
               ))}
             </select>
-            <input name="capacity" type="number" min={1} defaultValue={event.capacity ?? ''} placeholder="Capacity" className="rounded-lg border px-3 py-2" />
+            <input name="capacity" type="number" min={1} max={100000} defaultValue={event.capacity ?? ''} placeholder="Capacity" className="rounded-lg border px-3 py-2" />
             <input
               name="rsvpDeadlineAt"
               type="datetime-local"
@@ -135,7 +135,7 @@ export default async function OrganizerEventManagePage({
               defaultValue={event.rsvpDeadlineAt?.toISOString().slice(0, 16) || ''}
               className="rounded-lg border px-3 py-2"
             />
-            <input name="budgetKes" type="number" min={0} step="0.01" defaultValue={moneyNumber(event.budgetKes)} className="rounded-lg border px-3 py-2" />
+            <input name="budgetKes" type="number" min={0} max={999999} step="0.01" defaultValue={moneyNumber(event.budgetKes)} className="rounded-lg border px-3 py-2" />
             <input
               name="reminderOffsetsHours"
               defaultValue={event.reminderOffsetsHours.join(',')}
@@ -226,7 +226,7 @@ export default async function OrganizerEventManagePage({
             <form action={addEventCost} className="mt-3 space-y-2">
               <input type="hidden" name="eventId" value={event.id} />
               <input name="label" required placeholder="Cost label" className="w-full rounded-lg border px-3 py-2" />
-              <input name="amount" type="number" min={1} step="0.01" required className="w-full rounded-lg border px-3 py-2" />
+              <input name="amount" type="number" min={1} max={999999} step="0.01" required className="w-full rounded-lg border px-3 py-2" />
               <input name="notes" placeholder="Notes" className="w-full rounded-lg border px-3 py-2" />
               <button className="rounded-full bg-primary px-4 py-2 text-sm text-on-primary">Add cost</button>
             </form>

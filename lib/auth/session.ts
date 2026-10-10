@@ -88,7 +88,11 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
   if (!account) return null
   const store = await cookies()
   const profile = workspaceProfile(account, store.get(WORKSPACE_COOKIE)?.value)
-  if (isLockedOutByRole(profile, await getDisabledRoles())) redirect('/api/auth/logout?error=role_inactive')
+  // The account already passed the lockout check. A deactivated extra workspace falls back to
+  // the primary role, except for Admins and Super Admins, who may view it.
+  if (profile.role !== account.role && !(account.role === 'ADMIN' || account.isSuperAdmin)) {
+    if (isLockedOutByRole(profile, await getDisabledRoles())) return workspaceProfile(account)
+  }
   return profile
 }
 

@@ -53,9 +53,18 @@ describe('server permissions after selecting a workspace', () => {
     await expect(switchWorkspace('ADMIN')).rejects.toThrow('You do not have access')
     expect(mocks.setCookie).not.toHaveBeenCalled()
   })
-  it('does not enter a deactivated workspace', async () => {
+  it('lets an Admin or Super Admin open a deactivated workspace', async () => {
     mocks.isRoleActive.mockResolvedValue(false)
-    await expect(switchWorkspace('TREASURER')).rejects.toThrow('deactivated')
+    await switchWorkspace('AUDITOR')
+    expect(mocks.setCookie).toHaveBeenCalledWith(WORKSPACE_COOKIE, workspaceCookieValue('admin', 'AUDITOR'), expect.objectContaining({ httpOnly: true }))
+  })
+  it('does not let other accounts enter a deactivated workspace', async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: 'auth-treasurer', email: 'treasurer@example.com', app_metadata: {
+      dbUserId: 'treasurer', fullName: 'Treasurer', role: 'TREASURER', status: 'ACTIVE',
+      dashboardAccess: ['TREASURER', 'SECRETARY'], principalMemberId: null,
+    } } }, error: null })
+    mocks.isRoleActive.mockResolvedValue(false)
+    await expect(switchWorkspace('SECRETARY')).rejects.toThrow('deactivated')
     expect(mocks.setCookie).not.toHaveBeenCalled()
   })
 })

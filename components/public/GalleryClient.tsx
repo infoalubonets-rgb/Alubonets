@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { GALLERY_FULL_SIZES, GALLERY_GRID_SIZES, gallerySrcSet } from '@/lib/gallery-image'
 
 type Photo = {
   id: string
@@ -68,19 +69,23 @@ export default function GalleryClient({ photos }: { photos: Photo[] }) {
             <h3 className="font-h3 text-h3 text-on-surface">No Photos Yet</h3>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="columns-1 gap-4 sm:columns-2 lg:columns-3">
             {filtered.map((p, i) => (
               <figure
                 key={p.id}
-                className="reveal group relative cursor-zoom-in overflow-hidden rounded-2xl border border-outline-variant/40 shadow-sm transition-shadow hover:shadow-md"
+                className="reveal group relative mb-4 break-inside-avoid cursor-zoom-in overflow-hidden rounded-2xl border border-outline-variant/40 shadow-sm transition-shadow hover:shadow-md"
                 style={{ ['--reveal-delay' as string]: `${(i % 6) * 70}ms` }}
                 onClick={() => setLightbox(i)}
               >
                 <div className="relative overflow-hidden">
                   <img
                     src={p.url}
+                    srcSet={gallerySrcSet(p.url)}
+                    sizes={GALLERY_GRID_SIZES}
                     alt={p.caption || 'Gallery photo'}
-                    className="h-56 w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    loading={i < 6 ? 'eager' : 'lazy'}
+                    decoding="async"
+                    className="block h-auto w-full transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                     <span className="material-symbols-outlined text-white opacity-0 group-hover:opacity-100 transition-opacity text-[32px] drop-shadow-lg">zoom_in</span>
@@ -132,6 +137,8 @@ export default function GalleryClient({ photos }: { photos: Photo[] }) {
             <img
               key={lightbox}
               src={filtered[lightbox].url}
+              srcSet={gallerySrcSet(filtered[lightbox].url)}
+              sizes={GALLERY_FULL_SIZES}
               alt={filtered[lightbox].caption || 'Photo'}
               className="max-w-full max-h-[75vh] object-contain rounded-xl shadow-2xl"
             />

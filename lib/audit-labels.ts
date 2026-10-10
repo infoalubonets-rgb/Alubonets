@@ -7,6 +7,7 @@ export const ACTION_LABELS: Record<string, string> = {
   SUPER_ADMIN_FLAG: 'Updated Super Admin access',
   PROFILE_UPDATE: 'Updated their profile',
   CONTRIBUTION_CREATE: 'Recorded a contribution',
+  CONTRIBUTION_AMOUNT_EDIT: 'Changed a payment amount',
   CONTRIBUTION_CSV_IMPORT: 'Imported contributions (CSV)',
   WELFARE_REVIEW: 'Reviewed a welfare request',
   MEETING_CREATE: 'Created a meeting',

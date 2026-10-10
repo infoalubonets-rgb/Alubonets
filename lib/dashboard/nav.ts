@@ -93,10 +93,11 @@ export const TREASURER_NAV: NavItem[] = [
   overview('/dashboard/treasurer'),
   NOTIFICATIONS_NAV,
   finance('/dashboard/treasurer/contributions', [
-    { icon: 'account_balance', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
+    { icon: 'account_balance_wallet', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
     { icon: 'flag', label: 'Campaigns', href: '/dashboard/treasurer/campaigns' },
     FINANCIAL_REPORTS_NAV,
     { icon: 'savings', label: 'My contributions', href: '/contributions' },
+    { icon: 'groups', label: 'Member contributions', href: '/contributions?tab=members' },
   ]),
   projectsAndEvents('/dashboard/member/projects', [EVENTS_VIEW_NAV]),
   meetings(),
@@ -123,10 +124,9 @@ export const ORGANIZER_NAV: NavItem[] = [
   overview('/dashboard/organizer'),
   NOTIFICATIONS_NAV,
   finance('/contributions'),
-  projectsAndEvents('/dashboard/organizer/projects', [
-    MANAGE_EVENTS_NAV,
-    { icon: 'photo_library', label: 'Gallery', href: '/dashboard/organizer/gallery' },
-  ]),
+  projectsAndEvents('/dashboard/organizer/projects', [MANAGE_EVENTS_NAV]),
+  // Its own sidebar entry: the Organizing Secretary adds gallery photos from here.
+  { icon: 'photo_library', label: 'Gallery', href: '/dashboard/organizer/gallery' },
   meetings(),
   communications('/announcements'),
   documentsNav('/documents'),

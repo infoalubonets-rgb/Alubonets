@@ -1,5 +1,15 @@
 type FinanceViewer = { role: string; isSuperAdmin?: boolean | null; dashboardAccess?: readonly string[] | null }
 
+/** Contribution recording follows the account role, never workspace access alone. */
+export function canRecordContributions(viewer: FinanceViewer) {
+  return viewer.role === 'TREASURER' || Boolean(viewer.isSuperAdmin)
+}
+
+export function canRecordContributionFor(viewer: FinanceViewer & { id: string }, memberId: string) {
+  if (!canRecordContributions(viewer)) return false
+  return memberId !== viewer.id || (viewer.role === 'TREASURER' && !viewer.isSuperAdmin)
+}
+
 /**
  * Only the Treasurer records money (payments in, expenses and disbursements out) or proposes a
  * reversal. Admin and Super Admin can see everything but deliberately cannot do either; a member

@@ -214,7 +214,7 @@ export default function FamilyBranchClient({
             </div>
           )}
 
-          <div className="ml-5 border-l border-outline-variant/70 pl-5 dark:border-[#1e3461]">
+          {(isPrincipal || attached.length > 0) && <div className="ml-5 border-l border-outline-variant/70 pl-5 dark:border-[#1e3461]">
             {attached.map((member) => (
               <div key={member.id} className="relative flex items-center gap-3 border-b border-outline-variant/40 py-3 last:border-0 dark:border-[#1a2d4f]">
                 <span className="absolute -left-5 top-1/2 h-px w-4 bg-outline-variant dark:bg-[#1e3461]" />
@@ -249,12 +249,12 @@ export default function FamilyBranchClient({
                 </button>
               </div>
             ))}
-            {attached.length === 0 && (
+            {isPrincipal && attached.length === 0 && (
               <div className="py-5 text-sm text-on-surface-variant">
                 No attached family members yet.
               </div>
             )}
-          </div>
+          </div>}
           {!principal && !isPrincipal && (
             <p className="p-3 text-sm text-on-surface-variant">
               {principalName

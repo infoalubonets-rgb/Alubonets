@@ -24,6 +24,7 @@ import DashboardNotifications from './DashboardNotifications'
 import OldMonthPill from './OldMonthPill'
 import { NOTIFICATIONS_ALL_READ_EVENT, NOTIFICATIONS_READ_EVENT } from './NotificationActions'
 import UploadProgressToast from '@/components/ui/UploadProgressToast'
+import RelatedPageLinks from './RelatedPageLinks'
 
 
 export type NavItem = {
@@ -142,8 +143,9 @@ export default function DashboardShell({
   // The sidebar and overview name the workspace you are in — the role whose pages and menu are
   // showing (e.g. Secretary after switching), including the role label at the top right.
   const displayRole = role === 'ADMIN' && user?.activeSuperAdmin ? 'Super Administrator' : roleLabel(role)
+  const shownWorkspace = workspaceRole ?? user?.activeWorkspace ?? null
   const deactivatedWorkspace =
-    workspaceRole && user?.disabledRoles?.includes(workspaceRole) ? workspaceRole : null
+    shownWorkspace && user?.disabledRoles?.includes(shownWorkspace) ? shownWorkspace : null
   const isOverviewPage = pathname === '/admin' || /^\/dashboard\/(member|treasurer|executive|secretary|organizer)$/.test(pathname)
   // notificationCount already includes unread announcements and every role to-do.
   const notificationTotal = notificationCount + supportBellCount + paymentNotifCount
@@ -151,11 +153,12 @@ export default function DashboardShell({
   const pageLinks = activeNavGroup
     ? [activeNavGroup, ...(activeNavGroup.children || [])].filter((item) => item.href)
     : []
-  const selectedPageHref = pageLinks
-    .map((item) => item.href!)
-    .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
-    .sort((a, b) => b.length - a.length)[0]
-  const relatedPageLinks = pageLinks.filter((item) => item.href !== selectedPageHref)
+  const relatedPageLinks = pageLinks.filter((item) => {
+    // The contributions page already provides both personal and member tabs.
+    if (pathname === '/contributions' && item.href?.split('?')[0] === '/contributions') return false
+    return true
+  })
+  const flowHeaderButtons = pathname === '/contributions' || pathname === '/dashboard/treasurer/ledger'
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('dashSidebarCollapsed') === '1')
@@ -660,31 +663,18 @@ export default function DashboardShell({
             <div className="shrink-0 pt-1 sm:pt-2">
               <div className={pageCenter
                 ? 'flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] xl:items-center xl:gap-4'
-                : 'flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-4 sm:gap-y-2'}>
-                <div className="min-w-0">
+                : 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-x-4 sm:gap-y-2'}>
+                <div className={`min-w-0 sm:shrink-0 ${pageCenter ? '' : 'sm:pt-1'}`}>
                   <h1 className="font-h2 text-[22px] sm:text-[26px] md:text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
                   {isOverviewPage && <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>}
                 </div>
                 {pageCenter && <div className="flex min-w-0 justify-center">{pageCenter}</div>}
                 {(pageAction || (!hideRelatedLinks && relatedPageLinks.length > 0)) && (
-                <div className="flex w-full sm:w-auto shrink-0 flex-wrap items-center gap-2 sm:ml-auto sm:justify-end xl:justify-self-end">
-                {pageAction && <div className="w-full sm:w-auto shrink-0">{pageAction}</div>}
+                <div className={`flex min-w-0 w-full sm:w-auto sm:flex-1 flex-wrap items-center gap-2 sm:ml-auto sm:justify-end xl:justify-self-end ${flowHeaderButtons ? '!justify-end' : ''}`}>
+                {pageAction && <div className={flowHeaderButtons ? 'contents [&>div]:contents [&_nav]:contents' : 'min-w-0 max-w-full w-full sm:w-auto'}>{pageAction}</div>}
                 {!hideRelatedLinks && relatedPageLinks.length > 0 && (
-                  <nav aria-label={`Related ${activeNavGroup?.label} pages`} className="flex w-full sm:w-auto shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-                    {relatedPageLinks.map((item) => {
-                      const href = item.href!
-                      return (
-                        <Link
-                          key={href}
-                          href={href}
-                          className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-primary/30 bg-primary px-3.5 text-[12px] font-label-bold text-on-primary shadow-[0_3px_10px_rgba(0,31,80,0.18)] transition hover:border-secondary-container/50 hover:bg-secondary-container active:scale-[0.98] dark:border-primary-container/40 dark:bg-primary-container dark:hover:bg-secondary-container"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">{item.icon}</span>
-                          {item.label}
-                          {item.badge && <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[9px] leading-none text-white">{item.badge}</span>}
-                        </Link>
-                      )
-                    })}
+                  <nav aria-label={`Related ${activeNavGroup?.label} pages`} className={flowHeaderButtons ? 'contents' : 'flex min-w-0 w-full sm:w-auto flex-wrap items-center gap-2 sm:justify-end'}>
+                    <RelatedPageLinks items={relatedPageLinks} />
                   </nav>
                 )}
                 </div>

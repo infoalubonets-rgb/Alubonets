@@ -8,6 +8,7 @@ import { ROLE_LABEL, type Role } from '@/lib/auth/types'
 import { getNotificationsSeen, paymentsCountFrom, unseenAlertCount } from '@/lib/notification-seen'
 import { ClearReadButton, MarkAllReadButton } from '@/components/dashboard/NotificationActions'
 import NotificationsList, { type NotificationItem } from '@/components/dashboard/NotificationsList'
+import { announcementAudienceWhere, noticeAudienceWhere } from '@/lib/notification-audience'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Notifications — Alubonets' }
@@ -20,9 +21,10 @@ export default async function NotificationsPage() {
   const role = actor.role as Role
   const [alerts, notices, announcements, seen] = await Promise.all([
     getRoleAlerts({ id: actor.id, role, isSuperAdmin: actor.isSuperAdmin, dashboardAccess: actor.dashboardAccess as Role[] }),
-    prisma.userNotification.findMany({ where: { userId: actor.id }, orderBy: { createdAt: 'desc' }, take: 50 }),
+    // Only notices for the selected workspace (Admin sees all; personal/general notices show everywhere).
+    prisma.userNotification.findMany({ where: { userId: actor.id, ...noticeAudienceWhere(role) }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.announcementReceipt.findMany({
-      where: { userId: actor.id, announcement: { status: 'SENT' } },
+      where: { userId: actor.id, announcement: { status: 'SENT', ...announcementAudienceWhere(role) } },
       include: {
         announcement: {
           select: { id: true, title: true, content: true, imageUrl: true, publishedAt: true, author: { select: { fullName: true } } },

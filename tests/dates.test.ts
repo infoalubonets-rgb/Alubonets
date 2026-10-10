@@ -95,6 +95,15 @@ describe('assertNotFuture', () => {
   it('treats an absent optional date as valid', () => {
     expect(() => assertNotFuture(null, 'Payment date')).not.toThrow()
   })
+
+  it("accepts today's date shortly after midnight in Kenya", () => {
+    // 01:33 in Nairobi is still 22:33 the previous day in UTC.
+    vi.useFakeTimers().setSystemTime(new Date('2026-10-10T22:33:00Z'))
+    expect(() => assertNotFuture(new Date('2026-10-11'), 'Contribution date')).not.toThrow()
+    expect(() => assertNotFuture(new Date('2026-10-12'), 'Contribution date')).toThrow(
+      'Contribution date cannot be in the future.',
+    )
+  })
 })
 
 describe('todayRange', () => {

@@ -118,7 +118,6 @@ export default function AuthModal() {
       } else {
         router.push(redirectTo || homeForRole(user.role))
       }
-      router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid credentials')
     } finally {

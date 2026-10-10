@@ -1,5 +1,6 @@
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { announcementAudienceWhere } from '@/lib/notification-audience'
 import { formatMonthKey, formatMonthKeys, formatPaymentMethod } from '@/lib/chart-labels'
 import type { PaymentMethod, ProjectStatus, Role, WelfareStatus } from '@prisma/client'
 
@@ -676,8 +677,9 @@ export const getAnnouncementsForUser = unstable_cache(
 )
 
 export const getUnreadAnnouncementCount = unstable_cache(
-  async (userId: string) =>
-    prisma.announcementReceipt.count({ where: { userId, readAt: null } }),
+  // Counted for the selected workspace only, matching the Notifications page.
+  async (userId: string, workspace: Role) =>
+    prisma.announcementReceipt.count({ where: { userId, readAt: null, announcement: announcementAudienceWhere(workspace) } }),
   ['unread-announcement-count'],
   { tags: [TAGS.announcements], revalidate: 30 },
 )
@@ -812,6 +814,8 @@ export async function sendAnnouncement(input: {
   memberIds?: string[]
   includeSelf?: boolean
   expiresAt?: Date
+  /** Workspaces this announcement belongs to; empty = shown in every workspace. */
+  audienceRoles?: Role[]
 }) {
   const recipientIds = input.broadcast
     ? (
@@ -833,6 +837,7 @@ export async function sendAnnouncement(input: {
       imageUrl: input.imageUrl ?? null,
       broadcast: input.broadcast,
       expiresAt: input.expiresAt ?? null,
+      audienceRoles: input.audienceRoles ?? [],
       receipts: { create: recipientIds.map((userId) => ({ userId })) },
     },
   })

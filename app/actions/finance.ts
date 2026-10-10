@@ -4,6 +4,8 @@ import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { requireActiveRole, requireAdmin, requireTreasurer } from '@/lib/auth/session'
+import { requireContributionRecorder } from '@/lib/auth/contribution-recorder'
+import { canRecordContributionFor } from '@/lib/finance-access'
 import {
   compareMonths,
   createLedgerContribution,
@@ -28,6 +30,7 @@ import { TAGS } from '@/lib/data/queries'
 import { createSignedUpload } from '@/lib/upload-signed'
 import { requireWelfareEnabled } from '@/lib/feature-flags'
 import { assertNotFuture, assertNotPast } from '@/lib/dates'
+import { amountKes, amountKesOrZero } from '@/lib/money-limits'
 import { notifyUsers } from '@/lib/notifications'
 import {
   filterSelectableCategories,
@@ -136,8 +139,8 @@ export async function createContributionCategory(formData: FormData) {
 const campaignSchema = z.object({
   title: z.string().trim().min(2).max(160),
   description: z.string().trim().max(1000).optional(),
-  targetAmount: z.coerce.number().positive('Enter the overall campaign target.'),
-  perMemberTarget: z.coerce.number().positive().optional(),
+  targetAmount: amountKes('Overall target'),
+  perMemberTarget: amountKes('Per-member target').optional(),
   categoryId: z.string().min(1),
   startsAt: z.coerce.date(),
   dueAt: z.coerce.date().optional(),
@@ -293,13 +296,14 @@ export async function restoreCampaignObligation(formData: FormData) {
 }
 
 export async function recordLedgerContribution(formData: FormData) {
-  const actor = await requireTreasurer()
+  const actor = await requireContributionRecorder()
+  if (!canRecordContributionFor(actor, String(formData.get('userId') || ''))) throw new Error('Super Admin cannot record their own contribution.')
   const raw = {
     userId: formData.get('userId'),
     amount: formData.get('amount'),
-    description: formData.get('description'),
+    description: formData.get('description') || undefined,
     categoryId: formData.get('categoryId'),
-    otherCategoryDescription: formData.get('otherCategoryDescription'),
+    otherCategoryDescription: formData.get('otherCategoryDescription') || undefined,
     campaignId: formData.get('campaignId') || undefined,
     projectId: formData.get('projectId') || undefined,
     contributionPeriod: formData.get('contributionPeriod') || undefined,
@@ -309,18 +313,18 @@ export async function recordLedgerContribution(formData: FormData) {
     occurredAt: formData.get('occurredAt'),
   }
   const data = z.object({
-    userId: z.string().min(1),
-    amount: z.coerce.number().positive(),
-    description: z.string().trim().max(500).optional(),
+    userId: z.string({ invalid_type_error: 'Select the member.' }).min(1, 'Select the member.'),
+    amount: amountKes(),
+    description: z.string().trim().max(500, 'Note is too long (500 characters max).').optional(),
     categoryId: z.string().default(''),
-    otherCategoryDescription: z.string().trim().optional(),
+    otherCategoryDescription: z.string().trim().max(500).optional(),
     campaignId: z.string().optional(),
     projectId: z.string().optional(),
     contributionPeriod: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Choose the month this payment covers.').optional(),
-    sourceAccountId: z.string().min(1),
-    paymentMethod: z.enum(['CASH','MPESA','BANK','OTHER']),
-    providerReference: z.string().trim().max(100).optional(),
-    occurredAt: z.coerce.date(),
+    sourceAccountId: z.string({ invalid_type_error: 'Choose the receiving account.' }).min(1, 'Choose the receiving account.'),
+    paymentMethod: z.enum(['CASH','MPESA','BANK','OTHER'], { errorMap: () => ({ message: 'Choose the payment method.' }) }),
+    providerReference: z.string().trim().max(100, 'Transaction reference is too long (100 characters max).').optional(),
+    occurredAt: z.coerce.date({ errorMap: () => ({ message: 'Enter the date paid.' }) }),
   }).parse(raw)
   const { categoryId, otherLabel } = await resolvePaymentCategory({
     categoryId: data.categoryId,
@@ -329,22 +333,20 @@ export async function recordLedgerContribution(formData: FormData) {
     projectId: data.projectId,
     campaignId: data.campaignId,
   })
-  if (!otherLabel) {
-    z.string().trim().min(2).max(500).parse(data.description)
-  } else {
+  if (otherLabel) {
     otherCategoryDescriptionSchema.parse(data.otherCategoryDescription)
   }
   const description = paymentDescription(data.description?.trim() || 'Member contribution', otherLabel)
   assertNotFuture(data.occurredAt, 'Contribution date')
-  const evidence = z.object({
-    evidencePath: z.string().min(1, 'A receipt or proof of payment is required for every contribution.'),
-    evidenceMimeType: z.string().min(1),
-    evidenceTitle: z.string().min(1),
+  const evidence = formData.get('evidencePath') ? z.object({
+    evidencePath: z.string().min(1),
+    evidenceMimeType: z.enum(['application/pdf', 'image/png', 'image/webp', 'image/jpeg']),
+    evidenceTitle: z.string().regex(/\.(pdf|png|webp|jpe?g)$/i, 'Unsupported proof file type.'),
   }).parse({
     evidencePath: formData.get('evidencePath'),
     evidenceMimeType: formData.get('evidenceMimeType'),
     evidenceTitle: formData.get('evidenceTitle'),
-  })
+  }) : null
   // Incoming contributions are never held by the expense approval limit.
   const status = 'CONFIRMED'
   const result = await createLedgerContribution({
@@ -354,9 +356,9 @@ export async function recordLedgerContribution(formData: FormData) {
     receivedBy: actor.fullName,
     actorId: actor.id,
     status,
-    proofPath: evidence.evidencePath,
-    proofMimeType: evidence.evidenceMimeType,
-    proofTitle: evidence.evidenceTitle,
+    proofPath: evidence?.evidencePath,
+    proofMimeType: evidence?.evidenceMimeType,
+    proofTitle: evidence?.evidenceTitle,
   })
   await writeAudit({ userId: actor.id, action: 'LEDGER_CONTRIBUTION_CREATE', entity: 'FinancialTransaction', entityId: result.financial.id, meta: { contributionId: result.contribution.id, status, ...data } })
   refreshFinance()
@@ -364,8 +366,9 @@ export async function recordLedgerContribution(formData: FormData) {
 
 /** Step 1 of a fast upload: authorize, then hand back a signed URL for a direct browser→Supabase upload. */
 export async function requestEvidenceUploadUrl(formData: FormData) {
-  const actor = await requireTreasurer()
+  const actor = await requireContributionRecorder()
   const fileName = z.string().min(1).parse(formData.get('fileName'))
+  if (!/\.(pdf|png|webp|jpe?g)$/i.test(fileName)) throw new Error('Upload a PDF, PNG, WebP, JPEG or JPG file.')
   const safe = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${actor.id}/${Date.now()}-${crypto.randomUUID()}-${safe}`
   return createSignedUpload('financial-documents', path)
@@ -374,11 +377,11 @@ export async function requestEvidenceUploadUrl(formData: FormData) {
 export async function recordExpense(formData: FormData) {
   const actor = await requireTreasurer()
   const data = z.object({
-    amount: z.coerce.number().positive(),
+    amount: amountKes(),
     description: z.string().trim().max(500).optional(),
-    otherCategoryDescription: z.string().trim().optional(),
-    payee: z.string().trim().min(2).max(160),
-    purpose: z.string().trim().min(2).max(500),
+    otherCategoryDescription: z.string().trim().max(500).optional(),
+    payee: z.string().trim().min(2, 'Enter who was paid.').max(160),
+    purpose: z.string().trim().min(2, 'Enter what the expense was for.').max(500),
     categoryId: z.string().default(''),
     projectId: z.string().optional().transform((value) => value || undefined),
     sourceAccountId: z.string().min(1),
@@ -431,7 +434,7 @@ export async function recordWelfareDisbursement(formData: FormData) {
   const actor = await requireTreasurer()
   const data = z.object({
     welfareRequestId: z.string().min(1),
-    amount: z.coerce.number().positive(),
+    amount: amountKes(),
     sourceAccountId: z.string().min(1),
     occurredAt: z.coerce.date(),
   }).parse(Object.fromEntries(formData))
@@ -678,7 +681,7 @@ export async function reconcileContribution(formData: FormData) {
 export async function updateApprovalThreshold(formData: FormData): Promise<{ ok: true; amount: number }> {
   try {
     const actor = await requireAdmin()
-    const amount = z.coerce.number().positive().parse(formData.get('amount'))
+    const amount = amountKes('Approval threshold').parse(formData.get('amount'))
     await prisma.appSetting.upsert({
       where: { key: 'financial_approval_threshold_kes' },
       create: { key: 'financial_approval_threshold_kes', value: String(amount), updatedBy: actor.id },
@@ -726,9 +729,9 @@ export async function updateStandingSettings(formData: FormData): Promise<{ ok: 
     const actor = await requireAdmin()
     const previous = await getStandingSettings()
     const data = z.object({
-      monthlyFeeKes: z.coerce.number().min(0).max(1_000_000),
+      monthlyFeeKes: amountKesOrZero('Monthly fee'),
       monthlyGraceDays: z.coerce.number().int().min(1, 'Pick a monthly deadline day from 1 to 28.').max(28, 'Pick a monthly deadline day from 1 to 28.'),
-      annualFeeKes: z.coerce.number().min(0).max(10_000_000),
+      annualFeeKes: amountKesOrZero('Annual fee'),
       annualRenewalDays: z.coerce.number().int().min(0).max(365),
       annualDueDate: z.string().regex(ANNUAL_DUE_DATE_PATTERN).nullable(),
       effectiveFrom: z.coerce.date(),
@@ -970,4 +973,85 @@ export async function updateFundAllocationRule(formData: FormData) {
   })
   revalidatePath('/admin/settings')
   return rule
+}
+
+const editContributionAmountSchema = z.object({
+  id: z.string().min(1),
+  amount: amountKes('New amount'),
+  reason: z.string().trim().min(5, 'Give a reason of at least 5 characters.').max(500),
+})
+
+/**
+ * Treasurer-only: corrects the amount of a recorded payment. The contribution, its ledger
+ * transaction and both ledger entries change together so balances stay correct, and the
+ * old and new amounts go to the audit log with the reason.
+ */
+export async function editContributionAmount(formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const actor = await requireTreasurer()
+    const data = editContributionAmountSchema.parse({
+      id: formData.get('id'),
+      amount: formData.get('amount'),
+      reason: formData.get('reason'),
+    })
+    const newAmount = Number(data.amount.toFixed(2))
+    const contribution = await prisma.contribution.findUnique({
+      where: { id: data.id },
+      include: { user: { select: { fullName: true } } },
+    })
+    if (!contribution) return { ok: false, error: 'This payment no longer exists.' }
+    if (contribution.status === 'REVERSED' || contribution.status === 'REJECTED') {
+      return { ok: false, error: 'Reversed or rejected payments cannot be edited.' }
+    }
+    const oldAmount = Number(contribution.amount)
+    if (oldAmount === newAmount) return { ok: false, error: 'The new amount is the same as the current one.' }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.contribution.update({
+        where: { id: contribution.id },
+        data: {
+          amount: newAmount,
+          // Older payments have no fund split recorded; leave those as they are.
+          ...(contribution.emergencyPercent != null
+            ? { emergencyAmount: Number(((newAmount * contribution.emergencyPercent) / 100).toFixed(2)) }
+            : {}),
+          ...(contribution.reservePercent != null
+            ? { reserveAmount: Number(((newAmount * contribution.reservePercent) / 100).toFixed(2)) }
+            : {}),
+        },
+      })
+      if (contribution.financialTransactionId) {
+        await tx.financialTransaction.update({ where: { id: contribution.financialTransactionId }, data: { amount: newAmount } })
+        // Keep double entry balanced: the money-received debit and the income credit both move.
+        await tx.ledgerEntry.updateMany({ where: { transactionId: contribution.financialTransactionId, debit: { gt: 0 } }, data: { debit: newAmount } })
+        await tx.ledgerEntry.updateMany({ where: { transactionId: contribution.financialTransactionId, credit: { gt: 0 } }, data: { credit: newAmount } })
+        await markEditedAfterClose(contribution.financialTransactionId, tx)
+      }
+      if (contribution.campaignId) await refreshObligation(contribution.campaignId, contribution.userId, tx)
+    })
+
+    await writeAudit({
+      userId: actor.id,
+      action: 'CONTRIBUTION_AMOUNT_EDIT',
+      entity: 'Contribution',
+      entityId: contribution.id,
+      reason: data.reason,
+      oldValue: { amount: oldAmount },
+      newValue: { amount: newAmount },
+      meta: { memberName: contribution.user.fullName, category: contribution.category },
+    })
+    if (contribution.status === 'CONFIRMED' || contribution.status === 'RECONCILED') {
+      await recomputeStandingSafely(contribution.userId, actor.id)
+    }
+    if (contribution.projectId) {
+      const { syncProjectFinancials } = await import('@/lib/project-status')
+      await syncProjectFinancials(contribution.projectId).catch(() => {})
+    }
+    refreshFinance()
+    revalidateTag(TAGS.contributions)
+    return { ok: true }
+  } catch (error) {
+    if (error instanceof z.ZodError) return { ok: false, error: error.issues[0]?.message || 'Check the amount and reason.' }
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not change the amount.' }
+  }
 }

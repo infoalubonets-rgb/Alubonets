@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { actionDeleteGalleryPhoto, actionDeleteGalleryPhotos, actionUpdateGalleryPhoto } from '@/app/actions/domain'
 import GalleryGrid, { GalleryPhotoRow } from './GalleryGrid'
 import CreateGalleryForm from './CreateGalleryForm'
+import { GALLERY_FULL_SIZES, gallerySrcSet } from '@/lib/gallery-image'
 
 type Props = { photos: GalleryPhotoRow[] }
 
@@ -183,7 +184,7 @@ export default function OrganizerGalleryClient({ photos }: Props) {
           >
             {/* Image */}
             <div className="relative flex-shrink-0 max-h-72 overflow-hidden bg-black">
-              <img src={detail.url} alt={detail.caption || 'Photo'} className="w-full h-full object-contain" />
+              <img src={detail.url} srcSet={gallerySrcSet(detail.url)} sizes={GALLERY_FULL_SIZES} alt={detail.caption || 'Photo'} className="w-full h-full object-contain" />
               <button
                 type="button"
                 onClick={() => setDetail(null)}

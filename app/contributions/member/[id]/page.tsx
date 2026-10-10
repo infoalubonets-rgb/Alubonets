@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import ContributionsClient from '@/components/dashboard/ContributionsClient'
@@ -63,10 +62,6 @@ export default async function MemberContributionsPage({ params }: { params: Prom
   return (
     <DashboardShell role={role} title={member.fullName} nav={navForRole(role)}>
       <div className="mx-auto max-w-3xl space-y-4 px-4 pb-4 pt-4 md:px-0">
-        <Link href="/contributions?tab=members" className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-          <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-          Members’ contributions
-        </Link>
         <p className="text-sm text-on-surface-variant">
           {member.membershipNumber ? `${member.membershipNumber} · ` : ''}
           {member.standing === 'PAID_UP' ? 'Paid-up' : 'Lapsed'}

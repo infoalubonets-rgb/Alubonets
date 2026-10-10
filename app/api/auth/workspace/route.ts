@@ -19,7 +19,10 @@ export async function POST(request: NextRequest) {
     }
     await switchWorkspace(body.role)
     return NextResponse.json({ ok: true })
-  } catch {
-    return NextResponse.json({ error: 'That workspace is unavailable or you do not have access.' }, { status: 403 })
+  } catch (error) {
+    const message = error instanceof Error && /deactivated|do not have access/.test(error.message)
+      ? error.message
+      : 'That workspace is unavailable or you do not have access.'
+    return NextResponse.json({ error: message }, { status: 403 })
   }
 }

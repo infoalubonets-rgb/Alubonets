@@ -1,7 +1,7 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
+import AddContributionButton from '@/components/finance/AddContributionButton'
 import { TREASURER_NAV } from '@/lib/dashboard/nav'
 import { actionEmailReceipt } from '@/app/actions/domain'
-import Link from 'next/link'
 import {
   getTreasurerDashboardData,
   getContributionChartSeries,
@@ -30,7 +30,7 @@ import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Member contributions',
+  title: 'Finance',
 }
 
 export default async function TreasurerContributionsPage({
@@ -159,7 +159,7 @@ export default async function TreasurerContributionsPage({
   ]
 
   return (
-    <DashboardShell role="TREASURER" title="Member contributions" nav={TREASURER_NAV}>
+    <DashboardShell role="TREASURER" title="Finance" nav={TREASURER_NAV} pageAction={<AddContributionButton />}>
       <div className="space-y-6 p-4 md:p-6">
 
         {/* Header row with Payments button */}
@@ -271,19 +271,6 @@ export default async function TreasurerContributionsPage({
             )}
           </div>
         </div>
-
-        <section className="rounded-xl border bg-surface p-4">
-          <h2 className="font-semibold mb-3">Record contribution</h2>
-          <p className="text-sm text-on-surface-variant">All new contributions must be recorded through the immutable financial ledger.</p>
-          <Link href="/dashboard/treasurer/ledger" className="mt-3 inline-flex rounded-full bg-primary px-4 py-2 text-on-primary">Open ledger entry</Link>
-        </section>
-
-        <section className="rounded-xl border bg-surface p-4">
-          <h2 className="font-semibold mb-3">CSV import</h2>
-          <p className="text-sm text-on-surface-variant mb-2">
-            Legacy direct CSV import is disabled because every movement must produce balanced ledger entries. Use the ledger entry screen.
-          </p>
-        </section>
 
         <section className="rounded-xl border bg-surface p-4 overflow-x-auto">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

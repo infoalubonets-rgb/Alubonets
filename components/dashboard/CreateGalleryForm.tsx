@@ -2,10 +2,8 @@
 
 import { useRef, useState } from 'react'
 import { actionCreateGallery } from '@/app/actions/domain'
-import { createClient } from '@/utils/supabase/client'
 
-const MAX_PX    = 1200
-const MAX_BYTES = 3 * 1024 * 1024
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
 const GALLERY_CATEGORIES = [
   'Events',
@@ -25,59 +23,39 @@ type OptimisticPhoto = {
   category?: string | null; isPublic: boolean; uploadedAt: string
 }
 
-function toBlob(canvas: HTMLCanvasElement, q: number): Promise<Blob> {
-  return new Promise((res, rej) =>
-    canvas.toBlob((b) => (b ? res(b) : rej(new Error('toBlob failed'))), 'image/jpeg', q),
-  )
-}
+type UploadResult = { url: string; originalBytes: number; storedBytes: number }
 
-async function compressImage(file: File): Promise<File> {
-  const bmp = await createImageBitmap(file)
-  const canvas = document.createElement('canvas')
-  let { width: w, height: h } = bmp
-  if (w > MAX_PX) { h = Math.round((h * MAX_PX) / w); w = MAX_PX }
-  canvas.width = w; canvas.height = h
-  canvas.getContext('2d')!.drawImage(bmp, 0, 0, w, h)
-  bmp.close()
-  const name = file.name.replace(/\.[^.]+$/, '.jpg')
-  for (const q of [0.85, 0.65, 0.45]) {
-    const blob = await toBlob(canvas, q)
-    if (blob.size <= MAX_BYTES) return new File([blob], name, { type: 'image/jpeg' })
-  }
-  return new File([await toBlob(canvas, 0.45)], name, { type: 'image/jpeg' })
-}
-
-async function uploadWithProgress(file: File, onProgress: (pct: number) => void): Promise<string> {
-  const supabase = createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-    ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!session?.access_token) throw new Error('Your session has expired. Please sign in again.')
-  if (!supabaseKey) throw new Error('Supabase publishable key is not configured.')
-  const filePath = `gallery-photos/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
-  const uploadUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/gallery/${filePath}`
-
-  await new Promise<void>((resolve, reject) => {
+/**
+ * Sends the original photo to the server, which straightens it, resizes it for phones,
+ * tablets and desktops and converts it to WebP. Progress covers the upload; the last
+ * stretch is the server optimising it.
+ */
+function uploadWithProgress(file: File, onProgress: (pct: number) => void): Promise<UploadResult> {
+  return new Promise((resolve, reject) => {
+    const body = new FormData()
+    body.set('file', file)
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', uploadUrl)
-    xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`)
-    xhr.setRequestHeader('apikey', supabaseKey)
-    xhr.setRequestHeader('Content-Type', 'image/jpeg')
-    xhr.setRequestHeader('x-upsert', 'false')
+    xhr.open('POST', '/api/gallery/upload')
+    xhr.responseType = 'json'
     xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 95))
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 80))
     })
+    xhr.upload.addEventListener('load', () => onProgress(85))
     xhr.addEventListener('load', () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(new Error(`Upload failed (${xhr.status})`))
+      const data = xhr.response as (UploadResult & { error?: string }) | null
+      if (xhr.status >= 200 && xhr.status < 300 && data?.url) {
+        onProgress(100)
+        resolve(data)
+      } else {
+        reject(new Error(data?.error || `Upload failed (${xhr.status})`))
+      }
     })
     xhr.addEventListener('error', () => reject(new Error('Network error')))
-    xhr.send(file)
+    xhr.send(body)
   })
-
-  onProgress(100)
-  return supabase.storage.from('gallery').getPublicUrl(filePath).data.publicUrl
 }
+
+const kb = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`)
 
 export default function CreateGalleryForm({
   onOptimisticAdd,
@@ -102,13 +80,10 @@ export default function CreateGalleryForm({
     setUploadError(''); setUploadInfo(''); setUploadedUrl('')
     setUploadProgress(1)
     try {
-      const origKb = Math.round(file.size / 1024)
-      const compressed = await compressImage(file)
-      const compKb = Math.round(compressed.size / 1024)
-      setUploadProgress(5)
-      const url = await uploadWithProgress(compressed, (pct) => setUploadProgress(5 + pct * 0.95))
-      setUploadedUrl(url)
-      setUploadInfo(origKb > compKb ? `Compressed ${origKb} KB → ${compKb} KB` : `${compKb} KB`)
+      if (file.size > MAX_UPLOAD_BYTES) throw new Error('Photos must be 25 MB or smaller.')
+      const result = await uploadWithProgress(file, setUploadProgress)
+      setUploadedUrl(result.url)
+      setUploadInfo(`Optimised to WebP for every screen size · ${kb(result.originalBytes)} → ${kb(result.storedBytes)}`)
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed')
       setUploadProgress(null)
@@ -164,7 +139,7 @@ export default function CreateGalleryForm({
             <div className="flex items-center justify-between text-[11px] text-on-surface-variant dark:text-blue-200/50">
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-primary animate-spin" style={{ fontSize: 13 }}>progress_activity</span>
-                Uploading…
+                {uploadProgress >= 85 ? 'Optimising for every screen…' : 'Uploading…'}
               </span>
               <span className="font-semibold text-primary">{uploadProgress}%</span>
             </div>

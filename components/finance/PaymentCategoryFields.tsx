@@ -28,6 +28,14 @@ type Props = {
   onBillingKindChange?: (kind: string) => void
 }
 
+/** The everyday member payments are listed first; everything else stays alphabetical. */
+const PINNED_PURPOSES = ['cat-monthly-contribution', 'cat-member-contribution']
+
+function pinnedFirst(categories: Category[]) {
+  const rank = (id: string) => (PINNED_PURPOSES.includes(id) ? PINNED_PURPOSES.indexOf(id) : PINNED_PURPOSES.length)
+  return [...categories].sort((a, b) => rank(a.id) - rank(b.id))
+}
+
 function parsePurpose(value: string, campaigns: Campaign[]) {
   if (value.startsWith('campaign:')) {
     const campaign = campaigns.find((c) => `campaign:${c.id}` === value)
@@ -75,7 +83,7 @@ export default function PaymentCategoryFields({
           </option>
           {categories.length > 0 && (
             <optgroup label={kind === 'income' ? 'Payment purposes' : 'Expense categories'}>
-              {categories.map((category) => (
+              {pinnedFirst(categories).map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                   {category.billingKind === 'MONTHLY' ? ' (monthly)' : category.billingKind === 'ANNUAL' ? ' (annual)' : ''}

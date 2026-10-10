@@ -30,7 +30,8 @@ describe('unified sidebar', () => {
   it.each(roles)('%s uses the Administrator section names in the same order', (role) => {
     const labels = navForRole(role)
       .filter((item) => item.href !== '/support-chat')
-      .map((item) => (item.label === 'Activity logs' ? 'Settings' : item.label))
+      // Shortcuts that sit in the sidebar but belong to an Administrator section.
+      .map((item) => (item.label === 'Activity logs' ? 'Settings' : item.label === 'Gallery' ? 'Projects & events' : item.label))
     const positions = labels.map((label) => adminOrder.indexOf(label))
     expect(positions.every((p) => p >= 0)).toBe(true)
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)

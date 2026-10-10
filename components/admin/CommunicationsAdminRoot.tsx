@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
+import Link from 'next/link'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import ContactDestinationSettingsButton from '@/components/admin/ContactDestinationSettingsButton'
 import StatCard from '@/components/dashboard/StatCard'
@@ -158,6 +159,13 @@ export default function CommunicationsAdminRoot({
               updateAction={updateContactDestination}
             />
           )}
+          <Link
+            href="/admin/announcements/about"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full border-2 border-secondary-container/40 bg-secondary-container/10 px-3.5 text-[12px] font-label-bold text-secondary transition hover:bg-secondary-container/20"
+          >
+            <span className="material-symbols-outlined text-[18px]">badge</span>
+            About Us profiles
+          </Link>
           <button
             type="button"
             onClick={openNotificationHistory}

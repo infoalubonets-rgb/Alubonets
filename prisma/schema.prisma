@@ -963,6 +963,8 @@ model UserNotification {
   type      String
   entity    String?
   entityId  String?
+  /// Workspaces this notice belongs to (e.g. TREASURER for welfare reviews). Empty = personal/general, shown everywhere.
+  audienceRoles Role[]  @default([])
   readAt    DateTime?
   createdAt DateTime  @default(now())
 

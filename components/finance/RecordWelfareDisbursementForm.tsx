@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { recordWelfareDisbursement, requestEvidenceUploadUrl } from '@/app/actions/finance'
 import { uploadToSignedUrl } from '@/lib/upload-client'
 import { todayInputValue } from '@/lib/dates'
+import { MAX_AMOUNT_KES, amountError } from '@/lib/money-limits'
+import { readableError } from '@/lib/form-errors'
 
 type Account = { id: string; name: string }
 
@@ -23,11 +25,16 @@ export default function RecordWelfareDisbursementForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const form = event.currentTarget
+    const formData = new FormData(form)
+    const amountProblem = amountError(formData.get('amount'))
+    if (amountProblem) {
+      setError(amountProblem)
+      return
+    }
     setError('')
     setPending(true)
     try {
-      const form = event.currentTarget
-      const formData = new FormData(form)
       const evidenceFile = formData.get('evidence') as File | null
       if (!evidenceFile || !evidenceFile.size) throw new Error('A supporting document is required for every disbursement.')
 
@@ -45,7 +52,7 @@ export default function RecordWelfareDisbursementForm({
       form.reset()
       router.refresh()
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not record this payment. Try again.')
+      setError(readableError(cause, 'Could not record this payment. Try again.'))
     } finally {
       setPending(false)
     }
@@ -54,7 +61,7 @@ export default function RecordWelfareDisbursementForm({
   return (
     <form onSubmit={handleSubmit} className="mt-3 grid gap-2 md:grid-cols-4">
       <input type="hidden" name="welfareRequestId" value={welfareRequestId} />
-      <input name="amount" type="number" min="1" step="0.01" required disabled={pending} defaultValue={defaultAmount ?? undefined} placeholder="KES amount" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
+      <input name="amount" type="number" min="1" max={MAX_AMOUNT_KES} step="0.01" required disabled={pending} defaultValue={defaultAmount ?? undefined} placeholder="KES amount" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
       <select name="sourceAccountId" required disabled={pending} className="rounded-lg border px-3 py-2 disabled:opacity-60">
         {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
       </select>

@@ -287,7 +287,7 @@ export default function MeetingsListClient({ meetings: initial }: { meetings: Me
         <p className="text-[13px] text-on-surface-variant max-w-lg leading-relaxed">
           Meetings are stored as text. PDFs are only generated when you download or publish.
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2 [&>a]:shrink-0 [&>a]:whitespace-nowrap">
           <a
             href="/api/export/meetings/pdf"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-outline-variant dark:border-[#1e3461] text-[13px] font-semibold text-on-surface-variant hover:bg-surface-container dark:hover:bg-[#111f36] transition-colors"

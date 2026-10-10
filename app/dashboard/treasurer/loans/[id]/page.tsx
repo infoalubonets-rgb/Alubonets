@@ -121,6 +121,7 @@ export default async function TreasurerLoanDetailPage({
                     name="amount"
                     type="number"
                     min={1}
+                    max={999999}
                     step="0.01"
                     required
                     defaultValue={moneyNumber(loan.amountKes)}
@@ -155,7 +156,7 @@ export default async function TreasurerLoanDetailPage({
                 </h2>
                 <form action={recordLoanRepayment} className="mt-3 grid gap-2 md:grid-cols-2">
                   <input type="hidden" name="loanId" value={loan.id} />
-                  <input name="amount" type="number" min={1} step="0.01" required className="rounded-lg border px-3 py-2" />
+                  <input name="amount" type="number" min={1} max={999999} step="0.01" required className="rounded-lg border px-3 py-2" />
                   <select name="destinationAccountId" required className="rounded-lg border px-3 py-2">
                     {accounts.map((a) => (
                       <option key={a.id} value={a.id}>

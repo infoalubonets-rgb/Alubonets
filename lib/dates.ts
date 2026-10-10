@@ -60,9 +60,13 @@ export function assertNotPast(date: Date | null | undefined, label: string) {
   if (date && date < startOfToday()) throw new Error(`${label} cannot be in the past.`)
 }
 
-/** Throws when `date` falls after now, for server actions guarding a past-only field. */
+/**
+ * Throws when `date` falls after today in the group's timezone, for server actions guarding a
+ * past-only field. A `YYYY-MM-DD` value parses as UTC midnight, which is still "the future" on a
+ * UTC server between 00:00 and 03:00 in Kenya, so the cut-off is the end of the local day.
+ */
 export function assertNotFuture(date: Date | null | undefined, label: string) {
-  if (date && date.getTime() > Date.now()) throw new Error(`${label} cannot be in the future.`)
+  if (date && date.getTime() > todayRange().end.getTime()) throw new Error(`${label} cannot be in the future.`)
 }
 
 /**

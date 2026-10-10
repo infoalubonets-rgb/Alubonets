@@ -29,7 +29,7 @@ export default async function CampaignsPage() {
   return (
     <DashboardShell
       role="TREASURER"
-      title="Contribution campaigns"
+      title="Campaigns"
       nav={TREASURER_NAV}
       pageAction={
         <NewCampaignButton categories={campaignPurposeCategories(categories)} today={appTodayInputValue()} />

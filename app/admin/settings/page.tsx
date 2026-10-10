@@ -109,8 +109,8 @@ export default async function AdminSettingsPage() {
           >
             <p className="text-xs text-on-surface-variant">Members can only submit Welfare requests within this KES range.</p>
             <form action={updateWelfareAmountLimits} className="mt-3 grid gap-3 md:grid-cols-2">
-              <label className="text-sm">Minimum request (KES)<input name="min" type="number" min="0" step="0.01" required defaultValue={settings[SETTING_KEYS.welfareMinAmountKes] || '1000'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
-              <label className="text-sm">Maximum request (KES)<input name="max" type="number" min="1" step="0.01" required defaultValue={settings[SETTING_KEYS.welfareMaxAmountKes] || '100000'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+              <label className="text-sm">Minimum request (KES)<input name="min" type="number" min="0" max="999999" step="0.01" required defaultValue={settings[SETTING_KEYS.welfareMinAmountKes] || '1000'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
+              <label className="text-sm">Maximum request (KES)<input name="max" type="number" min="1" max="999999" step="0.01" required defaultValue={settings[SETTING_KEYS.welfareMaxAmountKes] || '100000'} className="mt-1 w-full rounded-lg border px-3 py-2 text-sm" /></label>
               <button className="w-fit rounded-full bg-primary px-4 py-2 text-sm text-on-primary md:col-span-2">Save welfare limits</button>
             </form>
           </SettingsSectionButton>

@@ -11,9 +11,11 @@ import { requireLoansEnabled } from '@/lib/feature-flags'
 import { getLoanPolicy } from '@/lib/settings'
 import { getPeriodForDate, periodFields, transactionNumber } from '@/lib/finance'
 import { sendAnnouncement } from '@/lib/data/queries'
+import { roleHolderIds } from '@/lib/notifications'
 import { sendBroadcastEmail } from '@/lib/email/resend'
 import { createServerClient } from '@/lib/supabase-server'
 import { assertNotFuture } from '@/lib/dates'
+import { amountKes } from '@/lib/money-limits'
 import { loanApplicationBodySchema, parseExternalGuarantorsFromForm } from '@/lib/loan-guarantor-validation'
 
 function refreshLoans(loanId?: string) {
@@ -112,15 +114,14 @@ export async function submitLoanApplication(formData: FormData) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
   after(async () => {
-    const treasurerNotification = prisma.user.findMany({
-      where: { status: 'ACTIVE', OR: [{ role: 'TREASURER' }, { role: 'ADMIN' }, { isSuperAdmin: true }] },
-      select: { id: true },
-    }).then((treasurers) => sendAnnouncement({
+    // Treasurer work: only shows in the Treasurer workspace (and Admin's, which sees everything).
+    const treasurerNotification = roleHolderIds(['TREASURER', 'ADMIN']).then((treasurerIds) => sendAnnouncement({
       authorId: actor.id,
       title: `Loan application: ${actor.fullName}`,
       content: `${actor.fullName} requested KES ${data.amountKes.toLocaleString()} — ${data.purpose}`,
       broadcast: false,
-      memberIds: treasurers.map((treasurer) => treasurer.id),
+      memberIds: treasurerIds,
+      audienceRoles: ['TREASURER'],
     }))
     await Promise.allSettled([
       writeAudit({ userId: actor.id, action: 'LOAN_SUBMIT', entity: 'LoanApplication', entityId: loan.id, newValue: { amountKes: data.amountKes, registeredGuarantors: guarantorIds.length, externalGuarantors: externalGuarantors.length } }),
@@ -337,7 +338,7 @@ export async function recordLoanDisbursement(formData: FormData) {
   const data = z
     .object({
       loanId: z.string().min(1),
-      amount: z.coerce.number().positive(),
+      amount: amountKes(),
       sourceAccountId: z.string().min(1),
       occurredAt: z.coerce.date(),
     })
@@ -438,7 +439,7 @@ export async function recordLoanRepayment(formData: FormData) {
   const data = z
     .object({
       loanId: z.string().min(1),
-      amount: z.coerce.number().positive(),
+      amount: amountKes(),
       destinationAccountId: z.string().min(1),
       occurredAt: z.coerce.date(),
       paymentMethod: z.enum(['CASH', 'MPESA', 'BANK', 'OTHER']),

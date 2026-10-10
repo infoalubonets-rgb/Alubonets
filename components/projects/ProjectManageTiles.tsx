@@ -223,15 +223,15 @@ export default function ProjectManageTiles({
               <input type="hidden" name="projectId" value={project.id} />
               <label className={LABEL}>
                 Budget (KES)
-                <input name="budgetKes" type="number" min={0} step="0.01" defaultValue={project.budgetKes} className={INPUT} />
+                <input name="budgetKes" type="number" min={0} max={999999} step="0.01" defaultValue={project.budgetKes} className={INPUT} />
               </label>
               <label className={LABEL}>
                 Funding target (KES)
-                <input name="fundingTargetKes" type="number" min={0} step="0.01" defaultValue={project.fundingTargetKes} className={INPUT} />
+                <input name="fundingTargetKes" type="number" min={0} max={999999} step="0.01" defaultValue={project.fundingTargetKes} className={INPUT} />
               </label>
               <label className={LABEL}>
                 Actual expenditure (KES)
-                <input name="actualExpenditureKes" type="number" min={0} step="0.01" defaultValue={project.actualExpenditureKes} className={INPUT} />
+                <input name="actualExpenditureKes" type="number" min={0} max={999999} step="0.01" defaultValue={project.actualExpenditureKes} className={INPUT} />
               </label>
               <div className="sm:col-span-2"><Submit>Save finance</Submit></div>
             </ActionForm>
@@ -250,7 +250,7 @@ export default function ProjectManageTiles({
                 </label>
                 <label className={LABEL}>
                   Amount (KES)
-                  <input name="amount" type="number" min={1} step="0.01" required className={INPUT} />
+                  <input name="amount" type="number" min={1} max={999999} step="0.01" required className={INPUT} />
                 </label>
                 <label className={LABEL}>
                   Date

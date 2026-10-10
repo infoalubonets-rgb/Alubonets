@@ -516,6 +516,7 @@ export default function CreateEventForm({
           <input
             type="number"
             min={1}
+            max={100000}
             value={capacity}
             onChange={(e) => setCapacity(e.target.value)}
             placeholder="Unlimited"

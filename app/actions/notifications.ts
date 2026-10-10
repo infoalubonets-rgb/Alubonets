@@ -8,6 +8,7 @@ import { requireSessionProfile } from '@/lib/auth/session'
 import { getRoleAlerts } from '@/lib/role-alerts'
 import { getNotificationsSeen, saveNotificationsSeen } from '@/lib/notification-seen'
 import type { Role } from '@/lib/auth/types'
+import { announcementAudienceWhere, noticeAudienceWhere } from '@/lib/notification-audience'
 
 /** Marks one notification read, or — with no id — everything, clearing the bell. */
 export async function markNotificationsRead(formData?: FormData) {
@@ -17,12 +18,13 @@ export async function markNotificationsRead(formData?: FormData) {
     where: {
       userId: actor.id,
       readAt: null,
-      ...(id ? { id } : {}),
+      // "Mark all" only touches what the selected workspace shows.
+      ...(id ? { id } : noticeAudienceWhere(actor.role as Role)),
     },
     data: { readAt: new Date() },
   })
   if (!id) {
-    await prisma.announcementReceipt.updateMany({ where: { userId: actor.id, readAt: null }, data: { readAt: new Date() } })
+    await prisma.announcementReceipt.updateMany({ where: { userId: actor.id, readAt: null, announcement: announcementAudienceWhere(actor.role as Role) }, data: { readAt: new Date() } })
     revalidateTag(TAGS.announcements)
     // Role to-dos and recent payments can't be "read" one by one; remember what was showing
     // so the bell only counts what arrives after this.
@@ -76,6 +78,6 @@ export async function deleteNotification(formData: FormData) {
 /** Deletes every notification the signed-in member has already read. */
 export async function clearReadNotifications() {
   const actor = await requireSessionProfile()
-  await prisma.userNotification.deleteMany({ where: { userId: actor.id, readAt: { not: null } } })
+  await prisma.userNotification.deleteMany({ where: { userId: actor.id, readAt: { not: null }, ...noticeAudienceWhere(actor.role as Role) } })
   revalidatePath('/notifications')
 }

@@ -74,11 +74,11 @@ export default function CampaignForm({
       </label>
       <label className="text-sm font-semibold">
         Total target (KES)
-        <input name="targetAmount" type="number" min="1" step="1" required disabled={pending} defaultValue={initial?.targetAmount} placeholder="500000" className={input} />
+        <input name="targetAmount" type="number" min="1" max="999999" step="1" required disabled={pending} defaultValue={initial?.targetAmount} placeholder="500000" className={input} />
       </label>
       <label className="text-sm font-semibold">
         Per member (KES, optional)
-        <input name="perMemberTarget" type="number" min="1" step="1" disabled={pending} defaultValue={initial?.perMemberTarget ?? undefined} placeholder="5000" className={input} />
+        <input name="perMemberTarget" type="number" min="1" max="999999" step="1" disabled={pending} defaultValue={initial?.perMemberTarget ?? undefined} placeholder="5000" className={input} />
       </label>
       <label className="text-sm font-semibold">
         Starts

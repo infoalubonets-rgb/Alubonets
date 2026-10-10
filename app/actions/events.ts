@@ -11,6 +11,7 @@ import { TAGS } from '@/lib/data/queries'
 import { sendBroadcastEmail } from '@/lib/email/resend'
 import { sendAnnouncement } from '@/lib/data/queries'
 import { assertNotPast } from '@/lib/dates'
+import { amountKes, amountKesOrZero } from '@/lib/money-limits'
 
 function refreshEvents(eventId?: string) {
   revalidatePath('/events')
@@ -42,10 +43,10 @@ export async function upsertEventDetails(formData: FormData) {
       isPublic: z.enum(['on', 'off']).optional(),
       audienceType: z.enum(['PUBLIC', 'ALL_MEMBERS', 'SELECTED_ROLES', 'SELECTED_MEMBERS', 'BRANCH_MEMBERS']),
       audiencePrincipalId: z.string().optional(),
-      capacity: z.coerce.number().int().positive().optional(),
+      capacity: z.coerce.number().int().positive().max(100_000, 'Capacity cannot be more than 100,000.').optional(),
       rsvpDeadlineAt: z.coerce.date().optional(),
-      budgetKes: z.coerce.number().min(0).optional(),
-      actualCostKes: z.coerce.number().min(0).optional(),
+      budgetKes: amountKesOrZero('Budget').optional(),
+      actualCostKes: amountKesOrZero('Actual cost').optional(),
       reminderOffsetsHours: z.string().optional(),
     })
     .parse({
@@ -287,7 +288,7 @@ export async function addEventCost(formData: FormData) {
     .object({
       eventId: z.string().min(1),
       label: z.string().trim().min(2),
-      amount: z.coerce.number().positive(),
+      amount: amountKes(),
       notes: z.string().trim().max(500).optional(),
     })
     .parse({
