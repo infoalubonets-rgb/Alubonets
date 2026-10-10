@@ -1,9 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { getActiveEmailSends } from '@/app/actions/email-sends'
+import type { ActiveEmailSend as Send } from '@/lib/email-sends'
 
-type Send = Awaited<ReturnType<typeof getActiveEmailSends>>[number]
+async function fetchActiveSends(): Promise<Send[]> {
+  const res = await fetch('/api/email-sends/active', { cache: 'no-store' })
+  if (!res.ok) return []
+  const data = (await res.json()) as { sends?: Send[] }
+  return data.sends ?? []
+}
 
 /** Fired by the composer when a notification is sent, so progress shows immediately. */
 export const EMAIL_SEND_STARTED_EVENT = 'email-send-started'
@@ -24,14 +29,16 @@ export default function EmailSendProgressBanner({ onActiveChange }: { onActiveCh
     let cancelled = false
     let timer: number | undefined
     const poll = async () => {
-      try {
-        const active = await getActiveEmailSends()
-        if (cancelled) return
-        setSends(active)
-        if (active.length) setStarting(false)
-        if (active.some((s) => !s.finished)) fastUntil.current = Date.now() + 5_000
-      } catch {
-        if (!cancelled) setSends([])
+      if (document.visibilityState === 'visible' || Date.now() < fastUntil.current) {
+        try {
+          const active = await fetchActiveSends()
+          if (cancelled) return
+          setSends(active)
+          if (active.length) setStarting(false)
+          if (active.some((s) => !s.finished)) fastUntil.current = Date.now() + 5_000
+        } catch {
+          // Network blip or server restart: keep the last state and retry on the next tick.
+        }
       }
       if (!cancelled) timer = window.setTimeout(poll, Date.now() < fastUntil.current ? FAST_MS : IDLE_MS)
     }

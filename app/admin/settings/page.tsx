@@ -75,6 +75,12 @@ export default async function AdminSettingsPage() {
             destination={financeDestination}
             allocation={fundRule}
           />
+          <p className="mt-4 rounded-xl bg-surface-container-low px-3 py-2.5 text-xs text-on-surface-variant">
+            Members see these details from the <b>Payment details</b> button on their Contributions page, and as a PDF pinned in the Document repository.{' '}
+            <a href="/api/pdf/payment-details" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline">
+              Preview PDF
+            </a>
+          </p>
         </SettingsSectionButton>
 
         <SettingsSectionButton title="Audit retention" description="How long activity logs are kept" icon="history">

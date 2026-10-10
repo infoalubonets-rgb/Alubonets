@@ -36,14 +36,14 @@ Two account flags sit on top of the role:
 
 ### Main role and second roles
 - Every account has one **main role** plus optional **second roles** (extra dashboards, stored in `dashboardAccess`).
-- A second role gives the full abilities of that role. For example, a Secretary with Treasurer as a second role can record payments. [`requireActiveRole` in `lib/auth/session.ts`]
+- A second role gives the abilities of that role **only after selecting its workspace**. For example, a Secretary must switch to Treasurer to record payments. [`requireActiveRole` in `lib/auth/session.ts`]
 - Anyone with more than one dashboard gets a **workspace switcher** in the header to move between them. [`components/dashboard/WorkspaceSwitcher.tsx`]
-- Admin and Super Admin automatically have every dashboard. [`allowedDashboards`]
+- Admin and Super Admin can select every dashboard. Switching to Member, Secretary or another role removes Admin permissions for that workspace. Server actions and APIs enforce the selected role; opening an Admin URL does not restore Admin authority. Administrator mode also removes Super Admin privileges; select Super Administrator to use those privileges. [`allowedDashboards`]
 
 ### Executive as a second role
 - **Anyone who has the Executive dashboard is an executive**, whether it is their main role or a second role (e.g. Secretary + Executive).
 - On the Roles page this is the **"Also an Executive (second role)"** switch.
-- Executives (main or second role) can open the full Members page, show in the Executive filter, and can be published on the public About page. [`isExecutive` in `lib/directory.ts`]
+- Executive assignments (main or second role) determine the Executive filter and public About eligibility. Full Members-page access requires selecting Executive, Admin or Auditor workspace. [`isExecutive` in `lib/directory.ts`]
 
 ### Changing roles
 - Roles, second roles, Super Admin and Principal status are all changed on **Admin → Settings → Roles & access**. Only Admins can do this.
@@ -69,12 +69,12 @@ Two account flags sit on top of the role:
 | --- | --- | --- |
 | Admin, Super Admin | Everything, and can manage accounts | Members page |
 | Auditor | Everything, read-only (no account controls) | Members page |
-| Executive (main or second role) | Everything, read-only (no account controls) | Members page |
+| Executive workspace (main or assigned second role) | Everything, read-only (no account controls) | Members page |
 | Treasurer | Name, membership number, email, phone — only alongside contributions | Contributions pages |
 | Secretary | Name, email, phone — only when adding people to minutes attendance | Minutes editor |
 | Organizing Secretary (and others who send messages) | Name, email, phone — only when choosing message recipients | Communications composer |
 | Principal Member | Full details of members attached to them | My Family / Branch |
-| Attached members | Basic details (name, email, phone, status) of their own family branch | My Family / Branch |
+| Attached members | Their Principal’s name, location, phone and relationship, read-only | My Family / Branch |
 | Everyone else | No member list | — |
 
 Rules:
@@ -86,84 +86,108 @@ Rules:
 
 ## 4. What each role can do
 
-### Super Admin
-Everything an Admin can do, plus:
-- Approve someone directly as Admin; give or remove the Admin role and Admin access.
-- Make another member Super Admin, and remove it again from anyone they promoted (or anyone those people promoted).
-- Cannot be suspended or edited while Super Admin. Can only lose Super Admin to the person above them in the chain of grants.
+Each table describes the **selected workspace**. Other roles assigned to the same account do not add permissions to it. See sections 2 and 6 for shared safeguards.
+
+### Super Administrator
+
+| Role | Area / permission | What it can do | Notes / restrictions |
+| --- | --- | --- | --- |
+| Super Admin | Administration | All Administrator permissions | Select Super Administrator mode to use Super Admin authority. |
+| Super Admin | Admin appointments | Approve applicants as Admin; grant or remove Admin role/access | Ordinary Administrator cannot grant Admin access. |
+| Super Admin | Super Admin appointments | Grant Super Admin; remove eligible grants down their grant chain | Cannot remove self, the person above them, or a founding Super Admin. |
+| Super Admin | Account protection | Protected from ordinary suspension and role editing | Grant-chain rules still apply; see section 2. |
 
 ### Administrator (`ADMIN`)
-Runs the organisation. Opens every dashboard.
-- **Members:** approve or reject applications (choosing their role), suspend/restore/close accounts, set standing (paid-up / lapsed / automatic), set contribution rights, export members.
-- **Roles:** change main roles and second roles, Principal status, the role catalogue.
-- **About page:** choose which executives appear on the public About page, their title, order and which details show (photo, profession, location, email, phone). Hidden by default.
-- **Finance (oversight):** see all finances; approve ledger entries and reversals made by someone else; verify and reconcile contributions; manage campaigns and categories; open and close accounting periods; set approval thresholds, standing rules, fund allocation rules and the payment destination.
-  - Admins **cannot record payments, expenses or reversals** — only the Treasurer can. [`canRecordPayments` in `lib/finance-access.ts`]
-- **Loans:** final decision on loan applications (when loans are switched on).
-- **Governance:** decide resolutions, set their visibility and publish results; create resolutions, notices, agendas and action points.
-- **Meetings:** create, edit, delete and submit minutes; approve and publish minutes.
-- **Documents:** manage the document repository and categories.
-- **Projects & events:** manage projects, events and the gallery queue; moderate project comments.
-- **Communications:** send announcements and emails to everyone, a role group or chosen members; manage templates; retry failed emails.
-- **Support chat:** answers member chats.
-- **Settings & logs:** all site settings, feature flags, contact destinations, activity (audit) logs.
+
+| Role | Area / permission | What it can do | Notes / restrictions |
+| --- | --- | --- | --- |
+| Administrator | Members | Approve/reject applicants; suspend, restore or close accounts; set standing and contribution rights; export members | Cannot grant Admin authority or suspend a Super Admin. |
+| Administrator | Roles and family | Assign main/second roles; manage Principal status, family links and role catalogue | Admin grants need Super Admin mode; Admin role cannot be disabled. |
+| Administrator | Public About page | Choose executives, titles, order and public fields | Details are hidden until explicitly published. |
+| Administrator | Finance oversight | Read all finances; verify/reconcile payments; approve ledger entries/reversals; manage campaigns/categories | Cannot approve their own entries. Recording money requires switching to Treasurer. |
+| Administrator | Finance settings | Manage periods, thresholds, standing, allocations and payment destination | Closed-period and maker-checker safeguards apply. |
+| Administrator | Loans | Review applications and make final decisions | Loans must be enabled. Disbursement/repayment recording requires Treasurer mode. |
+| Administrator | Governance | Create/edit/delete proposals; decide resolutions; set visibility; publish results; manage notices, agendas and action points | Reasons and audit records apply to changes. |
+| Administrator | Meetings and documents | Create/edit/delete/submit minutes; approve/publish minutes; manage repository documents, reports and categories | Submitted content and document workflow checks apply. |
+| Administrator | Projects, events and gallery | Manage projects, events, gallery queue and project-comment moderation | Deletion/moderation safeguards apply. |
+| Administrator | Communications and support | Send announcements/emails; manage templates; retry failed emails; answer support chats | Recipient and delivery rules apply. |
+| Administrator | Settings and logs | Manage site settings, flags and contact destinations; read/export activity logs | Audit records are not editable from the app. |
+| Administrator | Personal features | Use shared Member features | Personal data and ownership restrictions still apply. |
 
 ### Executive Committee (`EXECUTIVE`)
-Leaders of the organisation.
-- **Members:** open the full Members page (read-only).
-- **Meetings:** approve and publish minutes submitted by the Secretary.
-- **Projects:** create and manage projects; moderate project comments; see full project finances.
-- **Welfare:** approve welfare requests after the Treasurer has reviewed them (when welfare is switched on).
-- **Communications:** send announcements to members.
-- **Daily activities:** post to the Activities feed.
-- **Support chat:** answers member chats.
-- **About page:** can be shown on the public About page once an Admin switches them on.
-- Plus everything a Member can do.
+
+| Role | Area / permission | What it can do | Notes / restrictions |
+| --- | --- | --- | --- |
+| Executive Committee | Members | Read the full member directory | No membership approval, role editing, export or administrative family linking. |
+| Executive Committee | Minutes approval | Approve and publish submitted minutes | Shared with Admin; Secretary prepares and submits minutes. |
+| Executive Committee | Projects | Create/edit/delete projects; manage milestones, responsible people and schedules; view full project finances | Shared with Admin and Organizing Secretary. |
+| Executive Committee | Project comments | Moderate comments | Shared with Admin; a reason is required. |
+| Executive Committee | Welfare | Give Executive approval or reject a pending request | Both Treasurer and Executive office approvals are needed; either can review first. No ordinary self-approval. The code permits one account with both workspaces to perform both reviews. |
+| Executive Committee | Communications and activities | Send announcements; post activities; delete their own activity posts | Admin can delete any activity post. |
+| Executive Committee | Support | Answer member support chats | Shared with Admin. |
+| Executive Committee | Public About page | Be listed as an executive | Admin controls publication and visible details. |
+| Executive Committee | Personal features | Use shared Member features | Module, record, audience and ownership restrictions apply. |
+| Executive Committee | Excluded powers | Cannot manage roles/settings, record money, decide loans, manage repository documents/events or create/decide governance proposals | Must select another assigned workspace for those office functions. |
 
 ### Treasurer (`TREASURER`)
-The only role that moves money in the books.
-- **Records** payments, expenses and disbursements, and **proposes reversals**, through the ledger. [`requireTreasurer`]
-- **Verifies** member-submitted payments — but never one they recorded themselves (maker-checker).
-- **Approves** ledger entries and reversals made by someone else.
-- **Reconciles** confirmed payments (Reconcile button on each contribution row) and matches unmatched M-Pesa payments to members.
-- Manages campaigns, contribution categories and campaign obligations (waive/restore).
-- Emails receipts; sees M-Pesa payment notifications.
-- **Loans:** first review of loan applications; can publish a funding request to governance.
-- **Welfare:** first review of welfare requests.
-- Sees every member's contributions, with limited member details (see section 3).
-- Plus everything a Member can do.
+
+| Role | Area / permission | What it can do | Notes / restrictions |
+| --- | --- | --- | --- |
+| Treasurer | Money recording | Record payments, expenses, disbursements and repayments; propose reversals | Requires active Treasurer workspace; accounting-period rules apply. |
+| Treasurer | Verification and approval | Verify payments; approve others’ ledger entries and reversals | Cannot verify/approve an entry they recorded; role switching does not bypass account-ID checks. |
+| Treasurer | Reconciliation | Reconcile confirmed payments; match unmatched M-Pesa payments | Closed-period restrictions apply. |
+| Treasurer | Campaigns and receipts | Manage campaigns, contribution categories and obligations; email receipts; see M-Pesa notifications | Waiver/restoration and audit rules apply. |
+| Treasurer | Financial visibility | See every member’s contributions | Member contact details are limited to the financial context. |
+| Treasurer | Loans | First review; publish funding requests to governance; record disbursements/repayments | Admin can also review; final decision belongs to Admin. |
+| Treasurer | Welfare | Give Treasurer review/approval or reject a pending request | Executive approval is also required; welfare must be enabled. |
+| Treasurer | Governance | Create proposals with attachments; edit/delete proposals with a reason | Admin decides resolutions and publishes results. |
+| Treasurer | Communications | Announcement sending action permits Treasurer | Default Treasurer sidebar does not expose the composer. |
+| Treasurer | Personal features | Use shared Member features | No general membership administration or site settings access. |
 
 ### Secretary (`SECRETARY`)
-- **Meetings:** create, edit, delete and submit minutes for approval. Attendance can be picked from members in the system (name, email, phone) **or** typed in for guests.
-- **Governance:** circulate meeting notices, add agenda items and action points, submit minutes for approval, create minutes revisions, create resolutions.
-- **Proposals (Admin, Super Admin, Treasurer and Secretary):** edit or delete an existing proposal on Governance management. Both need a reason and are written to the activity log (`RESOLUTION_UPDATE`, `RESOLUTION_DELETE`), with the old wording kept there. [`updateResolution`, `deleteResolution` in `app/actions/governance.ts`]
-- **Documents:** upload, replace, archive, delete and restore repository documents and reports.
-- **Events:** create and manage events.
-- **Communications:** send announcements to members.
-- **Daily activities:** post to the Activities feed.
-- Plus everything a Member can do.
+
+| Role | Area / permission | What it can do | Notes / restrictions |
+| --- | --- | --- | --- |
+| Secretary | Meeting preparation | Create/edit/delete minutes; record attendance; submit for approval | Attendance supports system members and typed guests; Admin/Executive publishes submitted minutes. |
+| Secretary | Governance preparation | Circulate notices; add agenda/action points; create minutes revisions and proposals | Cannot decide resolutions or publish results. |
+| Secretary | Proposal changes | Edit/delete proposals | Reason required; changes are audited. |
+| Secretary | Documents and reports | Upload, replace, archive, delete individually/in bulk and restore | Document-category creation is Admin-only. |
+| Secretary | Events | Create/manage events | Event workflow restrictions apply. |
+| Secretary | Communications and activities | Send announcements; post activities; delete own activity posts | Cannot delete other people’s activity posts. |
+| Secretary | Personal features | Use shared Member features | No full member directory; attendance selection exposes limited contact details. |
 
 ### Organizing Secretary (`ORGANIZER`)
-- **Events:** create and manage events and invitations.
-- **Projects:** create and manage projects.
-- **Gallery:** manage the gallery and its queue.
-- **Communications:** send messages and announcements, choosing recipients with limited member details (name, email, phone).
-- **Daily activities:** post to the Activities feed.
-- Plus everything a Member can do.
+
+| Role | Area / permission | What it can do | Notes / restrictions |
+| --- | --- | --- | --- |
+| Organizing Secretary | Events | Create/manage events and invitations | Includes event-management pages. |
+| Organizing Secretary | Projects | Create/edit/delete projects; manage milestones, responsible people and schedules | Project-comment moderation belongs to Admin/Executive. |
+| Organizing Secretary | Project finance | See full project financial information | Does not permit recording money. |
+| Organizing Secretary | Gallery | Manage gallery and approval queue | Gallery workflow and audit rules apply. |
+| Organizing Secretary | Communications and activities | Send announcements/messages; post activities; delete own activity posts | Recipient selection exposes limited member contact details. |
+| Organizing Secretary | Personal features | Use shared Member features | No membership administration, site settings, minutes approval or governance proposal management. |
 
 ### Member (`MEMBER`)
-- See their own contributions and statements, and pay via M-Pesa.
-- Read announcements, governance, documents they are allowed to see, meetings & reports, projects and events.
-- Vote on resolutions, RSVP to events, update action points assigned to them.
-- Apply for welfare and loans, and respond to guarantor requests (when switched on).
-- Manage their own profile and family branch; chat with support.
 
-### Auditor (`AUDITOR`) — read-only
-- Financial reports, activity logs, meetings & reports, governance, documents, announcements.
-- Full Members page, read-only.
-- Sees every member's contributions.
-- **Cannot create, edit, approve or delete anything.**
+| Role | Area / permission | What it can do | Notes / restrictions |
+| --- | --- | --- | --- |
+| Member | Personal contributions | See own contributions/statements; pay via M-Pesa | Cannot see all members’ finances or verify/record ledger payments. |
+| Member | Group information | Read permitted announcements, governance, documents, meetings/reports, projects and events | Audience, publication and document access rules apply. |
+| Member | Participation | Vote on eligible resolutions; RSVP; update assigned action points | Only eligible records and own/assigned actions. |
+| Member | Applications | Apply for loans/welfare; respond to guarantor requests | Modules must be enabled; cannot approve own applications. |
+| Member | Profile and family | Manage own profile; see own Principal/attached members; use permitted Principal branch functions | Principal status is separate from role. No all-member list or Admin linking controls. |
+| Member | Support | Chat with support | Cannot answer other members’ support chats. |
+| Member | Excluded powers | No administrative membership/role/settings controls or staff approvals | An Admin in Member mode has these same restrictions. |
 
+### Auditor (`AUDITOR`)
+
+| Role | Area / permission | What it can do | Notes / restrictions |
+| --- | --- | --- | --- |
+| Auditor | Financial oversight | Read financial reports and every member’s contributions | Read-only; cannot record, reconcile or approve money. |
+| Auditor | Member directory | Read full member details | No account management controls or member CSV export. |
+| Auditor | Group records | Read permitted meetings/reports, governance, documents and announcements | Publication and audience restrictions apply. |
+| Auditor | Audit trail | Read activity logs | Cannot edit or delete audit records. |
+| Auditor | Excluded powers | Cannot create/edit/delete operational records, vote or approve decisions | Auditor workspace is oversight only. |
 ---
 
 ## 5. Principal Member rules
@@ -182,14 +206,14 @@ The only role that moves money in the books.
 
 - **Maker-checker:** the person who records a payment or ledger entry cannot verify or approve it.
 - **Closed periods:** payments in a closed accounting period cannot be reconciled or changed; edits after close are flagged.
-- **Recording money:** Treasurer only (main or second role). Admin and Super Admin see everything but cannot record.
-- **Seeing all finances:** Admin, Super Admin, Treasurer (main or second role) and Auditor. Everyone else sees only their own (and a Principal sees their branch). [`canViewAllFinances`]
+- **Recording money:** active Treasurer workspace only. Admin and Super Admin must explicitly switch to Treasurer to record; the maker-checker rule still uses their account ID, so switching roles cannot approve their own entry.
+- **Seeing all finances:** Admin, Super Admin, active Treasurer workspace and Auditor. Everyone else sees only their own (and a Principal sees their branch). [`canViewAllFinances`]
 
 ---
 
 ## 7. Notifications per role
 
-The Notifications page lists **to-dos** (things to act on) and **notifications** (things to know about) for every role the person holds.
+The Notifications page lists **to-dos** (things to act on) and **notifications** (things to know about) for the selected workspace. Other assigned roles do not add their permissions to that workspace.
 
 | Role | To-dos |
 | --- | --- |
@@ -213,13 +237,42 @@ Order: Overview · Notifications · Members · Finance · Projects & events · M
 | Role | Sections shown (header buttons in brackets) |
 | --- | --- |
 | Admin | Overview (Activities), Notifications, Members (Approvals), Finance (Contributions, Loans), Projects & events (Events, Gallery queue), Meetings & reports, Communications, Documents (Document repository), Governance, My Family, Settings (Roles & access, Activity logs) |
-| Executive | Overview, Notifications, Members, Finance (Payments & statements, Loans, Welfare approvals), Projects & events (Events), Meetings & reports, Communications, Documents, Governance, My Family |
-| Treasurer | Overview, Notifications, Finance (Financial ledger, Campaigns, Financial reports, My contributions, Loans, Welfare), Projects & events (Events), Meetings & reports, Documents, Governance, My Family |
-| Secretary | Overview, Notifications, Finance, Projects & events (Manage events, Events), Meetings & reports, Communications, Documents (Document repository), Governance, My Family |
-| Organizing Secretary | Overview, Notifications, Finance, Projects & events (Manage events, Gallery), Meetings & reports, Communications, Documents, Governance, My Family |
-| Member | Overview, Notifications, Finance (Loans, Welfare), Projects & events (Events), Meetings & reports, Documents, Governance, My Family |
+| Executive | Overview (Activities), Notifications, Members, Finance (Payments & statements, Loans, Welfare approvals), Projects & events (Events), Meetings & reports, Communications, Documents, Governance, My Family |
+| Treasurer | Overview (Activities), Notifications, Finance (Financial ledger, Campaigns, Financial reports, My contributions, Loans, Welfare), Projects & events (Events), Meetings & reports, Documents, Governance, My Family |
+| Secretary | Overview (Activities), Notifications, Finance, Projects & events (Manage events, Events), Meetings & reports, Communications, Documents (Document repository), Governance, My Family |
+| Organizing Secretary | Overview (Activities), Notifications, Finance, Projects & events (Manage events, Gallery), Meetings & reports, Communications, Documents, Governance, My Family |
+| Member | Overview (Activities), Notifications, Finance (Loans, Welfare), Projects & events (Events), Meetings & reports, Documents, Governance, My Family |
 | Auditor | Notifications, Members, Finance, Meetings & reports, Documents, Governance, Activity logs (in the Settings position) |
 
 Everyone reads group notices on **Notifications**. Communications is only for the roles that send them. [`app/notifications/page.tsx`]
 
 Loans and Welfare appear for the relevant roles when those modules are switched on. [`lib/dashboard/nav.ts`]
+
+
+## 9. Executive Committee compared with other roles
+
+These are the implemented permissions, not additional permissions automatically granted by a committee title. An account assigned Executive as a second role must select the Executive workspace to use them.
+
+| Capability | Executive | Other roles with the capability | Limits |
+| --- | --- | --- | --- |
+| Approve and publish submitted meeting minutes | Yes | Admin | Minutes must be pending approval and contain content. Secretary prepares/submits them; Secretary cannot publish them in Secretary mode. |
+| Give Executive welfare approval | Yes | Admin can act for the Executive office | Treasurer gives a separate approval. Both office approvals are needed; the code currently permits one account with both authorized workspaces to complete both. Executive cannot replace the Treasurer review in Executive mode. |
+| View the full member directory | Read-only | Admin manages it; Auditor reads it | No approval, suspension, role editing, export or family-linking controls. |
+| Create, edit and delete projects; manage milestones, responsible people and schedules | Yes | Admin, Organizing Secretary | Project management access is shared, not exclusive to Executive. |
+| Moderate project comments | Yes | Admin | Organizing Secretary cannot moderate through this action. A reason is required. |
+| View project financial information | Yes | Admin and Organizing Secretary | Viewing does not allow recording money. |
+| Send announcements and post activities | Yes | Admin, Secretary, Organizing Secretary; Treasurer announcement action | Audience, ownership and record checks still apply. Non-Admin activity creators delete only their own posts. |
+| Answer support chats | Yes | Admin | Access follows the support-chat rules, not general membership administration. |
+
+Executive **cannot** assign roles, approve memberships, manage family links for the whole group, change site settings, record ledger payments/expenses/disbursements, give final loan decisions, create/edit governance proposals, decide resolutions, manage repository documents, or create/manage events in Executive mode. Those tasks belong to the appropriate office. Executive can still vote on eligible resolutions and use personal Member features.
+
+There is no Executive power that excludes Super Administrator or Administrator across the entire app. Its distinction is the committee approval and oversight office, especially minutes publication and the Executive half of welfare approval. It is separate from the Treasurer’s financial recording office and the Secretary’s preparation/document office.
+
+## 10. Family and audit visibility
+
+- Admin/Super Administrator workspace: full family management, all members, Assign/Transfer/Link controls and administrative navigation.
+- Member and other personal workspaces: own Principal and own attached members only; no all-member list or Admin linking controls. A person without a Principal or attached members sees the empty state, not their own details as an attached member.
+- Principal status is an account/branch relationship, not a workspace role. Principals see attached members’ full details read-only; attached members see limited Principal details.
+- Audit details show actor name/email, the primary role when used, or primary plus the secondary role actually used. They give a short explanation of the change. The UI omits raw JSON and unrelated role lists; the stored audit record remains intact.
+
+Implementation references: `lib/auth/workspace.ts`, `lib/auth/session.ts`, `app/api/auth/workspace/route.ts`, `app/actions/meetings.ts`, `app/actions/welfare.ts`, `app/actions/projects.ts`, `app/actions/domain.ts`, `app/actions/governance.ts`, `app/actions/documents.ts`, `lib/audit.ts`.

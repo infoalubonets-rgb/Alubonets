@@ -43,7 +43,7 @@ export async function GET() {
         isSuperAdmin: profile.isSuperAdmin,
         dashboardAccess: profile.dashboardAccess,
         activeWorkspace: selectedWorkspace(profile, (await cookies()).get(WORKSPACE_COOKIE)?.value),
-    activeSuperAdmin: selectedWorkspaceMode(profile, (await cookies()).get(WORKSPACE_COOKIE)?.value) === 'SUPER_ADMIN',
+        activeSuperAdmin: selectedWorkspaceMode(profile, (await cookies()).get(WORKSPACE_COOKIE)?.value) === 'SUPER_ADMIN',
         isPrincipal,
         disabledRoles: await getDisabledRoles().catch(() => []),
       },

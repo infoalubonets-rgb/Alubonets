@@ -53,6 +53,9 @@ dev-accounts.local.json
 credentials.json
 service-account*.json
 
+# local data backups (may contain personal data)
+/backups/
+
 # vercel
 .vercel
 

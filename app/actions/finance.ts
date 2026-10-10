@@ -825,30 +825,53 @@ export async function verifyContribution(formData: FormData) {
 
 export async function publishFinanceDestination(formData: FormData) {
   const actor = await requireAdmin()
+  const optional = (max: number) => z.string().trim().max(max)
   const data = z.object({
-    bankName: z.string().trim().min(2).max(120),
-    accountName: z.string().trim().min(2).max(120),
-    accountNumber: z.string().trim().min(4).max(40),
-    paybillOrTill: z.string().trim().max(40).optional().or(z.literal('')),
-    branchName: z.string().trim().max(120).optional().or(z.literal('')),
-    notes: z.string().trim().max(500).optional().or(z.literal('')),
+    bankName: optional(120),
+    accountName: optional(120),
+    accountNumber: optional(40),
+    paybillOrTill: optional(40),
+    branchName: optional(120),
+    mpesaType: z.enum(['TILL', 'PAYBILL', '']),
+    mpesaNumber: z.string().trim().regex(/^\d{0,12}$/, 'M-Pesa number must be digits only'),
+    mpesaAccount: optional(60),
+    mpesaName: optional(120),
+    notes: optional(500),
   }).parse({
-    bankName: formData.get('bankName'),
-    accountName: formData.get('accountName'),
-    accountNumber: formData.get('accountNumber'),
+    bankName: formData.get('bankName') || '',
+    accountName: formData.get('accountName') || '',
+    accountNumber: formData.get('accountNumber') || '',
     paybillOrTill: formData.get('paybillOrTill') || '',
     branchName: formData.get('branchName') || '',
+    mpesaType: formData.get('mpesaType') || '',
+    mpesaNumber: formData.get('mpesaNumber') || '',
+    mpesaAccount: formData.get('mpesaAccount') || '',
+    mpesaName: formData.get('mpesaName') || '',
     notes: formData.get('notes') || '',
   })
+
+  const anyBank = Boolean(data.bankName || data.accountName || data.accountNumber || data.paybillOrTill || data.branchName)
+  const hasBank = Boolean(data.bankName && data.accountName && data.accountNumber)
+  if (anyBank && !hasBank) throw new Error('Bank details need a bank name, account name and account number.')
+  if (hasBank && data.accountNumber.length < 4) throw new Error('Account number looks too short.')
+  const hasMpesa = Boolean(data.mpesaNumber)
+  if (hasMpesa && !data.mpesaType) throw new Error('Choose whether the M-Pesa number is a Till or a Paybill.')
+  if (hasMpesa && data.mpesaNumber.length < 5) throw new Error('M-Pesa number looks too short.')
+  if (!hasBank && !hasMpesa) throw new Error('Add bank details, an M-Pesa Till/Paybill, or both.')
+  const isPaybill = hasMpesa && data.mpesaType === 'PAYBILL'
 
   await prisma.financeSettingVersion.updateMany({ where: { active: true }, data: { active: false } })
   const version = await prisma.financeSettingVersion.create({
     data: {
-      bankName: data.bankName,
-      accountName: data.accountName,
-      accountNumber: data.accountNumber,
-      paybillOrTill: data.paybillOrTill || null,
-      branchName: data.branchName || null,
+      bankName: hasBank ? data.bankName : '',
+      accountName: hasBank ? data.accountName : '',
+      accountNumber: hasBank ? data.accountNumber : '',
+      paybillOrTill: (hasBank && data.paybillOrTill) || null,
+      branchName: (hasBank && data.branchName) || null,
+      mpesaType: hasMpesa ? data.mpesaType : null,
+      mpesaNumber: hasMpesa ? data.mpesaNumber : null,
+      mpesaAccount: (isPaybill && data.mpesaAccount) || null,
+      mpesaName: (hasMpesa && data.mpesaName) || null,
       notes: data.notes || null,
       active: true,
       changedById: actor.id,

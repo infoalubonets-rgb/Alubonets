@@ -1,13 +1,21 @@
-'use server'
-
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
 
 /** How long a finished send stays in the banner so the admin sees the final result. */
 const FINISHED_WINDOW_MS = 60_000
 
-/** Lean poll endpoint for the admin email-send banner — keep this file free of heavy imports. */
-export async function getActiveEmailSends() {
+export type ActiveEmailSend = {
+  id: string
+  title: string
+  total: number
+  sent: number
+  failed: number
+  pending: number
+  finished: boolean
+}
+
+/** Lean query behind the admin email-send banner poll — keep this file free of heavy imports. */
+export async function getActiveEmailSends(): Promise<ActiveEmailSend[]> {
   try {
     const profile = await getSessionProfile()
     if (!profile || (profile.role !== 'ADMIN' && !profile.isSuperAdmin)) return []

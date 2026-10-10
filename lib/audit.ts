@@ -1,3 +1,6 @@
+import { cookies } from 'next/headers'
+import { WORKSPACE_COOKIE, selectedWorkspace } from '@/lib/auth/workspace'
+import type { Role } from '@/lib/auth/types'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { actingRoleFor, auditActorRole, isOutsidePrimaryRole } from '@/lib/audit-roles'
@@ -20,16 +23,27 @@ export async function writeAudit(entry: AuditEntry): Promise<void> {
   try {
     // Snapshot the actor's primary role now, so a later role change can't hide what they did.
     const actor = entry.userId
-      ? await prisma.user.findUnique({ where: { id: entry.userId }, select: { role: true, isSuperAdmin: true, dashboardAccess: true } })
+      ? await prisma.user.findUnique({ where: { id: entry.userId }, select: { id: true, role: true, isSuperAdmin: true, dashboardAccess: true } })
       : null
     const actorRole = actor ? auditActorRole(actor) : null
     const actorSecondaryRoles = (actor?.dashboardAccess ?? []).filter((role) => role !== actorRole)
+    let actingRole = actingRoleFor(entry.action, actorRole, actorSecondaryRoles)
+    if (actor) {
+      // Request-bound workspace records the role actually used, not all available roles.
+      // Background jobs have no request cookies and retain the legacy inference.
+      try {
+        const preference = (await cookies()).get(WORKSPACE_COOKIE)?.value
+        if (preference?.startsWith(`${actor.id}:`)) {
+          actingRole = selectedWorkspace({ ...actor, dashboardAccess: actor.dashboardAccess as Role[] }, preference)
+        }
+      } catch {}
+    }
     await prisma.auditLog.create({
       data: {
         actorRole,
         actorSecondaryRoles,
-        actingRole: actingRoleFor(entry.action, actorRole, actorSecondaryRoles),
-        outsideRole: isOutsidePrimaryRole(entry.action, actorRole),
+        actingRole,
+        outsideRole: actingRole ? actingRole !== actorRole : isOutsidePrimaryRole(entry.action, actorRole),
         userId: entry.userId ?? null,
         action: entry.action,
         entity: entry.entity ?? null,

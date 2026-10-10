@@ -26,6 +26,7 @@ const SUPPORT_CHAT_NAV: NavItem = { icon: 'support_agent', label: 'Support chat'
 const FAMILY_NAV: NavItem = { icon: 'family_restroom', label: 'My Family', href: '/dashboard/member/family' }
 const MEMBERS_NAV: NavItem = { icon: 'manage_accounts', label: 'Members', href: '/directory' }
 
+/** Activities is not in the sidebar — it shows as a button in the header of every Overview page. */
 const overview = (href: string): NavItem => ({ icon: 'dashboard', label: 'Overview', href, children: [ACTIVITIES_NAV] })
 const finance = (href: string, children: NavItem[] = []): NavItem => ({ icon: 'account_balance', label: 'Finance', href, children })
 const projectsAndEvents = (href: string, children: NavItem[]): NavItem => ({ icon: 'work', label: 'Projects & events', href, children })

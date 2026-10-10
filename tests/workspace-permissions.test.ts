@@ -18,7 +18,7 @@ describe('workspace permission isolation', () => {
     expect(effective.isSuperAdmin).toBe(false)
     expect(effective.dashboardAccess).toEqual([])
   })
-  it('restores permitted Admin authority only when Admin is selected', () => {
+  it('restores Super Admin authority only when Super Administrator is selected', () => {
     expect(workspaceProfile(account, workspaceCookieValue(account.id, 'SUPER_ADMIN')).isSuperAdmin).toBe(true)
   })
   it('removes Super Admin authority in Administrator mode', () => {
@@ -29,6 +29,12 @@ describe('workspace permission isolation', () => {
   it('cannot grant an ordinary member Admin through a modified cookie', () => {
     const member = { id: 'member', role: 'MEMBER' as const }
     expect(selectedWorkspace(member, workspaceCookieValue(member.id, 'ADMIN'))).toBe('MEMBER')
+  })
+  it('cannot grant an ordinary Administrator Super Admin authority', () => {
+    const ordinary = { id: 'ordinary-admin', role: 'ADMIN' as const }
+    const effective = workspaceProfile(ordinary, workspaceCookieValue(ordinary.id, 'SUPER_ADMIN'))
+    expect(effective.role).toBe('ADMIN')
+    expect(effective.isSuperAdmin).toBe(false)
   })
   it('accepts assigned second roles without inheriting permissions from them', () => {
     const member = { id: 'member', role: 'MEMBER' as const, dashboardAccess: ['SECRETARY' as const] }

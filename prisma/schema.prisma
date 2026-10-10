@@ -1696,6 +1696,12 @@ model FinanceSettingVersion {
   paybillOrTill String?
   branchName    String?
   notes         String?
+  /// Separate M-Pesa destination: TILL or PAYBILL.
+  mpesaType     String?
+  mpesaNumber   String?
+  /// Account number members enter when paying the M-Pesa Paybill.
+  mpesaAccount  String?
+  mpesaName     String?
   active        Boolean  @default(true)
   changedById   String?
   changedBy     User?    @relation("FinanceSettingEditor", fields: [changedById], references: [id], onDelete: SetNull)

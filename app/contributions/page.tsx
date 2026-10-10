@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { TAGS } from '@/lib/data/queries'
 import type { Role } from '@/lib/auth/types'
 import ContributionsClient from '@/components/dashboard/ContributionsClient'
-import OfficialPaymentDestination from '@/components/dashboard/OfficialPaymentDestination'
+import PaymentDetailsButton from '@/components/dashboard/PaymentDetailsButton'
 import { getActiveFinanceDestination } from '@/app/actions/finance'
 import { canViewAllFinances } from '@/lib/finance-access'
 import ContributionTabs from '@/components/dashboard/ContributionTabs'
@@ -164,16 +164,32 @@ export default async function ContributionsPage({ searchParams }: { searchParams
       </DashboardShell>
     )
   }
+  const paymentDetails = destination && {
+    bankName: destination.bankName,
+    accountName: destination.accountName,
+    accountNumber: destination.accountNumber,
+    paybillOrTill: destination.paybillOrTill,
+    branchName: destination.branchName,
+    mpesaType: destination.mpesaType,
+    mpesaNumber: destination.mpesaNumber,
+    mpesaAccount: destination.mpesaAccount,
+    mpesaName: destination.mpesaName,
+    notes: destination.notes,
+  }
   return (
     <DashboardShell
       role={role}
       title={title}
       nav={navForRole(role)}
-      pageAction={seesAll ? <ContributionTabs active="mine" /> : undefined}
+      pageAction={
+        <div className="flex flex-wrap items-center gap-2">
+          <PaymentDetailsButton destination={paymentDetails} />
+          {seesAll && <ContributionTabs active="mine" />}
+        </div>
+      }
     >
-      <div className="mx-auto max-w-3xl space-y-4 pb-4 pt-4 px-4 md:px-0">
-        <OfficialPaymentDestination destination={destination} />
-        {role === 'TREASURER' && (
+      {role === 'TREASURER' && (
+        <div className="mx-auto max-w-3xl pb-4 pt-4 px-4 md:px-0">
           <p className="rounded-2xl border border-outline-variant bg-surface p-4 text-sm text-on-surface-variant">
             Only the Treasurer records payments. Open the{' '}
             <a href="/dashboard/treasurer/ledger" className="font-semibold text-primary underline">
@@ -181,8 +197,8 @@ export default async function ContributionsPage({ searchParams }: { searchParams
             </a>{' '}
             to add a contribution for a member.
           </p>
-        )}
-      </div>
+        </div>
+      )}
       <ContributionsClient
         contributions={contributions.map((c) => ({
           id: c.id,

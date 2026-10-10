@@ -1,8 +1,7 @@
 'use client'
 
-import { switchWorkspace } from '@/app/actions/workspace'
 import { allowedDashboards, ROLE_HOME, ROLE_LABEL, roleForDashboardPath, type AuthUser, type Role } from '@/lib/auth/types'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 const SUPER_ADMIN_OPTION = 'SUPER_ADMIN'
@@ -12,7 +11,6 @@ type Props = {
 }
 
 export default function WorkspaceSwitcher({ user }: Props) {
-  const router = useRouter()
   const pathname = usePathname()
   const workspaces = allowedDashboards({
     role: user.role,
@@ -49,9 +47,14 @@ export default function WorkspaceSwitcher({ user }: Props) {
             setError('')
             startSwitch(async () => {
               try {
-                await switchWorkspace(value)
-                router.push(href)
-                router.refresh()
+                const response = await fetch('/api/auth/workspace', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ role: value }),
+                })
+                const result = await response.json()
+                if (!response.ok) throw new Error(result.error || 'Could not switch workspace.')
+                window.location.assign(href)
               } catch (cause) {
                 setError(cause instanceof Error ? cause.message : 'Could not switch workspace.')
                 setTarget(null)
@@ -72,7 +75,7 @@ export default function WorkspaceSwitcher({ user }: Props) {
           </option>
         ))}
       </select>
-      {error && <span role="alert" className="text-xs text-error">{error}</span>}
+      {error && <span role="alert" className="max-w-[220px] text-xs text-error">{error}</span>}
       {switching && (
         <span className="flex items-center gap-1 text-[11px] font-semibold text-secondary" role="status">
           <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>

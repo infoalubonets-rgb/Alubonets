@@ -162,22 +162,25 @@ export async function POST(req: Request) {
     void clearRateLimit(rateKey).catch((cause) =>
       logError('auth.login.clear_rate_limit', cause, { email }),
     )
-    void prisma.loginEvent
-      .create({
-        data: {
-          userId: profile.id,
-          email,
-          success: true,
-          ipAddress,
-          userAgent: req.headers.get('user-agent'),
-        },
-      })
-      .catch((cause) => logError('auth.login.event', cause, { email }))
+    const signedInUserId = profile.id
+    const recordSuccessfulLogin = () =>
+      prisma.loginEvent
+        .create({
+          data: {
+            userId: signedInUserId,
+            email,
+            success: true,
+            ipAddress,
+            userAgent: req.headers.get('user-agent'),
+          },
+        })
+        .catch((cause) => logError('auth.login.event', cause, { email }))
 
     const loginCookieStore = await cookies()
     loginCookieStore.delete(WORKSPACE_COOKIE)
 
     if (profile.status === 'PENDING') {
+      await recordSuccessfulLogin()
       return NextResponse.json({
         user: toAuthUser(profile),
         redirectTo: '/pending',
@@ -240,6 +243,8 @@ export async function POST(req: Request) {
         })
       }
     }
+
+    await recordSuccessfulLogin()
 
     if (profile.failedLoginCount > 0 || profile.lockedUntil) {
       await prisma.user.update({

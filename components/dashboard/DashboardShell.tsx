@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import dynamic from 'next/dynamic'
+import EmailSendProgressBanner from './EmailSendProgressBanner'
 import {
   useEffect,
   useRef,
@@ -15,6 +15,7 @@ import { ADMIN_SIDEBAR_LOGO } from '@/lib/constants'
 import { logoutRequest, meLookup, type AuthUser, type Role } from '@/lib/auth/client'
 import { ROLE_LABEL, roleForDashboardPath } from '@/lib/auth/types'
 import ThemeLoader from '@/components/ui/ThemeLoader'
+import { activeNavGroup as getActiveNavGroup } from '@/lib/dashboard/active-nav'
 import { navForRole } from '@/lib/dashboard/nav'
 import DashboardNav from './DashboardNav'
 import { useDashboardUser } from './DashboardUserProvider'
@@ -24,7 +25,6 @@ import OldMonthPill from './OldMonthPill'
 import { NOTIFICATIONS_ALL_READ_EVENT, NOTIFICATIONS_READ_EVENT } from './NotificationActions'
 import UploadProgressToast from '@/components/ui/UploadProgressToast'
 
-const EmailSendProgressBanner = dynamic(() => import('./EmailSendProgressBanner'), { ssr: false })
 
 export type NavItem = {
   icon: string
@@ -82,6 +82,10 @@ const SIDEBAR_COLLAPSED_WIDTH = 68
 const MOBILE_DRAWER_WIDTH = 308
 const DESKTOP_MQ = '(min-width: 768px)'
 
+function subscribeNever() {
+  return () => {}
+}
+
 function subscribeDesktop(onStoreChange: () => void) {
   const mq = window.matchMedia(DESKTOP_MQ)
   mq.addEventListener('change', onStoreChange)
@@ -127,6 +131,8 @@ export default function DashboardShell({
   const [signingOut, setSigningOut] = useState(false)
   const [emailsSending, setEmailsSending] = useState(false)
   const [welcome, setWelcome] = useState('')
+  // The greeting depends on the browser clock and live session, so it is drawn only after hydration.
+  const hydrated = useSyncExternalStore(subscribeNever, () => true, () => false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const isDesktop = useSyncExternalStore(subscribeDesktop, getDesktopSnapshot, getDesktopServerSnapshot)
   const pageScrollRef = useRef<HTMLElement>(null)
@@ -134,22 +140,14 @@ export default function DashboardShell({
   const workspaceRole = roleForDashboardPath(pathname)
   const roleLabel = (value: Role) => (value === 'MEMBER' && user?.isPrincipal ? 'Principal Member' : ROLE_LABEL[value])
   // The sidebar and overview name the workspace you are in — the role whose pages and menu are
-  // showing (e.g. Secretary after switching). The profile at the top right keeps your own role.
+  // showing (e.g. Secretary after switching), including the role label at the top right.
   const displayRole = role === 'ADMIN' && user?.activeSuperAdmin ? 'Super Administrator' : roleLabel(role)
   const deactivatedWorkspace =
     workspaceRole && user?.disabledRoles?.includes(workspaceRole) ? workspaceRole : null
   const isOverviewPage = pathname === '/admin' || /^\/dashboard\/(member|treasurer|executive|secretary|organizer)$/.test(pathname)
   // notificationCount already includes unread announcements and every role to-do.
   const notificationTotal = notificationCount + supportBellCount + paymentNotifCount
-  const activeNavGroup = nav.reduce<{ item: NavItem; score: number } | null>((best, item) => {
-    const score = [item, ...(item.children || [])].reduce((longest, candidate) => {
-      const href = candidate.href
-      return href && (pathname === href || pathname.startsWith(`${href}/`))
-        ? Math.max(longest, href.length)
-        : longest
-    }, 0)
-    return score > (best?.score || 0) ? { item, score } : best
-  }, null)?.item
+  const activeNavGroup = getActiveNavGroup(pathname, nav)
   const pageLinks = activeNavGroup
     ? [activeNavGroup, ...(activeNavGroup.children || [])].filter((item) => item.href)
     : []
@@ -496,7 +494,8 @@ export default function DashboardShell({
             href="/profile"
             onClick={() => setMobileNavOpen(false)}
             title={sidebarCollapsed ? 'My profile' : undefined}
-            className={`flex min-h-11 items-center gap-sm text-on-primary bg-white/10 hover:bg-white/15 text-[13px] font-label-bold transition-colors w-full rounded-lg px-sm py-2.5 ${sidebarCollapsed ? 'justify-center' : ''}`}
+            aria-current={pathname === '/profile' ? 'page' : undefined}
+            className={`flex min-h-11 items-center gap-sm ${pathname === '/profile' ? 'text-on-primary bg-secondary-container/20' : 'text-on-primary/70'} hover:bg-white/15 text-[13px] font-label-bold transition-colors w-full rounded-lg px-sm py-2.5 ${sidebarCollapsed ? 'justify-center' : ''}`}
           >
             <span className="material-symbols-outlined text-[17px]">account_circle</span>
             {!sidebarCollapsed && 'My profile'}
@@ -566,7 +565,7 @@ export default function DashboardShell({
             </button>
             <div className="min-w-0 hidden sm:block">
               <p className="truncate text-[13px] font-label-bold leading-tight text-on-surface dark:text-blue-50">
-                {welcome || (user ? `Welcome, ${user.fullName.split(' ')[0]}` : '')}
+                {hydrated ? welcome || (user ? `Welcome, ${user.fullName.split(' ')[0]}` : '') : ' '}
               </p>
             </div>
           </div>

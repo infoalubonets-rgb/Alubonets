@@ -1,5 +1,6 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import AuditLogsTable from '@/components/admin/AuditLogsTable'
+import RecentLoginsButton from '@/components/admin/RecentLoginsButton'
 import PaginationBar from '@/components/ui/PaginationBar'
 import { ADMIN_NAV, navForRole } from '@/lib/dashboard/nav'
 import { requireActiveRole } from '@/lib/auth/session'
@@ -53,9 +54,10 @@ export default async function AdminAuditLogsPage({
       include: { user: { select: { fullName: true, email: true } } },
     }),
     prisma.loginEvent.findMany({
+      where: { success: true },
       orderBy: { createdAt: 'desc' },
-      take: 40,
-      include: { user: { select: { fullName: true, email: true } } },
+      take: 50,
+      select: { id: true, email: true, createdAt: true, user: { select: { email: true } } },
     }),
     prisma.auditLog.count({ where: { ...(createdAt ? { createdAt } : {}), outsideRole: true } }),
   ])
@@ -68,7 +70,20 @@ export default async function AdminAuditLogsPage({
   const pages = totalPages(total, pageSize)
 
   return (
-    <DashboardShell role={role} title="Activity logs" nav={nav}>
+    <DashboardShell
+      role={role}
+      title="Activity logs"
+      nav={nav}
+      pageAction={
+        <RecentLoginsButton
+          logins={loginEvents.map((event) => ({
+            id: event.id,
+            email: event.user?.email ?? event.email,
+            at: event.createdAt.toISOString(),
+          }))}
+        />
+      }
+    >
       <div className="mb-4 space-y-3">
         <form className="grid gap-2 rounded-2xl border bg-surface p-4 md:grid-cols-3">
           <input
@@ -140,29 +155,6 @@ export default async function AdminAuditLogsPage({
         totalPages={pages}
         params={{ from, to, ...(onlyFlagged ? { flagged: '1' } : {}) }}
       />
-
-      <section className="mt-8 rounded-2xl border bg-surface p-5">
-        <h2 className="font-h3 text-xl text-primary">Recent login events</h2>
-        <p className="mt-1 text-sm text-on-surface-variant">
-          Stored in LoginEvent (separate from AuditLog) for authentication history.
-        </p>
-        <ul className="mt-3 divide-y text-sm">
-          {loginEvents.map((event) => (
-            <li key={event.id} className="flex flex-wrap justify-between gap-2 py-2">
-              <span>
-                <b>{event.user?.fullName ?? event.email}</b>
-                {' · '}
-                {event.success ? 'Success' : `Failed${event.reason ? ` (${event.reason})` : ''}`}
-              </span>
-              <span className="text-on-surface-variant">
-                {event.createdAt.toLocaleString()}
-                {event.ipAddress ? ` · ${event.ipAddress}` : ''}
-              </span>
-            </li>
-          ))}
-          {!loginEvents.length && <li className="py-2">No login events yet.</li>}
-        </ul>
-      </section>
     </DashboardShell>
   )
 }

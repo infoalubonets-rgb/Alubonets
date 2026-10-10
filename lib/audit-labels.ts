@@ -1,7 +1,6 @@
 export const ACTION_LABELS: Record<string, string> = {
   MEMBER_APPROVE: 'Approved a member',
   MEMBER_REJECT: 'Rejected a member',
-  MEMBER_ROLE_CHANGE: 'Changed a member’s role',
   MEMBER_DASHBOARD_ACCESS: 'Updated dashboard access',
   MEMBER_SUSPEND: 'Suspended a member',
   MEMBER_STATUS_CHANGE: 'Restored a member',
@@ -18,16 +17,24 @@ export const ACTION_LABELS: Record<string, string> = {
   CONTACT_MESSAGE_READ: 'Marked a contact message as read',
   CONTACT_MESSAGE_DELETE: 'Deleted a contact message',
   SEED: 'Seeded the database',
+  PROJECT_RESPONSIBLE_ADD: 'Assigned a person responsible for a project',
+  PROJECT_RESPONSIBLE_REMOVE: 'Removed a person from project responsibility',
+  MEMBER_ROLE_CHANGE: 'Changed a member’s role',
 }
 
 export function formatAuditAction(action: string): string {
-  return (
-    ACTION_LABELS[action] ??
-    action
-      .replace(/_/g, ' ')
-      .toLowerCase()
-      .replace(/^\w/, (c) => c.toUpperCase())
-  )
+  if (ACTION_LABELS[action]) return ACTION_LABELS[action]
+  const words = action.toLowerCase().split('_')
+  const verbs: Record<string, string> = {
+    create: 'Created', update: 'Updated', delete: 'Deleted', remove: 'Removed',
+    add: 'Added', approve: 'Approved', reject: 'Rejected', publish: 'Published',
+    archive: 'Archived', restore: 'Restored', replace: 'Replaced', assign: 'Assigned',
+    transfer: 'Transferred', revoke: 'Revoked', complete: 'Completed',
+    change: 'Changed', send: 'Sent', reconcile: 'Reconciled', upsert: 'Saved',
+  }
+  const verb = verbs[words[words.length - 1]]
+  if (verb) return `${verb} ${words.slice(0, -1).join(' ')}`
+  return words.join(' ').replace(/^\w/, c => c.toUpperCase())
 }
 
 export function formatAuditMeta(meta: unknown): string | null {

@@ -24,17 +24,22 @@ for (const line of readFileSync(envPath, 'utf8').split('\n')) {
 
 const months = Number(process.env.AUDIT_RETENTION_MONTHS || 18)
 const dryRun = process.argv.includes('--dry-run')
+// --all clears the whole log (pre-launch reset).
+const all = process.argv.includes('--all')
 const prisma = new PrismaClient()
 
 const cutoff = new Date()
-cutoff.setMonth(cutoff.getMonth() - months)
+if (all) cutoff.setFullYear(cutoff.getFullYear() + 1)
+else cutoff.setMonth(cutoff.getMonth() - months)
 
 const count = await prisma.auditLog.count({
   where: { createdAt: { lt: cutoff } },
 })
 
 console.log(
-  `Audit retention: ${count} row(s) older than ${months} months (before ${cutoff.toISOString()})`
+  all
+    ? `Audit reset: ${count} row(s) in total will be deleted`
+    : `Audit retention: ${count} row(s) older than ${months} months (before ${cutoff.toISOString()})`
 )
 
 if (dryRun) {

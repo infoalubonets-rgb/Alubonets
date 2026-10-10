@@ -35,69 +35,6 @@ const roleName = (role: string | null) => (role ? ROLE_LABEL[role as Role] ?? ro
 
 const PAGE_SIZE = 25
 
-function jsonPreview(value: unknown): string | null {
-  if (value == null) return null
-  try {
-    return JSON.stringify(value, null, 2)
-  } catch {
-    return String(value)
-  }
-}
-
-function friendlyMetaLines(meta: unknown): { label: string; value: string }[] {
-  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return []
-  const m = meta as Record<string, unknown>
-  const lines: { label: string; value: string }[] = []
-
-  if (typeof m.role === 'string') {
-    lines.push({
-      label: 'New role',
-      value: ROLE_LABEL[m.role as Role] ?? m.role,
-    })
-  }
-  if (typeof m.status === 'string') {
-    lines.push({ label: 'Status', value: m.status })
-  }
-  if (typeof m.isSuperAdmin === 'boolean') {
-    lines.push({ label: 'Super Admin', value: m.isSuperAdmin ? 'Granted' : 'Revoked' })
-  }
-  if (Array.isArray(m.dashboardAccess)) {
-    const roles = (m.dashboardAccess as string[])
-      .map((r) => ROLE_LABEL[r as Role] ?? r)
-      .join(', ')
-    lines.push({
-      label: 'Dashboards',
-      value: roles || `${m.dashboardAccess.length} granted`,
-    })
-  }
-  if (typeof m.created === 'number') {
-    lines.push({ label: 'Rows imported', value: String(m.created) })
-  }
-  if (typeof m.amount === 'number') {
-    lines.push({ label: 'Amount', value: `KES ${m.amount.toLocaleString()}` })
-  }
-  if (typeof m.checkoutRequestId === 'string') {
-    lines.push({ label: 'Checkout request', value: m.checkoutRequestId })
-  }
-  if (typeof m.merchantRequestId === 'string') {
-    lines.push({ label: 'Merchant request', value: m.merchantRequestId })
-  }
-  if (typeof m.targetUserId === 'string') {
-    lines.push({ label: 'Payment for user ID', value: m.targetUserId })
-  }
-  if (typeof m.documentId === 'string') {
-    lines.push({ label: 'Document', value: m.documentId })
-  }
-  if (typeof m.filename === 'string') {
-    lines.push({ label: 'File', value: m.filename })
-  }
-  if (typeof m.storagePath === 'string') {
-    lines.push({ label: 'Storage path', value: m.storagePath })
-  }
-
-  return lines
-}
-
 export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
   const [query, setQuery] = useState('')
   const [visible, setVisible] = useState(PAGE_SIZE)
@@ -135,15 +72,10 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
   )
 
   const slice = filtered.slice(0, visible)
-  const oldPreview = selected ? jsonPreview(selected.oldValue) : null
-  const newPreview = selected ? jsonPreview(selected.newValue) : null
 
   return (
     <div className="space-y-4 pb-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="max-w-xl text-sm text-on-surface-variant">
-          Who did what — tap the eye for old/new values and reason. Audit records are append-only.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="relative w-full sm:w-72">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-outline">
             search
@@ -212,7 +144,7 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
                       {row.outsideRole && (
                         <span className="mt-0.5 inline-flex items-center gap-0.5 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white" title="Done through extra access, not their primary role">
                           <span className="material-symbols-outlined text-[12px]">warning</span>
-                          Outside role · {roleName(row.actorRole)}
+                          {roleName(row.actorRole)} → {roleName(row.actingRole)}
                         </span>
                       )}
                     </td>
@@ -297,107 +229,28 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
               </div>
 
               <div className="space-y-4 p-5">
-                {selected.outsideRole && (
-                  <p className="flex items-start gap-2 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-100">
-                    <span className="material-symbols-outlined text-[20px]">warning</span>
-                    Done outside this person’s primary role ({roleName(selected.actorRole)}), through extra dashboard access. Check that it was expected.
-                  </p>
-                )}
                 <DetailBlock
                   label="Done by"
                   value={selected.user?.fullName ?? 'System / removed user'}
-                  hint={[selected.user?.email, selected.actorRole ? `Primary role: ${roleName(selected.actorRole)}` : null].filter(Boolean).join(' · ') || null}
+                  hint={selected.user?.email}
                 />
                 {selected.actorRole && (
-                  <div className="rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5">
-                    <p className="font-label-bold text-[10px] uppercase tracking-wide text-on-surface-variant">Roles when this was done</p>
-                    <dl className="mt-1.5 space-y-1.5 text-sm">
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-on-surface-variant">Primary role</dt>
-                        <dd className="text-right font-medium text-on-surface">{roleName(selected.actorRole)}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-on-surface-variant">Secondary roles</dt>
-                        <dd className="text-right font-medium text-on-surface">
-                          {selected.actorSecondaryRoles.length ? selected.actorSecondaryRoles.map(roleName).join(', ') : 'None'}
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-on-surface-variant">Change made as</dt>
-                        <dd className={`text-right font-bold ${selected.outsideRole ? 'text-red-700 dark:text-red-300' : 'text-on-surface'}`}>
-                          {selected.actingRole
-                            ? `${roleName(selected.actingRole)}${selected.outsideRole ? ' (secondary role)' : ''}`
-                            : selected.outsideRole ? 'No role covering this — review it' : roleName(selected.actorRole)}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                )}
-                {!selected.actorRole && selected.user && (
-                  <p className="text-xs text-on-surface-variant">Roles were not recorded for entries made before this feature.</p>
-                )}
-                <DetailBlock
-                  label="About"
-                  value={selected.targetLabel}
-                  hint={
-                    [selected.targetKind, selected.targetSubtitle].filter(Boolean).join(' · ') ||
-                    null
-                  }
-                />
-                {selected.reason && <DetailBlock label="Reason" value={selected.reason} />}
-                {(selected.ipAddress || selected.userAgent) && (
                   <DetailBlock
-                    label="Client"
-                    value={selected.ipAddress || '—'}
-                    hint={selected.userAgent}
+                    label={selected.actingRole && selected.actingRole !== selected.actorRole ? 'Roles' : 'Role'}
+                    value={selected.actingRole && selected.actingRole !== selected.actorRole
+                      ? `Primary: ${roleName(selected.actorRole)} · Used: ${roleName(selected.actingRole)} (secondary)`
+                      : roleName(selected.actorRole)}
                   />
                 )}
+                <DetailBlock
+                  label="What changed"
+                  value={formatAuditAction(selected.action)}
+                  hint={selected.targetLabel && !selected.targetLabel.endsWith('(removed)') && selected.targetLabel !== '—'
+                    ? [selected.targetLabel, selected.targetSubtitle].filter(Boolean).join(' · ')
+                    : null}
+                />
+                {selected.reason && <DetailBlock label="Reason" value={selected.reason} />}
 
-                {friendlyMetaLines(selected.meta).length > 0 && (
-                  <div className="space-y-2">
-                    <p className="font-label-bold text-[11px] uppercase tracking-wide text-secondary">
-                      Change details
-                    </p>
-                    <ul className="overflow-hidden divide-y divide-outline-variant/50 rounded-xl border border-outline-variant">
-                      {friendlyMetaLines(selected.meta).map((line) => (
-                        <li
-                          key={line.label}
-                          className="flex justify-between gap-3 bg-surface-container-low/40 px-3 py-2.5 text-sm"
-                        >
-                          <span className="text-on-surface-variant">{line.label}</span>
-                          <span className="break-all text-right font-medium text-on-surface">
-                            {line.value}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {oldPreview && (
-                  <div>
-                    <p className="mb-1 font-label-bold text-[11px] uppercase tracking-wide text-secondary">
-                      Old value
-                    </p>
-                    <pre className="overflow-x-auto rounded-xl border bg-surface-container-low p-3 text-[11px]">
-                      {oldPreview}
-                    </pre>
-                  </div>
-                )}
-                {newPreview && (
-                  <div>
-                    <p className="mb-1 font-label-bold text-[11px] uppercase tracking-wide text-secondary">
-                      New value
-                    </p>
-                    <pre className="overflow-x-auto rounded-xl border bg-surface-container-low p-3 text-[11px]">
-                      {newPreview}
-                    </pre>
-                  </div>
-                )}
-
-                <p className="text-xs text-on-surface-variant">
-                  Audit records can never be edited or deleted from the app.
-                </p>
               </div>
             </div>
           </div>,

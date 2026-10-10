@@ -28,7 +28,7 @@ export default async function DocumentsPage({
   const page = parsePage(pageRaw)
   const pageSize = 24
   const canAdd = actor.isSuperAdmin || actor.role === 'ADMIN' || actor.role === 'SECRETARY'
-  const [documents, categories] = await Promise.all([
+  const [documents, categories, paymentDestination] = await Promise.all([
     prisma.document.findMany({
       where: {
         ...(q
@@ -49,7 +49,9 @@ export default async function DocumentsPage({
       take: 500,
     }),
     prisma.documentCategory.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    prisma.financeSettingVersion.findFirst({ where: { active: true }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }),
   ])
+  const showPaymentDetails = page === 1 && !category && !tag && (!q || /pay|bank|m-?pesa/i.test(q))
   const visible = documents.filter((document) => canReadDocument(document, actor.role))
   const latest = visible.filter(
     (document, index, all) =>
@@ -122,7 +124,38 @@ export default async function DocumentsPage({
                 </tr>
               </thead>
               <tbody>
-                {pageItems.length === 0 ? (
+                {showPaymentDetails && (
+                  <tr className="border-t border-outline-variant/50 bg-secondary/[0.06] align-top">
+                    {canAdd && <td className="py-3.5 px-4" />}
+                    <td className="py-3.5 px-4">
+                      <p className="flex items-center gap-1.5 font-medium text-on-surface">
+                        <span className="material-symbols-outlined text-[18px] text-secondary">push_pin</span>
+                        Official payment details
+                      </p>
+                      <p className="mt-0.5 text-xs text-on-surface-variant">Bank and M-Pesa details for paying contributions. Always shows the latest details.</p>
+                    </td>
+                    <td className="py-3.5 px-4 text-on-surface-variant">Finance</td>
+                    <td className="py-3.5 px-4 text-on-surface-variant">Latest</td>
+                    <td className="py-3.5 px-4">
+                      <span className="whitespace-nowrap rounded-full bg-primary/10 px-2 py-1 text-xs text-primary">MEMBERS</span>
+                    </td>
+                    <td className="py-3.5 px-4 text-on-surface-variant">
+                      <p className="whitespace-nowrap">{paymentDestination ? paymentDestination.createdAt.toLocaleDateString() : 'Not published yet'}</p>
+                      <p className="text-xs">from Settings</p>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <a href="/api/pdf/payment-details" target="_blank" rel="noreferrer" className="inline-flex whitespace-nowrap rounded-full bg-primary px-3 py-1.5 text-xs text-on-primary">
+                          View
+                        </a>
+                        <a href="/api/pdf/payment-details?download=1" aria-label="Download payment details PDF" title="Download PDF" className="inline-flex items-center rounded-full border border-primary px-2 py-1.5 text-primary">
+                          <span className="material-symbols-outlined text-[16px]">download</span>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {pageItems.length === 0 && !showPaymentDetails ? (
                   <tr>
                     <td colSpan={canAdd ? 7 : 6} className="py-10 text-center text-on-surface-variant">
                       No documents found.

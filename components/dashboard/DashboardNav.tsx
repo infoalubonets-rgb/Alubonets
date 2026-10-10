@@ -2,24 +2,9 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { activeNavGroup } from '@/lib/dashboard/active-nav'
 import type { NavItem } from './DashboardShell'
-
-function isNavActive(pathname: string, href: string, allHrefs: string[]) {
-  if (!href || href === '#') return false
-  const matches = allHrefs.filter(
-    (h) => h && h !== '#' && (pathname === h || pathname.startsWith(`${h}/`)),
-  )
-  if (matches.length === 0) return false
-  const best = matches.reduce((a, b) => (a.length >= b.length ? a : b))
-  return best === href
-}
-
-function sectionActive(pathname: string, link: NavItem, hrefs: string[]) {
-  const href = link.href || '#'
-  if (isNavActive(pathname, href, hrefs)) return true
-  return Boolean(link.children?.some((child) => isNavActive(pathname, child.href || '#', hrefs)))
-}
 
 export default function DashboardNav({
   nav,
@@ -31,10 +16,7 @@ export default function DashboardNav({
   onNavigate?: () => void
 }) {
   const pathname = usePathname()
-  const hrefs = useMemo(
-    () => nav.flatMap((n) => [n.href || '#', ...(n.children?.map((child) => child.href || '#') || [])]),
-    [nav],
-  )
+  const currentGroup = activeNavGroup(pathname, nav)
   const scrollRef = useRef<HTMLElement>(null)
   const [scrollbar, setScrollbar] = useState({ visible: false, top: 0, height: 0 })
 
@@ -70,8 +52,8 @@ export default function DashboardNav({
       <nav ref={scrollRef} className="dashboard-nav-scroll h-full overflow-y-auto py-1 px-sm space-y-0">
         {nav.map((link) => {
           const href = link.href || '#'
-          const active = isNavActive(pathname, href, hrefs)
-          const inSection = sectionActive(pathname, link, hrefs)
+          const active = currentGroup === link
+          const inSection = active
           const className = active || inSection
             ? `flex min-h-[34px] items-center gap-sm px-sm py-1.5 rounded-lg bg-secondary-container/20 text-on-primary font-label-bold text-[13.5px] ${collapsed ? 'justify-center' : ''}`
             : `sidebar-link ${collapsed ? 'justify-center' : ''}`

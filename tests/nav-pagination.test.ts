@@ -36,6 +36,16 @@ describe('unified sidebar', () => {
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
   })
 
+  it.each(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const)(
+    '%s reaches Activities from a button on Overview, not the sidebar',
+    (role) => {
+      const nav = navForRole(role)
+      expect(nav.map((item) => item.href)).not.toContain('/today')
+      expect(nav[0].label).toBe('Overview')
+      expect(nav[0].children?.map((child) => child.href)).toContain('/today')
+    },
+  )
+
   it('places optional Loans and Welfare inside Finance', () => {
     const nav = withOptionalNav(MEMBER_NAV, LOANS_NAV_ITEMS.member, '/contributions')
     expect(nav.map((item) => item.label)).not.toContain('Loans')
@@ -55,7 +65,7 @@ describe('withOptionalNav', () => {
   })
 
   it('keeps the admin sidebar to 11 top-level sections', () => {
-    // Approvals, Today, Contributions and Roles live as related pages of Members, Overview, Finance and Settings.
+    // Approvals, Activities, Contributions and Roles live as related pages of Members, Overview, Finance and Settings.
     expect(ADMIN_NAV).toHaveLength(11)
     const topLevel = ADMIN_NAV.map((item) => item.href)
     for (const href of ['/admin/members', '/admin/approvals', '/today', '/contributions', '/admin/roles']) {
