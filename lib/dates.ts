@@ -119,3 +119,18 @@ export function todayRange(now: Date = new Date(), timeZone: string = APP_TIMEZO
     end: new Date(startOfLocalDay + 24 * 60 * 60 * 1000 - 1 - offset),
   }
 }
+
+/**
+ * First and last instants of a calendar day (`YYYY-MM-DD`) as experienced in the group's timezone.
+ * Use for date-range filters so a payment at 01:00 Nairobi time lands on the right day.
+ */
+export function appDayRange(value: string, timeZone: string = APP_TIMEZONE) {
+  const [year, month, day] = value.split('-').map(Number)
+  const midnightUtc = Date.UTC(year, month - 1, day)
+  // The offset is measured at that day's noon, safely away from any midnight transition.
+  const offset = timezoneOffsetMs(new Date(midnightUtc + 12 * 60 * 60 * 1000), timeZone)
+  return {
+    start: new Date(midnightUtc - offset),
+    end: new Date(midnightUtc + 24 * 60 * 60 * 1000 - 1 - offset),
+  }
+}

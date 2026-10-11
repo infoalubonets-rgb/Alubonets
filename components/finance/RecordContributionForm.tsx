@@ -14,6 +14,16 @@ type Category = { id: string; name: string; billingKind?: string | null }
 type Account = { id: string; name: string }
 type Project = { id: string; title: string }
 
+type SaveJob = {
+  id: number
+  label: string
+  state: 'saving' | 'done' | 'error'
+  note?: string
+  error?: string
+  /** Kept on failure so Retry can send exactly the same payment again. */
+  formData?: FormData
+}
+
 export default function RecordContributionForm({
   members,
   campaigns,
@@ -36,12 +46,42 @@ export default function RecordContributionForm({
   const [method, setMethod] = useState('MPESA')
   const [billingKind, setBillingKind] = useState('NONE')
   const [formKey, setFormKey] = useState(0)
-  const [pending, setPending] = useState(false)
+  // Saving runs in the background, so the form is never locked while a payment is sent.
+  const pending = false
   const [error, setError] = useState('')
-  const [progress, setProgress] = useState<{ percent: number; status: string } | null>(null)
   const [proofName, setProofName] = useState('')
+  const [jobs, setJobs] = useState<SaveJob[]>([])
+  const updateJob = (id: number, patch: Partial<SaveJob>) =>
+    setJobs((current) => current.map((job) => (job.id === id ? { ...job, ...patch } : job)))
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  /** Uploads any proof, then records the payment; updates the job's status as it goes. */
+  async function save(jobId: number, formData: FormData) {
+    updateJob(jobId, { state: 'saving', error: undefined, note: undefined })
+    try {
+      const evidenceFile = formData.get('evidence') as File | null
+      if (evidenceFile?.size) {
+        const requestFd = new FormData()
+        requestFd.set('fileName', evidenceFile.name)
+        const { bucket, path, token } = await requestEvidenceUploadUrl(requestFd)
+        await uploadToSignedUrlWithProgress(bucket, path, token, evidenceFile, (percent) =>
+          updateJob(jobId, { note: `uploading proof ${percent}%` }),
+        )
+        formData.set('evidencePath', path)
+        formData.set('evidenceMimeType', evidenceFile.type)
+        formData.set('evidenceTitle', evidenceFile.name)
+        formData.delete('evidence')
+        updateJob(jobId, { note: undefined })
+      }
+      await recordLedgerContribution(formData)
+      updateJob(jobId, { state: 'done' })
+      // Reload the totals, tables and history behind the pop-up.
+      router.refresh()
+    } catch (cause) {
+      updateJob(jobId, { state: 'error', note: undefined, error: readableError(cause, 'Could not record this contribution.'), formData })
+    }
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = event.currentTarget
     const formData = new FormData(form)
@@ -50,44 +90,30 @@ export default function RecordContributionForm({
       setError(problem)
       return
     }
-    setError('')
-    setPending(true)
-    try {
-      const evidenceFile = formData.get('evidence') as File | null
-      const customMethod = String(formData.get('customMethod') || '').trim()
-      if (method === 'OTHER' && customMethod) {
-        formData.set('description', [formData.get('description'), `Payment method: ${customMethod}`].filter(Boolean).join(' · '))
-      }
-      if (evidenceFile?.size) {
-        if (!/\.(pdf|png|webp|jpe?g)$/i.test(evidenceFile.name) || !['application/pdf', 'image/png', 'image/webp', 'image/jpeg'].includes(evidenceFile.type)) {
-          throw new Error('Upload a PDF, PNG, WebP, JPEG or JPG file.')
-        }
-        setProgress({ percent: 0, status: 'Uploading proof…' })
-        const requestFd = new FormData()
-        requestFd.set('fileName', evidenceFile.name)
-        const { bucket, path, token } = await requestEvidenceUploadUrl(requestFd)
-        await uploadToSignedUrlWithProgress(bucket, path, token, evidenceFile, (percent) =>
-          setProgress({ percent, status: `Uploading proof… ${percent}%` }),
-        )
-        formData.set('evidencePath', path)
-        formData.set('evidenceMimeType', evidenceFile.type)
-        formData.set('evidenceTitle', evidenceFile.name)
-      }
-      formData.delete('evidence')
-
-      await recordLedgerContribution(formData)
-      form.reset()
-      setFormKey((key) => key + 1)
-      setBillingKind('NONE')
-      setProofName('')
-      setProgress(null)
-      router.refresh()
-    } catch (cause) {
-      setError(readableError(cause, 'Could not record this contribution. Try again.'))
-      setProgress(null)
-    } finally {
-      setPending(false)
+    const evidenceFile = formData.get('evidence') as File | null
+    if (evidenceFile?.size && (!/\.(pdf|png|webp|jpe?g)$/i.test(evidenceFile.name) || !['application/pdf', 'image/png', 'image/webp', 'image/jpeg'].includes(evidenceFile.type))) {
+      setError('Upload a PDF, PNG, WebP, JPEG or JPG file.')
+      return
     }
+    if (!evidenceFile?.size) formData.delete('evidence')
+    const customMethod = String(formData.get('customMethod') || '').trim()
+    if (method === 'OTHER' && customMethod) {
+      formData.set('description', [formData.get('description'), `Payment method: ${customMethod}`].filter(Boolean).join(' · '))
+    }
+    setError('')
+
+    const payer = members.find((m) => m.id === formData.get('userId'))?.fullName ?? 'Member'
+    const label = `KES ${Number(formData.get('amount') || 0).toLocaleString('en-KE')} · ${payer}`
+    const id = Date.now() + Math.random()
+    setJobs((current) => [{ id, label, state: 'saving' as const }, ...current].slice(0, 6))
+
+    // Clear the form straight away so the next payment can be entered while this one saves.
+    form.reset()
+    setFormKey((key) => key + 1)
+    setBillingKind('NONE')
+    setProofName('')
+    setMethod('MPESA')
+    void save(id, formData)
   }
 
   /** Every field except proof and transaction reference must be filled before saving. */
@@ -183,19 +209,39 @@ export default function RecordContributionForm({
           </label>
         </div>
       </fieldset>
-      {progress && (
-        <div className="md:col-span-2 space-y-1">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress.percent}%` }} />
-          </div>
-          <p className="text-xs text-on-surface-variant">{progress.status}</p>
-        </div>
-      )}
       {error && <p className="text-sm text-error md:col-span-2">{error}</p>}
+      {jobs.length > 0 && (
+        <ul className="space-y-1.5 md:col-span-2" aria-live="polite">
+          {jobs.map((job) => (
+            <li
+              key={job.id}
+              className={`flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+                job.state === 'done'
+                  ? 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-200'
+                  : job.state === 'error'
+                    ? 'bg-error-container text-on-error-container'
+                    : 'bg-surface-container-high text-on-surface'
+              }`}
+            >
+              <span className={`material-symbols-outlined text-[18px] ${job.state === 'saving' ? 'animate-spin' : ''}`}>
+                {job.state === 'done' ? 'check_circle' : job.state === 'error' ? 'error' : 'progress_activity'}
+              </span>
+              <span className="font-semibold">{job.label}</span>
+              <span className="text-xs">
+                {job.state === 'done' ? 'Recorded' : job.state === 'error' ? job.error : `Saving${job.note ? ` — ${job.note}` : '…'}`}
+              </span>
+              {job.state === 'error' && job.formData && (
+                <button type="button" onClick={() => void save(job.id, job.formData!)} className="ml-auto rounded-full bg-primary px-3 py-1 text-xs font-semibold text-on-primary">
+                  Retry
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="flex justify-end border-t border-outline-variant/50 pt-4 md:col-span-2">
         <button type="submit" disabled={pending} className="inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary px-5 py-2.5 font-semibold text-on-primary disabled:cursor-wait disabled:opacity-60 sm:w-auto">
-          {pending && <span className="material-symbols-outlined animate-spin text-[16px]">progress_activity</span>}
-          {pending ? 'Recording…' : 'Record contribution'}
+          Record contribution
         </button>
       </div>
     </form>

@@ -1,3 +1,5 @@
+import { getFeatureFlags } from '@/lib/feature-flags'
+import { enabledRequestNoticesWhere } from '@/lib/notification-audience'
 import DashboardUserProvider from '@/components/dashboard/DashboardUserProvider'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
@@ -18,11 +20,12 @@ const formatDate = (date: Date) =>
 
 export default async function NotificationsPage() {
   const actor = await requireSessionProfile()
+  const flags = await getFeatureFlags()
   const role = actor.role as Role
   const [alerts, notices, announcements, seen] = await Promise.all([
     getRoleAlerts({ id: actor.id, role, isSuperAdmin: actor.isSuperAdmin, dashboardAccess: actor.dashboardAccess as Role[] }),
     // Only notices for the selected workspace (Admin sees all; personal/general notices show everywhere).
-    prisma.userNotification.findMany({ where: { userId: actor.id, ...noticeAudienceWhere(role) }, orderBy: { createdAt: 'desc' }, take: 50 }),
+    prisma.userNotification.findMany({ where: { userId: actor.id, AND: [noticeAudienceWhere(role), enabledRequestNoticesWhere(flags)] }, orderBy: { createdAt: 'desc' }, take: 50 }),
     prisma.announcementReceipt.findMany({
       where: { userId: actor.id, announcement: { status: 'SENT', ...announcementAudienceWhere(role) } },
       include: {
@@ -89,7 +92,7 @@ export default async function NotificationsPage() {
           summary: meta.receipt ? `M-Pesa receipt ${meta.receipt}` : 'M-Pesa payment',
           date: formatDate(payment.createdAt),
           unread: paymentUnread(payment),
-          href: '/dashboard/treasurer/contributions',
+          href: '/dashboard/treasurer/finance',
           details: [
             { label: 'Amount', value: amount },
             { label: 'From', value: from },
@@ -159,3 +162,4 @@ export default async function NotificationsPage() {
     </DashboardUserProvider>
   )
 }
+

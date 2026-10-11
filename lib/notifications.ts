@@ -3,6 +3,12 @@ import type { Role } from '@/lib/auth/types'
 
 type WorkRole = 'ADMIN' | 'EXECUTIVE' | 'TREASURER' | 'SECRETARY' | 'ORGANIZER' | 'AUDITOR'
 
+/** Request work belongs only to actual Treasurer accounts and their workspace. */
+export async function notifyTreasurerRequest(payload: Omit<Parameters<typeof notifyUsers>[0], 'userIds' | 'audienceRoles'>) {
+  const users = await prisma.user.findMany({ where: { role: 'TREASURER', status: 'ACTIVE' }, select: { id: true } })
+  await notifyUsers({ ...payload, type: 'finance_request', userIds: users.map((u) => u.id), audienceRoles: ['TREASURER'] })
+}
+
 export async function notifyUsers(input: {
   userIds: string[]
   title: string

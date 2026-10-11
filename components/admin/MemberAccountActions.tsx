@@ -53,7 +53,7 @@ export default function MemberAccountActions({ member }: { member: MemberAccount
   return (
     <div className="mt-4 space-y-4">
       <section className="space-y-2 border-t border-outline-variant pt-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3">
           <button type="button" disabled={pending} onClick={() => applyStanding('PAID_UP')} className="h-9 rounded-lg bg-primary text-[11px] font-semibold text-on-primary disabled:opacity-50">Mark paid-up</button>
           <button type="button" disabled={pending} onClick={() => applyStanding('LAPSED')} className="h-9 rounded-lg border border-error/40 text-[11px] font-semibold text-error disabled:opacity-50">Mark lapsed</button>
           <button type="button" disabled={pending || !member.standingOverride} onClick={() => applyStanding('AUTO')} className="h-9 rounded-lg border border-outline-variant text-[11px] font-semibold disabled:opacity-40">Automatic standing</button>
@@ -96,7 +96,7 @@ export default function MemberAccountActions({ member }: { member: MemberAccount
             <button type="button" disabled={pending || member.isSuperAdmin} onClick={() => setStatus('SUSPENDED')} className="h-11 w-full rounded-full border border-error/40 text-sm font-label-bold text-error hover:bg-error-container/40 disabled:opacity-40">
               Suspend member
             </button>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
               {(['RESIGNED', 'DECEASED', 'DISQUALIFIED'] as const).map((status) => (
                 <button key={status} type="button" disabled={pending || member.isSuperAdmin} onClick={() => setStatus(status)} className="h-9 rounded-lg border border-outline-variant text-[11px] font-semibold text-on-surface-variant hover:border-primary/40 disabled:opacity-40">
                   {status === 'RESIGNED' ? 'Resigned' : status === 'DECEASED' ? 'Deceased' : 'Disqualified'}

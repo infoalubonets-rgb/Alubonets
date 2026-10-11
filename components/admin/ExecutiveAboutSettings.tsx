@@ -61,7 +61,7 @@ export default function ExecutiveAboutSettings({ userId, about }: { userId: stri
 
       <div>
         <p className="mb-1 text-[11px] font-semibold text-on-surface-variant">Details shown on the About page</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2">
           {PUBLIC_PROFILE_FIELDS.map((field) => (
             <label key={field.key} className="flex items-center gap-2 rounded-lg border border-outline-variant px-3 py-2 text-sm">
               <input type="checkbox" className="h-4 w-4" checked={fields.includes(field.key)} disabled={pending} onChange={(e) => toggleField(field.key, e.target.checked)} />

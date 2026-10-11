@@ -34,6 +34,11 @@ enum MemberStanding {
   LAPSED
 }
 
+enum ContributionPlan {
+  MONTHLY
+  ANNUAL
+}
+
 enum BillingKind {
   NONE
   MONTHLY
@@ -340,6 +345,8 @@ model User {
   standingOverrideUntil      DateTime?
   /// Admin removed contribution rights: the member owes no dues and follows their Principal's standing.
   contributionExempt         Boolean                    @default(false)
+  /// Which dues standing checks: MONTHLY or ANNUAL. Unset = both (set when a member starts contributing).
+  contributionPlan           ContributionPlan?
   /// Details an Admin chose to show on the public About page (photo, profession, location, email, phone).
   publicProfileFields        String[]                   @default([])
   /// Executives only appear on the public About page once an Admin switches this on.
@@ -654,6 +661,7 @@ model Contribution {
   project                Project?              @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([userId, paidAt])
   @@index([principalMemberId])
   @@index([projectId])
   @@index([paidAt])

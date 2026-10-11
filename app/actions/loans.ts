@@ -1,5 +1,7 @@
 'use server'
 
+import { notifyTreasurerRequest } from '@/lib/notifications'
+
 import { after } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -10,8 +12,6 @@ import { writeAudit } from '@/lib/audit'
 import { requireLoansEnabled } from '@/lib/feature-flags'
 import { getLoanPolicy } from '@/lib/settings'
 import { getPeriodForDate, periodFields, transactionNumber } from '@/lib/finance'
-import { sendAnnouncement } from '@/lib/data/queries'
-import { roleHolderIds } from '@/lib/notifications'
 import { sendBroadcastEmail } from '@/lib/email/resend'
 import { createServerClient } from '@/lib/supabase-server'
 import { assertNotFuture } from '@/lib/dates'
@@ -20,6 +20,8 @@ import { loanApplicationBodySchema, parseExternalGuarantorsFromForm } from '@/li
 
 function refreshLoans(loanId?: string) {
   revalidatePath('/dashboard/member/loans')
+  revalidatePath('/dashboard/treasurer/finance')
+  revalidatePath('/dashboard/treasurer/ledger')
   revalidatePath('/dashboard/treasurer/loans')
   revalidatePath('/admin/loans')
   revalidatePath('/dashboard/executive/loans')
@@ -112,19 +114,17 @@ export async function submitLoanApplication(formData: FormData) {
     },
   })
 
+  await writeAudit({ userId: actor.id, action: 'LOAN_SUBMIT', entity: 'LoanApplication', entityId: loan.id, newValue: JSON.parse(JSON.stringify({ ...loan, registeredGuarantorIds: guarantorIds, externalGuarantors })) })
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
   after(async () => {
-    // Treasurer work: only shows in the Treasurer workspace (and Admin's, which sees everything).
-    const treasurerNotification = roleHolderIds(['TREASURER', 'ADMIN']).then((treasurerIds) => sendAnnouncement({
-      authorId: actor.id,
+    // Request work is delivered only to active Treasurer accounts.
+    const treasurerNotification = notifyTreasurerRequest({
       title: `Loan application: ${actor.fullName}`,
-      content: `${actor.fullName} requested KES ${data.amountKes.toLocaleString()} — ${data.purpose}`,
-      broadcast: false,
-      memberIds: treasurerIds,
-      audienceRoles: ['TREASURER'],
-    }))
+      body: `${actor.fullName} requested KES ${data.amountKes.toLocaleString()} — ${data.purpose}`,
+      href: '/dashboard/treasurer/loans', type: 'loan', entity: 'LoanApplication', entityId: loan.id,
+    })
     await Promise.allSettled([
-      writeAudit({ userId: actor.id, action: 'LOAN_SUBMIT', entity: 'LoanApplication', entityId: loan.id, newValue: { amountKes: data.amountKes, registeredGuarantors: guarantorIds.length, externalGuarantors: externalGuarantors.length } }),
+
       treasurerNotification,
       sendBroadcastEmail({
         subject: `Please guarantee a loan for ${actor.fullName}`,
@@ -263,6 +263,7 @@ export async function treasurerReviewLoan(formData: FormData) {
   await writeAudit({
     userId: actor.id,
     action: 'LOAN_TREASURER_REVIEW',
+    oldValue: JSON.parse(JSON.stringify(loan)),
     entity: 'LoanApplication',
     entityId: loan.id,
     newValue: { treasurerNote: data.treasurerNote },
@@ -313,6 +314,7 @@ export async function decideLoanApplication(formData: FormData) {
   await writeAudit({
     userId: actor.id,
     action: data.decision === 'APPROVED' ? 'LOAN_APPROVE' : 'LOAN_REJECT',
+    oldValue: JSON.parse(JSON.stringify(loan)),
     entity: 'LoanApplication',
     entityId: loan.id,
     newValue: { decision: data.decision, decisionNote: data.decisionNote },
@@ -524,3 +526,5 @@ export async function recordLoanRepayment(formData: FormData) {
   })
   refreshLoans(loan.id)
 }
+
+

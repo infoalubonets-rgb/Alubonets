@@ -45,10 +45,10 @@ export default async function AdminPage() {
 
   return (
     <DashboardShell role="ADMIN" title="Administrator" nav={nav}>
-      <div className="space-y-5 p-4 md:p-6 max-w-5xl mx-auto">
+      <div className="mx-auto max-w-7xl space-y-4 p-3 sm:space-y-5 sm:p-4 md:p-6">
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {stats.map((s) => {
             const inner = (
               <div className={`relative overflow-hidden rounded-2xl ${s.color} p-4 shadow-sm h-full`}>
@@ -74,7 +74,7 @@ export default async function AdminPage() {
 
         {/* Charts */}
         <div className="grid lg:grid-cols-2 gap-4">
-          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>trending_up</span>
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Contribution trend</h2>
@@ -85,7 +85,7 @@ export default async function AdminPage() {
               <ChartEmpty message="No confirmed contributions recorded yet." />
             )}
           </section>
-          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>donut_large</span>
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Membership status</h2>
@@ -98,7 +98,7 @@ export default async function AdminPage() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-4">
-          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>groups</span>
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Member growth</h2>
@@ -109,7 +109,7 @@ export default async function AdminPage() {
               <ChartEmpty message="No member registrations yet." />
             )}
           </section>
-          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5">
+          <section className="rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-4 sm:p-5">
             <div className="flex items-center gap-2 mb-4">
               <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>family_history</span>
               <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Members per Principal</h2>
@@ -123,7 +123,7 @@ export default async function AdminPage() {
         </div>
 
         {/* Quick links */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {quickLinks.map((l) => (
             <Link
               key={l.label}

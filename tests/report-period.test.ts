@@ -12,7 +12,16 @@ describe('report period', () => {
 
   it('uses supplied from/to when present', () => {
     const range = reportRangeFromSearch('2025-02-01', '2025-02-28T23:59:59.999Z', new Date('2026-01-01'))
-    expect(range.from.toISOString().startsWith('2025-02-01')).toBe(true)
+    // A plain date starts at midnight Nairobi time (UTC+3).
+    expect(range.from.toISOString()).toBe('2025-01-31T21:00:00.000Z')
     expect(range.to.getUTCFullYear()).toBe(2025)
+  })
+})
+
+describe('report period day boundaries', () => {
+  it('treats a plain To date as the whole Nairobi day', () => {
+    const range = reportRangeFromSearch('2026-10-01', '2026-10-31')
+    expect(range.from.toISOString()).toBe('2026-09-30T21:00:00.000Z')
+    expect(range.to.toISOString()).toBe('2026-10-31T20:59:59.999Z')
   })
 })

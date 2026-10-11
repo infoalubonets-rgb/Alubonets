@@ -186,3 +186,28 @@ describe('family standing', () => {
     expect(resolveFamilyStanding(lapsed, { manual: true, dependent: true, principalStanding: 'PAID_UP' }).standing).toBe('LAPSED')
   })
 })
+
+describe('contribution plan', () => {
+  // Both fees configured; on 20 Oct 2026 September's monthly fee is overdue and 2026's annual fee is due.
+  const both = settings({ monthlyFeeKes: 500, annualFeeKes: 6000, annualDueDate: '03-31', effectiveFrom: new Date('2026-01-01T00:00:00Z') })
+  const now = new Date('2026-10-20T00:00:00Z')
+  const yearPaid = [annual(6000, '2026-02-01T00:00:00Z')]
+
+  it('checks only the annual fee for annual members', () => {
+    expect(computeStanding(yearPaid, { ...member, plan: 'ANNUAL' }, both, now).standing).toBe('PAID_UP')
+    expect(computeStanding([], { ...member, plan: 'ANNUAL' }, both, now).reason).toMatch(/annual/)
+  })
+
+  it('checks only monthly fees for monthly members', () => {
+    const result = computeStanding(yearPaid, { ...member, plan: 'MONTHLY' }, both, now)
+    expect(result.standing).toBe('LAPSED')
+    expect(result.reason).toMatch(/monthly/)
+    expect(result.reason).not.toMatch(/annual/)
+  })
+
+  it('checks both when no plan is set', () => {
+    const result = computeStanding([], { ...member, plan: null }, both, now)
+    expect(result.reason).toMatch(/monthly/)
+    expect(result.reason).toMatch(/annual/)
+  })
+})

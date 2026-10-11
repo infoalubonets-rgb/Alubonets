@@ -40,18 +40,18 @@ export default function RecordExpenseForm({
     setError('')
     setPending(true)
     try {
+      // A supporting document is optional; upload it only when one is attached.
       const evidenceFile = formData.get('evidence') as File | null
-      if (!evidenceFile || !evidenceFile.size) throw new Error('A supporting document is required for every expense.')
-
-      const requestFd = new FormData()
-      requestFd.set('fileName', evidenceFile.name)
-      const { bucket, path, token } = await requestEvidenceUploadUrl(requestFd)
-      await uploadToSignedUrl(bucket, path, token, evidenceFile)
-
       formData.delete('evidence')
-      formData.set('evidencePath', path)
-      formData.set('evidenceMimeType', evidenceFile.type || 'application/octet-stream')
-      formData.set('evidenceTitle', evidenceFile.name)
+      if (evidenceFile?.size) {
+        const requestFd = new FormData()
+        requestFd.set('fileName', evidenceFile.name)
+        const { bucket, path, token } = await requestEvidenceUploadUrl(requestFd)
+        await uploadToSignedUrl(bucket, path, token, evidenceFile)
+        formData.set('evidencePath', path)
+        formData.set('evidenceMimeType', evidenceFile.type || 'application/octet-stream')
+        formData.set('evidenceTitle', evidenceFile.name)
+      }
 
       await recordExpense(formData)
       form.reset()
@@ -66,17 +66,25 @@ export default function RecordExpenseForm({
 
   return (
     <form onSubmit={handleSubmit} className="mt-3 grid gap-2 md:grid-cols-3">
-      <input name="amount" type="number" min="1" max={MAX_AMOUNT_KES} step="0.01" required disabled={pending} placeholder="Amount KES (max 999,999)" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
-      <input name="payee" required minLength={2} maxLength={160} disabled={pending} placeholder="Payee" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
-      <input name="purpose" required minLength={2} maxLength={500} disabled={pending} placeholder="Purpose" className="rounded-lg border px-3 py-2 disabled:opacity-60" />
-      <PaymentCategoryFields key={formKey} categories={categories} kind="expense" projects={projects} descriptionPlaceholder="Short note about this expense" />
-      <select name="sourceAccountId" required disabled={pending} className="rounded-lg border px-3 py-2 disabled:opacity-60">
-        {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-      </select>
-      <input name="occurredAt" type="date" required disabled={pending} max={today} defaultValue={today} className="rounded-lg border px-3 py-2 disabled:opacity-60" />
+      <label className="text-sm">
+        Amount (KES) <span className="text-error">*</span>
+        <input name="amount" type="number" min="1" max={MAX_AMOUNT_KES} step="0.01" required disabled={pending} placeholder="Max 999,999" className="mt-1 block w-full rounded-lg border px-3 py-2 disabled:opacity-60" />
+      </label>
+      {/* Purpose is required; choosing Other asks for one explanation. */}
+      <PaymentCategoryFields key={formKey} categories={categories} kind="expense" projects={projects} showDescription={false} />
+      <label className="text-sm">
+        Paid from <span className="text-error">*</span>
+        <select name="sourceAccountId" required disabled={pending} className="mt-1 block w-full rounded-lg border px-3 py-2 disabled:opacity-60">
+          {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+      </label>
+      <label className="text-sm">
+        Date paid <span className="text-error">*</span>
+        <input name="occurredAt" type="date" required disabled={pending} max={today} defaultValue={today} className="mt-1 block w-full rounded-lg border px-3 py-2 disabled:opacity-60" />
+      </label>
       <label className="text-sm md:col-span-3">
-        Supporting document
-        <input name="evidence" type="file" required disabled={pending} accept=".pdf,image/*" className="mt-1 block disabled:opacity-60" />
+        Supporting document <span className="text-on-surface-variant">(optional)</span>
+        <input name="evidence" type="file" disabled={pending} accept=".pdf,image/*" className="mt-1 block disabled:opacity-60" />
       </label>
       {error && <p className="text-sm text-error md:col-span-3">{error}</p>}
       <button type="submit" disabled={pending} className="inline-flex w-fit items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-on-primary disabled:cursor-wait disabled:opacity-60 md:col-span-3">

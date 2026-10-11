@@ -52,7 +52,7 @@ export async function actionEmailReceipt(formData: FormData) {
     entityId: id,
   })
 
-  revalidatePath('/dashboard/treasurer/contributions')
+  revalidatePath('/dashboard/treasurer/finance')
 }
 
 export async function actionUploadAnnouncementImage(

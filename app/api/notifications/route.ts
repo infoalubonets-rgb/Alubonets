@@ -1,3 +1,5 @@
+import { getFeatureFlags } from '@/lib/feature-flags'
+import { enabledRequestNoticesWhere } from '@/lib/notification-audience'
 import { NextResponse } from 'next/server'
 import { getSessionProfile } from '@/lib/auth/session'
 import { getRecentItems, getOldAnnouncementsCount, getPastEventsCount, getOldGalleryCount } from '@/lib/data/queries'
@@ -16,6 +18,7 @@ type StkMeta = { amount?: number; receipt?: string; phone?: string; checkoutRequ
 
 export async function GET() {
   try {
+    const flags = await getFeatureFlags()
     const profile = await getSessionProfile()
     if (!profile) return NextResponse.json({ items: [] }, { status: 401 })
 
@@ -40,7 +43,7 @@ export async function GET() {
             })
           : Promise.resolve([]),
         prisma.userNotification.findMany({
-          where: { userId: profile.id, readAt: null, ...noticeAudienceWhere(profile.role as Role) },
+          where: { userId: profile.id, readAt: null, AND: [noticeAudienceWhere(profile.role as Role), enabledRequestNoticesWhere(flags)] },
           orderBy: { createdAt: 'desc' },
           take: 30,
         }),
@@ -111,3 +114,4 @@ export async function GET() {
     return NextResponse.json(EMPTY)
   }
 }
+

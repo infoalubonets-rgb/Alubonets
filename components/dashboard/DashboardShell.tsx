@@ -25,6 +25,7 @@ import OldMonthPill from './OldMonthPill'
 import { NOTIFICATIONS_ALL_READ_EVENT, NOTIFICATIONS_READ_EVENT } from './NotificationActions'
 import UploadProgressToast from '@/components/ui/UploadProgressToast'
 import RelatedPageLinks from './RelatedPageLinks'
+import HeaderOverflow from './HeaderOverflow'
 
 
 export type NavItem = {
@@ -45,6 +46,8 @@ type Props = {
   /** Hide sibling page pills in the header (e.g. Document repository). */
   hideRelatedLinks?: boolean
   pageAction?: ReactNode
+  pageSecondRow?: ReactNode
+  pageFilters?: ReactNode
   /** Shown centred on the same row as the page title (e.g. search and filters). */
   pageCenter?: ReactNode
 }
@@ -110,6 +113,8 @@ export default function DashboardShell({
   hidePageHeading = false,
   hideRelatedLinks = false,
   pageAction,
+  pageFilters,
+  pageSecondRow,
   pageCenter,
 }: Props) {
   const router = useRouter()
@@ -158,7 +163,6 @@ export default function DashboardShell({
     if (pathname === '/contributions' && item.href?.split('?')[0] === '/contributions') return false
     return true
   })
-  const flowHeaderButtons = pathname === '/contributions' || pathname === '/dashboard/treasurer/ledger'
 
   useEffect(() => {
     setCollapsed(localStorage.getItem('dashSidebarCollapsed') === '1')
@@ -661,25 +665,26 @@ export default function DashboardShell({
           )}
           {!hidePageHeading && (
             <div className="shrink-0 pt-1 sm:pt-2">
-              <div className={pageCenter
-                ? 'flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] xl:items-center xl:gap-4'
-                : 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-x-4 sm:gap-y-2'}>
-                <div className={`min-w-0 sm:shrink-0 ${pageCenter ? '' : 'sm:pt-1'}`}>
-                  <h1 className="font-h2 text-[22px] sm:text-[26px] md:text-[28px] leading-tight text-primary dark:text-primary-fixed-dim">{title}</h1>
-                  {isOverviewPage && <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>}
-                </div>
-                {pageCenter && <div className="flex min-w-0 justify-center">{pageCenter}</div>}
-                {(pageAction || (!hideRelatedLinks && relatedPageLinks.length > 0)) && (
-                <div className={`flex min-w-0 w-full sm:w-auto sm:flex-1 flex-wrap items-center gap-2 sm:ml-auto sm:justify-end xl:justify-self-end ${flowHeaderButtons ? '!justify-end' : ''}`}>
-                {pageAction && <div className={flowHeaderButtons ? 'contents [&>div]:contents [&_nav]:contents' : 'min-w-0 max-w-full w-full sm:w-auto'}>{pageAction}</div>}
-                {!hideRelatedLinks && relatedPageLinks.length > 0 && (
-                  <nav aria-label={`Related ${activeNavGroup?.label} pages`} className={flowHeaderButtons ? 'contents' : 'flex min-w-0 w-full sm:w-auto flex-wrap items-center gap-2 sm:justify-end'}>
-                    <RelatedPageLinks items={relatedPageLinks} />
-                  </nav>
-                )}
-                </div>
-                )}
-              </div>
+              <HeaderOverflow
+                title={
+                  <>
+                    <h1 className="font-h2 text-[22px] leading-tight text-primary dark:text-primary-fixed-dim sm:text-[26px] md:text-[28px]">{title}</h1>
+                    {isOverviewPage && <p className="mt-1 text-sm text-on-surface-variant dark:text-blue-200/60">{displayRole}</p>}
+                  </>
+                }
+                units={[
+                  ...(pageAction ? [{ key: 'action', node: pageAction }] : []),
+                  ...(pageCenter ? [{ key: 'center', node: pageCenter }] : []),
+                  ...(pageFilters ? [{ key: 'filters', node: pageFilters }] : []),
+                  ...(!hideRelatedLinks
+                    ? relatedPageLinks.map((item) => ({
+                        key: `link:${item.href}`,
+                        node: <RelatedPageLinks items={[item]} activeAmong={relatedPageLinks} />,
+                      }))
+                    : []),
+                  ...(pageSecondRow ? [{ key: 'second', node: pageSecondRow }] : []),
+                ]}
+              />
             </div>
           )}
           {children}
@@ -708,3 +713,10 @@ export default function DashboardShell({
     </div>
   )
 }
+
+
+
+
+
+
+

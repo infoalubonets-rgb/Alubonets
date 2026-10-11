@@ -1,194 +1,143 @@
 import { requireActiveRole } from '@/lib/auth/session'
-import { prisma } from '@/lib/prisma'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
-import { accountBalances } from '@/lib/finance'
-import { ChartEmpty, IncomeExpenseChart } from '@/components/dashboard/Charts'
-import { formatMonthKeys, hasChartData, monthKeyFromDate } from '@/lib/chart-labels'
-import type { Prisma } from '@prisma/client'
+import { REPORT_KINDS, buildReport, parseReportFilters, reportCampaigns } from '@/lib/reports'
+import { appTodayInputValue } from '@/lib/dates'
 
-export default async function FinancialReportsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ from?: string; to?: string; category?: string }>
-}) {
+export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Financial reports' }
+
+/**
+ * Financial reports, kept minimal: pick a report and its filters, read four KPI cards, view the
+ * report as a table (collapsible) and download exactly that as PDF, Word or CSV.
+ */
+export default async function FinancialReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const actor = await requireActiveRole(['TREASURER', 'ADMIN', 'EXECUTIVE', 'AUDITOR'])
-  const filters = await searchParams
-  const from = filters.from ? new Date(filters.from) : new Date('2026-01-01')
-  const to = filters.to ? new Date(`${filters.to}T23:59:59.999`) : new Date('2026-12-31T23:59:59.999')
-  const where: Prisma.FinancialTransactionWhereInput = {
-    occurredAt: { gte: from, lte: to },
-    status: { in: ['CONFIRMED', 'RECONCILED'] },
-    ...(filters.category ? { categoryId: filters.category } : {}),
+  const filters = parseReportFilters(await searchParams)
+  const [report, campaigns] = await Promise.all([buildReport(filters), filters.kind === 'arrears' ? reportCampaigns() : Promise.resolve([])])
+
+  const query = new URLSearchParams({ report: filters.kind })
+  if (filters.kind === 'monthly') query.set('year', String(filters.year))
+  if (filters.kind === 'arrears' && filters.campaign) query.set('campaign', filters.campaign)
+  if (filters.kind === 'transactions') {
+    if (filters.from) query.set('from', filters.from)
+    if (filters.to) query.set('to', filters.to)
+    query.set('direction', filters.direction)
   }
-
-  const [transactions, categories, balances, obligations, reconciliations] = await Promise.all([
-    prisma.financialTransaction.findMany({ where, include: { category: true }, orderBy: { occurredAt: 'desc' } }),
-    prisma.transactionCategory.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
-    accountBalances(),
-    prisma.memberContributionObligation.findMany({
-      where: { status: { in: ['OUTSTANDING', 'PARTIALLY_PAID'] } },
-      include: {
-        user: true,
-        campaign: { include: { contributions: { where: { status: { in: ['CONFIRMED', 'RECONCILED'] } } } } },
-      },
-    }),
-    prisma.reconciliation.count({ where: { reconciledAt: { gte: from, lte: to } } }),
-  ])
-
-  const income = transactions
-    .filter((t) => t.type === 'CONTRIBUTION')
-    .reduce((s, t) => s + Number(t.amount), 0)
-  const expenses = transactions
-    .filter((t) => ['EXPENSE', 'DISBURSEMENT'].includes(t.type))
-    .reduce((s, t) => s + Number(t.amount), 0)
-
-  const monthlyMap = new Map<string, { income: number; expense: number }>()
-  for (const tx of transactions) {
-    const key = monthKeyFromDate(tx.occurredAt)
-    const entry = monthlyMap.get(key) ?? { income: 0, expense: 0 }
-    if (tx.type === 'CONTRIBUTION') entry.income += Number(tx.amount)
-    else if (['EXPENSE', 'DISBURSEMENT'].includes(tx.type)) entry.expense += Number(tx.amount)
-    monthlyMap.set(key, entry)
-  }
-  const chartKeys = [...monthlyMap.keys()].sort()
-  const chartLabels = formatMonthKeys(chartKeys)
-  const chartIncome = chartKeys.map((k) => monthlyMap.get(k)?.income ?? 0)
-  const chartExpense = chartKeys.map((k) => monthlyMap.get(k)?.expense ?? 0)
-  const hasMonthlyData = hasChartData(chartIncome) || hasChartData(chartExpense)
+  const download = (format: string) => `/api/export/report?${query.toString()}&format=${format}`
+  const thisYear = Number(appTodayInputValue().slice(0, 4))
+  const field = 'mt-1 block h-10 rounded-xl border border-outline-variant bg-surface px-3 text-sm font-normal text-on-surface'
 
   return (
     <DashboardShell role={actor.role} title="Financial reports" nav={navForRole(actor.role)}>
-      <div className="space-y-6 p-4 md:p-6">
-        <form className="flex flex-wrap items-end gap-2 rounded-xl border bg-surface p-4">
-          <label>
-            From
-            <input name="from" type="date" defaultValue={from.toISOString().slice(0, 10)} className="block rounded-lg border px-3 py-2" />
+      <div className="mx-auto max-w-7xl space-y-5 p-3 sm:p-4 md:p-6">
+        <form method="get" className="flex flex-wrap items-end gap-2 rounded-2xl border border-outline-variant bg-surface p-3">
+          <label className="text-xs font-semibold text-on-surface-variant">
+            Report
+            <select name="report" defaultValue={filters.kind} className={field}>
+              {REPORT_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
+            </select>
           </label>
-          <label>
-            To
-            <input name="to" type="date" defaultValue={to.toISOString().slice(0, 10)} className="block rounded-lg border px-3 py-2" />
-          </label>
-          <select name="category" defaultValue={filters.category || ''} className="rounded-lg border px-3 py-2">
-            <option value="">All categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+          {filters.kind === 'monthly' && (
+            <label className="text-xs font-semibold text-on-surface-variant">
+              Year
+              <select name="year" defaultValue={filters.year} className={field}>
+                {Array.from({ length: 6 }, (_, i) => thisYear - i).map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </label>
+          )}
+          {filters.kind === 'arrears' && (
+            <label className="text-xs font-semibold text-on-surface-variant">
+              Campaign
+              <select name="campaign" defaultValue={filters.campaign} className={field}>
+                <option value="">All campaigns</option>
+                {campaigns.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+              </select>
+            </label>
+          )}
+          {filters.kind === 'transactions' && (
+            <>
+              <label className="text-xs font-semibold text-on-surface-variant">From<input type="date" name="from" defaultValue={filters.from} className={field} /></label>
+              <label className="text-xs font-semibold text-on-surface-variant">To<input type="date" name="to" defaultValue={filters.to} className={field} /></label>
+              <label className="text-xs font-semibold text-on-surface-variant">
+                Show
+                <select name="direction" defaultValue={filters.direction} className={field}>
+                  <option value="all">Money in and out</option>
+                  <option value="in">Money in</option>
+                  <option value="out">Money out</option>
+                </select>
+              </label>
+            </>
+          )}
+          <button className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-on-primary">Show report</button>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {[
+              { format: 'pdf', label: 'PDF', icon: 'picture_as_pdf' },
+              { format: 'docx', label: 'Word', icon: 'description' },
+              { format: 'csv', label: 'CSV', icon: 'table_view' },
+            ].map((d) => (
+              <a key={d.format} href={download(d.format)} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-outline-variant px-3 text-sm font-semibold text-primary hover:bg-primary/5">
+                <span className="material-symbols-outlined text-[18px]">{d.icon}</span>
+                {d.label}
+              </a>
             ))}
-          </select>
-          <button className="rounded-full bg-primary px-4 py-2 text-on-primary">Apply</button>
-          <a
-            href={`/api/export/financial?from=${from.toISOString()}&to=${to.toISOString()}${filters.category ? `&category=${filters.category}` : ''}`}
-            className="rounded-full border px-4 py-2"
-          >
-            Export CSV
-          </a>
-          <a href="/financial-reports/active-months" className="rounded-full border px-4 py-2">
-            Active months per member
-          </a>
+          </div>
         </form>
 
-        <section className="grid gap-3 md:grid-cols-3">
-          <Card title="Income" value={income} />
-          <Card title="Expenditure" value={expenses} />
-          <Card title="Net movement" value={income - expenses} />
-        </section>
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
+          {report.kpis.map((kpi) => (
+            <div key={kpi.label} className="rounded-2xl border border-outline-variant bg-surface p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">{kpi.label}</p>
+              <p className="mt-1 truncate text-xl font-bold text-primary">{kpi.value}</p>
+            </div>
+          ))}
+        </div>
 
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-xl">Monthly income vs expenditure</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">From confirmed ledger transactions in the selected period.</p>
-          <div className="mt-4">
-            {hasMonthlyData ? (
-              <IncomeExpenseChart labels={chartLabels} income={chartIncome} expense={chartExpense} />
-            ) : (
-              <ChartEmpty message="No confirmed transactions in the selected period." />
-            )}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-xl">Cash, bank and M-Pesa balances</h2>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
-            {balances.filter((a) => a.type === 'ASSET').map((a) => (
-              <Card key={a.id} title={a.name} value={a.balance} />
-            ))}
-          </div>
-        </section>
-
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-xl">Arrears</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
+        <details open className="group rounded-2xl border border-outline-variant bg-surface">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 [&::-webkit-details-marker]:hidden">
+            <span>
+              <span className="block font-h3 text-lg text-primary">{report.title}</span>
+              <span className="block text-xs text-on-surface-variant">{report.subtitle} · {report.rows.length} row{report.rows.length === 1 ? '' : 's'}</span>
+            </span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant text-primary" aria-hidden="true">
+              <span className="material-symbols-outlined text-[22px] group-open:hidden">expand_more</span>
+              <span className="material-symbols-outlined hidden text-[22px] group-open:inline">expand_less</span>
+            </span>
+          </summary>
+          <div className="max-h-[70vh] overflow-auto border-t border-outline-variant">
+            <table className="w-full border-separate border-spacing-0 text-sm" style={{ minWidth: report.columns.length > 10 ? 1100 : 640 }}>
+              <thead className="sticky top-0 z-10 bg-surface-container-low text-[11px] uppercase tracking-wide text-on-surface-variant">
                 <tr>
-                  <th>Member</th>
-                  <th>Campaign</th>
-                  <th>Target</th>
-                  <th>Paid</th>
-                  <th>Balance</th>
+                  {report.columns.map((c, i) => (
+                    <th key={c.label} className={`border-b border-outline-variant px-3 py-2 ${c.align === 'right' ? 'text-right' : 'text-left'} ${i === 0 ? 'sticky left-0 z-20 bg-surface-container-low' : ''}`}>{c.label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {obligations.map((o) => {
-                  const paid = o.campaign.contributions
-                    .filter((c) => c.userId === o.userId)
-                    .reduce((s, c) => s + c.amount, 0)
-                  return (
-                    <tr key={o.id}>
-                      <td>{o.user.fullName}</td>
-                      <td>{o.campaign.title}</td>
-                      <td>{Number(o.targetAmount).toLocaleString()}</td>
-                      <td>{paid.toLocaleString()}</td>
-                      <td>{Math.max(0, Number(o.targetAmount) - paid).toLocaleString()}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border bg-surface p-5">
-          <h2 className="font-h3 text-xl">Income and expenditure</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Number</th>
-                  <th>Type</th>
-                  <th>Category</th>
-                  <th>Description</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((t) => (
-                  <tr key={t.id}>
-                    <td>{t.occurredAt.toLocaleDateString()}</td>
-                    <td>{t.transactionNumber}</td>
-                    <td>{t.type}</td>
-                    <td>{t.category?.name || '—'}</td>
-                    <td>{t.description}</td>
-                    <td>{Number(t.amount).toLocaleString()}</td>
+                {report.rows.length === 0 && (
+                  <tr><td colSpan={report.columns.length} className="py-10 text-center text-on-surface-variant">No data for these filters.</td></tr>
+                )}
+                {report.rows.map((cells, r) => (
+                  <tr key={r} className="hover:bg-primary/[0.03]">
+                    {cells.map((cell, i) => (
+                      <td key={i} className={`border-b border-outline-variant/40 px-3 py-1.5 tabular-nums ${report.columns[i]?.align === 'right' ? 'text-right' : ''} ${i === 0 ? 'sticky left-0 bg-surface font-medium' : ''} ${cell === '—' ? 'text-outline' : ''}`}>{cell}</td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
+              {report.totals && report.rows.length > 0 && (
+                <tfoot className="sticky bottom-0 bg-surface-container-low font-bold">
+                  <tr>
+                    {report.totals.map((cell, i) => (
+                      <td key={i} className={`border-t border-outline-variant px-3 py-2 tabular-nums ${report.columns[i]?.align === 'right' ? 'text-right' : ''} ${i === 0 ? 'sticky left-0 bg-surface-container-low' : ''}`}>{cell}</td>
+                    ))}
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
-          <p className="mt-3 text-sm">{reconciliations} reconciliation(s) in the selected period.</p>
-        </section>
+        </details>
       </div>
     </DashboardShell>
-  )
-}
-
-function Card({ title, value }: { title: string; value: number }) {
-  return (
-    <div className="rounded-xl border bg-surface p-4">
-      <p className="text-xs uppercase">{title}</p>
-      <b>KES {value.toLocaleString()}</b>
-    </div>
   )
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { appDayRange } from '@/lib/dates'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import AdminFinanceClient from '@/components/admin/AdminFinanceClient'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
@@ -29,9 +30,9 @@ export default async function AdminFinancePage({
     sp.from = new Date(Date.UTC(viewYear, viewMonth - 1, 1)).toISOString().slice(0, 10)
     sp.to = new Date(Date.UTC(viewYear, viewMonth, 0)).toISOString().slice(0, 10)
   }
-  const from = sp.from ? new Date(sp.from) : undefined
-  // Inclusive: payments made any time on the "to" day count.
-  const to = sp.to ? new Date(`${sp.to}T23:59:59.999Z`) : undefined
+  // Whole days in Nairobi time; payments made any time on the "to" day count.
+  const from = sp.from && /^\d{4}-\d{2}-\d{2}$/.test(sp.from) ? appDayRange(sp.from).start : undefined
+  const to = sp.to && /^\d{4}-\d{2}-\d{2}$/.test(sp.to) ? appDayRange(sp.to).end : undefined
 
   const contributionWhere: Prisma.ContributionWhereInput = {
     status: { in: ['CONFIRMED', 'RECONCILED'] },
@@ -244,7 +245,25 @@ export default async function AdminFinancePage({
             )}
           </div>
 
-          <div className="mt-4 overflow-x-auto rounded-xl border">
+          {/* Phones: one compact row per member. */}
+          <ul className="mt-4 divide-y divide-outline-variant/60 rounded-xl border md:hidden">
+            {memberRows.length === 0 ? (
+              <li className="p-6 text-center text-sm text-on-surface-variant">No members found.</li>
+            ) : (
+              memberRows.map((m) => (
+                <li key={m.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{m.fullName}</p>
+                    <p className="truncate text-xs text-on-surface-variant">
+                      {m.count} payment{m.count === 1 ? '' : 's'} · last {m.last ? new Date(m.last).toLocaleDateString() : '—'}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-semibold">KES {m.total.toLocaleString()}</p>
+                </li>
+              ))
+            )}
+          </ul>
+          <div className="mt-4 hidden overflow-x-auto rounded-xl border md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-surface-container-low text-left text-xs uppercase text-on-surface-variant">

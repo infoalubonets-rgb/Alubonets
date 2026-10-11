@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { after } from 'next/server'
 import { Prisma, type PaymentMethod } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { appTodayInputValue } from '@/lib/dates'
@@ -171,18 +172,25 @@ export async function createLedgerContribution(input: {
   proofTitle?: string | null
 }) {
   const occurredAt = input.occurredAt || new Date()
-  const result = await prisma.$transaction(async (tx) => {
-    const period = await getPeriodForDate(occurredAt, tx)
-    const source = await tx.financialAccount.findUniqueOrThrow({ where: { id: input.sourceAccountId } })
-    if (input.providerReference) {
-      const duplicate = await tx.financialTransaction.findUnique({ where: { providerReference: input.providerReference } })
-      if (duplicate) throw new Error(`Transaction reference ${input.providerReference} has already been used.`)
-    }
-    const payer = await tx.user.findUniqueOrThrow({
+  // Read-only lookups run together before the transaction: each one is a round trip to the
+  // database, so doing them in parallel keeps recording fast. The unique index on
+  // providerReference still blocks a duplicate that slips in between.
+  const [period, source, duplicate, payer, category, allocation] = await Promise.all([
+    getPeriodForDate(occurredAt),
+    prisma.financialAccount.findUniqueOrThrow({ where: { id: input.sourceAccountId } }),
+    input.providerReference
+      ? prisma.financialTransaction.findUnique({ where: { providerReference: input.providerReference }, select: { id: true } })
+      : Promise.resolve(null),
+    prisma.user.findUniqueOrThrow({
       where: { id: input.userId },
       select: { id: true, isPrincipal: true, principalMemberId: true },
-    })
-    const principalMemberId = payer.isPrincipal ? payer.id : payer.principalMemberId
+    }),
+    prisma.transactionCategory.findUniqueOrThrow({ where: { id: input.categoryId } }),
+    prisma.fundAllocationRule.findFirst({ where: { active: true }, orderBy: { version: 'desc' } }),
+  ])
+  if (duplicate) throw new Error(`Transaction reference ${input.providerReference} has already been used.`)
+  const principalMemberId = payer.isPrincipal ? payer.id : payer.principalMemberId
+  const result = await prisma.$transaction(async (tx) => {
     const status = input.status || 'PENDING'
     const financial = await tx.financialTransaction.create({
       data: {
@@ -214,11 +222,6 @@ export async function createLedgerContribution(input: {
             }
           : undefined,
       },
-    })
-    const category = await tx.transactionCategory.findUniqueOrThrow({ where: { id: input.categoryId } })
-    const allocation = await tx.fundAllocationRule.findFirst({
-      where: { active: true },
-      orderBy: { version: 'desc' },
     })
     const emergencyPercent = allocation?.emergencyPercent ?? 20
     const reservePercent = allocation?.reservePercent ?? 80
@@ -252,14 +255,30 @@ export async function createLedgerContribution(input: {
     if (input.campaignId) await refreshObligation(input.campaignId, input.userId, tx)
     return { contribution, financial }
   })
-  if (result.contribution.status === 'CONFIRMED' || result.contribution.status === 'RECONCILED') {
-    await recomputeStandingSafely(input.userId, input.actorId)
-  }
-  if (input.projectId) {
-    const { syncProjectFinancials } = await import('@/lib/project-status')
-    await syncProjectFinancials(input.projectId).catch(() => {})
+  // Standing and project totals are follow-ups: the payment is already saved, so they run
+  // after the response instead of keeping the Treasurer waiting.
+  const counts = result.contribution.status === 'CONFIRMED' || result.contribution.status === 'RECONCILED'
+  const projectId = input.projectId
+  if (counts || projectId) {
+    runAfterResponse(async () => {
+      if (counts) await recomputeStandingSafely(input.userId, input.actorId)
+      if (projectId) {
+        const { syncProjectFinancials } = await import('@/lib/project-status')
+        await syncProjectFinancials(projectId).catch(() => {})
+      }
+    })
   }
   return result
+}
+
+/** Runs work after the response is sent; outside a request (scripts, tests) it simply runs now. */
+export function runAfterResponse(task: () => Promise<unknown>) {
+  const run = () => task().catch((error) => console.error('[after-response] task failed', error))
+  try {
+    after(run)
+  } catch {
+    void run()
+  }
 }
 
 /** Standing must never block a payment from being recorded. */
@@ -272,8 +291,12 @@ export async function recomputeStandingSafely(userId: string, actorId?: string) 
   }
 }
 
+/**
+ * Account balances from posted ledger entries. A reversed entry stays posted and its confirmed
+ * reversal cancels it out, so both count; pending and rejected entries never do.
+ */
 export async function accountBalances() {
-  const accounts = await prisma.financialAccount.findMany({ where: { active: true }, orderBy: { code: 'asc' }, include: { entries: { where: { transaction: { status: { in: ['CONFIRMED', 'RECONCILED'] } } }, select: { debit: true, credit: true } } } })
+  const accounts = await prisma.financialAccount.findMany({ where: { active: true }, orderBy: { code: 'asc' }, include: { entries: { where: { transaction: { status: { in: ['CONFIRMED', 'RECONCILED', 'REVERSED'] } } }, select: { debit: true, credit: true } } } })
   return accounts.map((account) => ({
     ...account,
     balance: account.entries.reduce((sum, entry) => sum + Number(entry.debit) - Number(entry.credit), 0),

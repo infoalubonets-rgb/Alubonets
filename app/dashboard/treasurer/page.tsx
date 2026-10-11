@@ -26,7 +26,7 @@ export default async function TreasurerPage() {
   ]
 
   const quickLinks = [
-    { label: 'Contributions & Payments', description: 'Record contributions, M-Pesa payments, receipts', icon: 'payments', href: '/dashboard/treasurer/contributions' },
+    { label: 'Contributions & Payments', description: 'Record contributions, M-Pesa payments, receipts', icon: 'payments', href: '/dashboard/treasurer/finance' },
     { label: 'Welfare', description: `${data.pendingWelfare.length} pending review${data.pendingWelfare.length === 1 ? '' : 's'}`, icon: 'volunteer_activism', href: '/dashboard/treasurer/welfare', badge: data.pendingWelfare.length > 0 ? data.pendingWelfare.length : null },
     { label: 'Notifications', description: 'Payments received and group notices', icon: 'notifications', href: '/notifications' },
   ]
@@ -130,7 +130,7 @@ export default async function TreasurerPage() {
                 <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>receipt_long</span>
                 <h2 className="font-semibold text-[13px] text-on-surface dark:text-blue-50 uppercase tracking-wider">Recent contributions</h2>
               </div>
-              <Link href="/dashboard/treasurer/contributions" className="text-[12px] text-primary dark:text-blue-300 hover:underline font-medium">
+              <Link href="/dashboard/treasurer/finance" className="text-[12px] text-primary dark:text-blue-300 hover:underline font-medium">
                 View all →
               </Link>
             </div>

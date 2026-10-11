@@ -45,6 +45,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         fullName: true,
         membershipNumber: true,
         standing: true,
+        standingReason: true,
+        contributionPlan: true,
         attachedMembers: { select: { id: true, fullName: true }, orderBy: { fullName: 'asc' } },
       },
     }),
@@ -72,7 +74,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   return NextResponse.json(
     {
-      member: { id: member.id, fullName: member.fullName, membershipNumber: member.membershipNumber, standing: member.standing },
+      member: { id: member.id, fullName: member.fullName, membershipNumber: member.membershipNumber, standing: member.standing, standingReason: member.standingReason, contributionPlan: member.contributionPlan },
       contributions: rows.filter((c) => c.userId === member.id).map(toView),
       family: member.attachedMembers.map((m) => ({
         id: m.id,

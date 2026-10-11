@@ -11,7 +11,7 @@ import { getWelfarePolicy } from '@/lib/settings'
 import { amountKes } from '@/lib/money-limits'
 import { requireWelfareEnabled } from '@/lib/feature-flags'
 import { sendWelfareStatusEmail } from '@/lib/email/resend'
-import { notifyRoleHolders, notifyUsers } from '@/lib/notifications'
+import { notifyTreasurerRequest, notifyUsers } from '@/lib/notifications'
 
 function refreshWelfare() {
   revalidatePath('/dashboard/member/welfare')
@@ -21,6 +21,8 @@ function refreshWelfare() {
   revalidatePath('/dashboard/treasurer')
   revalidatePath('/dashboard/executive')
   revalidatePath('/admin')
+  revalidatePath('/dashboard/treasurer/finance')
+  revalidatePath('/dashboard/treasurer/ledger')
   revalidateTag(TAGS.welfare)
 }
 
@@ -64,12 +66,10 @@ export async function actionCreateWelfare(formData: FormData) {
     entity: 'WelfareRequest',
     entityId: request.id,
     newValue: {
-      amount: parsed.amount,
-      confidentiality: parsed.confidentiality,
-      supportType: parsed.supportType || null,
+      ...JSON.parse(JSON.stringify(request)),
     },
   })
-  await notifyRoleHolders(['TREASURER', 'EXECUTIVE', 'ADMIN'], {
+  await notifyTreasurerRequest({
     title: 'New welfare request',
     body: parsed.confidentiality === 'CONFIDENTIAL'
       ? 'A confidential welfare request needs Treasurer and Executive approval.'
@@ -119,7 +119,7 @@ export async function actionReviewWelfare(formData: FormData) {
       action: 'WELFARE_REVIEW',
       entity: 'WelfareRequest',
       entityId: id,
-      oldValue: { status: request.status },
+      oldValue: JSON.parse(JSON.stringify(request)),
       newValue: { status: 'REJECTED' },
       reason: reviewNote,
     })
@@ -192,7 +192,7 @@ export async function actionReviewWelfare(formData: FormData) {
     action: data.status === 'APPROVED' ? 'WELFARE_REVIEW' : 'WELFARE_STEP_APPROVE',
     entity: 'WelfareRequest',
     entityId: id,
-    oldValue: { status: request.status },
+    oldValue: JSON.parse(JSON.stringify(request)),
     newValue: {
       status: updated.status,
       treasurerApproved: Boolean(updated.treasurerApprovedAt),
@@ -213,12 +213,11 @@ export async function actionReviewWelfare(formData: FormData) {
       entityId: id,
     })
   } else {
-    await notifyRoleHolders(
-      updated.treasurerApprovedAt ? ['EXECUTIVE', 'ADMIN'] : ['TREASURER', 'ADMIN'],
+    await notifyTreasurerRequest(
       {
         title: 'Welfare request awaiting second approval',
         body: `${actor.fullName} recorded a ${stamp.toLowerCase()} approval.`,
-        href: updated.treasurerApprovedAt ? '/dashboard/executive/welfare' : '/dashboard/treasurer/welfare',
+        href: '/dashboard/treasurer/welfare',
         type: 'welfare',
         entity: 'WelfareRequest',
         entityId: id,

@@ -90,7 +90,41 @@ export default function CommitteeProfilesClient({ rows, members }: { rows: Commi
 
       {error && !editing && <p role="alert" className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">{error}</p>}
 
-      <div className="overflow-x-auto rounded-2xl border border-outline-variant bg-surface dark:bg-[#0d1729]">
+      {/* Phones: one card per profile. */}
+      <ul className="space-y-2 md:hidden">
+        {rows.length === 0 && (
+          <li className="rounded-2xl border border-dashed border-outline-variant px-4 py-6 text-center text-sm text-on-surface-variant">
+            No executive profiles yet.
+          </li>
+        )}
+        {rows.map((row) => (
+          <li key={row.id} className="rounded-2xl border border-outline-variant bg-surface p-3 dark:bg-[#0d1729]">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-on-surface">
+                  <span className="mr-1.5 text-xs text-on-surface-variant">#{row.displayOrder}</span>
+                  {row.name}
+                </p>
+                <p className="truncate text-sm text-on-surface-variant">{row.position}</p>
+                {row.memberName && <p className="truncate text-xs text-on-surface-variant">Linked: {row.memberName}</p>}
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${row.published ? 'bg-green-100 text-green-800' : 'bg-surface-container-high text-on-surface-variant'}`}>
+                {row.published ? 'Published' : 'Draft'}
+              </span>
+            </div>
+            <div className="mt-2 flex gap-2">
+              <button type="button" onClick={() => { setError(''); setEditing(row) }} className="h-9 flex-1 rounded-full border border-outline-variant text-sm font-semibold text-primary">
+                Edit
+              </button>
+              <button type="button" disabled={pending} onClick={() => remove(row)} className="h-9 flex-1 rounded-full border border-error/40 text-sm font-semibold text-error disabled:opacity-50">
+                Remove
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-outline-variant bg-surface dark:bg-[#0d1729] md:block">
         <table className="w-full min-w-[640px] text-sm">
           <thead className="bg-surface-container-low text-left text-xs uppercase tracking-wide text-on-surface-variant">
             <tr>

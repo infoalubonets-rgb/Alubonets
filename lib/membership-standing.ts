@@ -33,6 +33,8 @@ export type StandingMember = {
   joinedAt: Date
   override: Standing | null
   overrideUntil: Date | null
+  /** Monthly members are only checked for monthly dues, annual members only for the annual fee. Unset checks both. */
+  plan?: 'MONTHLY' | 'ANNUAL' | null
 }
 
 export type StandingResult = {
@@ -173,7 +175,7 @@ export function computeStanding(
   const reasons: string[] = []
   let result = { ...base }
 
-  if (settings.monthlyFeeKes > 0) {
+  if (settings.monthlyFeeKes > 0 && member.plan !== 'ANNUAL') {
     const firstMonth = monthStart(start)
     const due = overdueMonthCount(firstMonth, settings.monthlyGraceDays, now) * settings.monthlyFeeKes
     const paid = payments
@@ -186,7 +188,7 @@ export function computeStanding(
     }
   }
 
-  if (settings.annualFeeKes > 0) {
+  if (settings.annualFeeKes > 0 && member.plan !== 'MONTHLY') {
     const expiry = annualExpiry(payments, settings.annualFeeKes, start)
     result.annualExpiresAt = expiry
     if (now.getTime() > annualLastPayDay(expiry.getUTCFullYear(), settings).getTime() + DAY_MS) {

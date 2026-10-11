@@ -1,3 +1,5 @@
+import { getFeatureFlags } from '@/lib/feature-flags'
+import { enabledRequestNoticesWhere } from '@/lib/notification-audience'
 import { NextResponse } from 'next/server'
 import { getSessionProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
@@ -10,11 +12,12 @@ export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
+    const flags = await getFeatureFlags()
     const profile = await getSessionProfile()
     if (!profile) return NextResponse.json({ count: 0 }, { status: 401 })
     const [alerts, unreadNotices, unreadAnnouncements, seen] = await Promise.all([
       getRoleAlerts({ id: profile.id, role: profile.role as Role, isSuperAdmin: profile.isSuperAdmin, dashboardAccess: profile.dashboardAccess as Role[] }),
-      prisma.userNotification.count({ where: { userId: profile.id, readAt: null, ...noticeAudienceWhere(profile.role as Role) } }),
+      prisma.userNotification.count({ where: { userId: profile.id, readAt: null, AND: [noticeAudienceWhere(profile.role as Role), enabledRequestNoticesWhere(flags)] } }),
       prisma.announcementReceipt.count({ where: { userId: profile.id, readAt: null, announcement: announcementAudienceWhere(profile.role as Role) } }),
       getNotificationsSeen(profile.id),
     ])
@@ -25,3 +28,4 @@ export async function GET() {
     return NextResponse.json({ count: 0 })
   }
 }
+

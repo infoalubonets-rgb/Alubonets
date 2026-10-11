@@ -31,7 +31,7 @@ function refreshCategories() {
   revalidatePath('/admin/settings')
   revalidatePath('/admin/finance')
   revalidatePath('/financial-reports')
-  revalidatePath('/dashboard/treasurer/contributions')
+  revalidatePath('/dashboard/treasurer/finance')
   revalidatePath('/dashboard/treasurer/ledger')
 }
 

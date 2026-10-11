@@ -126,3 +126,13 @@ describe('todayRange', () => {
     expect(end.getTime() - start.getTime()).toBe(24 * 60 * 60 * 1000 - 1)
   })
 })
+
+describe('appDayRange', () => {
+  it('covers a whole Nairobi calendar day', async () => {
+    const { appDayRange } = await import('../lib/dates')
+    const { start, end } = appDayRange('2026-10-11', 'Africa/Nairobi')
+    // Nairobi is UTC+3: the day runs 10 Oct 21:00 UTC to 11 Oct 20:59:59.999 UTC.
+    expect(start.toISOString()).toBe('2026-10-10T21:00:00.000Z')
+    expect(end.toISOString()).toBe('2026-10-11T20:59:59.999Z')
+  })
+})

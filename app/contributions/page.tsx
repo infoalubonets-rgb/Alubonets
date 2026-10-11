@@ -4,6 +4,7 @@ import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
 import { getSessionProfile, getAccountProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
+import { rangeFilter, resolveTimeRange, type ResolvedTimeRange } from '@/lib/time-range'
 import { TAGS } from '@/lib/data/queries'
 import type { Role } from '@/lib/auth/types'
 import ContributionsClient from '@/components/dashboard/ContributionsClient'
@@ -53,22 +54,23 @@ function getAttachedMembers(principalId: string) {
   )()
 }
 
-/** One row per member: confirmed totals, pending checks and last payment. */
-async function getMemberContributionRows(): Promise<MemberContributionRow[]> {
+/** One row per member: confirmed totals, pending checks and last payment — all time or a period. */
+async function getMemberContributionRows(range: ResolvedTimeRange): Promise<MemberContributionRow[]> {
+  const paidAt = rangeFilter(range)
   const [members, paid, pending] = await Promise.all([
     prisma.user.findMany({
       where: { status: { not: 'PENDING' } },
-      select: { id: true, fullName: true, membershipNumber: true, status: true, standing: true },
+      select: { id: true, fullName: true, membershipNumber: true, status: true, standing: true, contributionPlan: true },
       orderBy: { fullName: 'asc' },
     }),
     prisma.contribution.groupBy({
       by: ['userId'],
-      where: { status: { in: ['CONFIRMED', 'RECONCILED'] } },
+      where: { status: { in: ['CONFIRMED', 'RECONCILED'] }, ...(paidAt ? { paidAt } : {}) },
       _sum: { amount: true },
       _count: true,
       _max: { paidAt: true },
     }),
-    prisma.contribution.groupBy({ by: ['userId'], where: { status: 'PENDING' }, _count: true }),
+    prisma.contribution.groupBy({ by: ['userId'], where: { status: 'PENDING', ...(paidAt ? { paidAt } : {}) }, _count: true }),
   ])
   const paidBy = new Map(paid.map((row) => [row.userId, row]))
   const pendingBy = new Map(pending.map((row) => [row.userId, row._count]))
@@ -80,6 +82,7 @@ async function getMemberContributionRows(): Promise<MemberContributionRow[]> {
       membershipNumber: member.membershipNumber,
       status: member.status,
       standing: member.standing,
+      plan: member.contributionPlan,
       payments: totals?._count ?? 0,
       totalPaid: Number(totals?._sum.amount ?? 0),
       pending: pendingBy.get(member.id) ?? 0,
@@ -88,7 +91,7 @@ async function getMemberContributionRows(): Promise<MemberContributionRow[]> {
   })
 }
 
-export default async function ContributionsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function ContributionsPage({ searchParams }: { searchParams: Promise<{ tab?: string; month?: string; range?: string; from?: string; to?: string }> }) {
   const profile = await getSessionProfile()
   if (!profile) redirect('/login?next=/contributions')
   if (profile.status === 'SUSPENDED') redirect('/login?error=suspended')
@@ -97,9 +100,15 @@ export default async function ContributionsPage({ searchParams }: { searchParams
   const seesAll = canViewAllFinances(profile)
   const title = seesAll ? 'Contributions' : 'My contributions'
 
-  if (seesAll && (await searchParams).tab === 'members') {
+  const sp = await searchParams
+  if (seesAll && sp.tab === 'members') {
+    // Old ?month=YYYY-MM links become a custom range for that month.
+    const monthMatch = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(sp.month ?? '')
+    const period = resolveTimeRange(monthMatch
+      ? { range: 'custom', from: `${sp.month}-01`, to: new Date(Date.UTC(Number(monthMatch[1]), Number(monthMatch[2]), 0)).toISOString().slice(0, 10) }
+      : sp)
     const account = await getAccountProfile()
-    const rows = await getMemberContributionRows()
+    const rows = await getMemberContributionRows(period)
     return (
       <DashboardShell
         role={role}
@@ -115,7 +124,12 @@ export default async function ContributionsPage({ searchParams }: { searchParams
       >
         <div className="space-y-4 pt-4">
           {/* Only the Treasurer can correct a payment amount (audited). */}
-          <MemberContributionsTable rows={rows} canEditAmounts={canRecordPayments(profile)} />
+          <MemberContributionsTable
+            rows={rows}
+            period={{ key: period.key, from: period.from, to: period.to, label: period.label }}
+            canEditAmounts={canRecordPayments(profile)}
+            canSetPlan={canRecordPayments(profile) || profile.role === 'ADMIN' || Boolean(profile.isSuperAdmin)}
+          />
         </div>
       </DashboardShell>
     )

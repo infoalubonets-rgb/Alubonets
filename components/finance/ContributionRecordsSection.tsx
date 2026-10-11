@@ -1,6 +1,5 @@
-import DashboardShell from '@/components/dashboard/DashboardShell'
-import AddContributionButton from '@/components/finance/AddContributionButton'
-import { TREASURER_NAV } from '@/lib/dashboard/nav'
+import { cache } from 'react'
+import { appDayRange } from '@/lib/dates'
 import { actionEmailReceipt } from '@/app/actions/domain'
 import {
   getTreasurerDashboardData,
@@ -8,7 +7,6 @@ import {
   getContributionAnalytics,
 } from '@/lib/data/queries'
 import {
-  BudgetDoughnutChart,
   ChartEmpty,
   ContributionTrendChart,
   PaymentMethodChart,
@@ -22,26 +20,16 @@ import ReconcilePaymentButton from '@/components/finance/ReconcilePaymentButton'
 import UnmatchedPayments from '@/components/finance/UnmatchedPayments'
 import { filterSelectableCategories } from '@/lib/payment-categories'
 import { prisma } from '@/lib/prisma'
-import { requireActiveRole } from '@/lib/auth/session'
-import { canRecordPayments } from '@/lib/finance-access'
 import type { Prisma, TransactionStatus } from '@prisma/client'
 import { parsePage, paginationSkip, totalPages } from '@/lib/pagination'
 
-export const dynamic = 'force-dynamic'
+export type ContributionRecordsParams = { page?: string; q?: string; year?: string; purpose?: string; status?: string; member?: string }
 
-export const metadata = {
-  title: 'Finance',
-}
+const PATH = '/dashboard/treasurer/finance'
 
-export default async function TreasurerContributionsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ page?: string; q?: string; year?: string; purpose?: string; status?: string; member?: string }>
-}) {
-  const actor = await requireActiveRole(['TREASURER'])
-  // Matching an M-Pesa payment records it, so only the Treasurer gets those controls.
-  const canRecord = canRecordPayments(actor)
-  const sp = await searchParams
+/** Loads everything the contribution parts need once per request, however many parts render. */
+const loadRecords = cache(async (spKey: string) => {
+  const sp = JSON.parse(spKey) as ContributionRecordsParams
   const page = parsePage(sp.page)
   const pageSize = 25
   const q = (sp.q || '').trim()
@@ -49,8 +37,9 @@ export default async function TreasurerContributionsPage({
   const purpose = (sp.purpose || '').trim()
   const statusFilter = (sp.status || '').trim()
   const memberId = (sp.member || '').trim()
-  const yearStart = year ? new Date(`${year}-01-01T00:00:00.000Z`) : null
-  const yearEnd = year ? new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`) : null
+  // The year runs 1 Jan to 31 Dec in Nairobi time.
+  const yearStart = /^\d{4}$/.test(year) ? appDayRange(`${year}-01-01`).start : null
+  const yearEnd = /^\d{4}$/.test(year) ? appDayRange(`${year}-12-31`).end : null
   const [purposeKind, purposeId] = purpose.includes(':') ? purpose.split(':', 2) : ['', '']
   const purposeFilter: Prisma.ContributionWhereInput | null = !purpose
     ? null
@@ -85,7 +74,7 @@ export default async function TreasurerContributionsPage({
     status: statusFilter
       ? { in: [statusFilter as TransactionStatus] }
       : { in: ['CONFIRMED', 'RECONCILED'] },
-    ...(yearStart && yearEnd ? { paidAt: { gte: yearStart, lt: yearEnd } } : {}),
+    ...(yearStart && yearEnd ? { paidAt: { gte: yearStart, lte: yearEnd } } : {}),
     ...(andFilters.length ? { AND: andFilters } : {}),
   }
 
@@ -142,38 +131,86 @@ export default async function TreasurerContributionsPage({
       }),
     ])
 
-  const catLabels = data.byCategory.map((c) => c.category || 'Uncategorized')
-  const catValues = data.byCategory.map((c) => c._sum.amount ?? 0)
   const methodLabels = analytics.byMethod.map((m) => m.label)
   const methodValues = analytics.byMethod.map((m) => m.total)
   const topLabels = analytics.topContributors.map((t) => t.name)
   const topValues = analytics.topContributors.map((t) => t.total)
   const currentYear = new Date().getFullYear()
   const yearOptions = Array.from({ length: 6 }, (_, i) => String(currentYear - i))
+  return {
+    page, pageSize, q, year, purpose, statusFilter, memberId,
+    members, purposeCategories, purposeCampaigns, purposeProjects, unmatchedEvents, activeCategories,
+    data, chart, analytics, mpesaContributions, failedPayments, contribTotal, recent, pendingRows,
+    methodLabels, methodValues, topLabels, topValues, currentYear, yearOptions,
+  }
+})
 
-  const stats = [
-    { label: 'Total collected (KES)', value: Math.round(data.total).toLocaleString() },
-    { label: 'This month (KES)', value: Math.round(data.monthTotal).toLocaleString() },
-    { label: 'Records', value: data.count.toLocaleString() },
-    { label: 'Contributing members', value: analytics.contributorCount.toLocaleString() },
-  ]
+/**
+ * Contribution parts of the Finance page, rendered where the page places them:
+ * `kpis` (stat cards), `charts` (trend, methods, top contributors) and `records`
+ * (pending checks, unmatched M-Pesa, payments and the filterable records table).
+ * `canRecord` is the Treasurer only — matching an M-Pesa payment records it.
+ */
+export default async function ContributionRecordsSection({ sp, canRecord, part }: { sp: ContributionRecordsParams; canRecord: boolean; part: 'kpis' | 'charts' | 'records' }) {
+  const {
+    page, pageSize, q, year, purpose, statusFilter, memberId,
+    members, purposeCategories, purposeCampaigns, purposeProjects, unmatchedEvents, activeCategories,
+    data, chart, analytics, mpesaContributions, failedPayments, contribTotal, recent, pendingRows,
+    methodLabels, methodValues, topLabels, topValues, currentYear, yearOptions,
+  } = await loadRecords(JSON.stringify(sp))
+
+  if (part === 'kpis') {
+    return (
+      <>
+          {[
+            { label: 'Collected this month', value: `KES ${Math.round(data.monthTotal).toLocaleString()}` },
+            { label: 'Contributions recorded', value: data.count.toLocaleString() },
+            { label: 'Contributing members', value: analytics.contributorCount.toLocaleString() },
+            { label: 'M-Pesa payments', value: `${mpesaContributions.length}${failedPayments.length ? ` · ${failedPayments.length} failed` : ''}` },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-2xl border border-outline-variant p-5">
+              <p className="text-sm text-on-surface-variant">{stat.label}</p>
+              <p className="mt-2 text-2xl font-bold">{stat.value}</p>
+            </div>
+          ))}
+      </>
+    )
+  }
+
+  if (part === 'charts') {
+    return (
+      <>
+          <div className="rounded-2xl border border-outline-variant bg-surface p-5">
+            <h2 className="mb-3 text-lg font-semibold">Monthly contribution trend</h2>
+            {hasChartData(chart.values) ? (
+              <ContributionTrendChart labels={chart.labels} values={chart.values} />
+            ) : (
+              <ChartEmpty message="No confirmed contributions recorded yet." />
+            )}
+          </div>
+          <div className="rounded-2xl border border-outline-variant bg-surface p-5">
+            <h2 className="mb-3 text-lg font-semibold">Payment methods</h2>
+            {hasChartData(methodValues) ? (
+              <PaymentMethodChart labels={methodLabels} values={methodValues} />
+            ) : (
+              <ChartEmpty message="No payment method data yet." />
+            )}
+          </div>
+          <div className="rounded-2xl border border-outline-variant bg-surface p-5">
+            <h2 className="mb-3 text-lg font-semibold">Top contributors</h2>
+            {hasChartData(topValues) ? (
+              <TopContributorsChart labels={topLabels} values={topValues} />
+            ) : (
+              <ChartEmpty message="No contributor data yet." />
+            )}
+          </div>
+      </>
+    )
+  }
 
   return (
-    <DashboardShell role="TREASURER" title="Finance" nav={TREASURER_NAV} pageAction={<AddContributionButton />}>
-      <div className="space-y-6 p-4 md:p-6">
-
-        {/* Header row with Payments button */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
-            {stats.map((s) => (
-              <div key={s.label} className="rounded-xl border bg-surface p-4">
-                <p className="text-xs text-on-surface-variant uppercase">{s.label}</p>
-                <p className="text-2xl font-semibold mt-1">{s.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
+    <div className="space-y-6">
+        <div id="pending">
         <PendingContributionVerify
           rows={pendingRows.map((row) => ({
             id: row.id,
@@ -189,7 +226,9 @@ export default async function TreasurerContributionsPage({
             statementRef: row.statementRef,
           }))}
         />
+        </div>
 
+        <div id="unmatched" />
         {!canRecord && unmatchedEvents.length > 0 && (
           <p className="rounded-2xl border border-outline-variant bg-surface p-4 text-sm text-on-surface-variant">
             {unmatchedEvents.length} M-Pesa payment{unmatchedEvents.length === 1 ? ' is' : 's are'} waiting to be matched. Only the Treasurer can match them.
@@ -234,63 +273,25 @@ export default async function TreasurerContributionsPage({
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-4">
-          <div className="rounded-xl border bg-surface p-4 lg:col-span-2">
-            <h2 className="font-semibold mb-3">Monthly contribution trend</h2>
-            {hasChartData(chart.values) ? (
-              <ContributionTrendChart labels={chart.labels} values={chart.values} />
-            ) : (
-              <ChartEmpty message="No confirmed contributions recorded yet." />
-            )}
-          </div>
-          <div className="rounded-xl border bg-surface p-4">
-            <h2 className="font-semibold mb-3">By category</h2>
-            {hasChartData(catValues) ? (
-              <BudgetDoughnutChart labels={catLabels} values={catValues} />
-            ) : (
-              <ChartEmpty message="No contributions by category yet." />
-            )}
-          </div>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-4">
-          <div className="rounded-xl border bg-surface p-4">
-            <h2 className="font-semibold mb-3">Payment methods</h2>
-            {hasChartData(methodValues) ? (
-              <PaymentMethodChart labels={methodLabels} values={methodValues} />
-            ) : (
-              <ChartEmpty message="No payment method data yet." />
-            )}
-          </div>
-          <div className="rounded-xl border bg-surface p-4 lg:col-span-2">
-            <h2 className="font-semibold mb-3">Top contributors</h2>
-            {hasChartData(topValues) ? (
-              <TopContributorsChart labels={topLabels} values={topValues} />
-            ) : (
-              <ChartEmpty message="No contributor data yet." />
-            )}
-          </div>
-        </div>
-
-        <section className="rounded-xl border bg-surface p-4 overflow-x-auto">
+        <section id="records" className="overflow-x-auto rounded-2xl border border-outline-variant bg-surface p-5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold">Recent contributions</h2>
+            <h2 className="text-lg font-semibold">Contribution records</h2>
             <div className="flex flex-wrap gap-2 text-sm">
               <a
                 className="rounded-full border px-3 py-1.5"
-                href={`/api/export/financial?from=${year || currentYear}-01-01&to=${year || currentYear}-12-31T23:59:59.999`}
+                href={`/api/export/financial?from=${year || currentYear}-01-01&to=${year || currentYear}-12-31`}
               >
                 Export CSV
               </a>
               <a
                 className="rounded-full border px-3 py-1.5"
-                href={`/api/export/financial-xlsx?from=${year || currentYear}-01-01&to=${year || currentYear}-12-31T23:59:59.999`}
+                href={`/api/export/financial-xlsx?from=${year || currentYear}-01-01&to=${year || currentYear}-12-31`}
               >
                 Export Excel
               </a>
             </div>
           </div>
-          <form method="get" className="mb-3 flex flex-wrap gap-2">
+          <form method="get" action={`${PATH}#records`} className="mb-3 flex flex-wrap gap-2">
             <input name="q" defaultValue={q} placeholder="Search member or ref" className="rounded-lg border px-3 py-1.5 text-sm" />
             <select name="year" defaultValue={year} className="rounded-lg border px-3 py-1.5 text-sm">
               <option value="">All years</option>
@@ -400,13 +401,13 @@ export default async function TreasurerContributionsPage({
             </tbody>
           </table>
           <PaginationBar
-            pathname="/dashboard/treasurer/contributions"
+            pathname={PATH}
             page={page}
             totalPages={totalPages(contribTotal, pageSize)}
             params={{ q, year, purpose, status: statusFilter, member: memberId }}
           />
         </section>
-      </div>
-    </DashboardShell>
+    </div>
   )
 }
+

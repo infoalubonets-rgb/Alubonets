@@ -9,7 +9,7 @@ type Props = {
   icon: string
   label: string
   title: string
-  size?: 'full' | 'compact' | 'wide'
+  size?: 'full' | 'compact' | 'wide' | 'xl'
   /** Show the label as visible text next to the icon, instead of an icon-only circular button. */
   showText?: boolean
   variant?: 'default' | 'primary' | 'orange'
@@ -50,3 +50,4 @@ export default function IconModalButton({ icon, label, title, size = 'compact', 
     </>
   )
 }
+

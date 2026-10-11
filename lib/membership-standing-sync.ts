@@ -10,6 +10,8 @@ import {
   type StandingSettings,
 } from '@/lib/membership-standing'
 import { getStandingSettings } from '@/lib/membership-standing-settings'
+import { getPurposeRules } from '@/lib/contribution-purpose-settings'
+import { memberPurposeRules, purposeBalance } from '@/lib/contribution-purpose-rules'
 
 type StandingUser = {
   id: string
@@ -22,6 +24,7 @@ type StandingUser = {
   standingOverride: Standing | null
   standingOverrideUntil: Date | null
   contributionExempt: boolean
+  contributionPlan: 'MONTHLY' | 'ANNUAL' | null
   memberProfile: { dateOfBirth: Date | null } | null
 }
 
@@ -36,6 +39,7 @@ const userSelect = {
   standingOverride: true,
   standingOverrideUntil: true,
   contributionExempt: true,
+  contributionPlan: true,
   memberProfile: { select: { dateOfBirth: true } },
 } as const
 
@@ -66,6 +70,7 @@ function evaluate(user: StandingUser, payments: StandingPayment[], settings: Sta
       joinedAt: user.approvedAt ?? user.createdAt,
       override: user.standingOverride,
       overrideUntil: user.standingOverrideUntil,
+      plan: user.contributionPlan,
     },
     settings,
     now,
@@ -75,7 +80,33 @@ function evaluate(user: StandingUser, payments: StandingPayment[], settings: Sta
 async function applyResults(users: StandingUser[], settings: StandingSettings, actorId?: string) {
   const now = new Date()
   const payments = await paymentsByUser(users.map((user) => user.id))
-  const own = new Map(users.map((user) => [user.id, evaluate(user, payments.get(user.id) ?? [], settings, now)]))
+  const { rules, overrides } = await getPurposeRules()
+  const purposePayments = rules.length || overrides.length ? await prisma.contribution.findMany({
+    where: { userId: { in: users.map(u => u.id) }, status: { in: ['CONFIRMED', 'RECONCILED'] } },
+    select: { userId: true, categoryId: true, amount: true, paidAt: true },
+  }) : []
+  const own = new Map(users.map(user => {
+    const assigned = memberPurposeRules(rules, overrides, user.id)
+    const membership = assigned.filter(a => a.rule.memberContribution && (!user.contributionPlan || a.rule.frequency === user.contributionPlan))
+    const memberSettings = { ...settings,
+      ...(membership.some(a => a.rule.frequency === 'MONTHLY') ? { monthlyFeeKes: 0 } : {}),
+      ...(membership.some(a => a.rule.frequency === 'ANNUAL') ? { annualFeeKes: 0 } : {}),
+    }
+    const result = evaluate(user, payments.get(user.id) ?? [], memberSettings, now)
+    if (user.standingOverride && (!user.standingOverrideUntil || user.standingOverrideUntil > now)) return [user.id, result] as const
+    const reasons: string[] = result.reason ? [result.reason] : []
+    for (const { rule, enabled } of membership) {
+      if (!enabled) continue
+      const balance = purposeBalance(rule, user.approvedAt ?? user.createdAt,
+        purposePayments.filter(p => p.userId === user.id && p.categoryId === rule.categoryId), now)
+      if (balance.outstanding > 0) {
+        reasons.push(`${rule.frequency === 'ANNUAL' ? 'Annual' : 'Monthly'} contribution overdue: KES ${balance.outstanding.toLocaleString()}`)
+        if (rule.frequency === 'MONTHLY') result.monthlyArrearsKes += balance.outstanding
+      }
+    }
+    if (reasons.length) { result.standing = 'LAPSED'; result.reason = reasons.join('; ') }
+    return [user.id, result] as const
+  }))
 
   const principalIds = users.map((u) => u.principalMemberId).filter((id): id is string => Boolean(id) && !own.has(id as string))
   const outsidePrincipals = principalIds.length
@@ -175,3 +206,4 @@ export async function getMemberStanding(userId: string) {
   })
   return { standing: (user?.standing ?? 'PAID_UP') as Standing, reason: user?.standingReason ?? null }
 }
+

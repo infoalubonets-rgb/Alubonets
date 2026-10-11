@@ -92,8 +92,9 @@ export const AUDITOR_NAV: NavItem[] = [
 export const TREASURER_NAV: NavItem[] = [
   overview('/dashboard/treasurer'),
   NOTIFICATIONS_NAV,
-  finance('/dashboard/treasurer/contributions', [
+  finance('/dashboard/treasurer/finance', [
     { icon: 'account_balance_wallet', label: 'Financial ledger', href: '/dashboard/treasurer/ledger' },
+    { icon: 'settings', label: 'Settings', href: '/dashboard/treasurer/settings' },
     { icon: 'flag', label: 'Campaigns', href: '/dashboard/treasurer/campaigns' },
     FINANCIAL_REPORTS_NAV,
     { icon: 'savings', label: 'My contributions', href: '/contributions' },
@@ -198,3 +199,4 @@ export function navForRole(role: Role): NavItem[] {
       return MEMBER_NAV
   }
 }
+

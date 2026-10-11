@@ -18,6 +18,7 @@ import {
   periodOpenBlocker,
   recomputeStandingSafely,
   refreshObligation,
+  runAfterResponse,
   setManuallyOpenedPeriod,
   transactionNumber,
   type MonthRef,
@@ -41,7 +42,7 @@ import {
 } from '@/lib/payment-categories'
 
 const refreshFinance = () => {
-  for (const path of ['/dashboard/treasurer/contributions','/dashboard/treasurer/ledger','/dashboard/treasurer/reports','/contributions','/admin/finance']) revalidatePath(path)
+  for (const path of ['/dashboard/treasurer/finance','/dashboard/treasurer/ledger','/dashboard/treasurer/reports','/contributions','/admin/finance']) revalidatePath(path)
   revalidateTag(TAGS.contributions)
 }
 
@@ -360,7 +361,8 @@ export async function recordLedgerContribution(formData: FormData) {
     proofMimeType: evidence?.evidenceMimeType,
     proofTitle: evidence?.evidenceTitle,
   })
-  await writeAudit({ userId: actor.id, action: 'LEDGER_CONTRIBUTION_CREATE', entity: 'FinancialTransaction', entityId: result.financial.id, meta: { contributionId: result.contribution.id, status, ...data } })
+  // The payment is saved; the audit entry is written just after the response.
+  runAfterResponse(() => writeAudit({ userId: actor.id, action: 'LEDGER_CONTRIBUTION_CREATE', entity: 'FinancialTransaction', entityId: result.financial.id, meta: { contributionId: result.contribution.id, status, ...data } }))
   refreshFinance()
 }
 
@@ -380,12 +382,12 @@ export async function recordExpense(formData: FormData) {
     amount: amountKes(),
     description: z.string().trim().max(500).optional(),
     otherCategoryDescription: z.string().trim().max(500).optional(),
-    payee: z.string().trim().min(2, 'Enter who was paid.').max(160),
-    purpose: z.string().trim().min(2, 'Enter what the expense was for.').max(500),
-    categoryId: z.string().default(''),
+    // Payee is no longer asked for; the purpose (or the Other explanation) describes the expense.
+    payee: z.string().trim().max(160).optional().default(''),
+    categoryId: z.string().min(1, 'Choose the purpose of this expense.'),
     projectId: z.string().optional().transform((value) => value || undefined),
-    sourceAccountId: z.string().min(1),
-    occurredAt: z.coerce.date(),
+    sourceAccountId: z.string().min(1, 'Choose the account it was paid from.'),
+    occurredAt: z.coerce.date({ errorMap: () => ({ message: 'Enter the date paid.' }) }),
   }).parse(Object.fromEntries(formData))
   const { categoryId, otherLabel } = await resolvePaymentCategory({
     categoryId: data.categoryId,
@@ -393,22 +395,25 @@ export async function recordExpense(formData: FormData) {
     actorId: actor.id,
     projectId: data.projectId,
   })
-  if (!otherLabel) {
-    z.string().trim().min(2).max(500).parse(data.description)
-  } else {
-    otherCategoryDescriptionSchema.parse(data.otherCategoryDescription)
-  }
-  const description = paymentDescription(data.description?.trim() || `Expense — ${data.payee}`, otherLabel)
+  if (otherLabel) otherCategoryDescriptionSchema.parse(data.otherCategoryDescription)
+  const purposeName = otherLabel
+    ? data.otherCategoryDescription!.trim()
+    : (await prisma.transactionCategory.findUnique({ where: { id: categoryId }, select: { name: true } }))?.name ?? 'Expense'
+  const purpose = data.description?.trim() || purposeName
+  const description = paymentDescription(purpose, otherLabel)
   assertNotFuture(data.occurredAt, 'Expense date')
-  const evidence = z.object({
-    evidencePath: z.string().min(1, 'A supporting document is required for every expense.'),
-    evidenceMimeType: z.string().min(1),
-    evidenceTitle: z.string().min(1),
-  }).parse({
-    evidencePath: formData.get('evidencePath'),
-    evidenceMimeType: formData.get('evidenceMimeType'),
-    evidenceTitle: formData.get('evidenceTitle'),
-  })
+  // Supporting document is optional.
+  const evidence = formData.get('evidencePath')
+    ? z.object({
+        evidencePath: z.string().min(1),
+        evidenceMimeType: z.string().min(1),
+        evidenceTitle: z.string().min(1),
+      }).parse({
+        evidencePath: formData.get('evidencePath'),
+        evidenceMimeType: formData.get('evidenceMimeType'),
+        evidenceTitle: formData.get('evidenceTitle'),
+      })
+    : null
   const threshold = Number((await prisma.appSetting.findUnique({ where: { key: 'financial_approval_threshold_kes' } }))?.value || 50000)
   // Guide: Admin must not bypass finance approval merely because of system role.
   const approvalRequired = data.amount > threshold
@@ -416,9 +421,11 @@ export async function recordExpense(formData: FormData) {
   const transaction = await prisma.financialTransaction.create({
     data: {
       transactionNumber: transactionNumber(), type: 'EXPENSE', status: approvalRequired ? 'PENDING' : 'CONFIRMED', amount: data.amount, description, occurredAt: data.occurredAt, categoryId, ...periodFields(period), createdById: actor.id, approvedById: approvalRequired ? null : actor.id, confirmedAt: approvalRequired ? null : new Date(),
-      entries: { create: [{ accountId: 'acct-expense', debit: data.amount, credit: 0, memo: data.purpose }, { accountId: data.sourceAccountId, debit: 0, credit: data.amount, memo: `Paid to ${data.payee}` }] },
-      expense: { create: { payee: data.payee, purpose: data.purpose, approvalRequired, projectId: data.projectId ?? null } },
-      supportingDocuments: { create: { title: evidence.evidenceTitle, fileUrl: evidence.evidencePath, mimeType: evidence.evidenceMimeType, uploadedById: actor.id } },
+      entries: { create: [{ accountId: 'acct-expense', debit: data.amount, credit: 0, memo: purpose }, { accountId: data.sourceAccountId, debit: 0, credit: data.amount, memo: data.payee ? `Paid to ${data.payee}` : purpose }] },
+      expense: { create: { payee: data.payee, purpose, approvalRequired, projectId: data.projectId ?? null } },
+      ...(evidence
+        ? { supportingDocuments: { create: { title: evidence.evidenceTitle, fileUrl: evidence.evidencePath, mimeType: evidence.evidenceMimeType, uploadedById: actor.id } } }
+        : {}),
     },
   })
   await writeAudit({ userId: actor.id, action: 'EXPENSE_CREATE', entity: 'FinancialTransaction', entityId: transaction.id, meta: { ...data, approvalRequired } })
@@ -1006,27 +1013,89 @@ export async function editContributionAmount(formData: FormData): Promise<{ ok: 
     const oldAmount = Number(contribution.amount)
     if (oldAmount === newAmount) return { ok: false, error: 'The new amount is the same as the current one.' }
 
+    // Ledger rows are locked by the database once posted, so a correction never edits them:
+    // the old entry is reversed and a fresh entry is posted for the right amount.
+    const original = contribution.financialTransactionId
+      ? await prisma.financialTransaction.findUnique({ where: { id: contribution.financialTransactionId }, include: { entries: true } })
+      : null
+    if (original && !['CONFIRMED', 'RECONCILED', 'PENDING'].includes(original.status)) {
+      return { ok: false, error: 'This payment has already been reversed or rejected in the ledger.' }
+    }
+    const period = original ? await getPeriodForDate(original.occurredAt) : null
+    const correction = `Amount corrected from KES ${oldAmount.toLocaleString()} to KES ${newAmount.toLocaleString()}: ${data.reason}`
+    const splits = {
+      ...(contribution.emergencyPercent != null
+        ? { emergencyAmount: Number(((newAmount * contribution.emergencyPercent) / 100).toFixed(2)) }
+        : {}),
+      ...(contribution.reservePercent != null
+        ? { reserveAmount: Number(((newAmount * contribution.reservePercent) / 100).toFixed(2)) }
+        : {}),
+    }
     await prisma.$transaction(async (tx) => {
+      let replacementId: string | null = null
+      if (original && period) {
+        const posted = original.status !== 'PENDING'
+        if (posted) {
+          // Confirmed reversal of the old entry: it and the original cancel out in the books.
+          await tx.financialTransaction.create({
+            data: {
+              transactionNumber: transactionNumber(),
+              type: 'REVERSAL',
+              status: 'CONFIRMED',
+              amount: original.amount,
+              description: `Reversal of ${original.transactionNumber} (amount correction)`,
+              occurredAt: original.occurredAt,
+              correctionReason: correction,
+              ...periodFields(period),
+              createdById: actor.id,
+              approvedById: actor.id,
+              confirmedAt: new Date(),
+              originalTransactionId: original.id,
+              entries: { create: original.entries.map((entry) => ({ accountId: entry.accountId, debit: entry.credit, credit: entry.debit, memo: correction })) },
+            },
+          })
+        }
+        await tx.financialTransaction.update({
+          where: { id: original.id },
+          data: posted ? { status: 'REVERSED', reversedAt: new Date(), correctionReason: correction } : { status: 'REJECTED', correctionReason: correction },
+        })
+        await markEditedAfterClose(original.id, tx)
+        const replacement = await tx.financialTransaction.create({
+          data: {
+            transactionNumber: transactionNumber(),
+            type: original.type,
+            status: original.status === 'RECONCILED' ? 'CONFIRMED' : original.status,
+            amount: newAmount,
+            description: original.description,
+            occurredAt: original.occurredAt,
+            categoryId: original.categoryId,
+            correctionReason: correction,
+            ...periodFields(period),
+            createdById: original.createdById,
+            approvedById: posted ? actor.id : null,
+            confirmedAt: posted ? new Date() : null,
+            entries: {
+              create: original.entries.map((entry) => ({
+                accountId: entry.accountId,
+                debit: Number(entry.debit) > 0 ? newAmount : 0,
+                credit: Number(entry.credit) > 0 ? newAmount : 0,
+                memo: entry.memo,
+              })),
+            },
+          },
+        })
+        replacementId = replacement.id
+      }
       await tx.contribution.update({
         where: { id: contribution.id },
         data: {
           amount: newAmount,
-          // Older payments have no fund split recorded; leave those as they are.
-          ...(contribution.emergencyPercent != null
-            ? { emergencyAmount: Number(((newAmount * contribution.emergencyPercent) / 100).toFixed(2)) }
-            : {}),
-          ...(contribution.reservePercent != null
-            ? { reserveAmount: Number(((newAmount * contribution.reservePercent) / 100).toFixed(2)) }
-            : {}),
+          ...splits,
+          correctionReason: correction,
+          ...(replacementId ? { financialTransactionId: replacementId } : {}),
+          ...(original?.status === 'RECONCILED' ? { status: 'CONFIRMED', reconciliationStatus: 'UNRECONCILED' } : {}),
         },
       })
-      if (contribution.financialTransactionId) {
-        await tx.financialTransaction.update({ where: { id: contribution.financialTransactionId }, data: { amount: newAmount } })
-        // Keep double entry balanced: the money-received debit and the income credit both move.
-        await tx.ledgerEntry.updateMany({ where: { transactionId: contribution.financialTransactionId, debit: { gt: 0 } }, data: { debit: newAmount } })
-        await tx.ledgerEntry.updateMany({ where: { transactionId: contribution.financialTransactionId, credit: { gt: 0 } }, data: { credit: newAmount } })
-        await markEditedAfterClose(contribution.financialTransactionId, tx)
-      }
       if (contribution.campaignId) await refreshObligation(contribution.campaignId, contribution.userId, tx)
     })
 
@@ -1054,4 +1123,85 @@ export async function editContributionAmount(formData: FormData): Promise<{ ok: 
     if (error instanceof z.ZodError) return { ok: false, error: error.issues[0]?.message || 'Check the amount and reason.' }
     return { ok: false, error: error instanceof Error ? error.message : 'Could not change the amount.' }
   }
+}
+
+const contributionPlanSchema = z.object({
+  userId: z.string().min(1),
+  plan: z.enum(['MONTHLY', 'ANNUAL']).nullable(),
+})
+
+/**
+ * Treasurer / Admin: marks whether a member pays monthly or annually. Standing then checks only
+ * the matching dues (monthly fees or the annual contribution). Audited; standing updates at once.
+ */
+export async function setContributionPlan(input: z.input<typeof contributionPlanSchema>): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const actor = await requireActiveRole(['TREASURER'])
+    const data = contributionPlanSchema.parse(input)
+    const member = await prisma.user.findUnique({ where: { id: data.userId }, select: { id: true, fullName: true, contributionPlan: true } })
+    if (!member) return { ok: false, error: 'Member not found.' }
+    if (member.contributionPlan === data.plan) return { ok: true }
+    await prisma.user.update({ where: { id: member.id }, data: { contributionPlan: data.plan } })
+    await writeAudit({
+      userId: actor.id,
+      action: 'MEMBER_CONTRIBUTION_PLAN',
+      entity: 'User',
+      entityId: member.id,
+      oldValue: { contributionPlan: member.contributionPlan },
+      newValue: { contributionPlan: data.plan },
+      meta: { memberName: member.fullName },
+    })
+    await recomputeStandingSafely(member.id, actor.id)
+    refreshFinance()
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not change the plan.' }
+  }
+}
+
+
+/**
+ * Treasurer-only: sends a confirmed transaction back to Pending so it must be approved again.
+ * While pending it no longer counts in balances or a member's standing. Reconciled entries,
+ * reversals and loan or welfare payouts stay as they are, because other records depend on them.
+ */
+export async function returnTransactionToPending(formData: FormData) {
+  const actor = await requireTreasurer()
+  const id = z.string().min(1).parse(formData.get('id'))
+  const reason = z.string().trim().max(500).optional().parse(formData.get('reason') || undefined)
+  const transaction = await prisma.financialTransaction.findUniqueOrThrow({
+    where: { id },
+    include: { loanLedgerLinks: { select: { id: true } }, disbursement: { select: { welfareRequestId: true } } },
+  })
+  if (transaction.status !== 'CONFIRMED') throw new Error('Only approved (confirmed) transactions can be sent back to pending.')
+  if (transaction.type === 'REVERSAL') throw new Error('Reversals cannot be sent back to pending.')
+  if (transaction.loanLedgerLinks.length || transaction.disbursement?.welfareRequestId) {
+    throw new Error('Loan and welfare payments cannot be sent back to pending; reverse them instead.')
+  }
+  const linked = await prisma.$transaction(async (tx) => {
+    await tx.financialTransaction.update({ where: { id }, data: { status: 'PENDING', approvedById: null, confirmedAt: null } })
+    await markEditedAfterClose(id, tx)
+    const contribution = await tx.contribution.findUnique({ where: { financialTransactionId: id } })
+    if (contribution && contribution.status === 'CONFIRMED') {
+      await tx.contribution.update({ where: { id: contribution.id }, data: { status: 'PENDING', verifiedAt: null, verifiedById: null } })
+      if (contribution.campaignId) await refreshObligation(contribution.campaignId, contribution.userId, tx)
+    }
+    return contribution
+  })
+  if (linked) await recomputeStandingSafely(linked.userId, actor.id)
+  if (linked?.projectId) {
+    const { syncProjectFinancials } = await import('@/lib/project-status')
+    await syncProjectFinancials(linked.projectId).catch(() => {})
+  }
+  await writeAudit({
+    userId: actor.id,
+    action: 'FINANCIAL_TRANSACTION_UNAPPROVE',
+    entity: 'FinancialTransaction',
+    entityId: id,
+    reason: reason || 'Sent back to pending through the status dropdown',
+    oldValue: { status: 'CONFIRMED', approvedById: transaction.approvedById },
+    newValue: { status: 'PENDING' },
+    meta: { transactionNumber: transaction.transactionNumber, amount: Number(transaction.amount) },
+  })
+  refreshFinance()
 }

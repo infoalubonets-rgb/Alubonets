@@ -93,7 +93,41 @@ export default function AuditLogsTable({ logs }: { logs: AuditLogRow[] }) {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
-        <div className="overflow-x-auto">
+        {/* Phones: one tappable card per entry; entries outside a person's role stay red. */}
+        <ul className="divide-y divide-outline-variant/50 md:hidden">
+          {slice.length === 0 ? (
+            <li className="py-10 text-center text-sm text-on-surface-variant">No activity found</li>
+          ) : (
+            slice.map((row) => (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(row.id)}
+                  className={`flex w-full items-start gap-3 px-4 py-3 text-left ${
+                    row.outsideRole ? 'bg-red-50 shadow-[inset_4px_0_0_#dc2626] dark:bg-red-500/10' : 'active:bg-primary/[0.04]'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <span className="inline-flex rounded-full bg-primary/8 px-2 py-0.5 text-[11px] font-label-bold text-primary">
+                      {formatAuditAction(row.action)}
+                    </span>
+                    <p className={`mt-1 truncate text-sm font-medium ${row.outsideRole ? 'text-red-800 dark:text-red-200' : 'text-on-surface'}`}>
+                      {row.user?.fullName ?? 'System / removed user'}
+                      {row.outsideRole && <span className="ml-1 text-[11px] font-bold">({roleName(row.actorRole)} → {roleName(row.actingRole)})</span>}
+                    </p>
+                    <p className="truncate text-xs text-on-surface-variant">
+                      {row.targetLabel}
+                      {row.reason ? ` · ${row.reason}` : ''}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-outline">{new Date(row.createdAt).toLocaleString()}</p>
+                  </div>
+                  <span className="material-symbols-outlined mt-1 text-[18px] text-outline">chevron_right</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-outline-variant bg-surface-container-low text-left">

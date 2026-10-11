@@ -1,10 +1,12 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import FullScreenModal from '@/components/ui/FullScreenModal'
-import { editContributionAmount } from '@/app/actions/finance'
+import MonthlyContributionsGrid from '@/components/dashboard/MonthlyContributionsGrid'
+import TimeRangeFilter from '@/components/finance/TimeRangeFilter'
+import { MemberPurposeSettingsButton } from '@/components/finance/PurposeSettingsEditor'
+import { editContributionAmount, setContributionPlan } from '@/app/actions/finance'
 
 export type MemberContributionRow = {
   id: string
@@ -12,6 +14,8 @@ export type MemberContributionRow = {
   membershipNumber: string | null
   status: string
   standing: string
+  /** MONTHLY or ANNUAL: which dues standing is checked against. Null until set. */
+  plan: 'MONTHLY' | 'ANNUAL' | null
   payments: number
   totalPaid: number
   pending: number
@@ -22,7 +26,7 @@ const kes = new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES',
 
 type PaymentView = { id: string; amount: number; paidAt: string; purpose: string; status: string; method: string | null; reference: string | null }
 type MemberDetail = {
-  member: { id: string; fullName: string; membershipNumber: string | null; standing: string }
+  member: { id: string; fullName: string; membershipNumber: string | null; standing: string; standingReason: string | null; contributionPlan: 'MONTHLY' | 'ANNUAL' | null }
   contributions: PaymentView[]
   family: { id: string; fullName: string; contributions: PaymentView[] }[]
 }
@@ -32,6 +36,31 @@ const STATUS_STYLE: Record<string, string> = {
   RECONCILED: 'bg-green-100 text-green-800',
   PENDING: 'bg-secondary-fixed text-secondary',
   REJECTED: 'bg-error-container text-error',
+}
+
+/** Loaded (and in-flight) member details, so hovering the eye starts the request and reopening is instant. */
+const loadedDetails = new Map<string, MemberDetail>()
+const pendingDetails = new Map<string, Promise<MemberDetail>>()
+
+function loadDetail(id: string): Promise<MemberDetail> {
+  const cached = loadedDetails.get(id)
+  if (cached) return Promise.resolve(cached)
+  const inFlight = pendingDetails.get(id)
+  if (inFlight) return inFlight
+  const request = fetch(`/api/contributions/member/${id}`, { cache: 'no-store' })
+    .then(async (res) => {
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(body.error || 'Could not load contributions.')
+      loadedDetails.set(id, body as MemberDetail)
+      return body as MemberDetail
+    })
+    .finally(() => pendingDetails.delete(id))
+  pendingDetails.set(id, request)
+  return request
+}
+
+const prefetchDetail = (id: string) => {
+  loadDetail(id).catch(() => {})
 }
 
 const counts = (status: string) => status === 'CONFIRMED' || status === 'RECONCILED'
@@ -69,6 +98,7 @@ function EditAmountForm({ payment, onDone, onCancel }: { payment: PaymentView; o
           <input
             type="number"
             min="1"
+            max="999999"
             step="0.01"
             required
             autoFocus
@@ -154,26 +184,87 @@ function PaymentsList({ payments, canEdit = false, onChanged }: { payments: Paym
   )
 }
 
-function MemberContributionsModal({ row, onClose, canEditAmounts = false }: { row: MemberContributionRow | null; onClose: () => void; canEditAmounts?: boolean }) {
+const PLAN_LABEL = { MONTHLY: 'Monthly', ANNUAL: 'Annual' } as const
+
+/** Monthly / Annual switch: standing is checked only against the chosen plan's dues. */
+function PlanSwitch({ memberId, plan, canEdit, onChanged }: { memberId: string; plan: 'MONTHLY' | 'ANNUAL' | null; canEdit: boolean; onChanged: () => void }) {
+  const [current, setCurrent] = useState(plan)
+  const [error, setError] = useState('')
+  const [pending, startTransition] = useTransition()
+  useEffect(() => setCurrent(plan), [plan])
+
+  const choose = (next: 'MONTHLY' | 'ANNUAL') => {
+    if (next === current || pending) return
+    const previous = current
+    setCurrent(next)
+    setError('')
+    startTransition(async () => {
+      const result = await setContributionPlan({ userId: memberId, plan: next })
+      if (!result.ok) {
+        setCurrent(previous)
+        setError(result.error)
+        return
+      }
+      onChanged()
+    })
+  }
+
+  return (
+    <div className="rounded-xl border border-outline-variant bg-surface px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Contribution plan</p>
+          <p className="text-xs text-on-surface-variant">
+            {current === 'MONTHLY'
+              ? 'Tracked against the monthly contribution.'
+              : current === 'ANNUAL'
+                ? 'Tracked against the annual contribution.'
+                : 'Not set yet: checked against both monthly and annual dues.'}
+          </p>
+        </div>
+        <div role="radiogroup" aria-label="Contribution plan" className="inline-flex rounded-full border border-outline-variant p-0.5">
+          {(['MONTHLY', 'ANNUAL'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="radio"
+              aria-checked={current === option}
+              disabled={!canEdit || pending}
+              onClick={() => choose(option)}
+              className={`rounded-full px-3.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed ${
+                current === option ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-primary/5'
+              } ${!canEdit && current !== option ? 'opacity-50' : ''}`}
+            >
+              {PLAN_LABEL[option]}
+            </button>
+          ))}
+        </div>
+      </div>
+      {error && <p className="mt-1 text-xs text-error">{error}</p>}
+    </div>
+  )
+}
+
+function MemberContributionsModal({ row, onClose, canEditAmounts = false, canSetPlan = false }: { row: MemberContributionRow | null; onClose: () => void; canEditAmounts?: boolean; canSetPlan?: boolean }) {
   const router = useRouter()
   // After an edit, reload this member's payments and the table totals behind the pop-up.
-  const refresh = () => {
-    setAttempt((n) => n + 1)
-    router.refresh()
-  }
   const [state, setState] = useState<{ id: string; data?: MemberDetail; error?: string } | null>(null)
   const [attempt, setAttempt] = useState(0)
   const rowId = row?.id
+  const refresh = () => {
+    if (rowId) loadedDetails.delete(rowId)
+    setAttempt((n) => n + 1)
+    router.refresh()
+  }
 
   useEffect(() => {
     if (!rowId) return
     let cancelled = false
-    setState({ id: rowId })
-    fetch(`/api/contributions/member/${rowId}`, { cache: 'no-store' })
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}))
-        if (!res.ok) throw new Error(body.error || 'Could not load contributions.')
-        if (!cancelled) setState({ id: rowId, data: body as MemberDetail })
+    const ready = loadedDetails.get(rowId)
+    setState(ready ? { id: rowId, data: ready } : { id: rowId })
+    loadDetail(rowId)
+      .then((data) => {
+        if (!cancelled) setState({ id: rowId, data })
       })
       .catch((e: unknown) => {
         if (!cancelled) setState({ id: rowId, error: e instanceof Error ? e.message : 'Could not load contributions.' })
@@ -181,7 +272,7 @@ function MemberContributionsModal({ row, onClose, canEditAmounts = false }: { ro
     return () => { cancelled = true }
   }, [rowId, attempt])
 
-  const data = state?.id === row?.id ? state?.data : undefined
+  const data = row ? (state?.id === row.id ? state.data : undefined) ?? loadedDetails.get(row.id) : undefined
   const error = state?.id === row?.id ? state?.error : undefined
   const confirmed = data?.contributions.filter((p) => counts(p.status)) ?? []
 
@@ -208,6 +299,10 @@ function MemberContributionsModal({ row, onClose, canEditAmounts = false }: { ro
             </div>
           ) : (
             <>
+              <PlanSwitch memberId={data.member.id} plan={data.member.contributionPlan} canEdit={canSetPlan} onChanged={refresh} />
+              {data.member.standing !== 'PAID_UP' && data.member.standingReason && (
+                <p className="rounded-lg bg-error-container/50 px-3 py-2 text-xs text-error">Why lapsed: {data.member.standingReason}</p>
+              )}
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { label: 'Total paid', value: kes.format(confirmed.reduce((sum, p) => sum + p.amount, 0)) },
@@ -231,11 +326,6 @@ function MemberContributionsModal({ row, onClose, canEditAmounts = false }: { ro
               ))}
             </>
           )}
-
-          <Link href={`/contributions/member/${row.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-            Open full page
-            <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-          </Link>
         </div>
       )}
     </FullScreenModal>
@@ -243,9 +333,16 @@ function MemberContributionsModal({ row, onClose, canEditAmounts = false }: { ro
 }
 
 /** Every member's contribution totals; the eye opens that member's payments in a pop-up. */
-export default function MemberContributionsTable({ rows, canEditAmounts = false }: { rows: MemberContributionRow[]; canEditAmounts?: boolean }) {
+export default function MemberContributionsTable({ rows, period = { key: 'all', from: '', to: '', label: 'All time' }, canEditAmounts = false, canSetPlan = false }: { rows: MemberContributionRow[]; period?: { key: string; from: string; to: string; label: string }; canEditAmounts?: boolean; canSetPlan?: boolean }) {
+  // The time filter lives in the URL so totals come from the server for that period.
+  const filtered = period.key !== 'all'
+  const monthLabel = filtered ? period.label : null
   const [viewing, setViewing] = useState<MemberContributionRow | null>(null)
   const [query, setQuery] = useState('')
+  // New rows mean payments changed, so pop-up details loaded earlier may be out of date.
+  useEffect(() => {
+    loadedDetails.clear()
+  }, [rows])
   const [show, setShow] = useState<'all' | 'paid' | 'none'>('all')
 
   const visible = useMemo(() => {
@@ -267,9 +364,9 @@ export default function MemberContributionsTable({ rows, canEditAmounts = false 
     <div className="mx-auto max-w-5xl space-y-4 px-4 pb-10 md:px-0">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: 'Total collected', value: kes.format(totals.collected) },
+          { label: monthLabel ? `Collected · ${monthLabel}` : 'Total collected', value: kes.format(totals.collected) },
           { label: 'Members', value: rows.length },
-          { label: 'Contributing', value: totals.contributing },
+          { label: monthLabel ? 'Paid in this period' : 'Contributing', value: totals.contributing },
           { label: 'Pending checks', value: totals.pending },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-outline-variant bg-surface px-4 py-3">
@@ -286,9 +383,11 @@ export default function MemberContributionsTable({ rows, canEditAmounts = false 
         </label>
         <select value={show} onChange={(e) => setShow(e.target.value as typeof show)} aria-label="Filter members by payments" className="h-10 rounded-xl border bg-surface px-3 text-sm">
           <option value="all">All members</option>
-          <option value="paid">Have paid</option>
-          <option value="none">Not yet paid</option>
+          <option value="paid">{filtered ? 'Paid in this period' : 'Have paid'}</option>
+          <option value="none">{filtered ? 'Not paid in this period' : 'Not yet paid'}</option>
         </select>
+        <TimeRangeFilter key={`${period.key}|${period.from}|${period.to}`} range={period.key} from={period.from} to={period.to} />
+        <MonthlyContributionsGrid />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
@@ -309,9 +408,12 @@ export default function MemberContributionsTable({ rows, canEditAmounts = false 
                 visible.map((row, i) => (
                   <tr key={row.id} className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`}>
                     <td className="px-4 py-3">
-                      <Link href={`/contributions/member/${row.id}`} className="font-medium text-on-surface hover:text-primary hover:underline">{row.fullName}</Link>
+                      <button type="button" onClick={() => setViewing(row)} onPointerEnter={() => prefetchDetail(row.id)} onFocus={() => prefetchDetail(row.id)} className="text-left font-medium text-on-surface hover:text-primary hover:underline">{row.fullName}</button>
                       <p className="text-xs text-on-surface-variant">
                         {row.membershipNumber || '—'}
+                        <span className={`ml-1.5 rounded-full px-1.5 text-[10px] font-bold ${row.plan ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'}`}>
+                          {row.plan ? PLAN_LABEL[row.plan] : 'No plan'}
+                        </span>
                         {row.status !== 'ACTIVE' && <span className="ml-1.5 rounded-full bg-surface-container px-1.5 text-[10px] font-bold">{row.status.toLowerCase()}</span>}
                       </p>
                     </td>
@@ -326,8 +428,8 @@ export default function MemberContributionsTable({ rows, canEditAmounts = false 
                         {row.standing === 'PAID_UP' ? 'Paid-up' : 'Lapsed'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button type="button" onClick={() => setViewing(row)} title="View contributions" aria-label={`View contributions for ${row.fullName}`} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition hover:bg-primary/10">
+                    <td className="px-4 py-3 text-right">{canSetPlan && <MemberPurposeSettingsButton memberId={row.id} name={row.fullName} />}
+                      <button type="button" onClick={() => setViewing(row)} onPointerEnter={() => prefetchDetail(row.id)} onFocus={() => prefetchDetail(row.id)} title="View contributions" aria-label={`View contributions for ${row.fullName}`} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition hover:bg-primary/10">
                         <span className="material-symbols-outlined text-[19px]">visibility</span>
                       </button>
                     </td>
@@ -339,7 +441,8 @@ export default function MemberContributionsTable({ rows, canEditAmounts = false 
         </div>
       </div>
       <p className="text-xs text-on-surface-variant">Totals count confirmed and reconciled payments. Pending payments are still waiting for a second check.</p>
-      <MemberContributionsModal row={viewing} onClose={() => setViewing(null)} canEditAmounts={canEditAmounts} />
+      <MemberContributionsModal row={viewing} onClose={() => setViewing(null)} canEditAmounts={canEditAmounts} canSetPlan={canSetPlan} />
     </div>
   )
 }
+

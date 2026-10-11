@@ -8,6 +8,8 @@ export const ACTION_LABELS: Record<string, string> = {
   PROFILE_UPDATE: 'Updated their profile',
   CONTRIBUTION_CREATE: 'Recorded a contribution',
   CONTRIBUTION_AMOUNT_EDIT: 'Changed a payment amount',
+  FINANCIAL_TRANSACTION_UNAPPROVE: 'Sent a transaction back to pending',
+  MEMBER_CONTRIBUTION_PLAN: 'Set a member’s contribution plan',
   CONTRIBUTION_CSV_IMPORT: 'Imported contributions (CSV)',
   WELFARE_REVIEW: 'Reviewed a welfare request',
   MEETING_CREATE: 'Created a meeting',

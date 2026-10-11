@@ -111,7 +111,33 @@ export default function ApprovalsTable({
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
-        <div className="overflow-x-auto">
+        {/* Phones: one card per applicant. */}
+        <ul className="divide-y divide-outline-variant/50 md:hidden">
+          {visibleApplicants.length === 0 ? (
+            <li className="py-10 text-center text-sm text-on-surface-variant">No pending applicants</li>
+          ) : (
+            visibleApplicants.map((a) => (
+              <li key={a.id} className="flex items-center gap-3 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-on-surface">{a.fullName}</p>
+                  <p className="truncate text-xs text-on-surface-variant">{a.email}</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {a.phone ? `${a.phone} · ` : ''}Registered {new Date(a.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => open(a.id)}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant text-primary"
+                  aria-label={`View ${a.fullName}`}
+                >
+                  <span className="material-symbols-outlined text-[20px]">visibility</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm min-w-[560px]">
             <thead>
               <tr className="text-left bg-surface-container-low border-b border-outline-variant">

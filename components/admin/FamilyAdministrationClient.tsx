@@ -102,7 +102,21 @@ export default function FamilyAdministrationClient({ members, principals }: { me
       </div>)}
     </div>
     <section className="overflow-hidden rounded-2xl border border-outline-variant bg-surface">
-      <div className="overflow-x-auto"><table className="min-w-full text-left text-sm"><thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant"><tr><th className="p-3">Member</th><th className="p-3">Contact</th><th className="p-3">Principal</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{filtered.map(m => <tr key={m.id} className="border-t"><td className="p-3"><b>{m.fullName}</b><p className="text-xs text-on-surface-variant">{m.relationship || (m.isPrincipal ? 'Principal Member' : 'Member')}</p></td><td className="p-3">{m.email}<p className="text-xs text-on-surface-variant">{m.phone || 'No phone'}</p></td><td className="p-3">{m.isPrincipal ? <Badge text="Principal" tone="primary" /> : m.principalName || <Badge text="Unassigned" tone="warning" />}</td><td className="p-3"><Badge text={m.status} tone={m.status === 'ACTIVE' ? 'success' : 'neutral'} /></td><td className="p-3">{!m.isPrincipal && <button onClick={() => openLink([m.id])} className={`inline-flex h-8 items-center rounded-full px-3.5 text-xs font-semibold transition hover:opacity-90 ${m.principalMemberId ? 'border border-secondary-container text-secondary' : 'bg-secondary-container text-on-primary shadow-[0_3px_10px_rgba(254,128,21,0.22)]'}`}>{m.principalMemberId ? 'Transfer' : 'Assign'}</button>}</td></tr>)}</tbody></table></div>
+      {/* Phones: one card per member with the Assign / Transfer action. */}
+      <ul className="divide-y divide-outline-variant/60 md:hidden">
+        {filtered.map(m => <li key={m.id} className="flex items-start gap-3 px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-on-surface">{m.fullName}</p>
+            <p className="truncate text-xs text-on-surface-variant">{m.relationship || (m.isPrincipal ? 'Principal Member' : 'Member')} · {m.email}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {m.isPrincipal ? <Badge text="Principal" tone="primary" /> : m.principalName ? <span className="text-xs text-on-surface-variant">Principal: {m.principalName}</span> : <Badge text="Unassigned" tone="warning" />}
+              <Badge text={m.status} tone={m.status === 'ACTIVE' ? 'success' : 'neutral'} />
+            </div>
+          </div>
+          {!m.isPrincipal && <button onClick={() => openLink([m.id])} className={`inline-flex h-9 shrink-0 items-center rounded-full px-3.5 text-xs font-semibold ${m.principalMemberId ? 'border border-secondary-container text-secondary' : 'bg-secondary-container text-on-primary'}`}>{m.principalMemberId ? 'Transfer' : 'Assign'}</button>}
+        </li>)}
+      </ul>
+      <div className="hidden overflow-x-auto md:block"><table className="min-w-full text-left text-sm"><thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant"><tr><th className="p-3">Member</th><th className="p-3">Contact</th><th className="p-3">Principal</th><th className="p-3">Status</th><th className="p-3">Action</th></tr></thead><tbody>{filtered.map(m => <tr key={m.id} className="border-t"><td className="p-3"><b>{m.fullName}</b><p className="text-xs text-on-surface-variant">{m.relationship || (m.isPrincipal ? 'Principal Member' : 'Member')}</p></td><td className="p-3">{m.email}<p className="text-xs text-on-surface-variant">{m.phone || 'No phone'}</p></td><td className="p-3">{m.isPrincipal ? <Badge text="Principal" tone="primary" /> : m.principalName || <Badge text="Unassigned" tone="warning" />}</td><td className="p-3"><Badge text={m.status} tone={m.status === 'ACTIVE' ? 'success' : 'neutral'} /></td><td className="p-3">{!m.isPrincipal && <button onClick={() => openLink([m.id])} className={`inline-flex h-8 items-center rounded-full px-3.5 text-xs font-semibold transition hover:opacity-90 ${m.principalMemberId ? 'border border-secondary-container text-secondary' : 'bg-secondary-container text-on-primary shadow-[0_3px_10px_rgba(254,128,21,0.22)]'}`}>{m.principalMemberId ? 'Transfer' : 'Assign'}</button>}</td></tr>)}</tbody></table></div>
     </section>
 
     {modal === 'link' && <LinkMembersModal

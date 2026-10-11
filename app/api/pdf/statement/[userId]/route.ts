@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { appDayRange } from '@/lib/dates'
 import { PDFDocument, StandardFonts, rgb, type PDFImage } from 'pdf-lib'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
@@ -41,8 +42,9 @@ export async function GET(
   const sp        = req.nextUrl.searchParams
   const startStr  = sp.get('startDate') ?? ''
   const endStr    = sp.get('endDate')   ?? ''
-  const startDate = startStr ? new Date(startStr + 'T00:00:00') : undefined
-  const endDate   = endStr   ? new Date(endStr   + 'T23:59:59') : undefined
+  // Whole days in Nairobi time, whatever timezone the server runs in.
+  const startDate = /^\d{4}-\d{2}-\d{2}$/.test(startStr) ? appDayRange(startStr).start : undefined
+  const endDate   = /^\d{4}-\d{2}-\d{2}$/.test(endStr) ? appDayRange(endStr).end : undefined
 
   const contributions = await prisma.contribution.findMany({
     where: {

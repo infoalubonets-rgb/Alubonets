@@ -42,14 +42,15 @@ function currentHref(items: LinkItem[], pathname: string, search: URLSearchParam
   return best?.href
 }
 
-function Links({ items, search }: { items: LinkItem[]; search: URLSearchParams | null }) {
+function Links({ items, search, activeAmong }: { items: LinkItem[]; search: URLSearchParams | null; activeAmong?: LinkItem[] }) {
   const pathname = usePathname()
   // The pill you clicked lights up straight away, even while the next page is still loading,
   // so the old page's pill never looks selected after you have chosen another one.
   const [clicked, setClicked] = useState<string | null>(null)
   const location = `${pathname}?${search?.toString() ?? ''}`
   useEffect(() => setClicked(null), [location])
-  const active = clicked ?? currentHref(items, pathname, search)
+  // When pills are split across rows, the current page is still chosen from the whole set.
+  const active = clicked ?? currentHref(activeAmong ?? items, pathname, search)
   return (
     <>
       {items.map((item) => {
@@ -75,16 +76,16 @@ function Links({ items, search }: { items: LinkItem[]; search: URLSearchParams |
   )
 }
 
-function LinksWithQuery({ items }: { items: LinkItem[] }) {
+function LinksWithQuery({ items, activeAmong }: { items: LinkItem[]; activeAmong?: LinkItem[] }) {
   const search = useSearchParams()
-  return <Links items={items} search={search} />
+  return <Links items={items} search={search} activeAmong={activeAmong} />
 }
 
 /** Header buttons for the sibling pages of the current section; the page you are on is light orange. */
-export default function RelatedPageLinks({ items }: { items: LinkItem[] }) {
+export default function RelatedPageLinks({ items, activeAmong }: { items: LinkItem[]; activeAmong?: LinkItem[] }) {
   return (
-    <Suspense fallback={<Links items={items} search={null} />}>
-      <LinksWithQuery items={items} />
+    <Suspense fallback={<Links items={items} search={null} activeAmong={activeAmong} />}>
+      <LinksWithQuery items={items} activeAmong={activeAmong} />
     </Suspense>
   )
 }
