@@ -197,6 +197,12 @@ export async function POST(req: Request) {
 
     const loginCookieStore = await cookies()
     loginCookieStore.delete(WORKSPACE_COOKIE)
+    // A fresh sign-in restarts the idle timer. Without this, a last-active time left over from an
+    // earlier visit made the middleware time the new session out at once (the "log in twice" bug).
+    loginCookieStore.set('alubonets_last_active', String(Date.now()), {
+      path: '/', sameSite: 'lax', httpOnly: true, maxAge: 60 * 60 * 24 * 400,
+      secure: process.env.NODE_ENV === 'production',
+    })
 
     if (profile.status === 'PENDING') {
       recordSuccessfulLogin()

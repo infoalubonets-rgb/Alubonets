@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/server'
 async function clearSession() {
   const cookieStore = await cookies()
   cookieStore.delete(WORKSPACE_COOKIE)
+  cookieStore.delete('alubonets_last_active')
   const supabase = createClient(cookieStore)
   try {
     await supabase.auth.signOut({ scope: 'local' })
