@@ -4,7 +4,7 @@ import { HERO_IMAGE } from '@/lib/constants'
 import ExecutivePortrait from '@/components/about/ExecutivePortrait'
 import { prisma } from '@/lib/prisma'
 import { createServerClient } from '@/lib/supabase-server'
-import { executivePublicExtras } from '@/lib/executive-public-profile'
+import { executivePublicExtras, type PublicDetail } from '@/lib/executive-public-profile'
 
 export const metadata: Metadata = {
   title: 'About',
@@ -28,7 +28,7 @@ type CommitteeCard = {
   photoUrl: string | null
   responsibilities: string[]
   biography: string
-  details: string[]
+  details: PublicDetail[]
 }
 
 async function memberPhotoUrl(path: string | null) {
@@ -228,21 +228,37 @@ export default async function AboutPage() {
                 <span className="mt-xs text-center font-body-md text-[13px] text-primary/70">
                   {member.role}
                 </span>
-                {rich && <details className="mt-3 w-full"><summary className="cursor-pointer text-center text-sm font-semibold text-primary">More</summary>
-                {member.details.map((detail) => (
-                  <p key={detail} className="mt-xs break-all text-center text-[12px] text-on-surface-variant">{detail}</p>
-                ))}
-                {member.biography && (
-                  <p className="mt-sm text-center text-[13px] leading-relaxed text-on-surface-variant">{member.biography}</p>
+                {/* Photo, name and position always show; anything else waits behind More details. */}
+                {rich && (
+                  <details className="group mt-3 w-full">
+                    <summary className="mx-auto flex w-fit cursor-pointer list-none items-center gap-1 rounded-full border border-primary/20 px-3 py-1 text-[12px] font-semibold text-primary hover:bg-primary/5 [&::-webkit-details-marker]:hidden">
+                      <span className="group-open:hidden">More details</span>
+                      <span className="hidden group-open:inline">Less</span>
+                      <span className="material-symbols-outlined text-[16px] transition-transform group-open:rotate-180" aria-hidden="true">expand_more</span>
+                    </summary>
+                    <div className="mt-2 space-y-2 rounded-xl border border-primary/10 bg-surface-container-lowest p-3 text-left">
+                      {member.details.length > 0 && (
+                        <dl className="space-y-1">
+                          {member.details.map((detail) => (
+                            <div key={detail.label} className="text-[12px]">
+                              <dt className="inline font-semibold text-primary">{detail.label}: </dt>
+                              <dd className="inline break-words text-on-surface-variant">{detail.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )}
+                      {member.biography && <p className="text-[13px] leading-relaxed text-on-surface-variant">{member.biography}</p>}
+                      {member.responsibilities.length > 0 && (
+                        <div>
+                          <p className="text-[12px] font-semibold text-primary">Responsibilities</p>
+                          <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-[13px] text-on-surface">
+                            {member.responsibilities.map((item) => <li key={item}>{item}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 )}
-                {member.responsibilities.length > 0 && (
-                  <ul className="mt-sm list-disc space-y-0.5 pl-5 text-left text-[13px] text-on-surface">
-                    {member.responsibilities.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                )}
-                </details>}
               </div>
             )
           })}

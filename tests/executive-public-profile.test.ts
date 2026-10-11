@@ -8,7 +8,7 @@ describe('executive public detail permissions', () => {
     expect(executivePublicExtras({ ...user, publicProfileFields: ['email', 'biography', 'responsibilities'] }, profile)).toEqual({ details: [], biography: '', responsibilities: [] })
   })
   it('only exposes individually approved fields', () => {
-    expect(executivePublicExtras({ ...user, publicProfileFields: ['more', 'profession', 'biography'] }, profile)).toEqual({ details: ['Teacher'], biography: 'Member biography', responsibilities: [] })
+    expect(executivePublicExtras({ ...user, publicProfileFields: ['more', 'profession', 'biography'] }, profile)).toEqual({ details: [{ label: 'Profession', value: 'Teacher' }], biography: 'Member biography', responsibilities: [] })
   })
   it('formats approved responsibilities and handles missing profiles', () => {
     expect(executivePublicExtras({ ...user, publicProfileFields: ['more', 'responsibilities'] }, profile).responsibilities).toEqual(['Lead meetings', 'Coordinate projects'])
@@ -19,6 +19,10 @@ describe('executive public detail permissions', () => {
   })
   it('keeps extended profile information private unless individually enabled', () => {
     const extended = { ...user, publicProfileFields: ['more', 'skills'], memberProfile: { profession: 'Teacher', skills: 'Planning', achievements: 'Award', interests: 'Hiking' } }
-    expect(executivePublicExtras(extended, profile).details).toEqual(['Planning'])
+    expect(executivePublicExtras(extended, profile).details).toEqual([{ label: 'Skills', value: 'Planning' }])
+  })
+  it('skips ticked details that are empty, so no More dropdown appears for blank profiles', () => {
+    const blank = { ...user, location: '  ', publicProfileFields: ['more', 'location', 'achievements', 'interests'], memberProfile: { profession: null, achievements: null, interests: '' } }
+    expect(executivePublicExtras(blank, undefined)).toEqual({ details: [], biography: '', responsibilities: [] })
   })
 })
