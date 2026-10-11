@@ -30,16 +30,10 @@ import { writeAudit } from '@/lib/audit'
 import { TAGS } from '@/lib/data/queries'
 import { createSignedUpload } from '@/lib/upload-signed'
 import { requireWelfareEnabled } from '@/lib/feature-flags'
-import { assertNotFuture, assertNotPast } from '@/lib/dates'
+import { assertNotFuture } from '@/lib/dates'
 import { amountKes, amountKesOrZero } from '@/lib/money-limits'
 import { notifyUsers } from '@/lib/notifications'
-import {
-  filterSelectableCategories,
-  otherCategoryDescriptionSchema,
-  paymentDescription,
-  resolvePaymentCategory,
-  uniqueCategoryCode,
-} from '@/lib/payment-categories'
+import { otherCategoryDescriptionSchema, paymentDescription, resolvePaymentCategory, uniqueCategoryCode } from '@/lib/payment-categories'
 
 const refreshFinance = () => {
   for (const path of ['/dashboard/treasurer/finance','/dashboard/treasurer/ledger','/dashboard/treasurer/reports','/contributions','/admin/finance']) revalidatePath(path)
@@ -635,55 +629,68 @@ export async function reconcilePaymentEvent(formData: FormData) {
 }
 
 /** Marks a confirmed payment as matched to the bank / M-Pesa statement. */
+export async function getReconciliationMembers() {
+  const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
+  return prisma.user.findMany({
+    where: { ...(canRecordContributionFor(actor, actor.id) ? {} : { id: { not: actor.id } }) },
+    select: { id: true, fullName: true, email: true },
+    orderBy: { fullName: 'asc' },
+  })
+}
+
 export async function reconcileContribution(formData: FormData) {
   const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
   const data = z.object({
     id: z.string().min(1),
+    memberId: z.string().min(1).optional(),
     statementRef: z.string().trim().max(120).optional(),
     notes: z.string().trim().min(5, 'Add a short reconciliation note (at least 5 characters).').max(1000),
   }).parse({
     id: formData.get('id'),
+    memberId: formData.get('memberId') || undefined,
     statementRef: formData.get('statementRef') || undefined,
     notes: formData.get('notes'),
   })
   const contribution = await prisma.contribution.findUniqueOrThrow({
     where: { id: data.id },
-    include: { financialTransaction: { select: { id: true, periodId: true, period: { select: { status: true } }, reconciliation: { select: { id: true } } } } },
+    include: { user: { select: { id: true, fullName: true, email: true } }, financialTransaction: { select: { id: true, periodId: true, period: { select: { status: true } }, reconciliation: { select: { id: true } } } } },
   })
-  if (contribution.status !== 'CONFIRMED') throw new Error('Only confirmed payments can be reconciled.')
+  if (!['CONFIRMED', 'RECONCILED'].includes(contribution.status)) throw new Error('Only confirmed or reconciled payments can be reconciled.')
+  const memberId = data.memberId || contribution.userId
+  const changedMember = memberId !== contribution.userId
+  if (changedMember && !canRecordContributionFor(actor, memberId)) throw new Error('You cannot assign this payment to this member.')
+  const member = await prisma.user.findUnique({ where: { id: memberId }, select: { id: true, fullName: true, email: true, isPrincipal: true, principalMemberId: true } })
+  if (!member) throw new Error('Select an existing member email.')
   const transaction = contribution.financialTransaction
   const now = new Date()
-  await prisma.$transaction([
-    prisma.contribution.update({
-      where: { id: contribution.id },
-      data: {
-        status: 'RECONCILED',
-        reconciliationStatus: 'RECONCILED',
-        reconciledAt: now,
-        ...(data.statementRef ? { statementRef: data.statementRef } : {}),
-      },
-    }),
-    ...(transaction
-      ? [
-          prisma.financialTransaction.update({ where: { id: transaction.id }, data: { status: 'RECONCILED', reconciledAt: now } }),
-          markEditedAfterClose(transaction.id),
-          ...(transaction.reconciliation
-            ? []
-            : [prisma.reconciliation.create({ data: { transactionId: transaction.id, periodId: transaction.periodId, notes: data.notes, reconciledById: actor.id } })]),
-        ]
-      : []),
-  ])
-  await writeAudit({
-    userId: actor.id,
-    action: 'CONTRIBUTION_RECONCILE',
-    entity: 'Contribution',
-    entityId: contribution.id,
-    reason: data.notes,
-    oldValue: { status: contribution.status },
-    newValue: { status: 'RECONCILED', statementRef: data.statementRef ?? contribution.statementRef },
+  await prisma.$transaction(async tx => {
+    const updated = await tx.contribution.updateMany({ where: { id: contribution.id, userId: contribution.userId, status: contribution.status }, data: {
+      userId: memberId, ...(changedMember ? { principalMemberId: member.isPrincipal ? member.id : member.principalMemberId } : {}), status: 'RECONCILED', reconciliationStatus: 'RECONCILED', reconciledAt: now,
+      ...(data.statementRef ? { statementRef: data.statementRef } : {}),
+    } })
+    if (updated.count !== 1) throw new Error('This payment changed. Refresh and try again.')
+    if (transaction) {
+      await tx.financialTransaction.update({ where: { id: transaction.id }, data: { status: 'RECONCILED', reconciledAt: now, ...(transaction.period?.status === 'CLOSED' ? { editedAfterClose: true } : {}) } })
+      await tx.reconciliation.upsert({ where: { transactionId: transaction.id }, create: { transactionId: transaction.id, periodId: transaction.periodId, notes: data.notes, reconciledById: actor.id }, update: { notes: data.notes, reconciledById: actor.id, reconciledAt: now } })
+    }
+    if (changedMember && contribution.campaignId) {
+      await refreshObligation(contribution.campaignId, contribution.userId, tx)
+      await refreshObligation(contribution.campaignId, memberId, tx)
+    }
+    await tx.auditLog.create({ data: { userId: actor.id, actorRole: actor.role, actingRole: actor.role, actorSecondaryRoles: actor.dashboardAccess || [], action: changedMember ? 'CONTRIBUTION_MEMBER_REASSIGN' : 'CONTRIBUTION_RECONCILE', entity: 'Contribution', entityId: contribution.id, reason: data.notes,
+      oldValue: { status: contribution.status, memberId: contribution.userId, email: contribution.user.email, name: contribution.user.fullName, statementRef: contribution.statementRef },
+      newValue: { status: 'RECONCILED', memberId, email: member.email, name: member.fullName, statementRef: data.statementRef ?? contribution.statementRef },
+      meta: { transactionId: transaction?.id ?? null, amount: contribution.amount },
+    } })
   })
+  if (changedMember) {
+    await recomputeStandingSafely(contribution.userId, actor.id)
+    await recomputeStandingSafely(memberId, actor.id)
+  }
   refreshFinance()
 }
+
+
 
 export async function updateApprovalThreshold(formData: FormData): Promise<{ ok: true; amount: number }> {
   try {

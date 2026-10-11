@@ -184,7 +184,8 @@ export default function CreateEventForm({
   function toggleEmailMember(id: string) {
     setSelectedEmailMembers((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }

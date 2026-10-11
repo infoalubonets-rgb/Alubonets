@@ -132,7 +132,7 @@ export default function NotificationsList({ items }: { items: NotificationItem[]
                   item.unread ? 'text-primary hover:bg-primary/10' : 'text-outline/40'
                 }`}
               >
-                <span className="material-symbols-outlined text-[18px]">{item.unread ? 'mark_email_read' : 'done_all'}</span>
+                <span className="material-symbols-outlined text-[18px]">done_all</span>
               </button>
               <button
                 type="button"
@@ -152,7 +152,6 @@ export default function NotificationsList({ items }: { items: NotificationItem[]
         {selected && (
           <div className="space-y-4">
             {selected.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={selected.imageUrl} alt="" className="max-h-64 w-full rounded-xl object-cover" />
             )}
             <p className="whitespace-pre-line text-sm leading-relaxed text-on-surface">{selected.summary}</p>

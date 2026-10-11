@@ -74,7 +74,7 @@ export default function AnnouncementsClient({
           <span className="material-symbols-outlined text-[56px] text-primary/15">campaign</span>
           <p className="text-[15px] font-semibold text-on-surface">No announcements yet</p>
           <p className="text-[13px] text-on-surface-variant">
-            You'll see group announcements here.
+            You&apos;ll see group announcements here.
           </p>
         </div>
       )}
@@ -220,7 +220,6 @@ export default function AnnouncementsClient({
                 </p>
                 {a.imageUrl && (
                   <div className="mt-3 rounded-xl overflow-hidden border border-outline-variant/40">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={a.imageUrl}
                       alt=""

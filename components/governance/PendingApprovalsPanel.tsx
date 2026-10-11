@@ -96,7 +96,6 @@ function PendingCard({ resolution, onDone }: { resolution: PendingResolution; on
       </p>
       <p className="mt-2 whitespace-pre-line text-sm">{resolution.body}</p>
       {resolution.imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
         <img src={resolution.imageUrl} alt="" className="mt-2 max-h-48 rounded-lg object-cover" />
       )}
       {resolution.documentUrl && (

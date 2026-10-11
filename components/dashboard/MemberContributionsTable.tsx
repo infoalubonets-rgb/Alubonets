@@ -343,7 +343,11 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
   useEffect(() => {
     loadedDetails.clear()
   }, [rows])
-  const [show, setShow] = useState<'all' | 'paid' | 'none'>('all')
+  // With a time period chosen, only members who paid in it are listed (switch to "Not paid" to see the rest).
+  const [show, setShow] = useState<'all' | 'paid' | 'none'>(filtered ? 'paid' : 'all')
+  useEffect(() => {
+    setShow(filtered ? 'paid' : 'all')
+  }, [filtered, period.from, period.to, period.key])
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -382,7 +386,7 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search member or membership number…" className="h-10 w-full rounded-xl border bg-surface py-2 pl-9 pr-3 text-sm" />
         </label>
         <select value={show} onChange={(e) => setShow(e.target.value as typeof show)} aria-label="Filter members by payments" className="h-10 rounded-xl border bg-surface px-3 text-sm">
-          <option value="all">All members</option>
+          <option value="all">{filtered ? 'All members (incl. not paid)' : 'All members'}</option>
           <option value="paid">{filtered ? 'Paid in this period' : 'Have paid'}</option>
           <option value="none">{filtered ? 'Not paid in this period' : 'Not yet paid'}</option>
         </select>
@@ -403,7 +407,7 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
             </thead>
             <tbody>
               {visible.length === 0 ? (
-                <tr><td colSpan={6} className="py-10 text-center text-on-surface-variant">No members match.</td></tr>
+                <tr><td colSpan={6} className="py-10 text-center text-on-surface-variant">{filtered && show === 'paid' && !query.trim() ? `Nobody paid in this period (${period.label.toLowerCase()}).` : 'No members match.'}</td></tr>
               ) : (
                 visible.map((row, i) => (
                   <tr key={row.id} className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`}>

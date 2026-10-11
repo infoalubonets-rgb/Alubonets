@@ -101,7 +101,7 @@ Each table describes the **selected workspace**. Other roles assigned to the sam
 | Administrator | Members | Approve/reject applicants; suspend, restore or close accounts; set standing and contribution rights; export members | Cannot grant Admin authority or suspend a Super Admin. |
 | Administrator | Roles and family | Assign main/second roles; manage Principal status, family links and role catalogue | Admin grants need Super Admin mode; Admin role cannot be disabled. |
 | Administrator | Public About page | Communications → About Us profiles: link executives to member records; set display name, title, responsibilities, biography, photo URL and display order; publish or keep as draft. Members → "Show on About page" is the fallback when nothing is published. | Only published profiles appear publicly. Linked members choose which extra details (photo, profession, location, contacts) are shown. |
-| Administrator | Finance oversight | Read all finances; verify/reconcile payments; approve ledger entries/reversals; manage campaigns/categories | Cannot approve their own entries. Recording money requires switching to Treasurer. |
+| Administrator | Finance oversight | Read all finances; verify/reconcile payments; approve ledger entries/reversals; manage campaigns/categories; set each member's Monthly/Annual contribution plan | Cannot approve their own entries. Recording money requires switching to Treasurer. |
 | Administrator | Finance settings | Manage periods, thresholds, standing, allocations and payment destination | Closed-period and maker-checker safeguards apply. |
 | Administrator | Loans | Review applications and make final decisions | Loans must be enabled. Disbursement/repayment recording requires Treasurer mode. |
 | Administrator | Governance | Create/edit/delete proposals; decide resolutions; set visibility; publish results; manage notices, agendas and action points | Reasons and audit records apply to changes. |
@@ -130,12 +130,14 @@ Each table describes the **selected workspace**. Other roles assigned to the sam
 
 | Role | Area / permission | What it can do | Notes / restrictions |
 | --- | --- | --- | --- |
-| Treasurer | Money recording | Record payments, expenses, disbursements and repayments; propose reversals | Requires active Treasurer workspace; accounting-period rules apply. |
+| Treasurer | Money recording | Record payments (saved in the background), expenses (proof optional), loan and welfare payouts and repayments; propose reversals | Requires active Treasurer workspace; accounting-period rules apply. |
+| Treasurer | Corrections | Change a payment amount with a reason (posted as a reversal plus a corrected entry); send a confirmed entry back to pending | Treasurer only; audited. Reconciled entries, reversals and loan/welfare payouts cannot be sent back to pending. |
+| Treasurer | Contribution plans | Set each member to Monthly or Annual so standing checks only the matching dues | Shared with Admin; audited. |
 | Treasurer | Verification and approval | Verify payments; approve others’ ledger entries and reversals | Cannot verify/approve an entry they recorded; role switching does not bypass account-ID checks. |
 | Treasurer | Reconciliation | Reconcile confirmed payments; match unmatched M-Pesa payments | Closed-period restrictions apply. |
 | Treasurer | Campaigns and receipts | Manage campaigns, contribution categories and obligations; email receipts; see M-Pesa notifications | Waiver/restoration and audit rules apply. |
-| Treasurer | Financial visibility | See every member’s contributions | Member contact details are limited to the financial context. |
-| Treasurer | Loans | First review; publish funding requests to governance; record disbursements/repayments | Admin can also review; final decision belongs to Admin. |
+| Treasurer | Financial visibility | See every member’s contributions; members × months grid; Financial overview, ledger and reports with time filters and PDF/Word/CSV downloads | Member contact details are limited to the financial context. Downloads are audited. |
+| Treasurer | Loans | First review; publish funding requests to governance; record disbursements/repayments from the loans & welfare board | Admin can also review; final approve/reject belongs to Admin. |
 | Treasurer | Welfare | Give Treasurer review/approval or reject a pending request | Executive approval is also required; welfare must be enabled. |
 | Treasurer | Governance | Create proposals with attachments; edit/delete proposals with a reason | Admin decides resolutions and publishes results. |
 | Treasurer | Communications | Announcement sending action permits Treasurer | Default Treasurer sidebar does not expose the composer. |
@@ -160,7 +162,7 @@ Each table describes the **selected workspace**. Other roles assigned to the sam
 | Organizing Secretary | Events | Create/manage events and invitations | Includes event-management pages. |
 | Organizing Secretary | Projects | Create/edit/delete projects; manage milestones, responsible people and schedules | Project-comment moderation belongs to Admin/Executive. |
 | Organizing Secretary | Project finance | See full project financial information | Does not permit recording money. |
-| Organizing Secretary | Gallery | Manage gallery and approval queue | Gallery workflow and audit rules apply. |
+| Organizing Secretary | Gallery | Add photos (auto-resized to WebP for every screen) and manage the approval queue from the Gallery sidebar entry | Gallery workflow and audit rules apply. |
 | Organizing Secretary | Communications and activities | Send announcements/messages; post activities; delete own activity posts | Recipient selection exposes limited member contact details. |
 | Organizing Secretary | Personal features | Use shared Member features | No membership administration, site settings, minutes approval or governance proposal management. |
 
@@ -206,12 +208,16 @@ Each table describes the **selected workspace**. Other roles assigned to the sam
 - **Closed periods:** payments in a closed accounting period cannot be reconciled or changed; edits after close are flagged.
 - **Recording money:** active Treasurer workspace only. Admin and Super Admin must explicitly switch to Treasurer to record; the maker-checker rule still uses their account ID, so switching roles cannot approve their own entry.
 - **Seeing all finances:** Admin, Super Admin, active Treasurer workspace and Auditor. Everyone else sees only their own (and a Principal sees their branch). [`canViewAllFinances`]
+- **Immutable ledger:** the database blocks changes to posted ledger entries. Corrections are new entries: a reversal plus, for amount changes, a corrected entry. Account balances count a reversed entry and its reversal together, so they cancel out.
+- **Dates:** every finance date filter uses whole days in Nairobi time; "Last 24 hours" is exact to the hour.
 
 ---
 
 ## 7. Notifications per role
 
 The Notifications page lists **to-dos** (things to act on) and **notifications** (things to know about) for the selected workspace. Other assigned roles do not add their permissions to that workspace.
+
+Notifications are **role-specific**: each notice records the workspace(s) it belongs to (for example, loan applications belong to Treasurer). A workspace shows only its own role's notices plus personal and general ones (your payment confirmed, a new event). The Admin / Super Admin workspace shows everything. The bell count, "Mark all as read" and "Clear read" follow the same rule. [`lib/notification-audience.ts`]
 
 | Role | To-dos |
 | --- | --- |
@@ -228,7 +234,7 @@ Notifications: unread announcements (everyone), M-Pesa payments received (Admin,
 
 ## 8. Sidebar per role
 
-Every role has the same sidebar as the Administrator: the same section names in the same order. A section the role can't use is hidden, and each section opens that role's own page. Related pages show as buttons in the page header, not in the sidebar. [`lib/dashboard/nav.ts`, checked by `tests/nav-pagination.test.ts`]
+Every role has the same sidebar as the Administrator: the same section names in the same order. A section the role can't use is hidden, and each section opens that role's own page. Related pages show as buttons in the page header, not in the sidebar. On desktop the header buttons fill the title row and any that do not fit move to a second row that scrolls sideways; on phones they sit in one scrolling row under the title. The Organizing Secretary's Gallery is the one shortcut shown in the sidebar itself. [`lib/dashboard/nav.ts`, checked by `tests/nav-pagination.test.ts`]
 
 Order: Overview · Notifications · Members · Finance · Projects & events · Meetings & reports · Communications · Documents · Governance · My Family · Settings
 
@@ -236,9 +242,9 @@ Order: Overview · Notifications · Members · Finance · Projects & events · M
 | --- | --- |
 | Admin | Overview (Activities), Notifications, Members (Approvals), Finance (Contributions, Loans), Projects & events (Events, Gallery queue), Meetings & reports, Communications, Documents (Document repository), Governance, My Family, Settings (Roles & access, Activity logs) |
 | Executive | Overview (Activities), Notifications, Members, Finance (Payments & statements, Loans, Welfare approvals), Projects & events (Events), Meetings & reports, Communications, Documents, Governance, My Family |
-| Treasurer | Overview (Activities), Notifications, Finance (Financial ledger, Campaigns, Financial reports, My contributions, Loans, Welfare), Projects & events (Events), Meetings & reports, Documents, Governance, My Family |
+| Treasurer | Overview (Activities), Notifications, Finance → Financial overview (Financial ledger, Settings, Campaigns, Financial reports, My contributions, Member contributions, Loans, Welfare), Projects & events (Events), Meetings & reports, Documents, Governance, My Family |
 | Secretary | Overview (Activities), Notifications, Finance, Projects & events (Manage events, Events), Meetings & reports, Communications, Documents (Document repository), Governance, My Family |
-| Organizing Secretary | Overview (Activities), Notifications, Finance, Projects & events (Manage events, Gallery), Meetings & reports, Communications, Documents, Governance, My Family |
+| Organizing Secretary | Overview (Activities), Notifications, Finance, Projects & events (Manage events), Gallery, Meetings & reports, Communications, Documents, Governance, My Family |
 | Member | Overview (Activities), Notifications, Finance (Loans, Welfare), Projects & events (Events), Meetings & reports, Documents, Governance, My Family |
 | Auditor | Notifications, Members, Finance, Meetings & reports, Documents, Governance, Activity logs (in the Settings position) |
 

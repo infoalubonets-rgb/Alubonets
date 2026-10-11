@@ -2,8 +2,7 @@
 
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { after } from 'next/server'
-import { z } from 'zod'
-import { requireActiveRole, requireAdmin, requireSessionProfile } from '@/lib/auth/session'
+import { requireActiveRole, requireSessionProfile } from '@/lib/auth/session'
 import {
   TAGS,
   approveGalleryPhoto,

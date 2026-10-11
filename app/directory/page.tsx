@@ -4,13 +4,12 @@ import DashboardShell from '@/components/dashboard/DashboardShell'
 import DirectoryClient from '@/components/dashboard/DirectoryClient'
 import DirectoryFilters from '@/components/dashboard/DirectoryFilters'
 import NewMemberButton from '@/components/admin/NewMemberButton'
-import ExecutivesAboutButton, { type AboutExecutive } from '@/components/admin/ExecutivesAboutButton'
 import { navForRole } from '@/lib/dashboard/nav'
 import { getSessionProfile } from '@/lib/auth/session'
 import { getDirectoryMembers } from '@/app/actions/directory'
 import { prisma } from '@/lib/prisma'
 import { canViewMemberDirectory } from '@/lib/directory'
-import { ROLE_LABEL, type Role } from '@/lib/auth/types'
+import { type Role } from '@/lib/auth/types'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Members — Alubonets' }
@@ -44,38 +43,10 @@ export default async function DirectoryPage({
   const navRole: Role = navForRole(profile.role as Role).some((item) => item.href === '/directory')
     ? (profile.role as Role)
     : 'EXECUTIVE'
-  const [members, pendingApprovals, publishedProfiles] = await Promise.all([
+  const [members, pendingApprovals] = await Promise.all([
     getDirectoryMembers(),
     isAdmin ? prisma.user.count({ where: { status: 'PENDING', rejectedAt: null } }) : Promise.resolve(0),
-    isAdmin ? prisma.committeeProfile.count({ where: { status: 'PUBLISHED' } }) : Promise.resolve(0),
   ])
-
-  const executiveRows = isAdmin ? members.filter((member) => member.isExecutive && member.account?.status === 'ACTIVE') : []
-  const withPhoto = executiveRows.length
-    ? new Set(
-        (await prisma.user.findMany({
-          where: { id: { in: executiveRows.map((member) => member.id) }, avatarUrl: { not: null } },
-          select: { id: true },
-        })).map((row) => row.id),
-      )
-    : new Set<string>()
-  const executives: AboutExecutive[] = executiveRows
-    .map((member) => ({
-      id: member.id,
-      fullName: member.fullName,
-      roleLabel: member.isSuperAdmin
-        ? 'Super Administrator · Executive access'
-        : member.role === 'EXECUTIVE'
-          ? 'Executive'
-          : `${ROLE_LABEL[member.role as Role] ?? member.role} · Executive`,
-      hasPhoto: withPhoto.has(member.id),
-      profession: member.profession,
-      location: member.location,
-      email: member.contact?.email ?? null,
-      phone: member.contact?.phone ?? null,
-      about: member.account!.about,
-    }))
-    .sort((a, b) => Number(b.about.show) - Number(a.about.show) || a.about.order - b.about.order || a.fullName.localeCompare(b.fullName))
 
   return (
     <DashboardShell
@@ -96,11 +67,7 @@ export default async function DirectoryPage({
               <span className="material-symbols-outlined text-[16px]">admin_panel_settings</span>
               Roles
             </Link>
-            <ExecutivesAboutButton
-              executives={executives}
-              publishedProfiles={publishedProfiles}
-              className={`${HEADER_BUTTON} bg-primary hover:opacity-90`}
-            />
+            <Link href="/admin/members/about" className={`${HEADER_BUTTON} bg-primary hover:opacity-90`}><span className="material-symbols-outlined text-[16px]">badge</span>About Us profiles</Link>
             <Link href="/admin/approvals" className={`${HEADER_BUTTON} bg-secondary-container hover:opacity-90`}>
               <span className="material-symbols-outlined text-[16px]">pending_actions</span>
               Approvals

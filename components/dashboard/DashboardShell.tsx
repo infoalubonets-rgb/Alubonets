@@ -455,7 +455,6 @@ export default function DashboardShell({
         <div
           className={`pt-lg pb-md flex items-center gap-sm border-b border-white/10 ${sidebarCollapsed ? 'justify-center px-sm' : 'px-md'}`}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={ADMIN_SIDEBAR_LOGO}
             alt="Alubonets"

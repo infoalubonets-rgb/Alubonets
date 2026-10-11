@@ -226,11 +226,7 @@ export async function actionPublishMeetingMinutes(meetingId: string) {
     throw new Error(`Storage upload failed: ${uploadError.message}`)
   }
 
-  const { data: signed, error: signError } = await supabase.storage
-    .from('documents')
-    .createSignedUrl(storagePath, 60 * 60 * 24 * 365)
-
-  // Prefer signed URL; fall back to path for app-relative storage reference
+  // Stored as a storage reference; downloads get short-lived signed links when opened.
   const fileUrl = `storage://documents/${storagePath}`
 
   const { findCategoryIdByName } = await import('@/lib/document-categories')

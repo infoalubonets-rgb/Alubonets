@@ -13,6 +13,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { formatAuditAction } from '@/lib/audit-labels'
 import { requireAdmin } from '@/lib/auth/session'
+import ActivityDetailsButton from '@/components/admin/ActivityDetailsButton'
 
 export default async function AdminPage() {
   await requireAdmin()
@@ -178,9 +179,9 @@ export default async function AdminPage() {
                       by {a.user?.fullName || 'System'}
                     </p>
                   </div>
-                  <span className="text-[11px] text-outline dark:text-blue-200/30 shrink-0 mt-0.5">
+                  <div className="flex shrink-0 items-center gap-3"><span className="text-[11px] text-outline dark:text-blue-200/30 mt-0.5">
                     {new Date(a.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  </span>
+                  </span><ActivityDetailsButton activity={a} /></div>
                 </li>
               ))}
             </ul>

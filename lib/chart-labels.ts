@@ -1,4 +1,5 @@
 import type { MemberStatus, PaymentMethod } from '@prisma/client'
+import { appTodayInputValue } from '@/lib/dates'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -14,7 +15,7 @@ export function formatMonthKeys(keys: string[]): string[] {
 }
 
 export function monthKeyFromDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  return appTodayInputValue(date).slice(0, 7)
 }
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {

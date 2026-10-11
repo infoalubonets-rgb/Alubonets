@@ -233,7 +233,6 @@ export default function AnnouncementComposer({
           {/* Preview / upload zone */}
           {effectiveImageUrl || imagePreview ? (
             <div className="relative rounded-xl overflow-hidden border border-outline-variant/40 dark:border-[#1e3461] bg-surface-container dark:bg-[#111f36]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imagePreview ?? effectiveImageUrl}
                 alt=""

@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { useEffect } from 'react'
 import * as Sentry from '@sentry/nextjs'
 
@@ -48,7 +50,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
           ) : (
             <button type="button" onClick={reset} className="rounded-full bg-secondary-container px-5 py-2.5 text-sm font-label-bold text-on-primary">Try again</button>
           )}
-          <a href="/" className="rounded-full border border-primary/40 px-5 py-2.5 text-sm font-label-bold text-primary">Return home</a>
+          <Link href="/" className="rounded-full border border-primary/40 px-5 py-2.5 text-sm font-label-bold text-primary">Return home</Link>
         </div>
       </section>
     </main>

@@ -8,7 +8,7 @@ import { PUBLIC_PROFILE_FIELDS } from '@/lib/public-profile'
 type About = { show: boolean; title: string | null; order: number; fields: string[] }
 
 /** Admin-only: whether this executive appears on the public About page and which details are shown. */
-export default function ExecutiveAboutSettings({ userId, about }: { userId: string; about: About }) {
+export default function ExecutiveAboutSettings({ userId, about, biography, responsibilities }: { userId: string; about: About; biography?: string; responsibilities?: string }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [show, setShow] = useState(about.show)
@@ -16,6 +16,8 @@ export default function ExecutiveAboutSettings({ userId, about }: { userId: stri
   const [order, setOrder] = useState(String(about.order))
   const [fields, setFields] = useState<string[]>(about.fields)
   const [error, setError] = useState('')
+  const [bio, setBio] = useState(biography ?? '')
+  const [duties, setDuties] = useState(responsibilities ?? '')
   const [ok, setOk] = useState('')
 
   const toggleField = (key: string, on: boolean) =>
@@ -26,7 +28,7 @@ export default function ExecutiveAboutSettings({ userId, about }: { userId: stri
     setOk('')
     startTransition(async () => {
       try {
-        await setAboutProfile({ userId, showOnAbout: show, aboutTitle: title.trim() || undefined, aboutOrder: Number(order) || 0, fields })
+        await setAboutProfile({ userId, showOnAbout: show, aboutTitle: title.trim() || undefined, aboutOrder: Number(order) || 0, fields, ...(biography !== undefined ? { biography: bio, responsibilities: duties } : {}) })
         setOk(show ? 'Shown on the About page' : 'Hidden from the About page')
         router.refresh()
       } catch (e) {
@@ -50,7 +52,7 @@ export default function ExecutiveAboutSettings({ userId, about }: { userId: stri
 
       <div className="grid grid-cols-[1fr_90px] gap-2">
         <label className="block text-[11px] font-semibold text-on-surface-variant">
-          Title shown
+          Position shown
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder="e.g. Chairperson" className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm" />
         </label>
         <label className="block text-[11px] font-semibold text-on-surface-variant">
@@ -71,6 +73,10 @@ export default function ExecutiveAboutSettings({ userId, about }: { userId: stri
         </div>
         <p className="mt-1 text-[11px] text-on-surface-variant">Name and title are always shown. Everything else stays private unless ticked.</p>
       </div>
+      {biography !== undefined && <div className="space-y-3">
+        <label className="block text-sm font-semibold">Biography<textarea rows={4} maxLength={5000} value={bio} onChange={e => setBio(e.target.value)} className="mt-1 block w-full rounded-lg border p-3 font-normal" /></label>
+        <label className="block text-sm font-semibold">Responsibilities (one per line)<textarea rows={4} maxLength={5000} value={duties} onChange={e => setDuties(e.target.value)} className="mt-1 block w-full rounded-lg border p-3 font-normal" /></label>
+      </div>}
 
       <button type="button" disabled={pending} onClick={save} className="h-10 w-full rounded-full bg-primary text-sm font-label-bold text-on-primary disabled:opacity-50">
         {pending ? 'Saving…' : 'Save About page settings'}

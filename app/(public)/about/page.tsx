@@ -3,6 +3,7 @@ import ValuesCarousel from '@/components/about/ValuesCarousel'
 import { COMMITTEE_HEADSHOT, HERO_IMAGE } from '@/lib/constants'
 import { prisma } from '@/lib/prisma'
 import { createServerClient } from '@/lib/supabase-server'
+import { executivePublicExtras } from '@/lib/executive-public-profile'
 
 export const metadata: Metadata = {
   title: 'About',
@@ -17,14 +18,6 @@ const VALUES_TAGS = [
   'Accountability',
   'Empowerment',
   'Respect',
-]
-
-const COMMITTEE = [
-  { name: 'James M.', role: 'Chairperson', alt: 'Chairperson' },
-  { name: 'Sarah K.', role: 'Secretary', alt: 'Secretary' },
-  { name: 'David O.', role: 'Treasurer', alt: 'Treasurer' },
-  { name: 'Mary N.', role: 'Vice Chair', alt: 'Vice Chair' },
-  { name: 'Peter W.', role: 'Member Rep', alt: 'Member' },
 ]
 
 type CommitteeCard = {
@@ -54,7 +47,7 @@ const profileUserSelect = {
   phone: true,
   location: true,
   publicProfileFields: true,
-  memberProfile: { select: { profession: true } },
+  memberProfile: { select: { profession: true, skills: true, educationLevel: true, achievements: true, mentorshipArea: true, interests: true } },
 } as const
 
 type ProfileUser = {
@@ -66,76 +59,29 @@ type ProfileUser = {
   memberProfile: { profession: string | null } | null
 }
 
-/** Only the details the member allowed on their public profile. */
-function publicDetails(user: ProfileUser | null) {
-  if (!user) return []
-  const allowed = new Set(user.publicProfileFields)
-  return [
-    allowed.has('profession') ? user.memberProfile?.profession : null,
-    allowed.has('location') ? user.location : null,
-    allowed.has('email') ? user.email : null,
-    allowed.has('phone') ? user.phone : null,
-  ].filter((value): value is string => Boolean(value))
-}
-
 async function allowedPhoto(user: ProfileUser | null) {
   return user && user.publicProfileFields.includes('photo') ? memberPhotoUrl(user.avatarUrl) : null
 }
 
 async function loadCommittee(): Promise<CommitteeCard[]> {
-  // 1. Profiles an Admin published from Communications → About Us profiles.
-  const published = await prisma.committeeProfile.findMany({
-    where: { status: 'PUBLISHED' },
-    orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
-    include: { user: { select: profileUserSelect } },
-  })
-  if (published.length) {
-    return Promise.all(
-      published.map(async (profile) => ({
-        name: profile.name,
-        role: profile.position,
-        alt: `${profile.name}, ${profile.position}`,
-        photoUrl: profile.photoUrl || (await allowedPhoto(profile.user)),
-        responsibilities: (profile.responsibilities || '')
-          .split('\n')
-          .map((line) => line.replace(/^[-•*]\s*/, '').trim())
-          .filter(Boolean),
-        biography: profile.biography,
-        details: publicDetails(profile.user),
-      })),
-    )
-  }
-
-  // 2. Executives switched on with "Show on About page" in Members.
   const executives = await prisma.user.findMany({
     where: { status: 'ACTIVE', showOnAbout: true, OR: [{ role: 'EXECUTIVE' }, { dashboardAccess: { has: 'EXECUTIVE' } }] },
     orderBy: [{ aboutOrder: 'asc' }, { fullName: 'asc' }],
-    select: { fullName: true, aboutTitle: true, ...profileUserSelect },
+    select: { id: true, fullName: true, aboutTitle: true, ...profileUserSelect },
   })
-  if (executives.length) {
-    return Promise.all(
-      executives.map(async (user) => {
-        const role = user.aboutTitle || 'Executive Committee'
-        return {
-          name: user.fullName,
-          role,
-          alt: `${user.fullName}, ${role}`,
-          photoUrl: await allowedPhoto(user),
-          responsibilities: [],
-          biography: '',
-          details: publicDetails(user),
-        }
-      }),
-    )
-  }
-
-  // 3. Placeholders until leadership confirms names.
-  return COMMITTEE.map((member) => ({ ...member, photoUrl: null, responsibilities: [], biography: '', details: [] }))
+  const profiles = executives.length ? await prisma.committeeProfile.findMany({ where: { userId: { in: executives.map(user => user.id) } }, orderBy: { updatedAt: 'desc' } }) : []
+  return Promise.all(executives.map(async user => {
+    const profile = profiles.find(profile => profile.userId === user.id)
+    const role = user.aboutTitle || 'Executive Committee'
+    return { name: user.fullName, role, alt: user.fullName + ', ' + role,
+      photoUrl: await allowedPhoto(user),
+      ...executivePublicExtras(user, profile),
+    }
+  }))
 }
 
 export default async function AboutPage() {
   const committee = await loadCommittee()
-  const placeholders = committee.length === COMMITTEE.length && committee.every((member, i) => member.name === COMMITTEE[i].name)
   return (
     <main className="flex-grow">
       <section className="relative overflow-hidden px-md py-xl sm:py-xxl md:px-lg">
@@ -265,7 +211,6 @@ export default async function AboutPage() {
           <h2 className="mb-sm font-h2 text-h2-mobile text-primary md:text-h2">Executive Committee</h2>
           <p className="font-body-md text-[15px] leading-relaxed text-on-surface">
             The Alubonets Self-Help Group is guided by an executive committee that provides leadership, coordination, and oversight.
-            {placeholders && ' Official names, ranks, and photographs will be added once leadership confirms them.'}
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-md md:gap-lg">
@@ -274,7 +219,7 @@ export default async function AboutPage() {
             return (
               <div
                 key={`${member.name}-${member.role}`}
-                className={`reveal flex flex-col items-center ${rich ? 'w-64' : 'w-36'}`}
+                className="reveal flex w-56 flex-col items-center"
                 style={{ ['--reveal-delay' as string]: `${index * 70}ms` }}
               >
                 <img
@@ -286,6 +231,7 @@ export default async function AboutPage() {
                 <span className="mt-xs text-center font-body-md text-[13px] text-primary/70">
                   {member.role}
                 </span>
+                {rich && <details className="mt-3 w-full"><summary className="cursor-pointer text-center text-sm font-semibold text-primary">More</summary>
                 {member.details.map((detail) => (
                   <p key={detail} className="mt-xs break-all text-center text-[12px] text-on-surface-variant">{detail}</p>
                 ))}
@@ -299,6 +245,7 @@ export default async function AboutPage() {
                     ))}
                   </ul>
                 )}
+                </details>}
               </div>
             )
           })}

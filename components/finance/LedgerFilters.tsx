@@ -18,7 +18,7 @@ export default function LedgerFilters({ range = '', from, to, today, categories,
   const update = (values: Record<string, string>) => {
     const params = new URLSearchParams(search.toString())
     params.delete('page'); params.delete('month')
-    for (const [key, value] of Object.entries(values)) value ? params.set(key, value) : params.delete(key)
+    for (const [key, value] of Object.entries(values)) { if (value) params.set(key, value); else params.delete(key) }
     startTransition(() => router.replace(`${pathname}?${params}`, { scroll: false }))
   }
   const selectRange = (value: string) => {

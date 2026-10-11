@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
 
 export const MEMBER_TYPES = ['Principal', 'Attached', 'Minor'] as const
@@ -13,16 +13,16 @@ const SELECT =
 
 /** Members-page filters, one dropdown each, kept in the URL so the table and header stay in sync. */
 export default function DirectoryFilters({ isAdmin }: { isAdmin: boolean }) {
-  const router = useRouter()
-  const pathname = usePathname()
   const params = useSearchParams()
 
   function set(key: 'type' | 'role' | 'status', value: string) {
-    const next = new URLSearchParams(params.toString())
+    // All rows are already loaded. Update the URL without another server request.
+    // Read the current URL so rapid changes preserve the other dropdowns.
+    const next = new URLSearchParams(window.location.search)
     if (value) next.set(key, value)
     else next.delete(key)
     const qs = next.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`)
   }
 
   return (

@@ -21,7 +21,7 @@ export default function TimeRangeFilter({ range, from, to, clear = ['page'] }: {
   const go = (values: Record<string, string>) => {
     const params = new URLSearchParams(search.toString())
     for (const key of [...clear, 'month']) params.delete(key)
-    for (const [key, value] of Object.entries(values)) value ? params.set(key, value) : params.delete(key)
+    for (const [key, value] of Object.entries(values)) { if (value) params.set(key, value); else params.delete(key) }
     const query = params.toString()
     startTransition(() => router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false }))
   }

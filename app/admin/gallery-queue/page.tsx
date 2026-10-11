@@ -26,7 +26,6 @@ export default async function AdminGalleryQueuePage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {queue.map((g) => (
             <figure key={g.id} className="border rounded-xl overflow-hidden bg-surface">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={g.url} alt={g.caption || 'Pending'} className="h-40 w-full object-cover" />
               <figcaption className="p-3 space-y-2">
                 <p className="text-sm font-medium">{g.caption || 'Untitled'}</p>

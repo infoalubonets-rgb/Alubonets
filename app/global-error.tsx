@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
 
@@ -17,7 +19,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             {error.digest && <p style={{ color: '#7890ae', fontSize: 10 }}>Reference: {error.digest}</p>}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 24, flexWrap: 'wrap' }}>
               <button onClick={reset} style={{ border: 0, borderRadius: 999, padding: '11px 20px', background: '#fe8015', color: 'white', fontWeight: 700, cursor: 'pointer' }}>Try again</button>
-              <a href="/" style={{ borderRadius: 999, padding: '10px 20px', border: '1px solid #7890ae', color: '#eef4ff', textDecoration: 'none' }}>Return home</a>
+              <Link href="/" style={{ borderRadius: 999, padding: '10px 20px', border: '1px solid #7890ae', color: '#eef4ff', textDecoration: 'none' }}>Return home</Link>
             </div>
           </section>
         </main>

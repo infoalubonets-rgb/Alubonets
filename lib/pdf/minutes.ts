@@ -23,7 +23,6 @@ const MX     = 50          // horizontal margin
 const MB     = 60          // bottom margin
 const NAVY   = rgb(0,     0.122, 0.314)   // #001f50
 const BRIGHT = rgb(0.996, 0.502, 0.082)   // #fe8015
-const ORANGE = rgb(0.592, 0.282, 0)       // #974800
 const WHITE  = rgb(1, 1, 1)
 const DARK   = rgb(0.08, 0.08, 0.1)
 const MUTED  = rgb(0.38, 0.40, 0.44)

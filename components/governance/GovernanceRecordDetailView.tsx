@@ -187,7 +187,6 @@ export default function GovernanceRecordDetailView({
         <h2 className="mt-3 font-h3 text-xl text-primary">{record.title}</h2>
         <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-on-surface">{record.body}</p>
         {record.imageUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
           <img src={record.imageUrl} alt="" className="mt-4 max-h-64 rounded-xl object-cover" />
         )}
         {record.documentUrl && (

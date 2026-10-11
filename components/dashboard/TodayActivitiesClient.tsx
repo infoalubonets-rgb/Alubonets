@@ -115,7 +115,6 @@ export default function TodayActivitiesClient({
         {viewing && (
           <div className="space-y-3">
             {viewing.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={viewing.imageUrl} alt="" className="max-h-72 w-full rounded-xl object-cover" />
             )}
             <p className="text-sm font-semibold text-secondary">{dayLabel(viewing.startsAt, 'long')}{viewing.venue ? ` · ${viewing.venue}` : ''}</p>

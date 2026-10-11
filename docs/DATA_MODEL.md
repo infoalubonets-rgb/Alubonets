@@ -120,7 +120,7 @@ erDiagram
 
 | Table | Important fields | Purpose and rules |
 |---|---|---|
-| `users` | `id`, `email`, `phone`, `auth_provider_id`, `account_status`, `last_login`, MFA fields | Authentication and account state. A record-only child or dependant does not require a row here. |
+| `users` | `id`, `email`, `phone`, `auth_provider_id`, `account_status`, `last_login` | Authentication and account state. A record-only child or dependant does not require a row here. |
 | `members` | `id`, nullable `user_id`, nullable `principal_member_id`, `is_principal`, `relationship_code`, names, DOB, contacts, lineage, `member_status`, `registration_state`, `registration_date` | Central person registry. Admin alone sets `is_principal`. Every attached member has one current Principal. |
 | `relationship_types` | `code`, `label`, `active`, `sort_order` | Configurable relationship dropdown such as spouse, son, daughter, child, dependant or other. |
 | `profile_visibility` | `member_id`, `visible_to_members`, `allowed_fields`, `approved_by_principal_id`, `changed_by`, `changed_at`, `review_at` | Field-level directory permission. Attached members default to hidden; child privacy rules can override permission. |
@@ -331,11 +331,13 @@ The target model above should be reconciled with the existing Prisma implementat
 | `users` + `members` | The current `User` model carries authentication-linked membership fields, while `MemberProfile` stores extended profile data. | Decide whether to keep the combined structure or later separate record-only people more fully; preserve a nullable-login design. |
 | Principal branch | `User.isPrincipal`, `User.principalMemberId`, `User.familyRelationship`, `User.familyRegistrationState`, `FamilyInvite` and `FamilyBranchHistory` are implemented. The migration, self-link/branch-shape constraints, Admin transfer workflow and history backfill are deployed. | Profile-visibility rules remain a separate P2 feature. |
 | Roles/permissions | Current role enum and dashboard-access fields provide role control. | Add a normalized permission matrix only if the current authorization design cannot express required scopes and active dates. |
-| Payments and purposes | `Contribution`, `FinancialTransaction`, `TransactionCategory`, reconciliation and ledger models implement much of the finance domain. | Add official account versioning, guide-purpose alignment, branch reporting and allocation rules. |
+| Payments and purposes | `Contribution` (with `contributionPeriod`, campaign/project links) and an immutable double-entry ledger (`FinancialTransaction`, `LedgerEntry`, protected by database triggers). Purposes are `TransactionCategory` rows with a billing kind (Monthly Contribution, Annual Contribution, campaigns, projects, Other). Official account versioning and fund-allocation rules (`FundAllocationRule`, snapshotted on each payment) are implemented. Every confirmed contribution has a ledger transaction. | Branch-level reporting polish. |
+| Membership standing | `User.standing`, override fields and `User.contributionPlan` (`MONTHLY` / `ANNUAL`) drive automatic Paid-up / Lapsed standing from monthly and annual dues. | Assign plans to existing members. |
+| Notifications | `UserNotification.audienceRoles` and `Announcement.audienceRoles` make notices role-specific per workspace. | — |
 | Activities/events | `Event`, invitation, RSVP, attendance, attachment and cost models exist. | Add Today’s Activities behavior and stronger branch/meeting linkage. |
 | Resources | `Document`, category/download data and project-document models exist. | Align resource metadata, tags, related entities, retention and sensitive access logging. |
-| Welfare/projects | Current welfare and project model families cover the main workflows. | Add confidentiality, family beneficiaries and configurable approval steps where required. |
-| Audit | `AuditLog` already stores actor, entity, old/new values, reason and request context. | Ensure every new family, visibility, finance-setting and allocation action writes an audit entry. |
+| Welfare/projects | Welfare has confidentiality, Treasurer + Executive approvals and decision history; projects have dates, funding progress and linked expenses. | Family beneficiaries if required. |
+| Audit | `AuditLog` stores actor, acting role, entity, old/new values, reason and request context; finance corrections, plans, family transfers, About-page changes and report downloads are audited. | Keep adding entries for new actions. |
 
 ## 13. Data-model acceptance checks
 

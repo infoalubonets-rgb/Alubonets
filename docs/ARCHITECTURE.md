@@ -160,6 +160,10 @@ Member and staff profiles. One row per person. Linked to Supabase Auth when `aut
 | `isSuperAdmin` | Boolean | Hierarchy; only supers grant Admin / supers |
 | `dashboardAccess` | Role[] | Extra workspaces beyond primary role |
 | `avatarUrl` | String? | Profile image URL |
+| `standing` / `standingReason` | Standing / String? | Automatic Paid-up / Lapsed and why; Admin override with an optional end date |
+| `contributionPlan` | ContributionPlan? | `MONTHLY` or `ANNUAL`: standing checks only the matching dues. Unset checks both. |
+| `isPrincipal` / `principalMemberId` | Boolean / String? | Family branch head, or the Principal this member is attached to |
+| `showOnAbout` / `aboutTitle` / `aboutOrder` / `publicProfileFields` | | Fallback About-page listing and which personal details are public |
 | `createdAt` / `updatedAt` | DateTime | |
 
 **Relations:** owns contributions, welfare requests, audit/email logs; authors announcements; uploads documents & gallery; records meetings.
@@ -184,11 +188,31 @@ Money received from a member (cash, bank, M-Pesa, etc.).
 | `statementRef` | String? | Bank / statement ref |
 | `paidAt` | DateTime | Payment date |
 | `mpesaRef` | String? | M-Pesa receipt / checkout ref |
+| `status` | TransactionStatus | `PENDING`, `CONFIRMED`, `RECONCILED`, `REVERSED`, `REJECTED` |
+| `categoryId` / `campaignId` / `projectId` | String? | Payment purpose, campaign or project |
+| `contributionPeriod` | String? | `YYYY-MM` a monthly fee covers |
+| `financialTransactionId` | String? unique | The ledger transaction for this payment |
 | `createdAt` | DateTime | Row created |
 
 **Indexes:** `userId`, `paidAt`.
 
-**Flows:** Treasurer form / CSV import / M-Pesa callback → row → PDF receipt `/api/pdf/receipt/[id]`.
+**Flows:** Treasurer form / CSV import / M-Pesa callback → contribution + ledger transaction (one database transaction) → PDF receipt `/api/pdf/receipt/[id]`. Every confirmed contribution has a ledger transaction.
+
+---
+
+### Finance ledger (`financial_transactions`, `ledger_entries`)
+
+Double-entry ledger. Each transaction (contribution, expense, disbursement, reversal, adjustment) has balanced debit/credit entries against accounts (bank, cash, M-Pesa, income, expense).
+
+- **Immutable:** database triggers block updates and deletes on `ledger_entries`, and changes to the amount, date, type, creator, period or reference of confirmed transactions. Status changes are allowed.
+- **Corrections:** a reversal transaction mirrors the original's entries and the original becomes `REVERSED`. A payment amount change posts a reversal plus a corrected transaction and re-links the contribution.
+- **Balances:** account balances sum entries of `CONFIRMED`, `RECONCILED` and `REVERSED` transactions, so an original and its reversal cancel out.
+- **Approval:** entries over the approval limit start `PENDING`; maker-checker applies. A confirmed entry can be sent back to `PENDING` (Treasurer, audited).
+- **Periods:** monthly accounting periods; entries added or changed after a period closes are flagged.
+
+### `user_notifications` (model `UserNotification`)
+
+Per-person notices. `audienceRoles` (Role[]) records which workspaces a notice belongs to; empty means personal/general. Each workspace shows its own role's notices plus personal ones; Admin sees all. Announcements carry the same `audienceRoles`.
 
 ---
 
@@ -657,15 +681,15 @@ The shape language is "Rounded" but controlled. A **12px radius** for cards prov
 ---
 
 # 3. Decisions
-Last reviewed: 30 July 2026
+Last reviewed: 11 October 2026
 
 | Topic | Decision | Status |
 |---|---|---|
 | Executive Committee content | Keep the Executive Committee section inside the About page. A dedicated route is not required. | Confirmed |
 | What We Do content | Keep welfare, empowerment, governance and related content inside the About page. A dedicated route is not required. | Confirmed |
 | Official contact email | `infoalubonets@gmail.com` | Confirmed |
-| Current test hosting | Netlify at `alubonets.netlify.app` | Confirmed |
-| Future production hosting | Vercel; migration date and final domain remain undecided. | Confirmed direction |
+| Hosting | Vercel, functions in the Dublin region near the database; final domain still to be decided. | Confirmed direction |
+| Timezone | All finance dates, filters and reports use whole days in `Africa/Nairobi`. | Confirmed |
 | Database classification | The connected Supabase project contains real production data. Treat all schema and data operations as production changes. | Confirmed |
 | Development accounts | Retain preset accounts for local development only. Do not expose the selector in production builds. | Confirmed |
 | Database backups | Use Supabase-managed database backups. Verify plan coverage and restoration capability before launch. | Confirmed direction |
@@ -674,13 +698,15 @@ Last reviewed: 30 July 2026
 | Personal-data retention | Committee approval required. | Open |
 | Contact-message retention | Committee approval required. | Open |
 | Uploaded-file retention | Committee approval required. | Open |
-| Finance correction policy | Treasurer/committee approval required before finance-ledger implementation. | Open |
-| Loan rules | Committee approval required before the loan module. | Open |
+| Finance correction policy | Ledger entries are never edited; corrections are reversals and new entries. The Treasurer may correct a payment amount with a reason (audited). | Confirmed |
+| Loan rules | Optional module. Admin / Super Admin approve or reject; Treasurer disburses and records repayments. | Confirmed (Treasurer decisions still open) |
+| Privileged MFA | Removed from the product. | Confirmed |
+| Notifications | Role-specific per workspace; Admin sees all. | Confirmed |
 
 ---
 
 # 4. Security status
-Last reviewed: 30 July 2026
+Last reviewed: 11 October 2026
 
 ## Dependency audit
 
@@ -707,12 +733,17 @@ Required follow-up:
 - Development account selector excluded from production UI
 - CI type checking, tests and Prisma validation
 - Production migration baseline
+- Rate limiting on login, registration, password reset and contact forms
+- Account lock after repeated failed logins, idle session timeout and login history
+- Password reset by email
+- Turnstile bot protection on the contact form
+- Immutable finance ledger (database triggers) with maker-checker approval
+- Audit log for finance, roles, family, settings, About page and report downloads
+- Gallery uploads re-encoded server-side with metadata (including GPS) stripped
 
 ## Outstanding controls
 
-- Add rate limiting to login, registration and contact submission.
-- Add CAPTCHA or equivalent bot protection to public forms.
-- Add password reset and privileged-role MFA.
+- Extend bot protection to registration if abuse appears.
 - Create a separate staging Supabase project.
 - Configure Sentry and an external uptime monitor.
 - Define personal-data and uploaded-file retention rules.

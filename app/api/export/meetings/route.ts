@@ -1,15 +1,5 @@
 import { NextResponse } from 'next/server'
-import {
-  AlignmentType,
-  BorderStyle,
-  Document,
-  HeadingLevel,
-  Packer,
-  Paragraph,
-  TextRun,
-  SectionType,
-  PageBreak,
-} from 'docx'
+import { AlignmentType, BorderStyle, Document, Packer, Paragraph, TextRun, SectionType, PageBreak } from 'docx'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
 import {

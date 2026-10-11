@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import LedgerStatusSelect from './LedgerStatusSelect'
 import { formatPaymentMethod } from '@/lib/chart-labels'
-import { readableError } from '@/lib/form-errors'
 import type { LedgerHistoryRow } from '@/lib/ledger-history'
 
 type Direction = 'all' | 'in' | 'out' | 'corrections'
@@ -25,13 +24,6 @@ const FLOW_STYLE: Record<Flow, { icon: string; badge: string; amount: string }> 
   in: { icon: 'south_west', badge: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300', amount: 'text-green-700 dark:text-green-300' },
   out: { icon: 'north_east', badge: 'bg-error-container text-error', amount: 'text-error' },
   other: { icon: 'sync_alt', badge: 'bg-surface-container-high text-on-surface-variant', amount: 'text-on-surface' },
-}
-const STATUS_STYLE: Record<string, string> = {
-  PENDING: 'bg-secondary-fixed text-secondary',
-  CONFIRMED: 'bg-primary/10 text-primary',
-  RECONCILED: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-200',
-  REVERSED: 'bg-surface-container text-on-surface-variant line-through',
-  REJECTED: 'bg-error-container text-error',
 }
 
 const label = (value: string) => value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ')

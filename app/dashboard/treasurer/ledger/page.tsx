@@ -2,9 +2,8 @@ import IconModalButton from '@/components/ui/IconModalButton'
 import { rangeFilter, resolveTimeRange } from '@/lib/time-range'
 import ArrearsTable, { type ArrearsRow } from '@/components/finance/ArrearsTable'
 import LedgerFilters from '@/components/finance/LedgerFilters'
-import { APP_TIMEZONE, appDayRange, appTodayInputValue } from '@/lib/dates'
+import { APP_TIMEZONE, appTodayInputValue } from '@/lib/dates'
 import FinancialRequestsHistory from '@/components/finance/FinancialRequestsHistory'
-import Link from 'next/link'
 import type { Prisma } from '@prisma/client'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import LedgerActions from '@/components/finance/LedgerActions'
@@ -26,8 +25,6 @@ export const metadata = { title: 'Financial ledger' }
 const PATH = '/dashboard/treasurer/ledger'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const shortDate = (value: string) =>
-  new Date(`${value}T12:00:00Z`).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 const label = (value: string) => value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ')
 const kes = (value: number) => `KES ${value.toLocaleString('en-KE', { maximumFractionDigits: 2 })}`
 

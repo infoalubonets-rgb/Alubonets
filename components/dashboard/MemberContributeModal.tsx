@@ -66,9 +66,12 @@ export default function MemberContributeModal() {
   // Ref-based stop flag — always current, safe to read inside any async callback
   const pollStoppedRef = useRef(true)
 
+  // Escape always calls the latest close handler, not the one from when the modal opened.
+  const closeRef = useRef(handleClose)
+  closeRef.current = handleClose
   useEffect(() => {
     if (!open) return
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') closeRef.current() }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
   }, [open])

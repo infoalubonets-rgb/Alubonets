@@ -6,15 +6,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import FullScreenModal from '@/components/ui/FullScreenModal'
 import ContributionCategoriesManager from '@/components/admin/ContributionCategoriesManager'
 import CampaignForm from '@/components/finance/CampaignForm'
-import {
-  approveFinancialTransaction,
-  approveReversal,
-  createContributionCategory,
-  updateApprovalThreshold,
-  updateLoanApplicationLimit,
-  updateStandingSettings,
-  toggleAccountingPeriod,
-} from '@/app/actions/finance'
+import { approveFinancialTransaction, approveReversal, updateApprovalThreshold, updateLoanApplicationLimit, updateStandingSettings, toggleAccountingPeriod } from '@/app/actions/finance'
 import { campaignPurposeCategories, filterAdminManagedCategories } from '@/lib/payment-categories'
 import { upcomingAnnualRenewalDay, upcomingMonthlyDeadlines } from '@/lib/membership-standing'
 import { ACCOUNTING_PERIOD_CHANGED } from '@/components/dashboard/OldMonthPill'
@@ -321,11 +313,6 @@ export default function AdminFinanceClient({ approvalThreshold, loanApplicationL
     }
   }
 
-  async function afterAction(action: (formData: FormData) => Promise<void>, formData: FormData) {
-    await action(formData)
-    router.refresh()
-    closeModal()
-  }
 
   async function afterActionKeepOpen(action: (formData: FormData) => Promise<void>, formData: FormData) {
     await action(formData)

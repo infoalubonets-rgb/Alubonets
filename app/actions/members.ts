@@ -74,6 +74,8 @@ const superSchema = z.object({
 })
 
 function revalidateAdmin() {
+  revalidatePath('/about')
+  revalidatePath('/admin/members/about')
   revalidatePath('/admin')
   revalidatePath('/directory')
   revalidatePath('/admin/approvals')
@@ -383,7 +385,9 @@ const aboutProfileSchema = z.object({
   showOnAbout: z.boolean(),
   aboutTitle: z.string().trim().max(80).optional(),
   aboutOrder: z.number().int().min(0).max(999).default(0),
-  fields: z.array(z.string()).max(10).default([]),
+  fields: z.array(z.string()).max(20).default([]),
+  biography: z.string().trim().max(5000).optional(),
+  responsibilities: z.string().trim().max(5000).optional(),
 })
 
 /** Admin decides whether an executive appears on the public About page, and which details show. */
@@ -396,20 +400,31 @@ export async function setAboutProfile(input: z.input<typeof aboutProfileSchema>)
     throw new Error('Only executives can appear on the About page. Give them the Executive role (main or second role) on the Roles page first.')
   }
   const fields = sanitizePublicProfileFields(data.fields)
-  const updated = await prisma.user.update({
-    where: { id: target.id },
-    data: { showOnAbout: data.showOnAbout, aboutTitle: data.aboutTitle || null, aboutOrder: data.aboutOrder, publicProfileFields: fields },
+  if ((data.biography !== undefined || data.responsibilities !== undefined) && !isExecutive(target)) throw new Error('Only Executive accounts can have an About Us profile.')
+  const previousProfile = await prisma.committeeProfile.findFirst({ where: { userId: target.id }, orderBy: { updatedAt: 'desc' } })
+  const updated = await prisma.$transaction(async tx => {
+    const user = await tx.user.update({
+      where: { id: target.id },
+      data: { showOnAbout: data.showOnAbout, aboutTitle: data.aboutTitle || null, aboutOrder: data.aboutOrder, publicProfileFields: fields },
+    })
+    if (data.biography !== undefined || data.responsibilities !== undefined) {
+      const profileData = { name: target.fullName, position: data.aboutTitle || 'Executive Committee', biography: data.biography ?? previousProfile?.biography ?? '', responsibilities: data.responsibilities ?? previousProfile?.responsibilities ?? '', displayOrder: data.aboutOrder, status: data.showOnAbout ? 'PUBLISHED' as const : 'DRAFT' as const, editedById: actor.id }
+      if (previousProfile) await tx.committeeProfile.update({ where: { id: previousProfile.id }, data: profileData })
+      else await tx.committeeProfile.create({ data: { ...profileData, userId: target.id } })
+    }
+    return user
   })
   await writeAudit({
     userId: actor.id,
     action: 'ABOUT_PROFILE_UPDATE',
     entity: 'User',
     entityId: target.id,
-    oldValue: { showOnAbout: target.showOnAbout, aboutTitle: target.aboutTitle, aboutOrder: target.aboutOrder, fields: target.publicProfileFields },
-    newValue: { showOnAbout: updated.showOnAbout, aboutTitle: updated.aboutTitle, aboutOrder: updated.aboutOrder, fields },
+    oldValue: { showOnAbout: target.showOnAbout, aboutTitle: target.aboutTitle, aboutOrder: target.aboutOrder, fields: target.publicProfileFields, biography: previousProfile?.biography ?? '', responsibilities: previousProfile?.responsibilities ?? '' },
+    newValue: { showOnAbout: updated.showOnAbout, aboutTitle: updated.aboutTitle, aboutOrder: updated.aboutOrder, fields, biography: data.biography ?? previousProfile?.biography ?? '', responsibilities: data.responsibilities ?? previousProfile?.responsibilities ?? '' },
   })
   revalidatePath('/about')
   revalidatePath('/directory')
+  revalidatePath('/admin/members/about')
 }
 
 /** Saves the About page selection for many executives at once (Members → Executives). */

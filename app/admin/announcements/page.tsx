@@ -14,7 +14,7 @@ export default async function AdminAnnouncementsPage() {
       orderBy: { createdAt: 'desc' },
       take: 40,
       include: {
-        receipts: { select: { emailStatus: true } },
+        receipts: { select: { emailStatus: true, userId: true, readAt: true } },
         author: { select: { fullName: true } },
       },
     }),
@@ -34,6 +34,8 @@ export default async function AdminAnnouncementsPage() {
     createdAt: a.createdAt.toISOString(),
     sent: a.receipts.filter((r) => r.emailStatus === 'SENT').length,
     failed: a.receipts.filter((r) => r.emailStatus === 'FAILED').length,
+    canMarkRead: a.receipts.some(r => r.userId === actor.id),
+    read: a.receipts.some(r => r.userId === actor.id && r.readAt !== null),
   }))
   const totalSent = rows.reduce((sum, a) => sum + a.sent, 0)
   const totalFailed = rows.reduce((sum, a) => sum + a.failed, 0)

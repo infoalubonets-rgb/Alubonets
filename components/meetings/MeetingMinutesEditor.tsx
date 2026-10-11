@@ -672,7 +672,6 @@ export default function MeetingMinutesEditor({
         <article className="rounded-2xl overflow-hidden shadow-[0_16px_40px_rgba(0,31,80,0.14)] bg-white border border-outline-variant/30">
           {/* Header */}
           <div className="bg-[#001f50] px-5 py-3.5 flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={SITE_LOGO}
               alt="Alubonets"

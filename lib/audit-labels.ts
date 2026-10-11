@@ -7,6 +7,8 @@ export const ACTION_LABELS: Record<string, string> = {
   SUPER_ADMIN_FLAG: 'Updated Super Admin access',
   PROFILE_UPDATE: 'Updated their profile',
   CONTRIBUTION_CREATE: 'Recorded a contribution',
+  CONTRIBUTION_RECONCILE: 'Reconciled a payment',
+  CONTRIBUTION_MEMBER_REASSIGN: 'Changed the member linked to a payment',
   CONTRIBUTION_AMOUNT_EDIT: 'Changed a payment amount',
   FINANCIAL_TRANSACTION_UNAPPROVE: 'Sent a transaction back to pending',
   MEMBER_CONTRIBUTION_PLAN: 'Set a member’s contribution plan',

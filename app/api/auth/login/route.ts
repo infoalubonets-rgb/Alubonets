@@ -14,7 +14,6 @@ import { requestIp } from '@/lib/membership'
 import { verificationStillValid } from '@/lib/email-verification'
 import { logError } from '@/lib/logger'
 import { publicErrorMessage } from '@/lib/safe-error'
-import { writeAudit } from '@/lib/audit'
 import { getDisabledRoles, isLockedOutByRole, roleInactiveMessage } from '@/lib/disabled-roles'
 
 const bodySchema = z.object({

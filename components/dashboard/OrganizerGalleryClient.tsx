@@ -22,7 +22,7 @@ export default function OrganizerGalleryClient({ photos }: Props) {
 
   /* ── selection ── */
   function toggleSelect(id: string) {
-    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
   function selectAll() { setSelected(new Set(localPhotos.map((p) => p.id))) }
   function clearSelection() { setSelected(new Set()) }

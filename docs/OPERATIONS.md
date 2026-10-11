@@ -111,13 +111,25 @@ Client files already in the repo: `utils/supabase/client.ts`, `server.ts`, `midd
 
 ```bash
 npm run db:generate
-npm run db:push
+npm run db:migrate:deploy   # apply versioned migrations (preferred over db:push)
+npm run db:migrate:status   # check which migrations are applied
 npm run db:seed
 npm run db:bootstrap-auth
 npm run db:test
 ```
 
 Seed / bootstrap Super Admin (real email only): **[ARCHITECTURE.md](./ARCHITECTURE.md)**.
+
+**Migrations that also change data** (safe to re-run; they only insert or fill gaps):
+
+| Migration | What it does |
+|---|---|
+| `20261010233000_notification_audience_roles` | Adds role audiences to notifications and tags existing loan/welfare/admin notices |
+| `20261011090000_member_and_monthly_contribution_purposes` | Adds the Monthly Contribution purpose (billed monthly) |
+| `20261011120000_contribution_plan_and_annual_purpose` | Adds Monthly/Annual contribution plans; the second purpose becomes **Annual Contribution** |
+| `20261011160000_backfill_unledgered_contributions` | Gives any confirmed contribution without a ledger entry its entry |
+
+**Ledger protection:** the database has triggers that block updates and deletes on posted ledger entries and on key fields of confirmed transactions. Do not remove them; the app corrects money with reversals and new entries.
 
 ---
 
@@ -201,7 +213,8 @@ GitHub repo: `https://github.com/vouh/Alubonets`.
    | `DIRECT_URL` | session / direct |
    | `NEXT_PUBLIC_APP_URL` | production origin, e.g. `https://alubonets.vercel.app` then the custom domain |
 
-4. Also set `NEXT_PUBLIC_APP_ENV=production`, `CRON_SECRET`, and email/Sentry keys as needed.
+4. Also set `NEXT_PUBLIC_APP_ENV=production`, `CRON_SECRET`, and email/Sentry keys as needed. `APP_TIMEZONE` defaults to `Africa/Nairobi`; every finance date filter and report uses it.
+   The functions run in the `dub1` (Dublin) region (`vercel.json`), close to the database in `eu-west-1`.
 5. Do **not** set `BYPASS_LOGIN_VERIFICATION` or `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` on Vercel.
 6. Redeploy after saving env (Deployments → … → Redeploy). Env added after a failed build is not applied until you redeploy.
 7. In Supabase Auth, add the Vercel URL to Redirect URLs and Site URL.
@@ -216,17 +229,22 @@ Shared PHP hosting is not suitable for this stack.
 
 ```bash
 npm install
-npm run dev              # http://localhost:3001
+npm run dev                 # http://localhost:3001
 npm run build
+npm test                    # unit tests
+npm run test:e2e            # Playwright smoke tests
 npm run db:generate
-npm run db:push
-npm run db:migrate
+npm run db:migrate:deploy   # apply migrations
+npm run db:migrate:status
 npm run db:seed
 npm run db:bootstrap-auth
 npm run db:test
 npm run db:studio
+npm run db:purge-audit      # audit-log retention purge
 npm run lint
 ```
+
+**Gallery images** are processed on the server with `sharp` (bundled with Next.js): resized to 480/960/1600 px WebP, rotated upright and stripped of metadata. On Windows machines where application control blocks native modules, check that `sharp` loads before testing uploads.
 
 ---
 
@@ -348,7 +366,6 @@ Database backups do not automatically prove that uploaded files in Supabase Stor
 - [ ] `BYPASS_LOGIN_VERIFICATION` unset or `false` (middleware and login API ignore it in production anyway)
 - [ ] `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS=false` (autofill is also disabled when `NODE_ENV=production`)
 - [ ] Seed / demo passwords rotated or demo accounts disabled (`SEED_DEMO_ACCOUNTS=false`)
-- [ ] Privileged roles enrolled in MFA from **My profile**
 - [ ] `SESSION_IDLE_MINUTES` set to the approved idle policy
 - [ ] Staging restore drill completed and recorded above
 - [ ] Accessibility / responsive UAT signed on mobile, tablet and desktop
@@ -362,7 +379,8 @@ Database backups do not automatically prove that uploaded files in Supabase Stor
 - [ ] `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` removed / `false` and test-account passwords rotated
 - [ ] Admin → Settings → Contact & finance: enquiry forwarding email and "Also send to" recipients confirmed
 - [ ] Admin → Finance: monthly fee, grace days, annual fee and renewal days confirmed with the Treasurer
-- [ ] `prisma migrate deploy` run against production (includes `20261003120000_meeting_sep9_changes`)
+- [ ] `prisma migrate deploy` run against production (includes the October 2026 migrations listed in section 1.4)
+- [ ] Live fee amounts set and every member assigned a Monthly or Annual contribution plan
 - [ ] M-Pesa: `MPESA_ENV=production`, live consumer key/secret, passkey, shortcode and (for a till) `MPESA_TRANSACTION_TYPE=CustomerBuyGoodsOnline` + `MPESA_TILL_NUMBER`
 - [ ] One live KES 1 STK test recorded, callback received and the contribution shows under the right purpose
 

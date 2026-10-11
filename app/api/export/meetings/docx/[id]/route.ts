@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  AlignmentType,
-  BorderStyle,
-  Document,
-  HeadingLevel,
-  Packer,
-  Paragraph,
-  PageBreak,
-  SectionType,
-  TextRun,
-} from 'docx'
+import { AlignmentType, BorderStyle, Document, Packer, Paragraph, TextRun } from 'docx'
 import { prisma } from '@/lib/prisma'
 import { getSessionProfile } from '@/lib/auth/session'
 import { ATTENDANCE_RECORDS_INCLUDE, attendanceLists } from '@/lib/meeting-attendance'

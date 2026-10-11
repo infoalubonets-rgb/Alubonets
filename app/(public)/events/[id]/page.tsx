@@ -92,7 +92,6 @@ export default async function EventDetailPage({ params }: Props) {
       <div className="mx-auto grid max-w-container-max gap-8 px-md py-xl md:grid-cols-3 md:px-lg">
         <div className="space-y-6 md:col-span-2">
           {event.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={event.imageUrl} alt="" className="h-64 w-full rounded-2xl object-cover" />
           )}
           <div className="space-y-4">

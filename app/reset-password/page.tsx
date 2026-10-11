@@ -143,7 +143,6 @@ export default function ResetPasswordPage() {
     <main className="min-h-screen bg-primary px-4 py-16">
       <div className="mx-auto max-w-md">
         <div className="relative z-10 mx-auto -mb-7 w-fit rounded-2xl border border-outline-variant/30 bg-surface px-4 py-2 shadow-xl">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={ADMIN_LOGIN_LOGO} alt="Alubonets SHG" className="h-12 w-auto" />
         </div>
         <Suspense

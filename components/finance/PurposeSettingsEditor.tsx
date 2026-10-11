@@ -38,6 +38,8 @@ export function PurposeSettingsEditor({ memberId }: { memberId?: string }) {
       if (source.categories[0]) choose(source.categories[0].id, source)
     }).catch(e => { if (!controller.signal.aborted) setError(e.message) })
     return () => controller.abort()
+    // `choose` only reads memberId, which is already a dependency; it is recreated each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [memberId])
   const patch = (values: Partial<PurposeRule>) => setRule(current => ({ ...current, ...values }))
   const submit = (e: FormEvent) => {

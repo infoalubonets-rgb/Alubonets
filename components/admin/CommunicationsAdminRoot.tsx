@@ -1,14 +1,14 @@
 'use client'
 
 import { useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react'
-import Link from 'next/link'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import ContactDestinationSettingsButton from '@/components/admin/ContactDestinationSettingsButton'
 import StatCard from '@/components/dashboard/StatCard'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { ALL_ROLES, ROLE_LABEL, type Role } from '@/lib/auth/types'
 import { ANNOUNCEMENT_ATTACHMENT_ACCEPT, validateAnnouncementAttachmentFiles } from '@/lib/announcement-attachments'
-import { actionMarkAnnouncementsRead } from '@/app/actions/domain'
+import { markNotificationItemRead, markNotificationsRead } from '@/app/actions/notifications'
+import FullScreenModal from '@/components/ui/FullScreenModal'
 
 type AnnouncementRow = {
   id: string
@@ -18,6 +18,8 @@ type AnnouncementRow = {
   createdAt: string
   sent: number
   failed: number
+  canMarkRead: boolean
+  read: boolean
 }
 
 type MemberOption = { id: string; fullName: string; role: Role }
@@ -51,7 +53,10 @@ export default function CommunicationsAdminRoot({
   emailTestRecipient = null,
 }: Props) {
   const [modal, setModal] = useState<null | 'send' | 'history'>(null)
-  const [historyBadge, setHistoryBadge] = useState(announcements.length)
+  const [readIds, setReadIds] = useState(new Set(announcements.filter(a => a.read).map(a => a.id)))
+  const historyBadge = announcements.filter(a => a.canMarkRead && !readIds.has(a.id)).length
+  const [reading, setReading] = useState(false)
+  const [readError, setReadError] = useState('')
   const [attachmentError, setAttachmentError] = useState('')
   const [audienceCategory, setAudienceCategory] = useState('')
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
@@ -139,11 +144,20 @@ export default function CommunicationsAdminRoot({
 
   function openNotificationHistory() {
     setModal('history')
-    setHistoryBadge(0)
-    window.dispatchEvent(new Event('announcements-read'))
-    void actionMarkAnnouncementsRead().catch(() => {
+  }
+
+  async function markRead(id?: string) {
+    setReading(true)
+    setReadError('')
+    try {
+      if (id) await markNotificationItemRead({ kind: 'announcement', id })
+      else await markNotificationsRead()
+      setReadIds(current => new Set([...current, ...(id ? [id] : announcements.map(a => a.id))]))
+      if (!id) window.dispatchEvent(new Event('notifications-all-read'))
+      window.dispatchEvent(new Event('notifications-read'))
       window.dispatchEvent(new Event('new-announcement'))
-    })
+    } catch { setReadError('Could not mark notifications as read. Try again.') }
+    finally { setReading(false) }
   }
 
   return (
@@ -159,13 +173,6 @@ export default function CommunicationsAdminRoot({
               updateAction={updateContactDestination}
             />
           )}
-          <Link
-            href="/admin/announcements/about"
-            className="inline-flex h-10 items-center gap-1.5 rounded-full border-2 border-secondary-container/40 bg-secondary-container/10 px-3.5 text-[12px] font-label-bold text-secondary transition hover:bg-secondary-container/20"
-          >
-            <span className="material-symbols-outlined text-[18px]">badge</span>
-            About Us profiles
-          </Link>
           <button
             type="button"
             onClick={openNotificationHistory}
@@ -321,6 +328,8 @@ export default function CommunicationsAdminRoot({
 
       {modal === 'history' && (
         <Modal title="Notification history" icon="history" onClose={() => setModal(null)}>
+          <div className="mb-3 flex justify-end"><button type="button" disabled={reading} onClick={() => void markRead()} className="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold text-primary disabled:opacity-50"><span className="material-symbols-outlined text-[20px]">done_all</span>Mark all as read</button></div>
+          {readError && <p role="alert" className="mb-3 text-sm text-error">{readError}</p>}
           {announcements.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-16">
               <span className="material-symbols-outlined text-on-surface-variant" style={{ fontSize: 40 }}>
@@ -342,6 +351,7 @@ export default function CommunicationsAdminRoot({
                         {a.author} · {new Date(a.createdAt).toLocaleString()} · email sent {a.sent} · failed {a.failed}
                       </p>
                     </div>
+                    <button type="button" disabled={reading || readIds.has(a.id) || !a.canMarkRead} onClick={() => void markRead(a.id)} title={readIds.has(a.id) ? 'Read' : a.canMarkRead ? 'Mark as read' : 'Not sent to your account'} aria-label={readIds.has(a.id) ? 'Read' : 'Mark as read'} className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border disabled:opacity-50 ${readIds.has(a.id) ? 'text-emerald-600' : 'text-primary'}`}><span className="material-symbols-outlined text-[20px]">done_all</span></button>
                     {a.failed > 0 && (
                       <form
                         action={async (formData) => {
@@ -363,36 +373,6 @@ export default function CommunicationsAdminRoot({
   )
 }
 
-function Modal({ title, icon, onClose, children }: { title: string; icon: string; onClose: () => void; children: ReactNode }) {
-  return (
-    <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,31,80,0.55)', backdropFilter: 'blur(4px)' }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-2xl dark:border-[#1a2d4f] dark:bg-[#0d1729]">
-        <div className="flex shrink-0 items-center justify-between border-b border-outline-variant px-5 py-4 dark:border-[#1a2d4f]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary-container/15">
-              <span className="material-symbols-outlined text-secondary" style={{ fontSize: 18 }}>
-                {icon}
-              </span>
-            </div>
-            <h2 className="text-[15px] font-semibold text-on-surface dark:text-blue-50">{title}</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-surface-container dark:hover:bg-[#111f36]"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-              close
-            </span>
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">{children}</div>
-      </div>
-    </div>
-  )
+function Modal({ title, onClose, children }: { title: string; icon: string; onClose: () => void; children: ReactNode }) {
+  return <FullScreenModal open title={title} onClose={onClose} size="compact">{children}</FullScreenModal>
 }

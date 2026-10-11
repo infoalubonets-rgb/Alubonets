@@ -113,7 +113,6 @@ export default function NewActivityButton({
               </label>
               {preview && (
                 <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={preview} alt="" className="h-16 w-24 rounded-lg object-cover" />
                   <button type="button" onClick={() => pickImage(null)} className="text-xs font-normal text-error underline">Remove</button>
                 </>

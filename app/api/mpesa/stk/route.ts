@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionProfile } from '@/lib/auth/session'
 import { mpesaConfigured, stkPush } from '@/lib/mpesa/daraja'
-import { prisma } from '@/lib/prisma'
 import { writeAudit } from '@/lib/audit'
 import { resolveStkPurpose } from '@/lib/mpesa/purpose'
 import { amountError } from '@/lib/money-limits'

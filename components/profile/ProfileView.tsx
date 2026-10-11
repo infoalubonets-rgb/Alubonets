@@ -113,7 +113,6 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
           <div className="flex justify-center -mt-[52px] mb-1">
             <div className="group relative h-[104px] w-[104px] rounded-full focus-within:ring-4 focus-within:ring-secondary-container/30">
               {data.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={data.avatarUrl}
                   alt={`${data.fullName}'s profile`}
@@ -264,7 +263,6 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
           <button type="button" onClick={() => setViewingAvatar(false)} className="absolute right-5 top-5 flex h-11 w-11 items-center justify-center rounded-full bg-white text-primary shadow-lg" aria-label="Close image preview">
             <span className="material-symbols-outlined">close</span>
           </button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={data.avatarUrl} alt={`${data.fullName}'s profile`} className="max-h-[85vh] max-w-[92vw] rounded-3xl object-contain shadow-2xl" onClick={(event) => event.stopPropagation()} />
         </div>,
         document.body,

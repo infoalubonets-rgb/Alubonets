@@ -69,4 +69,16 @@ describe('Members page filters', () => {
   it('never matches a status filter for viewers without account details', () => {
     expect(matchesDirectoryFilters(person({ account: null }), { ...none, status: 'ACTIVE' })).toBe(false)
   })
+  it('includes primary and secondary Executives and combines their other filters', () => {
+    const main = person({ role: 'EXECUTIVE', isPrincipal: true, isExecutive: true })
+    const secondary = person({ role: 'SECRETARY', isExecutive: true, account: { status: 'SUSPENDED' } as never })
+    expect(matchesDirectoryFilters(main, { ...none, role: 'EXECUTIVE' })).toBe(true)
+    expect(matchesDirectoryFilters(secondary, { ...none, role: 'EXECUTIVE' })).toBe(true)
+    expect(matchesDirectoryFilters(secondary, { role: 'EXECUTIVE', type: 'Principal', status: 'ACTIVE' })).toBe(false)
+    expect(matchesDirectoryFilters(main, { role: 'EXECUTIVE', type: 'Principal', status: 'ACTIVE' })).toBe(true)
+  })
+  it.each(['ACTIVE', 'PENDING', 'SUSPENDED', 'INACTIVE', 'RESIGNED', 'DECEASED', 'DISQUALIFIED'])('filters %s accounts', status => {
+    expect(matchesDirectoryFilters(person({ account: { status } as never }), { ...none, status })).toBe(true)
+    expect(matchesDirectoryFilters(person({ account: { status: 'OTHER' } as never }), { ...none, status })).toBe(false)
+  })
 })

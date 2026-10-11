@@ -1,7 +1,8 @@
 import { unstable_cache, revalidateTag } from 'next/cache'
+import { appDayRange } from '@/lib/dates'
 import { prisma } from '@/lib/prisma'
 import { announcementAudienceWhere } from '@/lib/notification-audience'
-import { formatMonthKey, formatMonthKeys, formatPaymentMethod } from '@/lib/chart-labels'
+import { formatMonthKeys, formatPaymentMethod, monthKeyFromDate } from '@/lib/chart-labels'
 import type { PaymentMethod, ProjectStatus, Role, WelfareStatus } from '@prisma/client'
 
 // ─── Cache tags ────────────────────────────────────────────────────────────────
@@ -94,8 +95,7 @@ export const getExecutiveDashboardData = unstable_cache(
   { tags: [TAGS.members, TAGS.contributions, TAGS.projects, TAGS.events, TAGS.announcements, TAGS.welfare, TAGS.meetings], revalidate: 60 },
 )
 
-export const getTreasurerDashboardData = unstable_cache(
-  async () => {
+export async function getTreasurerDashboardDataFresh() {
     const [agg, recent, byCategory, pendingWelfare, members] = await Promise.all([
       prisma.contribution.aggregate({ where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.contribution.findMany({
@@ -117,11 +117,10 @@ export const getTreasurerDashboardData = unstable_cache(
         orderBy: { fullName: 'asc' },
       }),
     ])
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
+    const now = new Date()
+    const monthStart = appDayRange(`${monthKeyFromDate(now)}-01`).start
     const monthAgg = await prisma.contribution.aggregate({
-      where: { paidAt: { gte: monthStart }, status: { in: ['CONFIRMED','RECONCILED'] } },
+      where: { paidAt: { gte: monthStart, lte: now }, status: { in: ['CONFIRMED','RECONCILED'] } },
       _sum: { amount: true },
     })
     return {
@@ -130,7 +129,10 @@ export const getTreasurerDashboardData = unstable_cache(
       monthTotal: monthAgg._sum.amount ?? 0,
       recent, byCategory, pendingWelfare, members,
     }
-  },
+}
+
+export const getTreasurerDashboardData = unstable_cache(
+  getTreasurerDashboardDataFresh,
   ['treasurer-dashboard'],
   { tags: [TAGS.contributions, TAGS.welfare, TAGS.members], revalidate: 60 },
 )
@@ -370,8 +372,7 @@ export const getPublicEvents = unstable_cache(
   { tags: [TAGS.events], revalidate: 300 },
 )
 
-export const getContributionChartSeries = unstable_cache(
-  async () => {
+export async function getContributionChartSeriesFresh() {
     const rows = await prisma.contribution.findMany({
       where: { status: { in: ['CONFIRMED','RECONCILED'] } },
       select: { amount: true, paidAt: true, category: true },
@@ -379,12 +380,15 @@ export const getContributionChartSeries = unstable_cache(
     })
     const byMonth = new Map<string, number>()
     for (const row of rows) {
-      const key = `${row.paidAt.getFullYear()}-${String(row.paidAt.getMonth() + 1).padStart(2, '0')}`
+      const key = monthKeyFromDate(row.paidAt)
       byMonth.set(key, (byMonth.get(key) ?? 0) + row.amount)
     }
     const keys = [...byMonth.keys()]
     return { labels: formatMonthKeys(keys), values: keys.map((k) => byMonth.get(k) ?? 0) }
-  },
+}
+
+export const getContributionChartSeries = unstable_cache(
+  getContributionChartSeriesFresh,
   ['contribution-chart'],
   { tags: [TAGS.contributions], revalidate: 120 },
 )
@@ -428,8 +432,7 @@ export const getFamilyBranchDistribution = unstable_cache(
   { tags: [TAGS.members], revalidate: 120 },
 )
 
-export const getContributionAnalytics = unstable_cache(
-  async () => {
+export async function getContributionAnalyticsFresh() {
     const [byMethod, byUser] = await Promise.all([
       prisma.contribution.groupBy({ by: ['paymentMethod'], where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.contribution.groupBy({
@@ -455,7 +458,10 @@ export const getContributionAnalytics = unstable_cache(
         total: u._sum.amount ?? 0,
       })),
     }
-  },
+}
+
+export const getContributionAnalytics = unstable_cache(
+  getContributionAnalyticsFresh,
   ['contribution-analytics'],
   { tags: [TAGS.contributions, TAGS.members], revalidate: 120 },
 )
