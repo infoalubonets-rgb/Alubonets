@@ -52,8 +52,8 @@ Fill `.env.local` (never commit secrets):
 | `MPESA_*` | Daraja portal | STK Push (when ready) |
 | `SUPER_ADMIN_EMAIL` | Ops bootstrap | Real Super Admin email for `db:seed` / `db:bootstrap-auth` |
 | `SUPER_ADMIN_PASSWORD` | Ops bootstrap | Auth password for that Super Admin only (never commit) |
-| `CRON_SECRET` | Local + Netlify/GitHub | Bearer token for `/api/cron/*` (never commit) |
-| `CRON_BASE_URL` | Optional | Override site URL for cron callers (defaults to `URL` / `NEXT_PUBLIC_APP_URL`) |
+| `CRON_SECRET` | Local + Vercel/GitHub | Bearer token for `/api/cron/*` (never commit) |
+| `CRON_BASE_URL` | Optional | Override site URL for local cron commands (defaults to `http://localhost:3001`) |
 | `SESSION_IDLE_MINUTES` | Auth | Idle session timeout in minutes (default `720` = 12 hours) |
 | `BYPASS_LOGIN_VERIFICATION` | Local only | Must be unset/`false` in production (ignored when `NODE_ENV=production`) |
 | `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` | Local only | Login autofill; forced off in production builds |
@@ -65,7 +65,7 @@ Routes (require `Authorization: Bearer $CRON_SECRET`):
 | Route | Schedule | Purpose |
 |-------|----------|---------|
 | `/api/cron/stage4-maintenance` | Hourly | Expire documents, overdue actions, event reminders, scheduled announcements, email retries |
-| `/api/cron/purge-audit` | Daily 03:00 UTC | Audit log retention + contact submission cleanup |
+| `/api/cron/purge-audit` | Daily 03:15 UTC | Audit log retention + contact submission cleanup |
 
 **Local (dev server must be running):**
 
@@ -74,9 +74,9 @@ npm run cron:maintenance
 npm run cron:purge-audit
 ```
 
-**Netlify:** scheduled functions in `netlify/functions/` call those routes. Set `CRON_SECRET` (and `NEXT_PUBLIC_APP_URL` if needed) in Netlify site env, then redeploy.
+**Vercel:** production runs at `https://alubonets.vercel.app`. Set `NEXT_PUBLIC_APP_URL` to that origin and `CRON_SECRET` in Vercel Production environment variables, then redeploy. GitHub Actions is the single scheduler; no native Vercel cron is needed (Hobby native cron only supports daily runs).
 
-**GitHub Actions:** `.github/workflows/cron.yml` — add repo secrets `CRON_SECRET` and `CRON_APP_URL` (your live site origin). Manual run: Actions → Cron → Run workflow.
+**GitHub Actions:** `.github/workflows/cron.yml` calls the Vercel production domain hourly for maintenance and daily at 03:15 UTC for audit retention. Set repository secret `CRON_SECRET` to exactly the same value as Vercel. The URL defaults to `https://alubonets.vercel.app`; optionally override it using repository variable `CRON_APP_URL` (not a secret). The old `CRON_APP_URL` secret is no longer used. Manual verification: Actions → Cron → Run workflow, once for each job. A successful run returns HTTP 200; HTTP 401 means the secrets differ, and HTTP 503 means Vercel is missing configuration.
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
@@ -252,25 +252,24 @@ npm run lint
 ## Current state
 
 - Local development runs at `http://localhost:3001`.
-- Netlify is the current testing host.
-- Vercel is the intended future production host.
+- Vercel hosts production at `https://alubonets.vercel.app`.
 - The currently connected Supabase project contains real production data.
 
-Because Netlify testing currently touches production data, testing must avoid destructive fixtures, bulk deletion, password resets and schema experiments. The recommended next infrastructure step is a separate Supabase project for development/staging.
+Because local and deployment testing currently touch production data, testing must avoid destructive fixtures, bulk deletion, password resets and schema experiments. The recommended next infrastructure step is a separate Supabase project for development/staging.
 
 ## Required separation
 
 | Environment | Hosting | Database | Purpose |
 |---|---|---|---|
 | Local | Developer machine | Separate development Supabase project recommended | Feature development |
-| Testing | Netlify | Separate staging Supabase project recommended | Committee acceptance |
+| Testing | Vercel preview deployments | Separate staging Supabase project recommended | Committee acceptance |
 | Production | Vercel | Current production Supabase project | Live member use |
 
 Until separate Supabase projects exist, changes must be backward-compatible, additive and reviewed before being run.
 
 ## Environment variables
 
-Use `.env.local` locally. It is Git-ignored. Configure equivalent values in Netlify deploy contexts and later in Vercel.
+Use `.env.local` locally. It is Git-ignored. Configure production values in Vercel; use separate development/staging values for preview deployments.
 
 Never place `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `DIRECT_URL`, provider secrets or API secrets in browser code.
 
@@ -391,7 +390,7 @@ Database backups do not automatically prove that uploaded files in Supabase Stor
 ## Available now
 
 - Server errors can be written as structured JSON through `lib/logger.ts`.
-- Netlify captures application `console` output in function/deploy logs.
+- Vercel captures application `console` output in function/deploy logs.
 - `/api/health` checks required environment configuration and database connectivity.
 
 Configure an external uptime monitor to request `/api/health` every five minutes and alert when it does not return HTTP 200.
@@ -406,11 +405,11 @@ disabled.
 The configured Sentry organization is `alubonets` and project is
 `javascript-nextjs`.
 
-Add these variables to Netlify now and Vercel when production moves there:
+Add these variables to Vercel:
 
 - `NEXT_PUBLIC_SENTRY_DSN`: the project DSN
 - `SENTRY_DSN`: the same project DSN
-- `NEXT_PUBLIC_APP_ENV`: `testing` on Netlify and `production` on Vercel
+- `NEXT_PUBLIC_APP_ENV`: `production` for production and `preview` for preview deployments
 - `SENTRY_AUTH_TOKEN`: a secret organization token with source-map upload access
 
 The application reports errors without `SENTRY_AUTH_TOKEN`. The token is needed

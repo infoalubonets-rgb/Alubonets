@@ -38,13 +38,13 @@ jobs:
 
       - name: Call cron endpoint
         env:
-          APP_URL: ${{ secrets.CRON_APP_URL }}
+          APP_URL: ${{ vars.CRON_APP_URL || 'https://alubonets.vercel.app' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           JOB: ${{ steps.job.outputs.name }}
         run: |
           set -euo pipefail
           if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
-            echo "Set repository secrets CRON_APP_URL and CRON_SECRET to enable scheduled cron."
+            echo "Set repository secret CRON_SECRET to match the Vercel Production environment."
             exit 1
           fi
           BASE="${APP_URL%/}"
@@ -53,7 +53,7 @@ jobs:
           else
             PATH_SUFFIX="/api/cron/stage4-maintenance"
           fi
-          echo "POST-like GET $PATH_SUFFIX"
+          echo "GET $PATH_SUFFIX"
           CODE=$(curl -sS -o /tmp/cron-body.json -w "%{http_code}" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "${BASE}${PATH_SUFFIX}")

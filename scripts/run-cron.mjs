@@ -5,7 +5,7 @@
  *   npm run cron:maintenance
  *   npm run cron:purge-audit
  *   node scripts/run-cron.mjs stage4-maintenance
- *   node scripts/run-cron.mjs purge-audit --url https://your-site.netlify.app
+ *   node scripts/run-cron.mjs purge-audit --url https://alubonets.vercel.app
  */
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
