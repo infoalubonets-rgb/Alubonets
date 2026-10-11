@@ -12,6 +12,8 @@ import { branchHistoryData, validateFamilyAttachment } from '@/lib/family-rules'
 import { notifyUsers } from '@/lib/notifications'
 import { sendDirectEmails } from '@/lib/email/resend'
 import { ALL_ROLES, ROLE_LABEL } from '@/lib/auth/types'
+import { createServerClient as createServiceClient } from '@/lib/supabase-server'
+import { ADMIN_CREATED_NOTE } from '@/lib/profile-completion'
 
 const RELATIONSHIPS = ['SPOUSE', 'SON', 'DAUGHTER', 'CHILD', 'DEPENDENT', 'OTHER'] as const
 const relationshipLabel = (value: string) => value.charAt(0) + value.slice(1).toLowerCase()
@@ -73,89 +75,168 @@ async function announceAttachment(
   })
 }
 
-const createMemberSchema = z.object({
-  fullName: z.string().trim().min(2, 'Enter the full name.').max(120),
-  email: z.string().trim().toLowerCase().email('Enter a valid email.'),
-  phone: z.string().trim().min(7, 'Enter a phone number.').max(40),
-  role: z.enum(ALL_ROLES as [Role, ...Role[]]).default('MEMBER'),
-  isPrincipal: z.boolean().default(false),
-  principalId: z.string().min(1).optional(),
-  relationship: z.enum(RELATIONSHIPS).optional(),
-  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-})
+const optionalText = (max: number) => z.string().trim().max(max).optional().transform((value) => value || undefined)
+
+/** Optional details an admin may fill now; the member completes the rest from My profile. */
+const profileSchema = z
+  .object({
+    gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).optional().or(z.literal('').transform(() => undefined)),
+    location: optionalText(120),
+    address: optionalText(200),
+    nextOfKinName: optionalText(120),
+    nextOfKinPhone: optionalText(40),
+    nextOfKinRelationship: optionalText(60),
+    emergencyContactName: optionalText(120),
+    emergencyContactPhone: optionalText(40),
+    profession: optionalText(120),
+    educationLevel: z
+      .enum(['PRIMARY', 'SECONDARY', 'CERTIFICATE', 'DIPLOMA', 'BACHELORS', 'MASTERS', 'DOCTORATE', 'OTHER'])
+      .optional()
+      .or(z.literal('').transform(() => undefined)),
+    skills: optionalText(500),
+    achievements: optionalText(500),
+    mentorshipArea: optionalText(200),
+    interests: optionalText(500),
+  })
+  .default({})
+
+const createMemberSchema = z
+  .object({
+    /** Minors get a family record without a login, email or password. */
+    isMinor: z.boolean().default(false),
+    fullName: z.string().trim().min(2, 'Enter the full name.').max(120),
+    email: z.string().trim().toLowerCase().email('Enter a valid email.').optional().or(z.literal('').transform(() => undefined)),
+    phone: optionalText(40),
+    /** Temporary password set by the admin; the member replaces it from the setup link. */
+    password: z.string().min(8, 'The temporary password must be at least 8 characters.').max(72).optional().or(z.literal('').transform(() => undefined)),
+    role: z.enum(ALL_ROLES as [Role, ...Role[]]).default('MEMBER'),
+    isPrincipal: z.boolean().default(false),
+    principalId: z.string().min(1).optional(),
+    relationship: z.enum(RELATIONSHIPS).optional(),
+    dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('').transform(() => undefined)),
+    profile: profileSchema,
+  })
+  .superRefine((data, ctx) => {
+    if (data.isMinor) return
+    if (!data.email) ctx.addIssue({ code: 'custom', path: ['email'], message: 'Enter their email address.' })
+    if (!data.phone || data.phone.length < 7) ctx.addIssue({ code: 'custom', path: ['phone'], message: 'Enter a phone number.' })
+    if (!data.password) ctx.addIssue({ code: 'custom', path: ['password'], message: 'Set a temporary password (at least 8 characters).' })
+  })
+
+/** Where an admin-created member sets their own password; the token is the key. */
+const setupUrlFor = (token: string) => `${appUrl()}/account-setup?token=${token}`
 
 /**
- * Admin adds a member directly: the account is approved now, gets a membership number, and the
- * person is emailed a link to create their login. They can be made a Principal, or attached to one.
+ * Admin adds a member directly; the account is approved now and gets a membership number.
+ *
+ * - **Adult:** a login is created with the admin's temporary password (email already confirmed),
+ *   and a setup link is emailed and returned to copy. Opening it lets the member choose their own
+ *   password with no email code; after signing in they are asked to complete My profile.
+ * - **Minor:** a family record without a login; the admin may fill any of the details.
  */
 export async function adminCreateMember(input: z.input<typeof createMemberSchema>) {
   const actor = await requireAdmin()
   const data = createMemberSchema.parse(input)
+  const role: Role = data.isMinor ? 'MEMBER' : data.role
   // Only a Super Admin can create, promote or demote Admins.
-  if (data.role === 'ADMIN' && !actor.isSuperAdmin) throw new Error('Only a Super Admin can add an Administrator.')
+  if (role === 'ADMIN' && !actor.isSuperAdmin) throw new Error('Only a Super Admin can add an Administrator.')
+  if (data.isMinor && data.isPrincipal) throw new Error('A minor cannot be a Principal Member.')
   if (data.isPrincipal && data.principalId) throw new Error('A Principal Member cannot also be attached to another Principal.')
   if (data.principalId && !data.relationship) throw new Error('Choose how they are related to the Principal.')
   const dob = data.dateOfBirth ? new Date(`${data.dateOfBirth}T00:00:00Z`) : null
   if (dob && dob.getTime() > Date.now()) throw new Error('Date of birth cannot be in the future.')
 
-  if (await prisma.user.findUnique({ where: { email: data.email }, select: { id: true } })) {
+  const email = data.isMinor
+    ? data.email || `record+${randomBytes(8).toString('hex')}@alubonets.local`
+    : data.email!
+  if (await prisma.user.findUnique({ where: { email }, select: { id: true } })) {
     throw new Error('A member with this email already exists.')
   }
   const principal = data.principalId ? await prisma.user.findUnique({ where: { id: data.principalId } }) : null
   if (data.principalId && !principal) throw new Error('Principal Member not found.')
   if (principal) validateFamilyAttachment({ id: '', isPrincipal: false, principalMemberId: null, familyRegistrationState: 'STANDARD', status: 'ACTIVE' }, principal)
 
-  const token = createHash('sha256').update(randomBytes(32)).digest('hex')
-  const created = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
-        email: data.email,
-        fullName: data.fullName,
-        phone: data.phone,
-        role: data.role,
-        status: 'ACTIVE',
-        approvedAt: new Date(),
-        approvalNotes: 'Added directly by an administrator',
-        membershipNumber: await nextMembershipNumber(tx),
-        isPrincipal: data.isPrincipal,
-        principalMemberId: principal?.id ?? null,
-        familyRelationship: principal ? (data.relationship as FamilyRelationship) : null,
-        familyRegistrationState: principal ? 'ACTIVE_ATTACHED' : 'STANDARD',
-        memberProfile: { create: { dateOfBirth: dob } },
-      },
+  // Adults get their login straight away, already confirmed, with the temporary password.
+  let authUserId: string | null = null
+  if (!data.isMinor) {
+    const service = createServiceClient()
+    const { data: createdAuth, error } = await service.auth.admin.createUser({
+      email,
+      password: data.password!,
+      email_confirm: true,
+      user_metadata: { full_name: data.fullName },
     })
-    if (principal) {
-      await tx.familyBranchHistory.create({
-        data: branchHistoryData({
-          memberId: user.id,
-          toPrincipalId: principal.id,
-          relationship: data.relationship as FamilyRelationship,
-          approvedById: actor.id,
-          reason: 'Added by an administrator',
-        }),
-      })
+    if (error || !createdAuth.user) {
+      throw new Error(error?.message?.toLowerCase().includes('already') ? 'A login with this email already exists.' : `Could not create the login: ${error?.message ?? 'unknown error'}`)
     }
-    const invite = await tx.familyInvite.create({
-      data: { token, userId: user.id, invitedById: actor.id, email: data.email, expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
-    })
-    return { user, invite }
-  })
+    authUserId = createdAuth.user.id
+  }
 
-  const registerUrl = `${appUrl()}/register?invite=${token}`
-  const mail = await sendDirectEmails({
-    emails: [data.email],
-    subject: 'You have been added to Alubonets SHG',
-    title: 'Welcome to Alubonets',
-    body: `<p>An administrator added you as a <strong>${escapeHtml(ROLE_LABEL[data.role])}</strong>${
-      principal ? ` in <strong>${escapeHtml(principal.fullName)}</strong>’s family branch` : ''
-    }. Create your login to open the member portal. The link works for 14 days.</p>`,
-    ctaLabel: 'Create my login',
-    ctaUrl: registerUrl,
-    actorId: actor.id,
-    template: 'admin_member_invite',
-  })
+  const { location, ...profileFields } = data.profile
+  const token = createHash('sha256').update(randomBytes(32)).digest('hex')
+  let created
+  try {
+    created = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          fullName: data.fullName,
+          phone: data.phone ?? null,
+          location: location ?? null,
+          role,
+          // Record-only minors follow the family convention: no login, so not an active account.
+          status: data.isMinor ? 'INACTIVE' : 'ACTIVE',
+          approvedAt: new Date(),
+          approvalNotes: ADMIN_CREATED_NOTE,
+          membershipNumber: await nextMembershipNumber(tx),
+          authUserId,
+          isPrincipal: data.isPrincipal,
+          principalMemberId: principal?.id ?? null,
+          familyRelationship: principal ? (data.relationship as FamilyRelationship) : null,
+          familyRegistrationState: data.isMinor ? 'RECORD_ONLY' : principal ? 'ACTIVE_ATTACHED' : 'STANDARD',
+          memberProfile: { create: { dateOfBirth: dob, ...profileFields } },
+        },
+      })
+      if (principal) {
+        await tx.familyBranchHistory.create({
+          data: branchHistoryData({
+            memberId: user.id,
+            toPrincipalId: principal.id,
+            relationship: data.relationship as FamilyRelationship,
+            approvedById: actor.id,
+            reason: data.isMinor ? 'Minor added by an administrator' : 'Added by an administrator',
+          }),
+        })
+      }
+      if (!data.isMinor) {
+        await tx.familyInvite.create({
+          data: { token, userId: user.id, invitedById: actor.id, email, expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) },
+        })
+      }
+      return user
+    })
+  } catch (cause) {
+    // Never leave a login without its member record.
+    if (authUserId) await createServiceClient().auth.admin.deleteUser(authUserId).catch(() => {})
+    throw cause
+  }
+
+  const setupUrl = data.isMinor ? null : setupUrlFor(token)
+  const mail = setupUrl
+    ? await sendDirectEmails({
+        emails: [email],
+        subject: 'Your Alubonets account is ready',
+        title: 'Welcome to Alubonets',
+        body: `<p>An administrator added you as a <strong>${escapeHtml(ROLE_LABEL[role])}</strong>${
+          principal ? ` in <strong>${escapeHtml(principal.fullName)}</strong>’s family branch` : ''
+        }. Open the link to choose your password, then sign in and complete your profile. The link works for 14 days.</p>`,
+        ctaLabel: 'Set my password',
+        ctaUrl: setupUrl,
+        actorId: actor.id,
+        template: 'admin_member_invite',
+      })
+    : { sent: 0 }
   if (principal) {
-    // The new member's own welcome email already names their Principal; tell the Principal too.
     await notifyUsers({
       userIds: [principal.id],
       title: `${data.fullName} was added to your family branch`,
@@ -163,7 +244,7 @@ export async function adminCreateMember(input: z.input<typeof createMemberSchema
       href: '/dashboard/member/family',
       type: 'FAMILY_ASSIGNED',
       entity: 'User',
-      entityId: created.user.id,
+      entityId: created.id,
     })
     if (!principal.email.endsWith('@alubonets.local')) {
       await sendDirectEmails({
@@ -183,25 +264,41 @@ export async function adminCreateMember(input: z.input<typeof createMemberSchema
     userId: actor.id,
     action: 'MEMBER_CREATE',
     entity: 'User',
-    entityId: created.user.id,
+    entityId: created.id,
     newValue: {
       fullName: data.fullName,
-      email: data.email,
-      role: data.role,
+      email: data.isMinor ? null : email,
+      role,
+      minor: data.isMinor,
       isPrincipal: data.isPrincipal,
       principalId: principal?.id ?? null,
       relationship: data.relationship ?? null,
     },
   })
-  await syncUserMetadata(created.user)
+  if (!data.isMinor) await syncUserMetadata(created)
   refreshMembers()
   return {
-    id: created.user.id,
-    membershipNumber: created.user.membershipNumber,
+    id: created.id,
+    membershipNumber: created.membershipNumber,
+    minor: data.isMinor,
     emailed: mail.sent > 0,
-    // Shown to the admin when email is not configured, so they can share it another way.
-    registerUrl: mail.sent > 0 ? undefined : registerUrl,
+    /** Always returned for adults so the admin can copy and share it. */
+    setupUrl,
   }
+}
+
+/** Issues a fresh 14-day setup link for an admin-created member who has not finished setup yet. */
+export async function adminNewSetupLink(userId: string) {
+  const actor = await requireAdmin()
+  const user = await prisma.user.findUnique({ where: { id: z.string().min(1).parse(userId) }, select: { id: true, email: true, authUserId: true } })
+  if (!user?.authUserId || user.email.endsWith('@alubonets.local')) throw new Error('This member has no login to set up.')
+  const token = createHash('sha256').update(randomBytes(32)).digest('hex')
+  await prisma.$transaction([
+    prisma.familyInvite.updateMany({ where: { userId: user.id, acceptedAt: null, revokedAt: null }, data: { revokedAt: new Date() } }),
+    prisma.familyInvite.create({ data: { token, userId: user.id, invitedById: actor.id, email: user.email, expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) } }),
+  ])
+  await writeAudit({ userId: actor.id, action: 'MEMBER_SETUP_LINK', entity: 'User', entityId: user.id })
+  return { setupUrl: setupUrlFor(token) }
 }
 
 /** Members an admin can attach to a principal: active, not principals, not already in this branch. */

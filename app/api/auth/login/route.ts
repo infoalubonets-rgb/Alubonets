@@ -1,4 +1,5 @@
 import { WORKSPACE_COOKIE } from '@/lib/auth/workspace'
+import { ADMIN_CREATED_NOTE, needsProfileCompletion } from '@/lib/profile-completion'
 export const dynamic = 'force-dynamic'
 
 import { NextResponse, after } from 'next/server'
@@ -274,13 +275,19 @@ export async function POST(req: Request) {
     }
 
     const user = toAuthUser(profile)
+    // Members an administrator created are sent to My profile until they fill in their details.
+    let redirectTo = ROLE_HOME[user.role]
+    if (profile.approvalNotes === ADMIN_CREATED_NOTE) {
+      const details = await prisma.user.findUnique({ where: { id: profile.id }, include: { memberProfile: true } })
+      if (details && needsProfileCompletion(details)) redirectTo = '/profile?complete=1'
+    }
     return NextResponse.json({
       user: {
         ...user,
         isSuperAdmin: profile.isSuperAdmin,
         dashboardAccess: profile.dashboardAccess,
       },
-      redirectTo: ROLE_HOME[user.role],
+      redirectTo,
       status: profile.status,
     })
   } catch (err) {
