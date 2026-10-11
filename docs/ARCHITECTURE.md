@@ -736,14 +736,13 @@ Required follow-up:
 - Rate limiting on login, registration, password reset and contact forms
 - Account lock after repeated failed logins, idle session timeout and login history
 - Password reset by email
-- Turnstile bot protection on the contact form
 - Immutable finance ledger (database triggers) with maker-checker approval
 - Audit log for finance, roles, family, settings, About page and report downloads
 - Gallery uploads re-encoded server-side with metadata (including GPS) stripped
 
 ## Outstanding controls
 
-- Extend bot protection to registration if abuse appears.
+- Turn Turnstile bot protection back on for the contact form (helper exists in `lib/turnstile.ts`; currently disabled in `app/actions/contact.ts`), then consider registration.
 - Create a separate staging Supabase project.
 - Configure Sentry and an external uptime monitor.
 - Define personal-data and uploaded-file retention rules.

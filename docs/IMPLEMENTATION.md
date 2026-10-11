@@ -73,7 +73,7 @@ Percentages are planning estimates and must be confirmed through acceptance test
 
 | System feature | Completed | Missing / not yet implemented |
 |---|---:|---|
-| **Authentication:** Account lock after repeated failures, idle timeout, rate limits and login history. Privileged MFA was removed by decision. | 90% | Phone verification if required. |
+| **Authentication:** Account lock after repeated failures, idle timeout, rate limits and login history. Privileged MFA was removed by decision. | 90% | Turn the contact-form CAPTCHA (Turnstile) back on; phone verification if required. |
 | **Authorization, privacy and audit:** Server-side role checks, private file access, immutable ledger, audit logs for finance, roles, family, About page and settings changes. | 95% | Extended privacy regression suite. |
 | **Responsive design:** Mobile-first admin pages (tables become cards on phones); headers fill one row and overflow to a scrolling second row. | 85% | Device UAT, keyboard and screen-reader checks. |
 | **Operations:** Environment validation, migrations, health checks, restore-drill template and launch checklist. | 85% | Staging restore drill, monitoring and production approval. |

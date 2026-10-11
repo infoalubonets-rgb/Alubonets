@@ -1,0 +1,6 @@
+from pathlib import Path
+import re
+p=Path('app/(public)/projects/[id]/page.tsx');s=p.read_text(encoding='utf-8');s=s.replace("import { submitProjectComment } from '@/app/actions/projects'\n",'');s=re.sub(r'      comments: \{.*?      \},\n','',s, count=1, flags=re.S);a=s.index('            <section className="space-y-3">\n              <h2 className="font-h3 text-xl text-primary">Comments</h2>');b=s.index('            </section>',a)+len('            </section>');s=s[:a]+s[b:];p.write_text(s,encoding='utf-8')
+p=Path('app/actions/projects.ts');s=p.read_text(encoding='utf-8');a=s.index('export async function submitProjectComment');b=s.index('export async function recordProjectInvestment',a);s=s[:a]+s[b:];s=s.replace("import { after } from 'next/server'\n",'').replace('TAGS, sendAnnouncement','TAGS').replace('canModerateProjectComments, isProjectManager','isProjectManager');p.write_text(s,encoding='utf-8')
+p=Path('lib/projects.ts');s=p.read_text(encoding='utf-8');s=re.sub(r'export function canModerateProjectComments\(role: Role\) \{.*?\}\n\n','',s,flags=re.S);p.write_text(s,encoding='utf-8')
+p=Path('lib/role-alerts.ts');s=p.read_text(encoding='utf-8');s='\n'.join(l for l in s.split('\n') if "key: 'organizer-comments'" not in l);p.write_text(s,encoding='utf-8')

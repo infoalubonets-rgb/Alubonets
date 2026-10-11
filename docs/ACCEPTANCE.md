@@ -102,7 +102,7 @@ Sign-off: ______________________  Role: __________
 ## Where to work
 - Overview: `/admin`
 - Members / approvals / roles: `/directory` (Members), `/admin/approvals`, `/admin/roles` (under Settings)
-- About Us page: Communications → **About Us profiles**, or Members → About-page button / an executive's eye
+- About Us page: Members → **About Us profiles** (`/admin/members/about`)
 - Settings & feature flags: `/admin/settings`
 - Announcements templates & delivery: `/admin/announcements`
 - Loans approve queue (when enabled): `/admin/loans`
