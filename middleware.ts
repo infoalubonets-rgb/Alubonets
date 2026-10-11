@@ -11,6 +11,7 @@ import {
 import { isAppRole, isMemberStatus } from '@/lib/auth/helpers'
 import { normalizeSupabaseUrl } from '@/lib/supabase-url'
 import { jwtVerify } from 'jose'
+import { EMAIL_VERIFICATION_ON } from '@/lib/auth/email-verification-switch'
 
 function isProtectedPath(pathname: string) {
   if (pathname === '/admin/login' || pathname.startsWith('/admin/login/')) {
@@ -226,8 +227,10 @@ export async function middleware(req: NextRequest) {
   }
 
   // Production hardening: never honor login-verification bypass outside development.
+  // Also skipped while sign-in email codes are switched off (lib/auth/email-verification-switch.ts).
   const allowVerificationBypass =
-    process.env.NODE_ENV !== 'production' && process.env.BYPASS_LOGIN_VERIFICATION === 'true'
+    !EMAIL_VERIFICATION_ON ||
+    (process.env.NODE_ENV !== 'production' && process.env.BYPASS_LOGIN_VERIFICATION === 'true')
 
   if (
     !allowVerificationBypass &&

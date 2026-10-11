@@ -375,6 +375,7 @@ Database backups do not automatically prove that uploaded files in Supabase Stor
 - [ ] Custom domain added in Vercel and in Supabase Auth → URL configuration (site URL + redirect URLs)
 - [ ] Resend sending domain verified; `FROM_EMAIL` uses that domain (not `onboarding@resend.dev`)
 - [ ] `RESEND_TEST_EMAIL` removed so emails reach real recipients instead of the test inbox
+- [ ] Email verification turned back on: set `NEXT_PUBLIC_EMAIL_VERIFICATION=on` and redeploy (sign-in codes and application email codes are off until then; see `lib/auth/email-verification-switch.ts`)
 - [ ] `NEXT_PUBLIC_ENABLE_TEST_ACCOUNTS` removed / `false` and test-account passwords rotated
 - [ ] Admin → Settings → Contact & finance: enquiry forwarding email and "Also send to" recipients confirmed
 - [ ] Admin → Finance: monthly fee, grace days, annual fee and renewal days confirmed with the Treasurer

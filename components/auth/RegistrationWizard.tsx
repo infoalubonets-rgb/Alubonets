@@ -12,6 +12,7 @@ import {
   registrationSchema,
 } from '@/lib/membership'
 import { todayInputValue } from '@/lib/dates'
+import { EMAIL_VERIFICATION_ON } from '@/lib/auth/email-verification-switch'
 
 const STORAGE_KEY = 'alubonets-registration-draft-v1'
 const steps = ['Verify email', 'Account', 'Personal', 'Family', 'Portfolio', 'Review']
@@ -66,8 +67,10 @@ export default function RegistrationWizard({
   invite?: InvitePrefill | null
 }) {
   const [form, setForm] = useState(initial)
-  const [step, setStep] = useState(invite ? 1 : 0)
-  const [emailVerified, setEmailVerified] = useState(Boolean(invite))
+  // Invited members, and everyone while email codes are switched off, start at the Account step.
+  const skipEmailStep = Boolean(invite) || !EMAIL_VERIFICATION_ON
+  const [step, setStep] = useState(skipEmailStep ? 1 : 0)
+  const [emailVerified, setEmailVerified] = useState(skipEmailStep)
   const [code, setCode] = useState('')
   const [codeSent, setCodeSent] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -105,7 +108,7 @@ export default function RegistrationWizard({
           setEmailVerified(true)
           setStep(1)
           setResumed(true)
-        } else if (Number.isInteger(saved.step)) setStep(Math.min(Math.max(saved.step, 0), 5))
+        } else if (Number.isInteger(saved.step)) setStep(Math.min(Math.max(saved.step, skipEmailStep ? 1 : 0), 5))
       }
       if (typeof saved?.sameAsKin === 'boolean') setSameAsKin(saved.sameAsKin)
       if (saved?.consentAccepted) setConsentAccepted(true)
@@ -114,7 +117,7 @@ export default function RegistrationWizard({
     } finally {
       setDraftLoaded(true)
     }
-  }, [invite])
+  }, [invite, skipEmailStep])
 
   useEffect(() => {
     if (!draftLoaded || invite) return
@@ -316,7 +319,7 @@ export default function RegistrationWizard({
         />
       </div>
       <div className="max-h-[58vh] overflow-y-auto px-1 py-1">
-        {step === 0 && !invite && (
+        {step === 0 && !skipEmailStep && (
           <div className="space-y-4">
             <p className="text-sm text-on-surface-variant">
               We verify your email first so you can safely continue this application later.

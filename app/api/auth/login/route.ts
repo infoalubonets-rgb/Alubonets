@@ -15,6 +15,7 @@ import { verificationStillValid } from '@/lib/email-verification'
 import { logError } from '@/lib/logger'
 import { publicErrorMessage } from '@/lib/safe-error'
 import { getDisabledRoles, isLockedOutByRole, roleInactiveMessage } from '@/lib/disabled-roles'
+import { EMAIL_VERIFICATION_ON } from '@/lib/auth/email-verification-switch'
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
@@ -247,7 +248,8 @@ export async function POST(req: Request) {
         .catch((cause) => logError('auth.login.last_active', cause, { email })),
     )
 
-    if (!(process.env.NODE_ENV !== 'production' && process.env.BYPASS_LOGIN_VERIFICATION === 'true')) {
+    // Sign-in email codes are switched off until the sending domain is verified (see the switch).
+    if (EMAIL_VERIFICATION_ON && !(process.env.NODE_ENV !== 'production' && process.env.BYPASS_LOGIN_VERIFICATION === 'true')) {
       const cookieStoreForVerification = await cookies()
       const verificationHours = 24
       const verified = await verificationStillValid(

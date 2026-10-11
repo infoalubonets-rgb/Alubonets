@@ -12,6 +12,7 @@ import { COOKIE_NAME, registrationEmailIsVerified } from '@/lib/registration-ema
 import { getFamilyInviteByToken, markFamilyInviteAccepted } from '@/lib/family-invite'
 import { logError } from '@/lib/logger'
 import { publicErrorMessage } from '@/lib/safe-error'
+import { EMAIL_VERIFICATION_ON } from '@/lib/auth/email-verification-switch'
 
 export async function POST(req: Request) {
   try {
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
     const registrationCookies = await cookies()
     if (
       !invite &&
+      EMAIL_VERIFICATION_ON &&
       !(await registrationEmailIsVerified(registrationCookies.get(COOKIE_NAME)?.value, email))
     ) {
       return NextResponse.json({ error: 'Verify your email before submitting the application.' }, { status: 403 })
