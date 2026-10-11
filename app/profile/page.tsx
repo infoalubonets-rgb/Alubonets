@@ -80,7 +80,7 @@ export default async function ProfilePage() {
         emergencyContactPhone: user.memberProfile?.emergencyContactPhone ?? '',
         educationLevel: user.memberProfile?.educationLevel ?? 'SECONDARY',
       }} />
-      {executive && <ExecutiveDetailsForm biography={aboutProfile?.biography ?? ''} responsibilities={aboutProfile?.responsibilities ?? ''} />}
+      {executive && <ExecutiveDetailsForm position={user.aboutTitle ?? ''} biography={aboutProfile?.biography ?? ''} responsibilities={aboutProfile?.responsibilities ?? ''} />}
       <div className="mx-auto mt-4 max-w-lg pb-12">
         <AccountSecurity />
       </div>

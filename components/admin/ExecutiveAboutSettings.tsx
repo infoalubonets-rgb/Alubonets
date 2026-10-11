@@ -52,7 +52,7 @@ export default function ExecutiveAboutSettings({ userId, about, biography, respo
 
       <div className="grid grid-cols-[1fr_90px] gap-2">
         <label className="block text-[11px] font-semibold text-on-surface-variant">
-          Position shown
+          Position
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder="e.g. Chairperson" className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm" />
         </label>
         <label className="block text-[11px] font-semibold text-on-surface-variant">

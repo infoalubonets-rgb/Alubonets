@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ session: vi.fn(), user: vi.fn(), profile: vi.fn(), update: vi.fn(), create: vi.fn(), audit: vi.fn() }))
+const m = vi.hoisted(() => ({ session: vi.fn(), user: vi.fn(), userUpdate: vi.fn(), profile: vi.fn(), update: vi.fn(), create: vi.fn(), audit: vi.fn() }))
 vi.mock('../lib/auth/session', () => ({ requireSessionProfile: m.session, syncUserMetadata: vi.fn() }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 vi.mock('../lib/audit', () => ({ writeAudit: vi.fn() }))
-vi.mock('../lib/prisma', () => ({ prisma: { $transaction: (fn: (tx: unknown) => unknown) => fn({ user: { findUnique: m.user }, committeeProfile: { findFirst: m.profile, update: m.update, create: m.create }, auditLog: { create: m.audit } }) } }))
+vi.mock('../lib/prisma', () => ({ prisma: { $transaction: (fn: (tx: unknown) => unknown) => fn({ user: { findUnique: m.user, update: m.userUpdate }, committeeProfile: { findFirst: m.profile, update: m.update, create: m.create }, auditLog: { create: m.audit } }) } }))
 import { updateMyExecutiveDetails } from '../app/actions/profile'
 
 beforeEach(() => {
@@ -19,7 +19,13 @@ describe('executive self-service About details', () => {
     expect(m.user).toHaveBeenCalledWith({ where: { id: 'self' } })
     expect(m.profile).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'self' } }))
     expect(m.update).toHaveBeenCalledWith({ where: { id: 'profile' }, data: { biography: 'New bio', responsibilities: 'New duties', editedById: 'self' } })
-    expect(m.audit).toHaveBeenCalledWith({ data: expect.objectContaining({ userId: 'self', oldValue: { biography: 'Old bio', responsibilities: 'Old duties' } }) })
+    expect(m.audit).toHaveBeenCalledWith({ data: expect.objectContaining({ userId: 'self', oldValue: { biography: 'Old bio', responsibilities: 'Old duties', position: 'Chairperson' } }) })
+  })
+  it('saves a self-entered position to the public title and audits it', async () => {
+    await updateMyExecutiveDetails({ position: 'Vice Chairperson', biography: 'Bio', responsibilities: '' })
+    expect(m.userUpdate).toHaveBeenCalledWith({ where: { id: 'self' }, data: { aboutTitle: 'Vice Chairperson' } })
+    expect(m.update).toHaveBeenCalledWith({ where: { id: 'profile' }, data: { biography: 'Bio', responsibilities: '', position: 'Vice Chairperson', editedById: 'self' } })
+    expect(m.audit).toHaveBeenCalledWith({ data: expect.objectContaining({ newValue: { position: 'Vice Chairperson', biography: 'Bio', responsibilities: '' } }) })
   })
   it('rejects non-executives on the server', async () => {
     m.user.mockResolvedValue({ id: 'self', role: 'MEMBER', dashboardAccess: [] })
