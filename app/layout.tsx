@@ -66,10 +66,24 @@ export const viewport = {
   themeColor: '#001f50',
 }
 
+/**
+ * Browser extensions (Bitdefender, Grammarly…) stamp attributes such as `bis_skin_checked` onto the
+ * page before React hydrates, which React reports as a hydration mismatch. Strip them as they appear
+ * until the page has settled.
+ */
+const STRIP_EXTENSION_ATTRIBUTES = `(function(){
+  var names=['bis_skin_checked','bis_register','bis_use','bis_size','bis_id','data-gr-ext-installed','data-new-gr-c-s-check-loaded','data-new-gr-c-s-loaded','data-gramm','data-lt-installed'];
+  function clean(el){for(var i=0;i<names.length;i++){if(el.hasAttribute&&el.hasAttribute(names[i]))el.removeAttribute(names[i]);}}
+  var observer=new MutationObserver(function(list){for(var i=0;i<list.length;i++)clean(list[i].target);});
+  observer.observe(document.documentElement,{attributes:true,subtree:true,attributeFilter:names});
+  window.addEventListener('load',function(){setTimeout(function(){observer.disconnect();},5000);});
+})();`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="light">
+    <html lang="en" className="light" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: STRIP_EXTENSION_ATTRIBUTES }} />
         <link
           rel="preload"
           href="/fonts/material-icons.woff2"
@@ -79,6 +93,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body
+        suppressHydrationWarning
         className={`${sora.variable} ${inter.variable} ${orbitron.variable} bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col`}
       >
         {children}
