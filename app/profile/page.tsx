@@ -9,6 +9,8 @@ import type { Role } from '@/lib/auth/types'
 import AccountSecurity from '@/components/profile/AccountSecurity'
 import MemberDetailsForm from '@/components/profile/MemberDetailsForm'
 import { createServerClient } from '@/lib/supabase-server'
+import { isExecutive } from '@/lib/directory'
+import ExecutiveDetailsForm from '@/components/profile/ExecutiveDetailsForm'
 
 export const metadata = {
   title: 'My profile',
@@ -33,6 +35,8 @@ export default async function ProfilePage() {
 
   const user = await prisma.user.findUnique({ where: { id: profile.id }, include: { memberProfile: true } })
   if (!user) redirect('/login')
+  const executive = isExecutive(user)
+  const aboutProfile = executive ? await prisma.committeeProfile.findFirst({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } }) : null
   let avatarUrl = user.avatarUrl
   if (avatarUrl && !avatarUrl.startsWith('http')) {
     const signed = await createServerClient().storage.from('member-avatars').createSignedUrl(avatarUrl, 3600)
@@ -76,6 +80,7 @@ export default async function ProfilePage() {
         emergencyContactPhone: user.memberProfile?.emergencyContactPhone ?? '',
         educationLevel: user.memberProfile?.educationLevel ?? 'SECONDARY',
       }} />
+      {executive && <ExecutiveDetailsForm biography={aboutProfile?.biography ?? ''} responsibilities={aboutProfile?.responsibilities ?? ''} />}
       <div className="mx-auto mt-4 max-w-lg pb-12">
         <AccountSecurity />
       </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import ValuesCarousel from '@/components/about/ValuesCarousel'
-import { COMMITTEE_HEADSHOT, HERO_IMAGE } from '@/lib/constants'
+import { HERO_IMAGE } from '@/lib/constants'
+import ExecutivePortrait from '@/components/about/ExecutivePortrait'
 import { prisma } from '@/lib/prisma'
 import { createServerClient } from '@/lib/supabase-server'
 import { executivePublicExtras } from '@/lib/executive-public-profile'
@@ -222,11 +223,7 @@ export default async function AboutPage() {
                 className="reveal flex w-56 flex-col items-center"
                 style={{ ['--reveal-delay' as string]: `${index * 70}ms` }}
               >
-                <img
-                  alt={member.alt}
-                  className="mb-sm h-28 w-28 rounded-full border border-primary/15 object-cover"
-                  src={member.photoUrl || COMMITTEE_HEADSHOT}
-                />
+                <ExecutivePortrait src={member.photoUrl} alt={member.alt} />
                 <h4 className="text-center font-label-bold text-[15px] text-primary">{member.name}</h4>
                 <span className="mt-xs text-center font-body-md text-[13px] text-primary/70">
                   {member.role}
