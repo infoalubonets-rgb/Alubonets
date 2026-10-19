@@ -3,11 +3,14 @@ import Link from 'next/link'
 import { getPublicEvents } from '@/lib/data/queries'
 import { getMemberAccess } from '@/lib/auth/member-access'
 import MemberGate from '@/components/public/MemberGate'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
-  title: 'Events — Alubonets SHG',
-  description: 'Upcoming and past events organised by Alubonets Self-Help Group.',
-}
+export const metadata: Metadata = pageMetadata({
+  title: 'Events',
+  description:
+    'Family gatherings, meetings, welfare drives and celebrations organised by Alubonets Self-Help Group. Members can view upcoming events and RSVP online.',
+  path: '/events',
+})
 
 type EventRow = {
   id: string

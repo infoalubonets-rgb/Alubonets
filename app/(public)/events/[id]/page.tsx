@@ -11,8 +11,14 @@ type Props = { params: Promise<{ id: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const event = await prisma.event.findUnique({ where: { id }, select: { title: true, isPublic: true } })
-  return { title: event ? `${event.title} — Alubonets` : 'Event' }
+  const event = await prisma.event.findUnique({ where: { id }, select: { title: true } })
+  // Members-only page: link previews still work, but it stays out of search results.
+  return {
+    title: event?.title ?? 'Event',
+    description: event ? `${event.title}, an Alubonets Self-Help Group event. Sign in to view details and RSVP.` : undefined,
+    alternates: { canonical: `/events/${id}` },
+    robots: { index: false, follow: true },
+  }
 }
 
 export default async function EventDetailPage({ params }: Props) {

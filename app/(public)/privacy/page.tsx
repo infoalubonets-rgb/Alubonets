@@ -1,8 +1,14 @@
 import Link from 'next/link'
 import { POLICY_LAST_UPDATED } from '@/lib/membership'
 import { CONTACT_EMAIL } from '@/lib/constants'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata = { title: 'Privacy Policy' }
+export const metadata = pageMetadata({
+  title: 'Privacy Policy',
+  description:
+    'How Alubonets Self-Help Group collects, uses and protects members’ personal information, including Google sign-in data, under the Kenya Data Protection Act, 2019.',
+  path: '/privacy',
+})
 
 export default function PrivacyPage() {
   return (

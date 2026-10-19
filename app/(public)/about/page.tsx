@@ -1,14 +1,18 @@
 import type { Metadata } from 'next'
 import ValuesCarousel from '@/components/about/ValuesCarousel'
 import { HERO_IMAGE } from '@/lib/constants'
+import { pageMetadata } from '@/lib/seo'
 import ExecutivePortrait from '@/components/about/ExecutivePortrait'
 import { prisma } from '@/lib/prisma'
 import { createServerClient } from '@/lib/supabase-server'
 import { executivePublicExtras, type PublicDetail } from '@/lib/executive-public-profile'
 
-export const metadata: Metadata = {
-  title: 'About',
-}
+export const metadata: Metadata = pageMetadata({
+  title: 'About Us',
+  description:
+    'Learn about Alubonets Self-Help Group: our mission, vision and values, the Alubokho family we unite, and the executive committee that leads the group in Butere, Kakamega County.',
+  path: '/about',
+})
 
 export const revalidate = 3600
 

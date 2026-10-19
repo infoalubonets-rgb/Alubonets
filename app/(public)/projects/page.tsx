@@ -2,8 +2,14 @@ import { getMemberProjects } from '@/lib/data/queries'
 import ProjectCard from '@/components/content/ProjectCard'
 import MemberGate from '@/components/public/MemberGate'
 import { getMemberAccess } from '@/lib/auth/member-access'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata = { title: 'Projects — Alubonets SHG' }
+export const metadata = pageMetadata({
+  title: 'Projects',
+  description:
+    'Community and economic development projects run by Alubonets Self-Help Group, with progress updates, milestones and funding for members.',
+  path: '/projects',
+})
 export const dynamic = 'force-dynamic'
 
 export default async function ProjectsPage() {

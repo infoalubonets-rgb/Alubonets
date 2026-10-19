@@ -1,8 +1,14 @@
 import Link from 'next/link'
 import { POLICY_LAST_UPDATED } from '@/lib/membership'
 import { CONTACT_EMAIL } from '@/lib/constants'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata = { title: 'Terms of Service' }
+export const metadata = pageMetadata({
+  title: 'Terms of Service',
+  description:
+    'The terms for using the Alubonets Self-Help Group website and member portal, covering membership, accounts, contributions, acceptable use and governing law.',
+  path: '/terms',
+})
 
 export default function TermsPage() {
   return (

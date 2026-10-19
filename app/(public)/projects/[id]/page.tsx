@@ -13,7 +13,13 @@ type Props = { params: Promise<{ id: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const project = await prisma.project.findUnique({ where: { id }, select: { title: true } })
-  return { title: project ? `${project.title} — Alubonets` : 'Project' }
+  // Members-only page: link previews still work, but it stays out of search results.
+  return {
+    title: project?.title ?? 'Project',
+    description: project ? `${project.title}, an Alubonets Self-Help Group project. Sign in to follow progress and updates.` : undefined,
+    alternates: { canonical: `/projects/${id}` },
+    robots: { index: false, follow: true },
+  }
 }
 
 const STATUS_STYLES: Record<string, { label: string; classes: string; icon: string }> = {

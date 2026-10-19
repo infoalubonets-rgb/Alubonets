@@ -3,11 +3,14 @@ import Link from 'next/link'
 import HeroActions from '@/components/home/HeroActions'
 import { HERO_IMAGE } from '@/lib/constants'
 import { getPublicContent } from '@/lib/public-content'
+import { SITE_DESCRIPTION } from '@/lib/seo'
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'Alubonets SHG - Home',
+    absolute: 'Alubonets SHG - Alubokho Family Self-Help Group, Butere, Kenya',
   },
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: '/' },
 }
 
 export default async function HomePage() {

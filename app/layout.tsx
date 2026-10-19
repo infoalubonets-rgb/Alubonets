@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Sora, Inter, Orbitron } from 'next/font/google'
 import './globals.css'
 import { getBranding } from '@/lib/settings'
+import { SITE_KEYWORDS, SITE_LEGAL_NAME, SITE_URL, isIndexable, organizationJsonLd } from '@/lib/seo'
 
 const sora = Sora({
   subsets: ['latin'],
@@ -30,13 +31,37 @@ export async function generateMetadata(): Promise<Metadata> {
     primaryHex: '#003366',
   }))
   const name = branding.siteName || 'Alubonets'
+  const description = `${name} Self-Help Group unites the descendants of the Alubokho family in Butere, Kakamega County, Kenya, to strengthen unity, provide welfare support and create opportunities for social and economic development.`
+  const indexable = isIndexable()
   return {
+    metadataBase: new URL(SITE_URL),
     title: {
       default: `${name} SHG`,
       template: `%s - ${name} SHG`,
     },
-    description:
-      `${name} Self-Help Group — uniting the descendants of the Alubokho family to strengthen unity, provide welfare support and create opportunities for social and economic development.`,
+    description,
+    keywords: SITE_KEYWORDS,
+    authors: [{ name: SITE_LEGAL_NAME, url: SITE_URL }],
+    creator: SITE_LEGAL_NAME,
+    publisher: SITE_LEGAL_NAME,
+    category: 'community',
+    formatDetection: { telephone: false, email: false, address: false },
+    robots: indexable
+      ? { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 } }
+      : { index: false, follow: false },
+    openGraph: {
+      type: 'website',
+      siteName: `${name} SHG`,
+      locale: 'en_KE',
+      url: '/',
+      title: `${name} SHG`,
+      description,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${name} SHG`,
+      description,
+    },
     applicationName: `${name} SHG`,
     manifest: '/site.webmanifest',
     icons: {
@@ -97,6 +122,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${sora.variable} ${inter.variable} ${orbitron.variable} bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col`}
       >
         {children}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
+        />
       </body>
     </html>
   )

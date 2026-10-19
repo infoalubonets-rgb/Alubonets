@@ -3,6 +3,9 @@ import { redirect } from 'next/navigation'
 import InviteRegistrationClient from '@/components/auth/InviteRegistrationClient'
 import { getFamilyInviteByToken } from '@/lib/family-invite'
 
+// Personal invite links must never appear in search results.
+export const metadata = { title: 'Accept invite', robots: { index: false, follow: false } }
+
 export default async function RegisterPage({
   searchParams,
 }: {

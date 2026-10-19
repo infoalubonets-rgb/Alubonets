@@ -2,10 +2,14 @@ import type { Metadata } from 'next'
 import ContactForm from '@/components/contact/ContactForm'
 import { getPublicContent } from '@/lib/public-content'
 import { getPublicContact } from '@/lib/settings'
+import { pageMetadata } from '@/lib/seo'
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: 'Contact Us',
-}
+  description:
+    'Get in touch with Alubonets Self-Help Group in Butere, Kakamega County, Kenya. Send us a message about membership, welfare, events or partnerships.',
+  path: '/contact',
+})
 
 export default async function ContactPage() {
   const [content, contact] = await Promise.all([getPublicContent('CONTACT'), getPublicContact()])
