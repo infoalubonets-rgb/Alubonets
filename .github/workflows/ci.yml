@@ -21,7 +21,11 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - run: npm run typecheck
       - run: npm test
+      # Validation only reads the schema; it needs the env vars to exist, not a real database.
       - run: npx prisma validate
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
 
   e2e:
     if: ${{ vars.E2E_ENABLED == 'true' }}
