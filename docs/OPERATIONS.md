@@ -76,7 +76,7 @@ npm run cron:purge-audit
 
 **Vercel:** production runs at `https://alubonets.vercel.app`. Set `NEXT_PUBLIC_APP_URL` to that origin and `CRON_SECRET` in Vercel Production environment variables, then redeploy. GitHub Actions is the single scheduler; no native Vercel cron is needed (Hobby native cron only supports daily runs).
 
-**GitHub Actions:** `.github/workflows/cron.yml` calls the Vercel production domain hourly for maintenance and daily at 03:15 UTC for audit retention. Set repository secret `CRON_SECRET` to exactly the same value as Vercel. The URL defaults to `https://alubonets.vercel.app`; optionally override it using repository variable `CRON_APP_URL` (not a secret). The old `CRON_APP_URL` secret is no longer used. Manual verification: Actions → Cron → Run workflow, once for each job. A successful run returns HTTP 200; HTTP 401 means the secrets differ, and HTTP 503 means Vercel is missing configuration.
+**GitHub Actions:** `.github/workflows/cron.yml` calls the Vercel production domain hourly for maintenance and daily at 03:15 UTC for audit retention. Set repository secret `CRON_SECRET` to exactly the same value as Vercel. The URL defaults to `https://www.alubonets.com` (the bare `alubonets.vercel.app` is not this project and returns 404); optionally override it using repository variable `CRON_APP_URL` (not a secret). The old `CRON_APP_URL` secret is no longer used. Manual verification: Actions → Cron → Run workflow, once for each job. A successful run returns HTTP 200; HTTP 401 means the secrets differ, and HTTP 503 means Vercel is missing configuration.
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co

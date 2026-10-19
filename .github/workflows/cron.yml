@@ -38,7 +38,7 @@ jobs:
 
       - name: Call cron endpoint
         env:
-          APP_URL: ${{ vars.CRON_APP_URL || 'https://alubonets.vercel.app' }}
+          APP_URL: ${{ vars.CRON_APP_URL || 'https://www.alubonets.com' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           JOB: ${{ steps.job.outputs.name }}
         run: |
