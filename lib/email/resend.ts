@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
+import { logError } from '@/lib/logger'
 import type { Contribution, User } from '@prisma/client'
 import { buildReceiptPdf } from '@/lib/pdf/receipt'
 import { SITE_LOGO, CONTACT_EMAIL, DEFAULT_FROM_EMAIL } from '@/lib/constants'
@@ -10,7 +11,12 @@ function getResend() {
   return new Resend(key)
 }
 
-export const emailFrom = () => process.env.FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL
+export const emailFrom = () => {
+  const configured = process.env.FROM_EMAIL?.trim()
+  // Live mail must use the real sender even if onboarding settings remain.
+  if (process.env.NODE_ENV === 'production' && configured?.includes('onboarding@resend.dev')) return DEFAULT_FROM_EMAIL
+  return configured || DEFAULT_FROM_EMAIL
+}
 const from = emailFrom
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
 // When set, ALL outgoing emails are redirected here (use until domain is verified).
@@ -88,7 +94,10 @@ export async function sendSupportMessageEmail(input: { memberName: string; membe
 export async function sendPasswordResetEmail(input: { userId: string; fullName: string; email: string; resetUrl: string }) {
   const resend = getResend()
   if (!resend) throw new Error('Password-reset email is not configured.')
-  const recipient = testEmailOverride() || input.email
+  // Recovery links must reach the account owner in production, never a test inbox.
+  const production = process.env.NODE_ENV === 'production'
+  const recipient = production ? input.email : testEmailOverride() || input.email
+  const sender = production && from().includes('onboarding@resend.dev') ? DEFAULT_FROM_EMAIL : from()
   const subject = 'Reset your Alubonets password'
   const safeName = input.fullName.replace(/[<>&]/g, '')
   const html = baseHtml(`<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Reset your password</h2>
@@ -96,9 +105,14 @@ export async function sendPasswordResetEmail(input: { userId: string; fullName: 
     <p style="color:#374151;line-height:1.6;">This secure reset link expires in <strong>10 minutes</strong> and can only be used once.</p>
     <p><a href="${input.resetUrl}" style="display:inline-block;background:#003d82;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;">Reset password</a></p>
     <p style="color:#6b7280;font-size:13px;">If you did not request this, ignore this email. Your password will not change.</p>`)
-  const delivery = await resend.emails.send({ from: from(), to: recipient, subject, html })
+  const delivery = await resend.emails.send({ from: sender, to: recipient, subject, html })
   if (delivery.error) throw new Error(delivery.error.message)
-  await prisma.emailLog.create({ data: { userId: input.userId, toEmail: recipient, subject, template: 'password_reset', status: 'accepted', meta: { providerMessageId: delivery.data?.id || null, testMode: Boolean(testEmailOverride()), intendedRecipient: input.email } } })
+  // An audit failure must not invalidate a link the provider already accepted.
+  try {
+    await prisma.emailLog.create({ data: { userId: input.userId, toEmail: recipient, subject, template: 'password_reset', status: 'accepted', meta: { providerMessageId: delivery.data?.id || null, testMode: !production && Boolean(testEmailOverride()), intendedRecipient: input.email } } })
+  } catch (error) {
+    logError('auth.password_reset.email_log_failed', error, { userId: input.userId })
+  }
 }
 
 type BroadcastAttachment = { filename: string; content: Buffer; contentType?: string }

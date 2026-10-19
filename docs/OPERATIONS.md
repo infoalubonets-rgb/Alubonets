@@ -434,3 +434,26 @@ and `FROM_EMAIL` overrides it. Emails go to their real recipients unless
 `RESEND_TEST_EMAIL` is set or `FROM_EMAIL` uses `onboarding@resend.dev`. If either is
 true, every email (including sign-in codes) goes to the test inbox instead.
 Never set `RESEND_TEST_EMAIL` in Vercel Production.
+
+
+### Password-reset delivery
+
+Production password-reset emails always go to the account owner. They ignore
+`RESEND_TEST_EMAIL` and replace the Resend onboarding sender with
+`DEFAULT_FROM_EMAIL` if a test sender is left in `FROM_EMAIL`. The sending domain
+`info.alubonets.com` must be verified in Resend. Development retains test inbox
+redirection. Email-log failures are recorded separately and do not invalidate
+a reset link already accepted by the provider.
+
+
+### Contact enquiry forwarding
+
+Configure the primary inbox under Admin > Settings > Enquiry forwarding
+(`contact_destination_email`). The default is `infoalubonets@gmail.com`.
+Each enquiry is saved in Communications and creates an Admin notification for
+the assigned administrator. The primary inbox is emailed separately from
+additional recipients, so copy failures cannot block or change its delivery
+status. Production ignores `RESEND_TEST_EMAIL` for enquiry forwarding and uses
+the real default sender if an onboarding sender remains configured. Provider
+rejections are logged as `contact.email.rejected`; saved enquiries remain
+available even if email delivery fails.

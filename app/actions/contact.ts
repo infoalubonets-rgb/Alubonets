@@ -1,6 +1,6 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import { Resend } from 'resend'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
@@ -81,19 +81,29 @@ async function createContactSubmissionAndNotify({
     resolveContactAssigneeId(),
     ensureEnquiryDestinationEmail(),
   ])
-  const submission = await prisma.contactSubmission.create({
-    data: {
-      name,
-      email,
-      phone: phone || null,
-      category: category || null,
-      message,
-      assignedToId,
-    },
+  const submission = await prisma.$transaction(async (tx) => {
+    const saved = await tx.contactSubmission.create({
+      data: { name, email, phone: phone || null, category: category || null, message, assignedToId },
+    })
+    if (assignedToId) {
+      await tx.userNotification.create({
+        data: {
+          userId: assignedToId,
+          title: 'New contact enquiry',
+          body: `${name} sent a ${category || 'general'} enquiry.`,
+          href: '/admin/announcements',
+          type: 'contact_enquiry',
+          entity: 'ContactSubmission',
+          entityId: saved.id,
+          audienceRoles: ['ADMIN'],
+        },
+      })
+    }
+    return saved
   })
   const { enquiryEmail, recipients } = await getPublicContact()
   // Prefer the Communications / Settings destination; fall back to CONTACT_EMAIL.
-  const destination = enquiryEmail || destinationEmail || CONTACT_EMAIL
+  const destination = destinationEmail || enquiryEmail || CONTACT_EMAIL
   const copies = recipients.length ? recipients : await defaultContactRecipients()
 
   const key = process.env.RESEND_API_KEY
@@ -101,11 +111,8 @@ async function createContactSubmissionAndNotify({
     try {
       const resend = new Resend(key)
       const from = emailFrom()
-      // Resend sandbox can only deliver to the account owner — when RESEND_TEST_EMAIL
-      // is set, also deliver there so local/dev still receives a copy.
-      const to = process.env.RESEND_TEST_EMAIL
-        ? Array.from(new Set([destination, process.env.RESEND_TEST_EMAIL].filter(Boolean)))
-        : [destination]
+      // Send the main inbox independently: a failed copy must not block it.
+      const to = [destination]
       const rendered = renderEmailTemplate('contact_enquiry', {
         name,
         email,
@@ -124,17 +131,17 @@ async function createContactSubmissionAndNotify({
         where: { id: submission.id },
         data: { emailStatus: error ? 'failed' : 'sent' },
       })
-      // Sent separately: one unverified copy recipient must not block the primary notification.
-      const extra = copies.filter((address) => !to.includes(address))
-      if (extra.length) {
-        const copy = await resend.emails.send({
-          from,
-          to: extra,
-          replyTo: email,
-          subject: rendered.subject,
-          html: rendered.html,
-        })
-        if (copy.error) logError('contact.email.copies_failed', copy.error, { submissionId: submission.id })
+      if (error) logError('contact.email.rejected', error, { submissionId: submission.id })
+      const testCopy = process.env.NODE_ENV !== 'production' ? process.env.RESEND_TEST_EMAIL?.trim() : undefined
+      const extra = Array.from(new Set([...copies, ...(testCopy ? [testCopy] : [])].map(address => address.trim().toLowerCase())))
+        .filter(address => address && address !== destination.toLowerCase())
+      for (const address of extra) {
+        try {
+          const copy = await resend.emails.send({ from, to: address, replyTo: email, subject: rendered.subject, html: rendered.html })
+          if (copy.error) logError('contact.email.copies_failed', copy.error, { submissionId: submission.id })
+        } catch (copyError) {
+          logError('contact.email.copies_failed', copyError, { submissionId: submission.id })
+        }
       }
     } catch (error) {
       logError('contact.email.failed', error, { submissionId: submission.id })
@@ -151,6 +158,7 @@ async function createContactSubmissionAndNotify({
   }
 
   revalidatePath('/admin/announcements')
+  revalidatePath('/notifications')
   return submission
 }
 
@@ -378,6 +386,7 @@ export async function updateContactDestination(formData: FormData) {
   const value = z.string().email().parse(formData.get('email'))
   await prisma.appSetting.upsert({ where: { key: 'contact_destination_email' }, create: { key: 'contact_destination_email', value, updatedBy: actor.id }, update: { value, updatedBy: actor.id } })
   await writeAudit({ userId: actor.id, action: 'CONTACT_DESTINATION_UPDATE', entity: 'AppSetting', entityId: 'contact_destination_email' })
+  revalidateTag('app-settings')
   revalidatePath('/admin/announcements')
   revalidatePath('/contact')
 }

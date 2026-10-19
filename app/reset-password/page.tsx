@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useState, type FormEvent } from 'react'
 import { PasswordVisibilityIcon } from '@/components/auth/AuthIcons'
 import { ADMIN_LOGIN_LOGO } from '@/lib/constants'
-import { passwordError } from '@/lib/password-reset'
+import { passwordError } from '@/lib/password-policy'
 
 function PasswordField({
   label,
