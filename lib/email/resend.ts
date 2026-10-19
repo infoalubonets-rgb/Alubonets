@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 import type { Contribution, User } from '@prisma/client'
 import { buildReceiptPdf } from '@/lib/pdf/receipt'
-import { SITE_LOGO, CONTACT_EMAIL } from '@/lib/constants'
+import { SITE_LOGO, CONTACT_EMAIL, DEFAULT_FROM_EMAIL } from '@/lib/constants'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -10,12 +10,12 @@ function getResend() {
   return new Resend(key)
 }
 
-const from = () =>
-  process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
+export const emailFrom = () => process.env.FROM_EMAIL?.trim() || DEFAULT_FROM_EMAIL
+const from = emailFrom
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
 // When set, ALL outgoing emails are redirected here (use until domain is verified).
 // With the Resend onboarding sender, default to the group info inbox.
-const testEmailOverride = () =>
+export const testEmailOverride = () =>
   process.env.RESEND_TEST_EMAIL?.trim() ||
   (from().includes('onboarding@resend.dev') ? CONTACT_EMAIL : null)
 
@@ -348,7 +348,7 @@ export async function sendGalleryNotificationEmail({
 
 export async function sendMemberApprovedEmail(user: User) {
   const resend = getResend()
-  const recipient = process.env.RESEND_TEST_EMAIL || user.email
+  const recipient = testEmailOverride() || user.email
   const subject = 'Your Alubonets membership was approved'
   const html = baseHtml(`
     <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Welcome to Alubonets SHG!</h2>

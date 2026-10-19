@@ -10,6 +10,7 @@ import { CONTACT_EMAIL } from '@/lib/constants'
 import { getPublicContact } from '@/lib/settings'
 import { logError } from '@/lib/logger'
 import { renderEmailTemplate } from '@/lib/email/templates'
+import { emailFrom } from '@/lib/email/resend'
 import { headers } from 'next/headers'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import type { ContactSubmitResult } from '@/lib/contact-types'
@@ -99,7 +100,7 @@ async function createContactSubmissionAndNotify({
   if (key && !key.startsWith('re_your-')) {
     try {
       const resend = new Resend(key)
-      const from = process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
+      const from = emailFrom()
       // Resend sandbox can only deliver to the account owner — when RESEND_TEST_EMAIL
       // is set, also deliver there so local/dev still receives a copy.
       const to = process.env.RESEND_TEST_EMAIL
@@ -320,7 +321,7 @@ export async function replyToContact(
     const key = process.env.RESEND_API_KEY
     if (key && !key.startsWith('re_your-')) {
       const resend = new Resend(key)
-      const from = process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
+      const from = emailFrom()
       // Always reply to the enquiry sender; also copy RESEND_TEST_EMAIL in sandbox/dev.
       const to = process.env.RESEND_TEST_EMAIL
         ? Array.from(new Set([submission.email, process.env.RESEND_TEST_EMAIL].filter(Boolean)))

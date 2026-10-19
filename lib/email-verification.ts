@@ -2,24 +2,20 @@ import { createHash, randomInt } from 'crypto'
 import { SignJWT, jwtVerify } from 'jose'
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
-import { CONTACT_EMAIL } from '@/lib/constants'
-import { otpCodeHtml } from '@/lib/email/resend'
+import { emailFrom, otpCodeHtml, testEmailOverride } from '@/lib/email/resend'
 import { logError } from '@/lib/logger'
 
 const secret = () => new TextEncoder().encode(process.env.JWT_SECRET || '')
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 
-function fromAddress() {
-  return process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>'
-}
+const fromAddress = emailFrom
 
 /**
- * Login/registration OTP destination.
- * Prefer RESEND_TEST_EMAIL; otherwise always use the group info inbox until a
- * custom sending domain is verified (Resend sandbox cannot deliver to arbitrary members).
+ * Login/registration OTP destination: the member's own address, unless test mode
+ * (RESEND_TEST_EMAIL, or the Resend onboarding sender) redirects it.
  */
 export function resolveOtpRecipient(intendedEmail: string) {
-  const to = (process.env.RESEND_TEST_EMAIL?.trim() || CONTACT_EMAIL)
+  const to = testEmailOverride() || intendedEmail.trim()
   return {
     to,
     redirected: to.toLowerCase() !== intendedEmail.trim().toLowerCase(),

@@ -11,6 +11,8 @@ export const ADMIN_SIDEBAR_LOGO =
   'https://lh3.googleusercontent.com/aida-public/AB6AXuAdftVT0b5kRl1qFFsclxaUAbXkDvijpgsYIZwtlv-i0BPSIPnLvPIu2ogx0ddz-HKa8BYpLouaIS-_zCjRCi89EtRrqBjGiAALHMFQ7l1vdNH8FqsYT0ZRKvPpcIimPglYSDOokQdCvH4KfZ06-A2jQpBWh81fRP1zJSZGv-m2Mjm5cOI2dgAYs-XDFFuAM4NhmYLnTkPoOEPLcqBx6yYLVH22UdYeHYZq9344zgQpfFoLSIwQB53hT0Ouy4cZkEhnYQE'
 
 export const CONTACT_EMAIL = 'infoalubonets@gmail.com'
+// Sender on the domain verified in Resend. FROM_EMAIL overrides it.
+export const DEFAULT_FROM_EMAIL = 'Alubonets <support@info.alubonets.com>'
 
 export const NAV_LINKS: { href: string; label: string }[] = [
   { href: '/', label: 'Home' },

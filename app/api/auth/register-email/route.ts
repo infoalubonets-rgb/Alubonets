@@ -11,7 +11,7 @@ import {
   registrationEmailIsVerified,
   verifyRegistrationEmailCode,
 } from '@/lib/registration-email-verification'
-import { otpCodeHtml } from '@/lib/email/resend'
+import { emailFrom, otpCodeHtml } from '@/lib/email/resend'
 import { resolveOtpRecipient } from '@/lib/email-verification'
 
 const emailSchema = z.string().trim().toLowerCase().email('Enter a valid email address.')
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     if (!key || key.startsWith('re_your-')) throw new Error('Email verification is not configured.')
     const { to } = resolveOtpRecipient(email)
     const { error } = await new Resend(key).emails.send({
-      from: process.env.FROM_EMAIL || 'Alubonets <onboarding@resend.dev>',
+      from: emailFrom(),
       to,
       subject: 'Verify your Alubonets membership email',
       html: otpCodeHtml('Verify your membership application email', code),

@@ -426,10 +426,11 @@ Configure Sentry alerts for:
 
 Do not send passwords, service keys, full database URLs, contribution details or private member data to Sentry.
 
-## Resend testing limitation
+## Resend sending domain
 
-Until an Alubonets domain is verified in Resend, keep
-`FROM_EMAIL=Alubonets <onboarding@resend.dev>` and
-`RESEND_TEST_EMAIL=infoalubonets@gmail.com`. The latter redirects outgoing test
-messages to the verified account. After domain verification, replace `FROM_EMAIL`
-with a sender on that domain and remove the test override.
+The sending domain is `info.alubonets.com` (DNS at Spaceship). The default sender is
+`Alubonets <support@info.alubonets.com>` (`DEFAULT_FROM_EMAIL` in `lib/constants.ts`),
+and `FROM_EMAIL` overrides it. Emails go to their real recipients unless
+`RESEND_TEST_EMAIL` is set or `FROM_EMAIL` uses `onboarding@resend.dev`. If either is
+true, every email (including sign-in codes) goes to the test inbox instead.
+Never set `RESEND_TEST_EMAIL` in Vercel Production.

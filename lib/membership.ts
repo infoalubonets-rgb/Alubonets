@@ -1,6 +1,8 @@
 import { z } from 'zod'
 
-export const POLICY_VERSION = '2026-07-30-v1'
+export const POLICY_VERSION = '2026-10-20-v2'
+// Shown on /privacy and /terms; update together with POLICY_VERSION.
+export const POLICY_LAST_UPDATED = '20 October 2026'
 
 export const MEMBER_CATEGORIES = [
   'ORDINARY',
