@@ -45,7 +45,7 @@ describe('forgot password', () => {
     m.findUser.mockResolvedValue(null)
     const res = await POST(request('nobody@example.com'))
     expect(res.status).toBe(200)
-    expect((await res.json()).message).toContain('If an account exists')
+    expect((await res.json()).message).toBe('A password-reset link has been sent to nobody@example.com. It expires in 10 minutes. Check your spam folder too.')
     await runBackground()
     expect(m.deliver).not.toHaveBeenCalled()
     expect(m.supabase).not.toHaveBeenCalled()

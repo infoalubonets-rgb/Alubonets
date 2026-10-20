@@ -66,6 +66,6 @@ export async function POST(request: Request) {
   )
   // The same answer, straight away, whether or not the email has an account.
   return NextResponse.json({
-    message: `If an account exists for ${email}, a password-reset link is on its way. It expires in ${PASSWORD_RESET_TTL_MINUTES} minutes. Check your spam folder too.`,
+    message: `A password-reset link has been sent to ${email}. It expires in ${PASSWORD_RESET_TTL_MINUTES} minutes. Check your spam folder too.`,
   })
 }
