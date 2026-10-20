@@ -141,7 +141,10 @@ export default async function MyFamilyPage({ adminWorkspace = false }: { adminWo
   // A dev server can briefly retain the previous generated Prisma client during hot reload.
   // Keep the family page usable until the server has reloaded the newly generated delegate.
   const transitionDelegate = prisma.familyAccountTransition
-  const transitionHistory = branchRootId && transitionDelegate
+  // Account transition history is an administrative audit trail (invites sent, revoked, …), so
+  // it is loaded only for Admins and Super Admins; members never receive it.
+  const canSeeTransitionHistory = actor.isSuperAdmin || actor.role === 'ADMIN'
+  const transitionHistory = canSeeTransitionHistory && branchRootId && transitionDelegate
     ? await transitionDelegate.findMany({
         where: { member: { OR: [{ id: branchRootId }, { principalMemberId: branchRootId }] } },
         orderBy: { occurredAt: 'desc' }, take: 30,
