@@ -64,10 +64,12 @@ export const applicationSchema = registrationSchema.omit({ email: true, password
 
 export type RegistrationInput = z.infer<typeof registrationSchema>
 
+/** Client IP for rate limits and audit logs. Vercel sets these headers itself, so prefer them. */
 export function requestIp(req: Request) {
   return (
+    req.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip')?.trim() ||
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
     null
   )
 }

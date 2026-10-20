@@ -1,6 +1,6 @@
 import { ROLE_HOME, type AuthUser, type Role } from './types'
 
-export { ROLE_HOME }
+export { ROLE_HOME, homeForAccount } from './types'
 export type { AuthUser, Role }
 
 const fetchOpts: RequestInit = {

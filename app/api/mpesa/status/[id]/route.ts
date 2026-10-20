@@ -16,6 +16,19 @@ export async function GET(
   const { id: checkoutRequestId } = await context.params
   if (!checkoutRequestId) return NextResponse.json({ status: 'pending' })
 
+  // Only the person who started the payment (or finance staff) may see its outcome.
+  const staff = profile.isSuperAdmin || ['ADMIN', 'TREASURER'].includes(profile.role)
+  if (!staff) {
+    const owned = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM audit_logs
+      WHERE action = 'MPESA_STK_INIT'
+        AND meta->>'checkoutRequestId' = ${checkoutRequestId}
+        AND ("userId" = ${profile.id} OR meta->>'targetUserId' = ${profile.id})
+      LIMIT 1
+    `
+    if (!owned.length) return NextResponse.json({ status: 'error' }, { status: 404 })
+  }
+
   const rows = await prisma.$queryRaw<LogRow[]>`
     SELECT action, meta
     FROM audit_logs

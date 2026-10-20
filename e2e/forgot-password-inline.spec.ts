@@ -1,0 +1,41 @@
+import { expect, test } from '@playwright/test'
+
+test.beforeEach(async ({ page }) => {
+  page.on('pageerror', error => console.log('Browser error:', error.message))
+  await page.route('**/api/auth/me', route => route.fulfill({ status: 401, json: { error: 'Not signed in' } }))
+  await page.route('**/api/auth/forgot-password', route => route.fulfill({ json: { message: 'Check your email for a reset link.' } }))
+})
+
+test('public modal requests a reset and returns to sign in without navigation', async ({ page }) => {
+  await page.goto('/')
+  await page.waitForLoadState('networkidle')
+  await page.getByRole('button', { name: 'Login / Register', exact: true }).click()
+  const modal = page.locator('#authModal')
+  await modal.locator('input[type=email]').fill('member@example.com')
+  await modal.locator('input[type=email]').press('Tab')
+  await modal.getByRole('button', { name: 'Forgot password?', exact: true }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(modal.getByLabel('Email address')).toHaveValue('member@example.com')
+  await expect(modal.locator('input[type=password]')).toHaveCount(0)
+  await modal.getByRole('button', { name: 'Send reset link' }).click()
+  await expect(modal.getByRole('status')).toHaveText('Check your email for a reset link.')
+  await modal.getByRole('button', { name: 'Back to sign in' }).click()
+  await expect(modal.getByRole('heading', { name: 'Sign In', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/$/)
+})
+
+test('admin login switches to recovery in the same card and URL', async ({ page }) => {
+  await page.goto('/admin/login')
+  await page.waitForLoadState('networkidle')
+  await page.locator('input[name=email]').fill('admin@example.com')
+  await page.locator('input[name=email]').press('Tab')
+  await page.getByRole('button', { name: 'Forgot password?', exact: true }).click()
+  await expect(page).toHaveURL(/\/admin\/login$/)
+  await expect(page.getByLabel('Email address')).toHaveValue('admin@example.com')
+  await expect(page.locator('input[type=password]')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Send reset link' }).click()
+  await expect(page.getByRole('status')).toHaveText('Check your email for a reset link.')
+  await page.getByRole('button', { name: 'Back to sign in' }).click()
+  await expect(page.getByRole('heading', { name: 'Admin Login', exact: true })).toBeVisible()
+  await expect(page).toHaveURL(/\/admin\/login$/)
+})

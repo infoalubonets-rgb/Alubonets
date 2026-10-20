@@ -16,11 +16,11 @@ import { enforceRateLimit } from '@/lib/rate-limit'
 import type { ContactSubmitResult } from '@/lib/contact-types'
 
 const contactSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(254),
-  phone: z.string().trim().max(40).optional(),
+  name: z.string().trim().min(2, 'Enter a name with at least 2 characters.').max(120, 'Name must be no more than 120 characters.'),
+  email: z.string().trim().email('Enter a valid email address.').max(254, 'Email must be no more than 254 characters.'),
+  phone: z.string().trim().max(40, 'Phone number must be no more than 40 characters.').optional(),
   category: z.string().trim().max(60).optional(),
-  message: z.string().trim().min(5).max(5000),
+  message: z.string().trim().min(1, 'Enter a message.').max(5000, 'Message must be no more than 5,000 characters.'),
 })
 
 // Shared by the full contact page and the public chat widget: creates the
@@ -181,7 +181,7 @@ export async function sendContactMessage(formData: FormData): Promise<ContactSub
     category: String(formData.get('category') || '') || undefined,
     message: String(formData.get('message') || ''),
   })
-  if (!parsed.success) return { ok: false, error: 'invalid' }
+  if (!parsed.success) return { ok: false, error: 'invalid', message: parsed.error.issues[0]?.message || 'Please check the form fields.' }
 
   await createContactSubmissionAndNotify(parsed.data)
   return { ok: true }

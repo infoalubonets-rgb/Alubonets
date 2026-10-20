@@ -38,7 +38,7 @@ async function warnBeforePurge(days: number) {
  * Retention purge (NOT backups — Supabase owns DB backups):
  * audit logs are kept forever unless Admin → Settings sets audit_retention_days. When a period
  * is set, rows older than it are deleted, and admins are warned 30 days before any row is due.
- * Protect with Authorization: Bearer $CRON_SECRET (or ?secret=).
+ * Protect with Authorization: Bearer $CRON_SECRET.
  * Sets app.allow_audit_purge so the append-only trigger allows the delete.
  */
 export async function GET(req: NextRequest) {
@@ -49,8 +49,8 @@ export async function GET(req: NextRequest) {
 
   const auth = req.headers.get('authorization')
   const bearer = auth?.startsWith('Bearer ') ? auth.slice(7) : null
-  const querySecret = req.nextUrl.searchParams.get('secret')
-  if (bearer !== secret && querySecret !== secret) {
+  // Header only: a secret in the URL ends up in access logs and browser history.
+  if (bearer !== secret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
 import { logError } from '@/lib/logger'
+import { appBaseUrl } from '@/lib/app-url'
 import type { Contribution, User } from '@prisma/client'
 import { buildReceiptPdf } from '@/lib/pdf/receipt'
 import { SITE_LOGO, CONTACT_EMAIL, DEFAULT_FROM_EMAIL } from '@/lib/constants'
@@ -18,7 +19,10 @@ export const emailFrom = () => {
   return configured || DEFAULT_FROM_EMAIL
 }
 const from = emailFrom
-const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
+const appUrl = appBaseUrl
+/** Escapes text before it goes into email HTML; names and notes are typed by members. */
+const esc = (value: string) =>
+  value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 // When set, ALL outgoing emails are redirected here (use until domain is verified).
 // With the Resend onboarding sender, default to the group info inbox.
 export const testEmailOverride = () =>
@@ -49,7 +53,6 @@ export function baseHtml(body: string) {
       </td>
       <td style="vertical-align:middle;">
         <span style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:-.3px;font-family:sans-serif;">Alubonets SHG</span>
-        <div style="color:#fe8015;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-top:4px;">Self-Help Group</div>
       </td>
     </tr></table>
   </div>
@@ -80,7 +83,7 @@ export async function sendSupportMessageEmail(input: { memberName: string; membe
   const recipients = override ? [{ id: responders[0].id, email: override }] : responders
   const resend = getResend()
   const subject = `Support message from ${input.memberName}`
-  const html = baseHtml(`<h2>New support message</h2><p><strong>${input.memberName}</strong> (${input.memberEmail}) wrote:</p><p style="white-space:pre-wrap">${input.body.replace(/[<>&]/g, (c) => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]!))}</p><p><a href="${appUrl()}/support-chat">Open support chat</a></p>`)
+  const html = baseHtml(`<h2>New support message</h2><p><strong>${esc(input.memberName)}</strong> (${esc(input.memberEmail)}) wrote:</p><p style="white-space:pre-wrap">${esc(input.body)}</p><p><a href="${appUrl()}/support-chat">Open support chat</a></p>`)
   if (!resend) return { skipped: true as const }
   let accepted = 0
   for (const recipient of recipients) {
@@ -103,7 +106,7 @@ export async function sendPasswordResetEmail(input: { userId: string; fullName: 
   const html = baseHtml(`<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Reset your password</h2>
     <p style="color:#374151;">Hello ${safeName},</p>
     <p style="color:#374151;line-height:1.6;">This secure reset link expires in <strong>10 minutes</strong> and can only be used once.</p>
-    <p><a href="${input.resetUrl}" style="display:inline-block;background:#003d82;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;">Reset password</a></p>
+    <p><a href="${esc(input.resetUrl)}" style="display:inline-block;background:#003d82;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;">Reset password</a></p>
     <p style="color:#6b7280;font-size:13px;">If you did not request this, ignore this email. Your password will not change.</p>`)
   const delivery = await resend.emails.send({ from: sender, to: recipient, subject, html })
   if (delivery.error) throw new Error(delivery.error.message)
@@ -163,7 +166,7 @@ export async function sendBroadcastEmail({
 
   const html = (name: string) =>
     baseHtml(`${imageBlock}<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">${title}</h2>
-<p style="margin:0 0 8px;color:#374151;">Hello ${name},</p>
+<p style="margin:0 0 8px;color:#374151;">Hello ${esc(name)},</p>
 <div style="color:#374151;line-height:1.7;">${body}</div>
 ${ctaBlock}`)
 
@@ -305,7 +308,7 @@ export async function sendDirectEmails({
       : ''
   const html = (name: string) =>
     baseHtml(`<h2 style="margin:0 0 16px;font-size:20px;color:#111827;">${title}</h2>
-<p style="margin:0 0 8px;color:#374151;">Hello ${name},</p>
+<p style="margin:0 0 8px;color:#374151;">Hello ${esc(name)},</p>
 <div style="color:#374151;line-height:1.7;">${body}</div>
 ${ctaBlock}`)
 
@@ -347,8 +350,8 @@ export async function sendGalleryNotificationEmail({
   category?: string
   actorId: string
 }) {
-  const captionLine = caption ? `<p style="color:#6b7280;font-style:italic;">"${caption}"</p>` : ''
-  const catLine = category ? `<p style="color:#6b7280;">Category: <strong>${category}</strong></p>` : ''
+  const captionLine = caption ? `<p style="color:#6b7280;font-style:italic;">"${esc(caption)}"</p>` : ''
+  const catLine = category ? `<p style="color:#6b7280;">Category: <strong>${esc(category)}</strong></p>` : ''
   return sendBroadcastEmail({
     subject: 'New photos added to our gallery — Alubonets SHG',
     title: 'New gallery photos',
@@ -366,9 +369,9 @@ export async function sendMemberApprovedEmail(user: User) {
   const subject = 'Your Alubonets membership was approved'
   const html = baseHtml(`
     <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Welcome to Alubonets SHG!</h2>
-    <p style="margin:0 0 12px;color:#374151;">Hello ${user.fullName},</p>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${esc(user.fullName)},</p>
     <p style="margin:0 0 20px;color:#374151;">Your membership has been approved and your account is now active. You can log in and start using the member portal.</p>
-    <p><a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/login" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Log in to your account</a></p>
+    <p><a href="${appUrl()}/login" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Log in to your account</a></p>
   `)
 
   if (!resend) {
@@ -425,8 +428,8 @@ export async function sendContributionReceiptEmail(
   const subject = `Contribution receipt — KES ${amount.toLocaleString()}`
   const html = baseHtml(`
     <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Payment received</h2>
-    <p style="margin:0 0 12px;color:#374151;">Hello ${user.fullName},</p>
-    <p style="margin:0 0 8px;color:#374151;">We have received your contribution of <strong style="color:#974800;">KES ${Math.round(amount).toLocaleString()}</strong>${ref ? ` (M-Pesa ref: <strong>${ref}</strong>)` : ''}.</p>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${esc(user.fullName)},</p>
+    <p style="margin:0 0 8px;color:#374151;">We have received your contribution of <strong style="color:#974800;">KES ${Math.round(amount).toLocaleString()}</strong>${ref ? ` (M-Pesa ref: <strong>${esc(ref)}</strong>)` : ''}.</p>
     <p style="margin:0 0 20px;color:#374151;">Your official receipt is attached as a PDF to this email.</p>
     <p style="margin:0;font-size:13px;color:#6b7280;">Thank you for your continued support of Alubonets SHG.</p>
   `)
@@ -495,9 +498,9 @@ export async function sendWelfareStatusEmail(
   const statusColor = status === 'APPROVED' ? '#15803d' : status === 'REJECTED' ? '#dc2626' : '#374151'
   const html = baseHtml(`
     <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Welfare request update</h2>
-    <p style="margin:0 0 12px;color:#374151;">Hello ${user.fullName},</p>
-    <p style="margin:0 0 12px;color:#374151;">Your welfare request is now <strong style="color:${statusColor};">${status}</strong>.</p>
-    ${note ? `<p style="margin:0;color:#374151;">Note: ${note}</p>` : ''}
+    <p style="margin:0 0 12px;color:#374151;">Hello ${esc(user.fullName)},</p>
+    <p style="margin:0 0 12px;color:#374151;">Your welfare request is now <strong style="color:${statusColor};">${esc(status)}</strong>.</p>
+    ${note ? `<p style="margin:0;color:#374151;">Note: ${esc(note)}</p>` : ''}
   `)
 
   if (!resend) {
@@ -556,9 +559,9 @@ export async function sendFamilyInviteEmail({
   const subject = `${principalName} invited you to Alubonets SHG`
   const html = baseHtml(`
     <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Family membership invite</h2>
-    <p style="margin:0 0 12px;color:#374151;">Hello ${fullName},</p>
-    <p style="margin:0 0 20px;color:#374151;"><strong>${principalName}</strong> added you under their family branch on Alubonets. Complete registration to create your login. An administrator may still need to approve your account before portal access.</p>
-    <p><a href="${inviteUrl}" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Accept invite &amp; register</a></p>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${esc(fullName)},</p>
+    <p style="margin:0 0 20px;color:#374151;"><strong>${esc(principalName)}</strong> added you under their family branch on Alubonets. Complete registration to create your login. An administrator may still need to approve your account before portal access.</p>
+    <p><a href="${esc(inviteUrl)}" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Accept invite &amp; register</a></p>
   `)
 
   if (!resend) {
@@ -619,8 +622,8 @@ export async function sendFamilyLinkedNoticeEmail({
   const subject = `You were added to ${principalName}'s family branch`
   const html = baseHtml(`
     <h2 style="margin:0 0 16px;font-size:20px;color:#111827;">Family branch update</h2>
-    <p style="margin:0 0 12px;color:#374151;">Hello ${member.fullName},</p>
-    <p style="margin:0 0 20px;color:#374151;">You have been linked under <strong>${principalName}</strong> on Alubonets. Sign in to view your family branch details.</p>
+    <p style="margin:0 0 12px;color:#374151;">Hello ${esc(member.fullName)},</p>
+    <p style="margin:0 0 20px;color:#374151;">You have been linked under <strong>${esc(principalName)}</strong> on Alubonets. Sign in to view your family branch details.</p>
     <p><a href="${appUrl()}/login" style="display:inline-block;background:#001f50;color:#fff;padding:11px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Log in</a></p>
   `)
 

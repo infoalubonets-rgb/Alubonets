@@ -6,9 +6,11 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { ADMIN_LOGIN_LOGO } from '@/lib/constants'
 import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
 import { testAccountsEnabled } from '@/lib/dev-test-accounts'
-import { homeForRole, loginRequest, logoutRequest, meLookup, registerRequest } from '@/lib/auth/client'
+import { homeForAccount, loginRequest, logoutRequest, meLookup, registerRequest } from '@/lib/auth/client'
 import ErrorDialog from '@/components/ui/ErrorDialog'
+import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm'
 import { friendlyError } from '@/lib/safe-error'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 import { PasswordVisibilityIcon, UnlockIcon } from '@/components/auth/AuthIcons'
 
 type Props = {
@@ -20,7 +22,7 @@ type Props = {
 export default function LoginForm({ title = 'Member Login', allowRegister = true, admin = false }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [mode, setMode] = useState<'signin' | 'register'>('signin')
+  const [mode, setMode] = useState<'signin' | 'register' | 'forgot'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -38,7 +40,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
       .then((result) => {
         if (cancelled || result.status !== 'authenticated') return
         const next = searchParams.get('next')
-        router.replace(next && next.startsWith('/') ? next : homeForRole(result.user.role))
+        window.location.replace(safeRedirectPath(next) ?? homeForAccount(result.user))
       })
       .catch(() => {
         // Ignore — login page should stay usable
@@ -68,18 +70,6 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-    if (mode === 'signin' && !admin) {
-      try {
-        const draft = JSON.parse(localStorage.getItem('alubonets-registration-draft-v1') || 'null')
-        if (draft?.form?.email?.toLowerCase() === email.trim().toLowerCase() && draft.step > 0) {
-          setError('Your registration is not finished. Continue your saved application before signing in.')
-          window.setTimeout(() => router.push('/register'), 900)
-          return
-        }
-      } catch {
-        localStorage.removeItem('alubonets-registration-draft-v1')
-      }
-    }
     if (mode === 'register' && password !== confirmPassword) {
       setError('Passwords do not match')
       return
@@ -102,18 +92,18 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
           setError('Your account is still waiting for approval by an administrator.')
           return
         }
-        router.push('/pending')
+        window.location.assign('/pending')
         return
       }
       if (requiresVerification || redirectTo === '/verify-login') {
-        router.push('/verify-login')
+        window.location.assign('/verify-login')
         return
       }
-      const next = searchParams.get('next')
-      if (next && next.startsWith('/')) {
-        router.push(next)
+      const next = safeRedirectPath(searchParams.get('next'))
+      if (next) {
+        window.location.assign(next)
       } else {
-        router.push(redirectTo || homeForRole(user.role))
+        window.location.assign(redirectTo || homeForAccount(user))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -133,8 +123,12 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
           </div>
           <div className="bg-surface rounded-2xl pt-[52px] pb-lg px-lg shadow-2xl border border-white/10">
             <div className="text-center mb-lg">
-              <h1 className="font-h3 text-h3 text-secondary-container">{title}</h1>
+              <h1 className="font-h3 text-h3 text-secondary-container">{mode === 'forgot' ? 'Forgot your password?' : title}</h1>
             </div>
+            {mode === 'forgot' ? (
+              <ForgotPasswordForm email={email} onEmailChange={setEmail} variant="portal" onBack={() => { setError(''); setMode('signin') }} />
+            ) : (
+              <>
             <form onSubmit={onSubmit} className="flex flex-col gap-md">
               {mode === 'register' && (
                 <>
@@ -265,16 +259,13 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
             </form>
             {mode === 'signin' && (
               <p className="mt-3 text-center text-sm">
-                <Link
-                  href="/forgot-password"
+                <button
+                  type="button"
                   className="text-primary hover:underline"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    router.push('/forgot-password')
-                  }}
+                  onClick={() => { setError(''); setPassword(''); setMode('forgot') }}
                 >
                   Forgot password?
-                </Link>
+                </button>
               </p>
             )}
 
@@ -310,6 +301,8 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   </>
                 )}
               </p>
+            )}
+              </>
             )}
           </div>
           <p className="text-center mt-lg">

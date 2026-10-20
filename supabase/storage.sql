@@ -72,11 +72,12 @@ create policy gallery_storage_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'gallery' and (public.is_admin() or public.current_app_role() = 'ORGANIZER'));
 
--- Documents: authenticated members read; secretary/admin write (use signed URLs for private access)
+-- Documents: only admin/secretary read directly; members get short-lived signed links from the
+-- site after its per-document permission checks (loan evidence lives here too).
 drop policy if exists documents_storage_read on storage.objects;
 create policy documents_storage_read on storage.objects
   for select to authenticated
-  using (bucket_id = 'documents' and public.is_active_member());
+  using (bucket_id = 'documents' and (public.is_admin() or public.current_app_role() = 'SECRETARY'));
 
 drop policy if exists documents_storage_upload on storage.objects;
 create policy documents_storage_upload on storage.objects

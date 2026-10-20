@@ -63,7 +63,7 @@ function ContactSuccessModal({ open, onClose }: { open: boolean; onClose: () => 
 export default function ContactForm() {
   const formRef = useRef<HTMLFormElement>(null)
   const [pending, startTransition] = useTransition()
-  const [error, setError] = useState<'invalid' | 'rate' | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [successOpen, setSuccessOpen] = useState(false)
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -72,33 +72,32 @@ export default function ContactForm() {
     const formData = new FormData(form)
     setError(null)
     startTransition(async () => {
-      const result: ContactSubmitResult = await sendContactMessage(formData)
-      if (!result.ok) {
-        setError(result.error)
-        return
+      try {
+        const result: ContactSubmitResult = await sendContactMessage(formData)
+        if (!result.ok) {
+          setError(result.error === 'rate'
+            ? 'Too many messages were submitted. Please wait before trying again.'
+            : result.message || 'Please check the form fields.')
+          return
+        }
+        formRef.current?.reset()
+        setSuccessOpen(true)
+      } catch {
+        setError('We could not send your message. Please try again.')
       }
-      formRef.current?.reset()
-      setSuccessOpen(true)
     })
   }
 
   return (
     <>
-      {error === 'invalid' && (
-        <div className="mb-md flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-          <span className="material-symbols-outlined icon-fill text-red-500">error</span>
-          <p className="text-[14px] font-medium">
-            Please provide a valid name, email address and message.
-          </p>
-        </div>
-      )}
-      {error === 'rate' && (
-        <div className="mb-md rounded-xl bg-red-50 p-3 text-sm text-red-700">
-          Too many messages were submitted. Please wait before trying again.
+      {error && (
+        <div role="alert" className="mb-md flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+          <span className="material-symbols-outlined icon-fill text-red-500" aria-hidden="true">error</span>
+          <p className="text-[14px] font-medium">{error}</p>
         </div>
       )}
 
-      <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-md">
+      <form ref={formRef} onSubmit={onSubmit} onInput={() => setError(null)} onReset={() => setError(null)} className="flex flex-col gap-md">
         <input name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
         <div>
           <div className="contact-section-label mb-sm">
@@ -117,6 +116,8 @@ export default function ContactForm() {
                   className="contact-field-modern font-body-md text-[16px] text-on-surface"
                   id="name"
                   name="name"
+                  minLength={2}
+                  maxLength={120}
                   placeholder="Jane Doe"
                   type="text"
                   required
@@ -134,6 +135,7 @@ export default function ContactForm() {
                   className="contact-field-modern font-body-md text-[16px] text-on-surface"
                   id="phone"
                   name="phone"
+                  maxLength={40}
                   placeholder="+254 7** *** ***"
                   type="tel"
                   required
@@ -153,6 +155,7 @@ export default function ContactForm() {
                   className="contact-field-modern font-body-md text-[16px] text-on-surface"
                   id="email"
                   name="email"
+                  maxLength={254}
                   placeholder="jane@example.com"
                   type="email"
                   required
@@ -205,6 +208,7 @@ export default function ContactForm() {
                 className="contact-field-modern font-body-md text-[16px] text-on-surface resize-none"
                 id="message"
                 name="message"
+                maxLength={5000}
                 placeholder="Please provide details about your inquiry..."
                 rows={4}
                 required

@@ -8,7 +8,10 @@
  * - MPESA_TRANSACTION_TYPE: `CustomerPayBillOnline` (default) or `CustomerBuyGoodsOnline`
  * - MPESA_TILL_NUMBER: required for Buy Goods; receives the money (PartyB)
  * - MPESA_CALLBACK_URL (optional): defaults to NEXT_PUBLIC_APP_URL/api/mpesa/callback
+ * - MPESA_CALLBACK_TOKEN (recommended): random secret appended to the callback URL
  */
+
+import { timingSafeEqual } from 'crypto'
 
 export type MpesaTransactionType = 'CustomerPayBillOnline' | 'CustomerBuyGoodsOnline'
 
@@ -41,7 +44,46 @@ export function mpesaConfigured() {
 }
 
 export function mpesaCallbackUrl() {
-  return process.env.MPESA_CALLBACK_URL || `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'}/api/mpesa/callback`
+  const base = process.env.MPESA_CALLBACK_URL || `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'}/api/mpesa/callback`
+  // A secret only Safaricom learns (it is sent inside each STK request), so forged callbacks
+  // without it are rejected. Optional: the STK Query check below is the real safeguard.
+  const token = process.env.MPESA_CALLBACK_TOKEN?.trim()
+  if (!token) return base
+  const url = new URL(base)
+  url.searchParams.set('token', token)
+  return url.toString()
+}
+
+/** True when the callback carries the configured secret token (or no token is configured). */
+export function mpesaCallbackTokenValid(received: string | null) {
+  const expected = process.env.MPESA_CALLBACK_TOKEN?.trim()
+  if (!expected) return true
+  if (!received || received.length !== expected.length) return false
+  return timingSafeEqual(Buffer.from(received), Buffer.from(expected))
+}
+
+/**
+ * Asks Safaricom directly whether an STK request was paid. Callbacks are unauthenticated HTTP
+ * posts, so a payment is only credited after this confirms ResultCode 0 for that request.
+ */
+export async function stkQuery(checkoutRequestId: string): Promise<{ paid: boolean; resultCode: string; resultDesc: string }> {
+  const token = await getMpesaAccessToken()
+  const shortcode = required('MPESA_SHORTCODE')
+  const passkey = required('MPESA_PASSKEY')
+  const ts = timestamp()
+  const res = await fetch(`${baseUrl()}/mpesa/stkpushquery/v1/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      BusinessShortCode: shortcode,
+      Password: Buffer.from(`${shortcode}${passkey}${ts}`).toString('base64'),
+      Timestamp: ts,
+      CheckoutRequestID: checkoutRequestId,
+    }),
+  })
+  const data = await res.json().catch(() => ({}))
+  const resultCode = String(data.ResultCode ?? data.errorCode ?? '')
+  return { paid: res.ok && resultCode === '0', resultCode, resultDesc: String(data.ResultDesc ?? data.errorMessage ?? '') }
 }
 
 export function formatMpesaPhone(raw: string) {

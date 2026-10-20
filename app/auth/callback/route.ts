@@ -3,9 +3,10 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
-import { ROLE_HOME, ALL_ROLES } from '@/lib/auth/types'
+import { homeForAccount, ALL_ROLES } from '@/lib/auth/types'
 import { syncUserMetadata } from '@/lib/auth/session'
 import { onboardingPath, onboardingStep } from '@/lib/auth/onboarding'
+import { safeRedirectPath } from '@/lib/safe-redirect'
 import type { Role } from '@prisma/client'
 
 export async function GET(request: Request) {
@@ -95,7 +96,7 @@ export async function GET(request: Request) {
   }
 
   const safeNext =
-    next && next.startsWith('/') && !next.startsWith('//') ? next : ROLE_HOME[profile.role]
+    safeRedirectPath(next) ?? homeForAccount(profile)
 
   return NextResponse.redirect(`${origin}${safeNext}`)
 }

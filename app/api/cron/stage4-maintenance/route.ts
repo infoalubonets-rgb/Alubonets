@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic'
  * - Scheduled announcements
  * - Retry failed announcement emails (up to 3)
  * - Membership standing (paid-up / lapsed)
- * Protect with Authorization: Bearer $CRON_SECRET (or ?secret=).
+ * Protect with Authorization: Bearer $CRON_SECRET.
  */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -29,8 +29,8 @@ export async function GET(req: NextRequest) {
 
   const auth = req.headers.get('authorization')
   const bearer = auth?.startsWith('Bearer ') ? auth.slice(7) : null
-  const querySecret = req.nextUrl.searchParams.get('secret')
-  if (bearer !== secret && querySecret !== secret) {
+  // Header only: a secret in the URL ends up in access logs and browser history.
+  if (bearer !== secret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

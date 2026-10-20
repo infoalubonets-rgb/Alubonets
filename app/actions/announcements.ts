@@ -1,6 +1,7 @@
 'use server'
 
 import { after } from 'next/server'
+import { headers } from 'next/headers'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import type { Role } from '@prisma/client'
@@ -208,7 +209,7 @@ export async function createTargetedAnnouncement(formData: FormData) {
   }
 }
 
-export async function deliverAnnouncementEmails(announcementId: string, actorId?: string) {
+async function deliverAnnouncementEmails(announcementId: string, actorId?: string) {
   const announcement = await prisma.announcement.findUniqueOrThrow({
     where: { id: announcementId },
     include: {
@@ -324,7 +325,18 @@ export async function retryFailedAnnouncementEmails(formData: FormData) {
   return result
 }
 
+/**
+ * Exports of a 'use server' file can be called as server actions, so the cron-only jobs below
+ * check for the cron request's Bearer secret themselves.
+ */
+async function requireCronRequest() {
+  const secret = process.env.CRON_SECRET
+  const auth = (await headers()).get('authorization')
+  if (!secret || auth !== `Bearer ${secret}`) throw new Error('Not allowed.')
+}
+
 export async function processScheduledAnnouncements() {
+  await requireCronRequest()
   const due = await prisma.announcement.findMany({
     where: { status: 'SCHEDULED', scheduledFor: { lte: new Date() } },
     select: { id: true, authorId: true },
@@ -342,6 +354,7 @@ export async function processScheduledAnnouncements() {
 }
 
 export async function processEventReminders() {
+  await requireCronRequest()
   const now = new Date()
   const events = await prisma.event.findMany({
     where: {
@@ -390,6 +403,7 @@ export async function processEventReminders() {
 }
 
 export async function retryFailedAnnouncementEmailsBatch() {
+  await requireCronRequest()
   const failed = await prisma.announcementReceipt.findMany({
     where: { emailStatus: 'FAILED', retryCount: { lt: 3 } },
     select: { announcementId: true },

@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { cookies } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
-import { ROLE_HOME } from '@/lib/auth/types'
+import { homeForAccount } from '@/lib/auth/types'
 import { syncUserMetadata } from '@/lib/auth/session'
 import { toAuthUser } from '@/lib/auth/helpers'
 import { clearRateLimit, enforceRateLimit } from '@/lib/rate-limit'
@@ -170,6 +170,9 @@ export async function POST(req: Request) {
             setTimeout(() => reject(new Error('metadata sync timeout')), 6_000),
           ),
         ])
+        // Persist a JWT with the updated role before the browser loads a protected page.
+        const refreshed = await supabase.auth.refreshSession()
+        if (refreshed.error) throw refreshed.error
       } catch (cause) {
         logError('auth.login.metadata_sync', cause, { userId: profile.id })
       }
@@ -276,8 +279,8 @@ export async function POST(req: Request) {
 
     const user = toAuthUser(profile)
     // Members an administrator created are sent to My profile until they fill in their details.
-    let redirectTo = ROLE_HOME[user.role]
-    if (profile.approvalNotes === ADMIN_CREATED_NOTE) {
+    let redirectTo = homeForAccount(profile)
+    if (!profile.isSuperAdmin && profile.role !== 'ADMIN' && profile.approvalNotes === ADMIN_CREATED_NOTE) {
       const details = await prisma.user.findUnique({ where: { id: profile.id }, include: { memberProfile: true } })
       if (details && needsProfileCompletion(details)) redirectTo = '/profile?complete=1'
     }

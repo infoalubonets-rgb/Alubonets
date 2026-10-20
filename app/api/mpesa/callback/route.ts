@@ -3,6 +3,7 @@ import { revalidateTag } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { createLedgerContribution, getPeriodForDate } from '@/lib/finance'
+import { mpesaCallbackTokenValid, stkQuery } from '@/lib/mpesa/daraja'
 
 type CallbackBody = {
   Body?: {
@@ -57,17 +58,43 @@ async function findStkInit(checkoutRequestId: string) {
   }
 }
 
+const ACCEPTED = { ResultCode: 0, ResultDesc: 'Accepted' }
+
+/** True when this STK request has already been credited (a replayed or duplicate callback). */
+async function alreadyCredited(checkoutRequestId: string) {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM audit_logs
+    WHERE action = 'MPESA_STK_SUCCESS' AND meta->>'checkoutRequestId' = ${checkoutRequestId}
+    LIMIT 1
+  `
+  return rows.length > 0
+}
+
+/**
+ * Safaricom STK callback. The request itself is unauthenticated, so nothing in it is trusted
+ * on its own: a payment is credited only when (1) it carries our secret token, (2) it matches
+ * an STK request this site started, (3) Safaricom's STK Query confirms that request was paid,
+ * and (4) it has not been credited before. The amount always comes from our own STK record.
+ */
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as CallbackBody
+  if (!mpesaCallbackTokenValid(req.nextUrl.searchParams.get('token'))) {
+    console.warn('M-Pesa callback rejected: missing or wrong token')
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  const body = (await req.json().catch(() => ({}))) as CallbackBody
   const cb = body.Body?.stkCallback
-  if (!cb) return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
+  if (!cb) return NextResponse.json(ACCEPTED)
 
   const checkoutRequestId = cb.CheckoutRequestID
 
   // Look up the initiating STK for userId + meta (phone, amount)
   const stkInit = checkoutRequestId ? await findStkInit(checkoutRequestId) : null
-  const initiatorUserId = stkInit?.userId
-  const stkMeta = stkInit?.meta
+  if (!checkoutRequestId || !stkInit) {
+    console.warn('M-Pesa callback ignored: no matching STK request', { checkoutRequestId })
+    return NextResponse.json(ACCEPTED)
+  }
+  const initiatorUserId = stkInit.userId
+  const stkMeta = stkInit.meta
   const targetUserId = stkMeta?.targetUserId || initiatorUserId
 
   // Handle failure — save to audit log so treasurer can inspect
@@ -97,14 +124,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
   }
 
-  // Successful payment
+  // Claimed success: confirm with Safaricom before any money is recorded.
+  if (await alreadyCredited(checkoutRequestId)) return NextResponse.json(ACCEPTED)
+  let verified = false
+  try {
+    verified = (await stkQuery(checkoutRequestId)).paid
+  } catch (error) {
+    console.error('M-Pesa STK Query failed; payment not credited', error)
+  }
+  if (!verified) {
+    try {
+      await prisma.auditLog.create({
+        data: {
+          userId: initiatorUserId,
+          action: 'MPESA_STK_UNVERIFIED',
+          entity: 'Contribution',
+          meta: { checkoutRequestId, claimedResultCode: cb.ResultCode ?? null, rawPayload: body as Prisma.InputJsonValue },
+        },
+      })
+    } catch { /* non-fatal */ }
+    return NextResponse.json(ACCEPTED)
+  }
+
   const items = cb.CallbackMetadata?.Item || []
-  const amount = Number(items.find((i) => i.Name === 'Amount')?.Value || 0)
+  // The amount is the one this site requested, never the figure inside the callback.
+  const amount = Number(stkMeta?.amount || 0)
   const receipt = String(items.find((i) => i.Name === 'MpesaReceiptNumber')?.Value || '')
-  const phone = String(items.find((i) => i.Name === 'PhoneNumber')?.Value || '')
+  const phone = String(items.find((i) => i.Name === 'PhoneNumber')?.Value || stkMeta?.phone || '')
 
   const providerReference = receipt || checkoutRequestId
-  if (!providerReference || amount <= 0) return NextResponse.json({ ResultCode: 0, ResultDesc: 'Accepted' })
+  if (!providerReference || amount <= 0) return NextResponse.json(ACCEPTED)
   let paymentEvent
   try {
     paymentEvent = await prisma.paymentEvent.create({

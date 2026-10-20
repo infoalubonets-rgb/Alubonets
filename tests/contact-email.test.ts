@@ -68,4 +68,26 @@ describe('contact enquiry forwarding and notifications', () => {
     expect(m.notify).toHaveBeenCalledTimes(1)
     expect(m.update).toHaveBeenCalledWith({ where: { id: 'enquiry-1' }, data: { emailStatus: 'not_configured' } })
   })
+  it('accepts the short message from the reported form submission', async () => {
+    const data = form()
+    data.set('name', 'Info Alubonets')
+    data.set('email', 'infoalubonets@gmail.com')
+    data.set('phone', '+254714516132')
+    data.set('message', 'hehe')
+    expect(await sendContactMessage(data)).toEqual({ ok: true })
+    expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ message: 'hehe' }) })
+  })
+  it('explains a whitespace-only message and does not save or email it', async () => {
+    const data = form()
+    data.set('message', '   ')
+    expect(await sendContactMessage(data)).toEqual({ ok: false, error: 'invalid', message: 'Enter a message.' })
+    expect(m.create).not.toHaveBeenCalled()
+    expect(m.send).not.toHaveBeenCalled()
+  })
+  it('identifies an invalid email instead of blaming every input', async () => {
+    const data = form()
+    data.set('email', 'invalid-email')
+    expect(await sendContactMessage(data)).toEqual({ ok: false, error: 'invalid', message: 'Enter a valid email address.' })
+  })
+
 })

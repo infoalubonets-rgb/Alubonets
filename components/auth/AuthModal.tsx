@@ -2,12 +2,13 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { type FormEvent, useEffect, useState } from 'react'
-import { homeForRole, loginRequest, registerRequest } from '@/lib/auth/client'
+import { homeForAccount, loginRequest, registerRequest } from '@/lib/auth/client'
 import { createClient } from '@/utils/supabase/client'
 import DevAccountsDropdown from '@/components/auth/DevAccountsDropdown'
 import { testAccountsEnabled } from '@/lib/dev-test-accounts'
 import GoogleButton from '@/components/auth/GoogleButton'
 import RegistrationWizard from '@/components/auth/RegistrationWizard'
+import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm'
 import { PasswordVisibilityIcon } from '@/components/auth/AuthIcons'
 
 type AuthTab = 'signin' | 'signup' | 'signup-success' | 'forgot'
@@ -70,10 +71,8 @@ export default function AuthModal() {
 
   useEffect(() => {
     _open = (t: AuthTab = 'signin') => {
-      if (t === 'forgot') {
-        router.push('/forgot-password')
-        return
-      }
+      setError('')
+      setPassword('')
       setTab(t)
       setOpen(true)
     }
@@ -100,23 +99,16 @@ export default function AuthModal() {
   const onSignIn = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
-    try {
-      const draft = JSON.parse(localStorage.getItem('alubonets-registration-draft-v1') || 'null')
-      if (draft?.form?.email?.toLowerCase() === email.trim().toLowerCase() && draft.step > 0) {
-        setTab('signup')
-        return
-      }
-    } catch { localStorage.removeItem('alubonets-registration-draft-v1') }
     setLoading(true)
     try {
       const { user, redirectTo, status, requiresVerification } = await loginRequest(email, password)
       setOpen(false)
       if (status === 'PENDING') {
-        router.push('/pending')
+        window.location.assign('/pending')
       } else if (requiresVerification || redirectTo === '/verify-login') {
-        router.push('/verify-login')
+        window.location.assign('/verify-login')
       } else {
-        router.push(redirectTo || homeForRole(user.role))
+        window.location.assign(redirectTo || homeForAccount(user))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid credentials')
@@ -239,8 +231,9 @@ export default function AuthModal() {
                 <button
                   type="button"
                   onClick={() => {
-                    setOpen(false)
-                    router.push('/forgot-password')
+                    setError('')
+                    setPassword('')
+                    setTab('forgot')
                   }}
                   className="hover:text-primary"
                 >
@@ -355,14 +348,9 @@ export default function AuthModal() {
           )}
 
           {tab === 'forgot' && (
-            <div className="auth-tab-content flex flex-col gap-md">
-              <h2 className="font-h3 text-h3 text-primary">Reset Password</h2>
-              <p className="text-sm text-on-surface-variant">
-                We will email you a secure password-reset link.
-              </p>
-              <button type="button" onClick={() => { setOpen(false); router.push('/forgot-password') }} className="auth-primary-btn">
-                Continue
-              </button>
+            <div className="flex flex-col gap-md">
+              <h2 className="font-h3 text-h3 text-primary">Forgot your password?</h2>
+              <ForgotPasswordForm email={email} onEmailChange={setEmail} onBack={() => { setError(''); setTab('signin') }} />
             </div>
           )}
         </div>

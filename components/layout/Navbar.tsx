@@ -6,16 +6,53 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { openAuthModal } from '@/components/auth/AuthModal'
 import { NAV_LINKS, SITE_LOGO } from '@/lib/constants'
+import { meLookup, type AuthUser } from '@/lib/auth/client'
 
 const CLOSE_MS = 280
 const MOBILE_MENU_TITLE_ID = 'mobile-navigation-title'
 
+function AccountAvatar({ user }: { user: AuthUser }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [user.avatarUrl])
+  return (
+    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-white" aria-hidden="true">
+      {user.avatarUrl && !failed
+        ? <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />
+        : user.email.trim().charAt(0).toUpperCase() || 'A'}
+    </span>
+  )
+}
+
 export default function Navbar() {
   const pathname = usePathname()
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuShown, setMenuShown] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [backdropReady, setBackdropReady] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    let latest = 0
+    const refresh = async () => {
+      const request = ++latest
+      const result = await meLookup()
+      if (!active || request !== latest) return
+      if (result.status === 'authenticated') setUser(result.user)
+      else if (result.status === 'unauthenticated') setUser(null)
+    }
+    const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
+    void refresh()
+    window.addEventListener('focus', refresh)
+    window.addEventListener('pageshow', refresh)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('pageshow', refresh)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [pathname])
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
@@ -120,6 +157,12 @@ export default function Navbar() {
                   </li>
                 ))}
               </ul>
+              {user ? (
+                <Link href="/profile" onClick={closeMenu} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-secondary-container px-lg py-3 font-label-bold text-on-primary">
+                  <AccountAvatar user={user} />
+                  Account
+                </Link>
+              ) : (
               <button
                 type="button"
                 className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl bg-secondary-container px-lg py-3 font-label-bold text-on-primary"
@@ -130,6 +173,7 @@ export default function Navbar() {
               >
                 Login / Register
               </button>
+              )}
             </nav>
           </div>
         </div>,
@@ -163,6 +207,12 @@ export default function Navbar() {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-md">
+            {user ? (
+              <Link href="/profile" className="flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-secondary-container px-3 py-2 font-label-bold text-on-primary transition-opacity hover:opacity-90" aria-label="Account">
+                <AccountAvatar user={user} />
+                <span className="hidden sm:inline">Account</span>
+              </Link>
+            ) : (
             <button
               type="button"
               className="hidden min-h-[48px] items-center justify-center rounded-lg bg-secondary-container px-md py-sm font-label-bold text-label-bold text-on-primary transition-opacity hover:opacity-90 md:flex"
@@ -170,6 +220,7 @@ export default function Navbar() {
             >
               Login / Register
             </button>
+            )}
             <button
               type="button"
               className="flex h-11 w-11 items-center justify-center rounded-lg text-primary hover:bg-surface-container md:hidden"
