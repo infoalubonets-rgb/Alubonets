@@ -5,6 +5,7 @@ import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
 import { ageOn } from '@/lib/profile-privacy'
+import { familyTag } from '@/lib/family-tags'
 
 const RELATIONSHIP_LABEL: Record<string, string> = {
   SPOUSE: 'Spouse',
@@ -81,7 +82,7 @@ export default async function MyFamilyPage({ adminWorkspace = false }: { adminWo
     where: { id: actor.id },
     include: {
       memberProfile: true,
-      principal: { select: { id: true, fullName: true } },
+      principal: { select: { id: true, fullName: true, familyCode: true } },
       attachedMembers: {
         orderBy: { fullName: 'asc' },
         select: {
@@ -94,6 +95,9 @@ export default async function MyFamilyPage({ adminWorkspace = false }: { adminWo
           phone: true,
           location: true,
           membershipNumber: true,
+          familyCode: true,
+          familyMemberNumber: true,
+          isPrincipal: true,
           standing: true,
           contributionExempt: true,
           approvedAt: true,
@@ -118,7 +122,6 @@ export default async function MyFamilyPage({ adminWorkspace = false }: { adminWo
               memberCategory: true,
             },
           },
-          isPrincipal: true,
         },
       },
       familyInvitesSent: {
@@ -167,6 +170,8 @@ export default async function MyFamilyPage({ adminWorkspace = false }: { adminWo
           phone: m.phone,
           location: m.location,
           isPrincipal: false,
+          memberId: m.membershipNumber,
+          familyTag: familyTag({ ...m, principal: { familyCode: me.familyCode } }),
           // The Principal sees every detail of the members attached to them.
           details: fullDetails(m),
         })),
@@ -188,6 +193,10 @@ export default async function MyFamilyPage({ adminWorkspace = false }: { adminWo
               familyRegistrationState: true,
               phone: true,
               location: true,
+              membershipNumber: true,
+              familyCode: true,
+              familyMemberNumber: true,
+              principal: { select: { familyCode: true } },
             },
           })
           return siblings.filter((m) => m.id !== me.id).map((m) => ({
@@ -205,6 +214,8 @@ export default async function MyFamilyPage({ adminWorkspace = false }: { adminWo
             location: m.location,
             isPrincipal: m.isPrincipal,
             isYou: m.id === me.id,
+            memberId: m.membershipNumber,
+            familyTag: familyTag(m),
             ...(m.id === me.id ? { details: fullDetails(me) } : {}),
           }))
         })()
@@ -226,6 +237,7 @@ export default async function MyFamilyPage({ adminWorkspace = false }: { adminWo
       <FamilyBranchClient
         isPrincipal={me.isPrincipal}
         canManage={false}
+        yourIdentity={{ memberId: me.membershipNumber, familyTag: familyTag(me) }}
         principalName={me.isPrincipal ? me.fullName : me.principal?.fullName || null}
         relationshipLabel={
           me.familyRelationship

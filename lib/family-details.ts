@@ -9,6 +9,8 @@ export type FamilyDetailMember = {
   isPrincipal?: boolean
   phone?: string | null
   location?: string | null
+  memberId?: string | null
+  familyTag?: string | null
   details?: [string, string][]
 }
 
@@ -34,6 +36,8 @@ export function familyDetailView(member: FamilyDetailMember, relationshipToPrinc
       ['Relationship', member.isPrincipal ? 'Principal Member' : member.relationship || 'Family member'],
       ['Email', member.email],
       ['Phone', member.phone || 'Not provided'],
+      ...(member.memberId ? [['Member ID', member.memberId] as [string, string]] : []),
+      ...(member.familyTag ? [['Family tag', member.familyTag] as [string, string]] : []),
       ['Membership status', member.status],
       ['Registration state', member.registrationState.replaceAll('_', ' ')],
       ...(member.details ?? []),

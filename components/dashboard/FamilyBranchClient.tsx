@@ -34,6 +34,24 @@ type InviteRow = {
 
 type BranchMember = FamilyDetailMember
 
+function IdentityChips({ memberId, familyTag }: { memberId?: string | null; familyTag?: string | null }) {
+  if (!memberId && !familyTag) return null
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-1">
+      {memberId && (
+        <span className="rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[11px] font-bold text-primary" title="Member ID">
+          {memberId}
+        </span>
+      )}
+      {familyTag && (
+        <span className="rounded-md bg-secondary-container/15 px-1.5 py-0.5 font-mono text-[11px] font-bold text-secondary" title="Family tag">
+          {familyTag}
+        </span>
+      )}
+    </p>
+  )
+}
+
 export default function FamilyBranchClient({
   isPrincipal,
   principalName,
@@ -43,6 +61,7 @@ export default function FamilyBranchClient({
   transitionHistory,
   otherPrincipals = [],
   canManage = false,
+  yourIdentity,
 }: {
   isPrincipal: boolean
   /** Adding, moving or removing branch members is for Admins; Principals only view their branch. */
@@ -53,6 +72,8 @@ export default function FamilyBranchClient({
   members: BranchMember[]
   pendingInvites: InviteRow[]
   transitionHistory: Array<{ id: string; type: string; reason: string; fromState: string; toState: string; occurredAt: string; memberName: string }>
+  /** The signed-in member's ID and family tag — shown on this page, not in the site header. */
+  yourIdentity?: { memberId: string | null; familyTag: string | null }
 }) {
   const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
@@ -193,6 +214,12 @@ export default function FamilyBranchClient({
       </div>}
       <section className="mx-auto w-full max-w-6xl overflow-hidden rounded-2xl border border-outline-variant/70 bg-surface shadow-[0_8px_24px_rgba(0,31,80,0.06)] dark:border-[#1a2d4f] dark:bg-[#0d1729]">
         <div className="p-4">
+          {yourIdentity && (yourIdentity.memberId || yourIdentity.familyTag) && (
+            <div className="mb-3 rounded-xl border border-outline-variant/60 bg-surface-container-lowest px-3 py-2.5">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">Your IDs</p>
+              <IdentityChips memberId={yourIdentity.memberId} familyTag={yourIdentity.familyTag} />
+            </div>
+          )}
           {principal && (
             <div className="flex items-center gap-3 rounded-xl bg-primary/[0.045] p-3 dark:bg-white/[0.04]">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-on-primary">
@@ -207,6 +234,7 @@ export default function FamilyBranchClient({
                     Principal Member
                   </span>
                 </div>
+                <IdentityChips memberId={principal.memberId} familyTag={principal.familyTag} />
               </div>
               <button type="button" onClick={() => setDetailMember(principal)} aria-label={principal.isYou ? 'View my details' : `View Principal details for ${principal.fullName}`} title={principal.isYou ? 'My details' : 'Principal Member details'} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-outline-variant text-primary transition hover:bg-primary/5">
                 <span className="material-symbols-outlined text-[18px]">visibility</span>
@@ -225,6 +253,7 @@ export default function FamilyBranchClient({
                   <p className="truncate text-sm font-medium text-on-surface dark:text-blue-50">
                     {member.fullName}{member.isYou ? ' (you)' : ''}
                   </p>
+                  <IdentityChips memberId={member.memberId} familyTag={member.familyTag} />
                   <p className="truncate text-xs text-on-surface-variant dark:text-blue-200/55">{member.email}</p>
                   <p className="text-xs text-on-surface-variant dark:text-blue-200/55">
                     {member.phone || 'No phone'}

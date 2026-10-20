@@ -126,17 +126,7 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
                       className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`}
                     >
                       <td className="px-4 py-3">
-                        <p className="flex items-center gap-1.5 font-medium text-on-surface">
-                          {member.fullName}
-                          {member.familyTag && (
-                            <span className="rounded-md bg-secondary-container/15 px-1.5 py-0.5 font-mono text-[11px] font-bold text-secondary" title="Family tag">
-                              {member.familyTag}
-                            </span>
-                          )}
-                        </p>
-                        {member.details?.membershipNumber && (
-                          <p className="text-xs text-on-surface-variant">{member.details.membershipNumber}</p>
-                        )}
+                        <p className="font-medium text-on-surface">{member.fullName}</p>
                       </td>
                       <td className="px-4 py-3 text-on-surface-variant">{roleLabel(member)}</td>
                       <td className="px-4 py-3">
@@ -193,8 +183,6 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
             <DetailRow label="Role" value={roleLabel(selected)} />
             <DetailRow label="Member type" value={memberType(selected)} />
             <DetailRow label="Account status" value={selected.account && title(selected.account.status)} />
-            <DetailRow label="Member ID" value={selected.details?.membershipNumber} />
-            <DetailRow label="Family tag" value={selected.familyTag} />
             <DetailRow label="Standing" value={selected.details && title(selected.details.standing)} />
             <DetailRow label="Joined" value={selected.details && new Date(selected.details.joinedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })} />
             <DetailRow label="Principal member" value={selected.principalName} />
