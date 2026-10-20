@@ -2,7 +2,10 @@
 
 import { createHash, randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
+import { unstable_rethrow } from 'next/navigation'
 import { z } from 'zod'
+import { logError } from '@/lib/logger'
+import { publicErrorMessage } from '@/lib/safe-error'
 import type { FamilyRelationship, Role } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin, syncUserMetadata } from '@/lib/auth/session'
@@ -134,7 +137,26 @@ const setupUrlFor = (token: string) => `${appUrl()}/account-setup?token=${token}
  *   password with no email code; after signing in they are asked to complete My profile.
  * - **Minor:** a family record without a login; the admin may fill any of the details.
  */
-export async function adminCreateMember(input: z.input<typeof createMemberSchema>) {
+export type CreateMemberResult =
+  | ({ ok: true } & Awaited<ReturnType<typeof createMember>>)
+  | { ok: false; error: string }
+
+/**
+ * Errors thrown by a server action reach the browser as a generic "An error occurred in the
+ * Server Components render" in production, so the reason is returned as data instead.
+ */
+export async function adminCreateMember(input: z.input<typeof createMemberSchema>): Promise<CreateMemberResult> {
+  try {
+    return { ok: true, ...(await createMember(input)) }
+  } catch (cause) {
+    unstable_rethrow(cause)
+    if (cause instanceof z.ZodError) return { ok: false, error: cause.issues[0]?.message || 'Check the form details.' }
+    logError('member_admin.create_failed', cause)
+    return { ok: false, error: publicErrorMessage(cause, 'Could not add the member. Please try again.') }
+  }
+}
+
+async function createMember(input: z.input<typeof createMemberSchema>) {
   const actor = await requireAdmin()
   const data = createMemberSchema.parse(input)
   const role: Role = data.isMinor ? 'MEMBER' : data.role
@@ -149,8 +171,17 @@ export async function adminCreateMember(input: z.input<typeof createMemberSchema
   const email = data.isMinor
     ? data.email || `record+${randomBytes(8).toString('hex')}@alubonets.local`
     : data.email!
-  if (await prisma.user.findUnique({ where: { email }, select: { id: true } })) {
-    throw new Error('A member with this email already exists.')
+  const existing = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, status: true, authUserId: true, _count: { select: { consentRecords: true } } },
+  })
+  // A sign-up that never submitted the application (typically a first "Continue with Google")
+  // holds no member data, so the admin's record takes it over instead of failing. The person
+  // keeps their existing login, Google included.
+  const unfinished =
+    existing && !data.isMinor && existing.status === 'PENDING' && existing._count.consentRecords === 0 ? existing : null
+  if (existing && !unfinished) {
+    throw new Error('A member with this email already exists. Find them in the Directory instead.')
   }
   const principal = data.principalId ? await prisma.user.findUnique({ where: { id: data.principalId } }) : null
   if (data.principalId && !principal) throw new Error('Principal Member not found.')
@@ -158,7 +189,17 @@ export async function adminCreateMember(input: z.input<typeof createMemberSchema
 
   // Adults get their login straight away, already confirmed, with the temporary password.
   let authUserId: string | null = null
-  if (!data.isMinor) {
+  let createdLoginHere = false
+  if (!data.isMinor && unfinished?.authUserId) {
+    // Reuse the unfinished sign-up's login; the temporary password is added to it.
+    const { error } = await createServiceClient().auth.admin.updateUserById(unfinished.authUserId, {
+      password: data.password!,
+      email_confirm: true,
+      user_metadata: { full_name: data.fullName },
+    })
+    if (error) throw new Error(`Could not update the existing login: ${error.message}`)
+    authUserId = unfinished.authUserId
+  } else if (!data.isMinor) {
     const service = createServiceClient()
     const { data: createdAuth, error } = await service.auth.admin.createUser({
       email,
@@ -167,9 +208,14 @@ export async function adminCreateMember(input: z.input<typeof createMemberSchema
       user_metadata: { full_name: data.fullName },
     })
     if (error || !createdAuth.user) {
-      throw new Error(error?.message?.toLowerCase().includes('already') ? 'A login with this email already exists.' : `Could not create the login: ${error?.message ?? 'unknown error'}`)
+      throw new Error(
+        error?.message?.toLowerCase().includes('already')
+          ? 'A login already exists for this email in Supabase but has no member record. Remove it under Supabase → Authentication → Users, then try again.'
+          : `Could not create the login: ${error?.message ?? 'unknown error'}`,
+      )
     }
     authUserId = createdAuth.user.id
+    createdLoginHere = true
   }
 
   const { location, ...profileFields } = data.profile
@@ -177,26 +223,35 @@ export async function adminCreateMember(input: z.input<typeof createMemberSchema
   let created
   try {
     created = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email,
-          fullName: data.fullName,
-          phone: data.phone ?? null,
-          location: location ?? null,
-          role,
-          // Record-only minors follow the family convention: no login, so not an active account.
-          status: data.isMinor ? 'INACTIVE' : 'ACTIVE',
-          approvedAt: new Date(),
-          approvalNotes: ADMIN_CREATED_NOTE,
-          membershipNumber: await nextMembershipNumber(tx),
-          authUserId,
-          isPrincipal: data.isPrincipal,
-          principalMemberId: principal?.id ?? null,
-          familyRelationship: principal ? (data.relationship as FamilyRelationship) : null,
-          familyRegistrationState: data.isMinor ? 'RECORD_ONLY' : principal ? 'ACTIVE_ATTACHED' : 'STANDARD',
-          memberProfile: { create: { dateOfBirth: dob, ...profileFields } },
-        },
-      })
+      const fields = {
+        fullName: data.fullName,
+        phone: data.phone ?? null,
+        location: location ?? null,
+        role,
+        // Record-only minors follow the family convention: no login, so not an active account.
+        status: data.isMinor ? ('INACTIVE' as const) : ('ACTIVE' as const),
+        approvedAt: new Date(),
+        approvalNotes: ADMIN_CREATED_NOTE,
+        membershipNumber: await nextMembershipNumber(tx),
+        authUserId,
+        isPrincipal: data.isPrincipal,
+        principalMemberId: principal?.id ?? null,
+        familyRelationship: principal ? (data.relationship as FamilyRelationship) : null,
+        familyRegistrationState: data.isMinor ? ('RECORD_ONLY' as const) : principal ? ('ACTIVE_ATTACHED' as const) : ('STANDARD' as const),
+      }
+      const user = unfinished
+        ? await tx.user.update({
+            where: { id: unfinished.id },
+            data: {
+              ...fields,
+              memberProfile: {
+                upsert: { create: { dateOfBirth: dob, ...profileFields }, update: { dateOfBirth: dob, ...profileFields } },
+              },
+            },
+          })
+        : await tx.user.create({
+            data: { ...fields, email, memberProfile: { create: { dateOfBirth: dob, ...profileFields } } },
+          })
       if (principal) {
         await tx.familyBranchHistory.create({
           data: branchHistoryData({
@@ -216,8 +271,8 @@ export async function adminCreateMember(input: z.input<typeof createMemberSchema
       return user
     })
   } catch (cause) {
-    // Never leave a login without its member record.
-    if (authUserId) await createServiceClient().auth.admin.deleteUser(authUserId).catch(() => {})
+    // Never leave a login without its member record (only one created just now; a reused one stays).
+    if (authUserId && createdLoginHere) await createServiceClient().auth.admin.deleteUser(authUserId).catch(() => {})
     throw cause
   }
 

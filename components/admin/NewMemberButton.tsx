@@ -161,10 +161,14 @@ export default function NewMemberButton({
           dateOfBirth: value('dateOfBirth') || undefined,
           profile: minor ? Object.fromEntries(PROFILE_KEYS.map((key) => [key, value(key)])) : {},
         })
+        if (!result.ok) {
+          setError(result.error)
+          return
+        }
         setDone({ name, minor: result.minor, emailed: result.emailed, setupUrl: result.setupUrl, password })
         router.refresh()
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not add the member.')
+      } catch {
+        setError('Could not reach the server. Check your connection and try again.')
       }
     })
   }
