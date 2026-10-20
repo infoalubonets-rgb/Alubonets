@@ -33,10 +33,15 @@ export type AuthUser = {
   fullName: string
   role: Role
   initials: string
+  avatarUrl?: string | null
   isSuperAdmin?: boolean
   dashboardAccess?: Role[]
   status?: string
   isPrincipal?: boolean
+  /** Permanent member ID, e.g. AL2608-001 (null until approved). */
+  memberId?: string | null
+  /** PJW for a Principal, PJW01 for an attached member, null when not in a family. */
+  familyTag?: string | null
   /** Role selected for page data and operation permissions. */
   activeWorkspace?: Role
   activeSuperAdmin?: boolean
@@ -59,6 +64,11 @@ export const ROLE_HOME: Record<Role, string> = {
   ORGANIZER: '/dashboard/organizer',
   MEMBER: '/dashboard/member',
   AUDITOR: '/financial-reports',
+}
+
+/** Default landing page for the account, before any workspace is selected. */
+export function homeForAccount(user: { role: Role; isSuperAdmin?: boolean }) {
+  return user.isSuperAdmin ? ROLE_HOME.ADMIN : ROLE_HOME[user.role]
 }
 
 export const ROLE_LABEL: Record<Role, string> = {

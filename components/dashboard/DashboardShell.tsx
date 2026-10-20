@@ -52,6 +52,25 @@ type Props = {
   pageCenter?: ReactNode
 }
 
+/** The signed-in member's permanent ID and, when they belong to a family, their family tag. */
+function MemberIdentityBadges({ memberId, familyTag }: { memberId?: string | null; familyTag?: string | null }) {
+  if (!memberId && !familyTag) return null
+  return (
+    <p className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] leading-none">
+      {memberId && (
+        <span className="rounded-md bg-primary/10 px-1.5 py-1 font-mono font-bold text-primary dark:bg-blue-300/15 dark:text-blue-200" title="Your member ID">
+          {memberId}
+        </span>
+      )}
+      {familyTag && (
+        <span className="rounded-md bg-secondary-container/15 px-1.5 py-1 font-mono font-bold text-secondary dark:text-orange-300" title="Your family tag">
+          {familyTag}
+        </span>
+      )}
+    </p>
+  )
+}
+
 function LiveDateBadge() {
   const [now, setNow] = useState<Date | null>(null)
 
@@ -569,10 +588,11 @@ export default function DashboardShell({
                 {menuOpen ? 'menu_open' : 'menu'}
               </span>
             </button>
-            <div className="min-w-0 hidden sm:block">
-              <p className="truncate text-[13px] font-label-bold leading-tight text-on-surface dark:text-blue-50">
+            <div className="min-w-0">
+              <p className="hidden truncate text-[13px] font-label-bold leading-tight text-on-surface dark:text-blue-50 sm:block">
                 {hydrated ? welcome || (user ? `Welcome, ${user.fullName.split(' ')[0]}` : '') : ' '}
               </p>
+              <MemberIdentityBadges memberId={user?.memberId} familyTag={user?.familyTag} />
             </div>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2.5 md:gap-4">

@@ -3,6 +3,7 @@ import { missingProfileDetails, needsProfileCompletion } from '@/lib/profile-com
 import { getSessionProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { initialsFromName } from '@/lib/auth/helpers'
+import { familyTag } from '@/lib/family-tags'
 import ProfileView from '@/components/profile/ProfileView'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
@@ -35,7 +36,10 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
     prisma.welfareRequest.count({ where: { userId: profile.id } }),
   ])
 
-  const user = await prisma.user.findUnique({ where: { id: profile.id }, include: { memberProfile: true } })
+  const user = await prisma.user.findUnique({
+    where: { id: profile.id },
+    include: { memberProfile: true, principal: { select: { familyCode: true } } },
+  })
   if (!user) redirect('/login')
   const executive = isExecutive(user)
   const aboutProfile = executive ? await prisma.committeeProfile.findFirst({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } }) : null
@@ -75,6 +79,8 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           status: user.status,
           isSuperAdmin: user.isSuperAdmin,
           initials: initialsFromName(user.fullName),
+          memberId: user.membershipNumber,
+          familyTag: familyTag(user),
           contributionCount: agg._count,
           contributionTotal: agg._sum.amount ?? 0,
           welfareCount,

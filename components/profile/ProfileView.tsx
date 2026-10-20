@@ -43,6 +43,10 @@ export type ProfileViewData = {
   status: string
   isSuperAdmin: boolean
   initials: string
+  /** Permanent member ID, e.g. AL2608-001. */
+  memberId: string | null
+  /** PJW / PJW01; null when not in a family. */
+  familyTag: string | null
   contributionCount: number
   contributionTotal: number
   welfareCount: number
@@ -179,6 +183,20 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
               {data.email}
               {data.phone ? ` · ${data.phone}` : ''}
             </p>
+            {(data.memberId || data.familyTag) && (
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {data.memberId && (
+                  <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-[12px] text-primary">
+                    Member ID <b className="font-mono">{data.memberId}</b>
+                  </span>
+                )}
+                {data.familyTag && (
+                  <span className="rounded-lg bg-secondary-container/15 px-2.5 py-1 text-[12px] text-secondary">
+                    Family tag <b className="font-mono">{data.familyTag}</b>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {!editing && error && (
