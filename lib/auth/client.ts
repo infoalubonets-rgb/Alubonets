@@ -1,4 +1,5 @@
 import { ROLE_HOME, type AuthUser, type Role } from './types'
+import { clearAccountHint, writeAccountHint } from './account-hint'
 
 export { ROLE_HOME, homeForAccount } from './types'
 export type { AuthUser, Role }
@@ -24,6 +25,7 @@ export async function loginRequest(email: string, password: string) {
     if (!res.ok) {
       throw new Error(data.error || 'Invalid credentials')
     }
+    if (data.user) writeAccountHint(data.user)
     return data as {
       user: AuthUser
       redirectTo: string
@@ -62,6 +64,7 @@ export async function registerRequest(
 }
 
 export async function logoutRequest() {
+  clearAccountHint()
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 2500)
   try {
@@ -95,10 +98,17 @@ export async function meLookup(): Promise<MeLookup> {
       signal: controller.signal,
       ...fetchOpts,
     })
-    if (res.status === 401) return { status: 'unauthenticated' }
+    if (res.status === 401) {
+      clearAccountHint()
+      return { status: 'unauthenticated' }
+    }
     if (!res.ok) return { status: 'unavailable' }
     const data = await res.json()
-    if (!data.user) return { status: 'unauthenticated' }
+    if (!data.user) {
+      clearAccountHint()
+      return { status: 'unauthenticated' }
+    }
+    writeAccountHint(data.user)
     return { status: 'authenticated', user: data.user as AuthUser }
   } catch {
     return { status: 'unavailable' }

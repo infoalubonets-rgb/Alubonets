@@ -6,26 +6,34 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { openAuthModal } from '@/components/auth/AuthModal'
 import { NAV_LINKS, SITE_LOGO } from '@/lib/constants'
-import { meLookup, type AuthUser } from '@/lib/auth/client'
+import { homeForAccount, meLookup, type AuthUser } from '@/lib/auth/client'
+import { readAccountHint } from '@/lib/auth/account-hint'
 
 const CLOSE_MS = 280
 const MOBILE_MENU_TITLE_ID = 'mobile-navigation-title'
 
-function AccountAvatar({ user }: { user: AuthUser }) {
+/** Who the navbar shows: the confirmed user, or the browser's last-known account while checking. */
+type NavAccount = Pick<AuthUser, 'fullName' | 'role' | 'isSuperAdmin'> & { avatarUrl?: string | null; email?: string }
+
+function AccountAvatar({ user }: { user: NavAccount }) {
   const [failed, setFailed] = useState(false)
   useEffect(() => setFailed(false), [user.avatarUrl])
+  const letter = (user.fullName || user.email || 'A').trim().charAt(0).toUpperCase() || 'A'
   return (
     <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-white" aria-hidden="true">
       {user.avatarUrl && !failed
         ? <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />
-        : user.email.trim().charAt(0).toUpperCase() || 'A'}
+        : letter}
     </span>
   )
 }
 
 export default function Navbar() {
   const pathname = usePathname()
-  const [user, setUser] = useState<AuthUser | null>(null)
+  const [user, setUser] = useState<NavAccount | null>(null)
+  // True until the first answer from the server; the login button waits for it so a signed-in
+  // member never sees "Login / Register" flash and click it by mistake.
+  const [checking, setChecking] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuShown, setMenuShown] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -40,7 +48,11 @@ export default function Navbar() {
       if (!active || request !== latest) return
       if (result.status === 'authenticated') setUser(result.user)
       else if (result.status === 'unauthenticated') setUser(null)
+      setChecking(false)
     }
+    // Show the last signed-in account at once; the server check below confirms or clears it.
+    const hint = readAccountHint()
+    if (hint) setUser((current) => current ?? hint)
     const onVisible = () => { if (document.visibilityState === 'visible') void refresh() }
     void refresh()
     window.addEventListener('focus', refresh)
@@ -158,10 +170,12 @@ export default function Navbar() {
                 ))}
               </ul>
               {user ? (
-                <Link href="/profile" onClick={closeMenu} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-secondary-container px-lg py-3 font-label-bold text-on-primary">
+                <Link href={homeForAccount(user)} onClick={closeMenu} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-secondary-container px-lg py-3 font-label-bold text-on-primary">
                   <AccountAvatar user={user} />
-                  Account
+                  My dashboard
                 </Link>
+              ) : checking ? (
+                <span className="mt-4 block h-12 w-full animate-pulse rounded-xl bg-surface-container" aria-hidden="true" />
               ) : (
               <button
                 type="button"
@@ -208,10 +222,17 @@ export default function Navbar() {
 
           <div className="flex items-center gap-2 sm:gap-md">
             {user ? (
-              <Link href="/profile" className="flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-secondary-container px-3 py-2 font-label-bold text-on-primary transition-opacity hover:opacity-90" aria-label="Account">
+              <Link
+                href={homeForAccount(user)}
+                className="flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-secondary-container px-3 py-2 font-label-bold text-on-primary transition-opacity hover:opacity-90"
+                aria-label="My dashboard"
+                title={`Signed in as ${user.fullName}. Open my dashboard`}
+              >
                 <AccountAvatar user={user} />
-                <span className="hidden sm:inline">Account</span>
+                <span className="hidden sm:inline">Dashboard</span>
               </Link>
+            ) : checking ? (
+              <span className="hidden h-12 w-12 animate-pulse rounded-lg bg-surface-container md:block" aria-hidden="true" />
             ) : (
             <button
               type="button"
