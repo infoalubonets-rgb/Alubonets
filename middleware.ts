@@ -81,12 +81,31 @@ function allowedPath(
   return allowed.includes(target)
 }
 
+/**
+ * Fully public pages that never read the session on the server (the navbar asks /api/auth/me
+ * from the browser). Skipping the Supabase session check here saves a round trip to Supabase on
+ * every visit, and lets the CDN serve them from cache (see next.config.ts).
+ */
+const PUBLIC_STATIC_PATHS = new Set([
+  '/',
+  '/about',
+  '/contact',
+  '/privacy',
+  '/terms',
+  '/robots.txt',
+  '/sitemap.xml',
+  '/opengraph-image',
+  '/site.webmanifest',
+])
+
 export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+  if (PUBLIC_STATIC_PATHS.has(pathname)) return NextResponse.next()
+
   let supabaseResponse = NextResponse.next({
     request: { headers: req.headers },
   })
 
-  const { pathname } = req.nextUrl
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey =
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
@@ -336,6 +355,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Static files never need the session check (fonts were going through it on every page).
+    '/((?!_next/static|_next/image|favicon.ico|fonts/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|txt|xml|webmanifest)$).*)',
   ],
 }

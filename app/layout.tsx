@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Sora, Inter, Orbitron } from 'next/font/google'
+import { Sora, Inter } from 'next/font/google'
 import './globals.css'
 import { getBranding } from '@/lib/settings'
 import { SITE_KEYWORDS, SITE_LEGAL_NAME, SITE_URL, isIndexable, organizationJsonLd } from '@/lib/seo'
@@ -16,13 +16,6 @@ const inter = Inter({
   weight: ['400', '500', '600'],
   display: 'swap',
   variable: '--font-inter',
-})
-
-const orbitron = Orbitron({
-  subsets: ['latin'],
-  weight: ['500', '600'],
-  display: 'swap',
-  variable: '--font-orbitron',
 })
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -111,7 +104,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: STRIP_EXTENSION_ATTRIBUTES }} />
         <link
           rel="preload"
-          href="/fonts/material-icons.woff2"
+          href="/fonts/material-icons-subset.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"
@@ -119,7 +112,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body
         suppressHydrationWarning
-        className={`${sora.variable} ${inter.variable} ${orbitron.variable} bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col`}
+        className={`${sora.variable} ${inter.variable} bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col`}
       >
         {children}
         <script

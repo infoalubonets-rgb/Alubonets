@@ -7,8 +7,11 @@
   font-family: 'Material Icons Local';
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/material-icons.woff2') format('woff2');
+  /* block, not swap: until the font arrives an icon is invisible instead of showing its name
+     ("menu", "visibility") as text. The subset is ~14 KB and preloaded, so the wait is short.
+     Rebuild with `npm run icons:subset` after using a new icon name. */
+  font-display: block;
+  src: url('/fonts/material-icons-subset.woff2') format('woff2');
 }
 
 /* Smooth theme change without permanently animating every interaction. */

@@ -34,7 +34,15 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   poweredByHeader: false,
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }]
+    // Pages that are identical for every visitor (the navbar loads the account in the browser).
+    // Next marks them `max-age=0, must-revalidate`, so each visit from Kenya went back to the
+    // Dublin region; letting Vercel's nearby edge cache them for a minute, and serve a slightly
+    // older copy while it refreshes, removes that round trip. Admin edits appear within ~1 minute.
+    const edgeCached = ['/', '/about', '/contact', '/privacy', '/terms'].map((source) => ({
+      source,
+      headers: [{ key: 'Vercel-CDN-Cache-Control', value: 'public, s-maxage=60, stale-while-revalidate=86400' }],
+    }))
+    return [{ source: '/:path*', headers: securityHeaders }, ...edgeCached]
   },
   async redirects() {
     return [
