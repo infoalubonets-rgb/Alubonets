@@ -9,6 +9,7 @@ import {
   GENDERS,
   MEMBER_CATEGORIES,
   POLICY_VERSION,
+  applicationSchema,
   registrationSchema,
 } from '@/lib/membership'
 import { todayInputValue } from '@/lib/dates'
@@ -57,18 +58,24 @@ type InvitePrefill = {
   familyBranchHint?: string
 }
 
+/** Someone already signed in (e.g. with Google) who still has to apply: no email code, no password. */
+type SignedInAccount = { email: string; fullName: string }
+
 export default function RegistrationWizard({
   onComplete,
   onSignIn,
   invite,
+  account,
 }: {
   onComplete: (fullName: string) => void
   onSignIn: () => void
   invite?: InvitePrefill | null
+  account?: SignedInAccount | null
 }) {
   const [form, setForm] = useState(initial)
-  // Invited members, and everyone while email codes are switched off, start at the Account step.
-  const skipEmailStep = Boolean(invite) || !EMAIL_VERIFICATION_ON
+  // Invited members, signed-in applicants, and everyone while email codes are switched off,
+  // start at the Account step.
+  const skipEmailStep = Boolean(invite) || Boolean(account) || !EMAIL_VERIFICATION_ON
   const [step, setStep] = useState(skipEmailStep ? 1 : 0)
   const [emailVerified, setEmailVerified] = useState(skipEmailStep)
   const [code, setCode] = useState('')
@@ -100,6 +107,13 @@ export default function RegistrationWizard({
       setDraftLoaded(true)
       return
     }
+    if (account) {
+      setForm((current) => ({ ...current, email: account.email, fullName: current.fullName || account.fullName }))
+      setEmailVerified(true)
+      setStep(1)
+      setDraftLoaded(true)
+      return
+    }
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
       if (saved?.form) {
@@ -117,10 +131,10 @@ export default function RegistrationWizard({
     } finally {
       setDraftLoaded(true)
     }
-  }, [invite, skipEmailStep])
+  }, [invite, account, skipEmailStep])
 
   useEffect(() => {
-    if (!draftLoaded || invite) return
+    if (!draftLoaded || invite || account) return
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -131,7 +145,7 @@ export default function RegistrationWizard({
         consentAccepted,
       }),
     )
-  }, [draftLoaded, form, step, emailVerified, sameAsKin, consentAccepted, invite])
+  }, [draftLoaded, form, step, emailVerified, sameAsKin, consentAccepted, invite, account])
 
   const set = (name: keyof typeof initial, value: string) => {
     if (name === 'email' && value !== form.email && !invite) {
@@ -149,7 +163,9 @@ export default function RegistrationWizard({
   function validate(current: number) {
     setError('')
     if (current === 0 && !emailVerified) return fail('Verify your email to continue.')
-    if (current === 1) {
+    if (current === 1 && account) {
+      if (!required(['fullName', 'phone'])) return fail('Complete all account fields.')
+    } else if (current === 1) {
       if (!required(['fullName', 'phone', 'password'])) return fail('Complete all account fields.')
       if (form.password.length < 8) return fail('Password must be at least 8 characters.')
       if (
@@ -209,8 +225,40 @@ export default function RegistrationWizard({
     }
   }
 
+  async function submitSignedIn() {
+    const { email: _email, password: _password, ...details } = form
+    const checked = applicationSchema.safeParse({
+      ...details,
+      emergencyContactName: sameAsKin ? form.nextOfKinName : form.emergencyContactName,
+      emergencyContactPhone: sameAsKin ? form.nextOfKinPhone : form.emergencyContactPhone,
+      consentAccepted,
+      termsVersion: POLICY_VERSION,
+      privacyVersion: POLICY_VERSION,
+    })
+    if (!checked.success) {
+      setError(checked.error.issues[0]?.message || 'Check your application details.')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/auth/complete-application', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(checked.data),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Could not submit your application.')
+      onComplete(checked.data.fullName)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not submit your application.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function submit() {
     if (!validate(5)) return
+    if (account) return submitSignedIn()
     if (!form.password) {
       setError('Return to the Account step and enter your password again before submitting.')
       return
@@ -294,7 +342,7 @@ export default function RegistrationWizard({
     <div className="flex flex-col gap-4">
       <div className="pr-8">
         <h2 className="font-h3 text-2xl text-primary">
-          {invite ? 'Accept family invite' : 'Membership application'}
+          {invite ? 'Accept family invite' : account ? 'Complete your membership application' : 'Membership application'}
         </h2>
         <p className="mt-1 text-sm text-on-surface-variant">
           Step {step + 1} of {steps.length}: {steps[step]}
@@ -303,6 +351,12 @@ export default function RegistrationWizard({
           <p className="mt-2 rounded-lg bg-primary/10 p-3 text-sm text-primary">
             Invited by <strong>{invite.principalName}</strong>. Complete registration for{' '}
             <strong>{invite.email}</strong>. Admin approval may still be required.
+          </p>
+        )}
+        {account && (
+          <p className="mt-2 rounded-lg bg-primary/10 p-3 text-sm text-primary">
+            You signed in as <strong>{account.email}</strong>. Fill in your details to apply for
+            membership. An administrator will review your application before you can use the portal.
           </p>
         )}
       </div>
@@ -365,7 +419,8 @@ export default function RegistrationWizard({
           <div className="grid gap-4 sm:grid-cols-2">
             {input('fullName', 'Full name')}
             {input('phone', 'Phone', 'tel')}
-            {input('email', 'Email address', 'email', Boolean(invite))}
+            {input('email', 'Email address', 'email', Boolean(invite) || Boolean(account))}
+            {!account && (<>
             <label className="block text-sm font-medium">
               Password <span className="text-error">*</span>
               <span className="relative mt-1 block">
@@ -406,6 +461,7 @@ export default function RegistrationWizard({
                 </button>
               </span>
             </label>
+            </>)}
           </div>
         )}
         {step === 2 && (
@@ -494,7 +550,7 @@ export default function RegistrationWizard({
               setStep(step - 1)
             }}
             className="rounded-full border border-primary px-5 py-2 text-sm text-primary"
-            disabled={Boolean(invite) && step === 1}
+            disabled={(Boolean(invite) || Boolean(account)) && step === 1}
           >
             Back
           </button>
@@ -509,9 +565,9 @@ export default function RegistrationWizard({
         </div>
       )}
       <p className="text-center text-xs text-on-surface-variant">
-        Already registered?{' '}
+        {account ? 'Not you?' : 'Already registered?'}{' '}
         <button type="button" onClick={onSignIn} className="auth-link-accent">
-          Sign in
+          {account ? 'Sign out' : 'Sign in'}
         </button>
       </p>
     </div>

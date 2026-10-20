@@ -11,6 +11,7 @@ import { isAppRole, toAuthUser } from './helpers'
 import { getDisabledRoles, isLockedOutByRole } from '@/lib/disabled-roles'
 import { canRecordPayments } from '@/lib/finance-access'
 import type { MemberStatus, User } from '@prisma/client'
+import { onboardingStep, type OnboardingStep } from './onboarding'
 
 export type SessionProfile = AuthUser & {
   status: MemberStatus
@@ -31,6 +32,8 @@ export type AppMetadataPayload = {
   fullName: string
   isPrincipal?: boolean
   principalMemberId?: string | null
+  /** Unfinished sign-up step the middleware enforces; null clears it (app_metadata merges keys). */
+  onboarding?: OnboardingStep
 }
 
 export async function syncAppMetadata(
@@ -67,6 +70,7 @@ export async function syncUserMetadata(user: User) {
     fullName: user.fullName,
     isPrincipal: user.isPrincipal,
     principalMemberId: user.principalMemberId,
+    onboarding: await onboardingStep(user.id),
   })
 }
 

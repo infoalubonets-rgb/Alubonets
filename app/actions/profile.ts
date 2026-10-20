@@ -87,7 +87,7 @@ export async function updateMyMemberDetails(input: z.infer<typeof memberDetailsS
   const before = await prisma.memberProfile.findUnique({ where: { userId: session.id } })
   const { phone, location, ...profileData } = data
 
-  await prisma.$transaction([
+  const [updated] = await prisma.$transaction([
     prisma.user.update({ where: { id: session.id }, data: { phone, location } }),
     prisma.memberProfile.upsert({
       where: { userId: session.id },
@@ -95,6 +95,8 @@ export async function updateMyMemberDetails(input: z.infer<typeof memberDetailsS
       update: { address: location, ...profileData },
     }),
   ])
+  // Re-derives the onboarding step, so a finished profile unlocks the rest of the portal.
+  await syncUserMetadata(updated)
   await writeAudit({
     userId: session.id,
     action: 'MEMBER_PROFILE_DETAILS_UPDATE',

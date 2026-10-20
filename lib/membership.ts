@@ -58,6 +58,9 @@ export const registrationSchema = z.object({
   inviteToken: z.string().trim().min(10).optional(),
 })
 
+/** The same application for someone already signed in (e.g. with Google): no email or password. */
+export const applicationSchema = registrationSchema.omit({ email: true, password: true, inviteToken: true })
+
 export type RegistrationInput = z.infer<typeof registrationSchema>
 
 export function requestIp(req: Request) {

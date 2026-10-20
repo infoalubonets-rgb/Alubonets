@@ -20,6 +20,7 @@ const PRIVATE_PATHS = [
   '/support-chat',
   '/pending',
   '/account-setup',
+  '/complete-application',
   '/auth/',
   '/verify-login',
   '/forgot-password',

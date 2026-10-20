@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { ROLE_HOME, ALL_ROLES } from '@/lib/auth/types'
 import { syncUserMetadata } from '@/lib/auth/session'
+import { onboardingPath, onboardingStep } from '@/lib/auth/onboarding'
 import type { Role } from '@prisma/client'
 
 export async function GET(request: Request) {
@@ -71,6 +72,13 @@ export async function GET(request: Request) {
   }
 
   await syncUserMetadata(profile)
+
+  // New Google sign-ups must submit the full membership application before anything else;
+  // admin-created accounts with missing details go to My profile first.
+  const pendingStep = onboardingPath(await onboardingStep(profile.id))
+  if (pendingStep && profile.status !== 'SUSPENDED') {
+    return NextResponse.redirect(`${origin}${pendingStep}`)
+  }
 
   if (profile.status === 'PENDING') {
     return NextResponse.redirect(`${origin}/pending`)

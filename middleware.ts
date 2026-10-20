@@ -140,7 +140,7 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!isProtectedPath(pathname) && pathname !== '/pending') {
+  if (!isProtectedPath(pathname) && pathname !== '/pending' && pathname !== '/complete-application') {
     return supabaseResponse
   }
 
@@ -263,8 +263,30 @@ export async function middleware(req: NextRequest) {
     return redirectWithCookies(url)
   }
 
+  // Unfinished sign-up (lib/auth/onboarding.ts): nothing else opens until it is done.
+  const onboarding = user.app_metadata?.onboarding
+  const onProfile = pathname === '/profile' || pathname.startsWith('/profile/')
+  if (onboarding === 'application') {
+    if (pathname === '/complete-application') return supabaseResponse
+    const url = req.nextUrl.clone()
+    url.pathname = '/complete-application'
+    url.search = ''
+    return redirectWithCookies(url)
+  }
+  if (pathname === '/complete-application') {
+    const url = req.nextUrl.clone()
+    url.pathname = status === 'PENDING' ? '/pending' : ROLE_HOME[role]
+    return redirectWithCookies(url)
+  }
+  if (onboarding === 'profile' && status === 'ACTIVE' && !onProfile) {
+    const url = req.nextUrl.clone()
+    url.pathname = '/profile'
+    url.search = '?complete=1'
+    return redirectWithCookies(url)
+  }
+
   if (status === 'PENDING') {
-    if (pathname === '/profile' || pathname.startsWith('/profile/')) {
+    if (onProfile) {
       return supabaseResponse
     }
     if (pathname !== '/pending') {

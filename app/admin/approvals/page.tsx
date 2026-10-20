@@ -13,7 +13,12 @@ export default async function AdminApprovalsPage() {
     .filter((role) => role !== 'ADMIN' || actor.isSuperAdmin)
     .map((role) => ({ value: role, label: ROLE_LABEL[role] }))
   const [pending, principals] = await Promise.all([prisma.user.findMany({
-    where: { status: 'PENDING', rejectedAt: null },
+    where: {
+      status: 'PENDING',
+      rejectedAt: null,
+      // Signed in (e.g. with Google) but never submitted the application: nothing to review yet.
+      NOT: { AND: [{ authUserId: { not: null } }, { consentRecords: { none: {} } }] },
+    },
     orderBy: { createdAt: 'desc' },
     include: {
       memberProfile: true,
