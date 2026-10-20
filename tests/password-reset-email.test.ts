@@ -4,7 +4,7 @@ vi.mock('resend', () => ({ Resend: class { emails = { send: mocks.send } } }))
 vi.mock('@/lib/prisma', () => ({ prisma: { emailLog: { create: mocks.log } } }))
 vi.mock('@/lib/pdf/receipt', () => ({ buildReceiptPdf: vi.fn() }))
 vi.mock('@/lib/logger', () => ({ logError: mocks.logError }))
-import { sendPasswordResetEmail } from '@/lib/email/resend'
+import { sendPasswordResetEmail, RESEND_ONBOARDING_FROM } from '@/lib/email/resend'
 import { DEFAULT_FROM_EMAIL } from '@/lib/constants'
 
 const input = { userId: 'member-1', fullName: 'Test Member', email: 'member@example.com', resetUrl: 'https://alubonets.com/reset-password?token=test-token' }
@@ -44,5 +44,15 @@ describe('password reset email delivery', () => {
     mocks.send.mockResolvedValue({ data: null, error: { message: 'Sender not verified' } })
     await expect(sendPasswordResetEmail(input)).rejects.toThrow('Sender not verified')
     expect(mocks.log).not.toHaveBeenCalled()
+  })
+  it('retries with Resend onboarding sender when the group domain is rejected', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    mocks.send
+      .mockResolvedValueOnce({ data: null, error: { message: 'The info.alubonets.com domain is not verified' } })
+      .mockResolvedValueOnce({ data: { id: 'email-2' }, error: null })
+    await sendPasswordResetEmail(input)
+    expect(mocks.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ from: DEFAULT_FROM_EMAIL, to: input.email }))
+    expect(mocks.send).toHaveBeenNthCalledWith(2, expect.objectContaining({ from: RESEND_ONBOARDING_FROM, to: input.email }))
+    expect(mocks.log).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ meta: expect.objectContaining({ from: RESEND_ONBOARDING_FROM }) }) }))
   })
 })

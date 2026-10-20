@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Suspense, useState, type FormEvent } from 'react'
+import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import { PasswordVisibilityIcon } from '@/components/auth/AuthIcons'
+import { createClient } from '@/utils/supabase/client'
 import { ADMIN_LOGIN_LOGO } from '@/lib/constants'
 import { passwordError } from '@/lib/password-policy'
 
@@ -55,6 +56,24 @@ function ResetPasswordForm() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [ready, setReady] = useState(Boolean(token))
+  const [hasRecoverySession, setHasRecoverySession] = useState(false)
+
+  useEffect(() => {
+    if (token) return
+    let cancelled = false
+    createClient().auth.getUser().then(({ data, error: sessionError }) => {
+      if (cancelled) return
+      if (sessionError || !data.user) setError('This reset link is missing or invalid. Request a new link.')
+      else setHasRecoverySession(true)
+      setReady(true)
+    }).catch(() => {
+      if (cancelled) return
+      setError('This reset link is missing or invalid. Request a new link.')
+      setReady(true)
+    })
+    return () => { cancelled = true }
+  }, [token])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -62,13 +81,13 @@ function ResetPasswordForm() {
     const policyError = passwordError(password)
     if (policyError) return setError(policyError)
     if (password !== confirm) return setError('Passwords do not match.')
-    if (!token) return setError('This reset link is missing or invalid. Request a new link.')
+    if (!token && !hasRecoverySession) return setError('This reset link is missing or invalid. Request a new link.')
     setLoading(true)
     try {
       const response = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify(token ? { token, password } : { password }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Unable to reset password.')
@@ -90,7 +109,9 @@ function ResetPasswordForm() {
           Use at least 8 characters with uppercase, lowercase, a number, and a special character.
         </p>
       </div>
-      {success ? (
+      {!ready && !success ? (
+        <p className="text-center text-sm text-on-surface-variant">Checking your reset link…</p>
+      ) : success ? (
         <>
           <p role="status" className="rounded-lg bg-primary-fixed p-3 text-sm text-on-primary-fixed">
             {success}
@@ -100,6 +121,17 @@ function ResetPasswordForm() {
             className="block w-full rounded-full bg-secondary-container py-3 text-center font-semibold text-on-secondary"
           >
             Continue to login
+          </Link>
+        </>
+      ) : !token && !hasRecoverySession ? (
+        <>
+          {error && (
+            <p role="alert" className="rounded-lg bg-error-container p-3 text-sm text-on-error-container">
+              {error}
+            </p>
+          )}
+          <Link href="/forgot-password" className="block text-center text-sm text-primary hover:underline">
+            Request another link
           </Link>
         </>
       ) : (

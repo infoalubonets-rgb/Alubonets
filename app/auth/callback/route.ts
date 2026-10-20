@@ -74,6 +74,11 @@ export async function GET(request: Request) {
 
   await syncUserMetadata(profile)
 
+  const recoveryNext = safeRedirectPath(next)
+  if (recoveryNext === '/reset-password') {
+    return NextResponse.redirect(`${origin}/reset-password`)
+  }
+
   // New Google sign-ups must submit the full membership application before anything else;
   // admin-created accounts with missing details go to My profile first.
   const pendingStep = onboardingPath(await onboardingStep(profile.id))

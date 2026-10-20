@@ -1,14 +1,16 @@
 export const dynamic = 'force-dynamic'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { createServerClient } from '@/lib/supabase-server'
+import { createClient } from '@/utils/supabase/server'
 import { hashPasswordResetToken, passwordSchema } from '@/lib/password-reset'
 import { logError } from '@/lib/logger'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { requestIp } from '@/lib/membership'
 
-const bodySchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema })
+const bodySchema = z.object({ token: z.string().min(20).max(200).optional(), password: passwordSchema })
 
 export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
@@ -18,6 +20,23 @@ export async function POST(request: Request) {
     await enforceRateLimit(`password-reset-submit-ip:${ipAddress || 'unknown'}`, 10, 15)
   } catch {
     return NextResponse.json({ error: 'Too many attempts. Please wait and try again.' }, { status: 429 })
+  }
+  if (!parsed.data.token) {
+    try {
+      const supabase = createClient(await cookies())
+      const { data: { user }, error: sessionError } = await supabase.auth.getUser()
+      if (sessionError || !user) {
+        return NextResponse.json({ error: 'This reset link is invalid, expired, or has already been used.' }, { status: 410 })
+      }
+      const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
+      if (error) {
+        return NextResponse.json({ error: error.message || 'We could not update your password right now. Please try again.' }, { status: 400 })
+      }
+      return NextResponse.json({ message: 'Your password has been changed. You can now sign in.' })
+    } catch (error) {
+      logError('auth.password_reset.session_update_failed', error)
+      return NextResponse.json({ error: 'We could not update your password right now. Please try again.' }, { status: 503 })
+    }
   }
   const record = await prisma.passwordResetToken.findUnique({ where: { tokenHash: hashPasswordResetToken(parsed.data.token) }, include: { user: { select: { authUserId: true } } } })
   if (!record || record.consumedAt || record.expiresAt <= new Date() || !record.user.authUserId) return NextResponse.json({ error: 'This reset link is invalid, expired, or has already been used.' }, { status: 410 })

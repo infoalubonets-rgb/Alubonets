@@ -94,6 +94,9 @@ export async function sendSupportMessageEmail(input: { memberName: string; membe
   return { skipped: false as const, accepted: accepted > 0 }
 }
 
+/** Fallback sender if a custom from-address is rejected. Live mail uses info.alubonets.com. */
+export const RESEND_ONBOARDING_FROM = 'Alubonets <onboarding@resend.dev>'
+
 export async function sendPasswordResetEmail(input: { userId: string; fullName: string; email: string; resetUrl: string }) {
   const resend = getResend()
   if (!resend) throw new Error('Password-reset email is not configured.')
@@ -108,11 +111,18 @@ export async function sendPasswordResetEmail(input: { userId: string; fullName: 
     <p style="color:#374151;line-height:1.6;">This secure reset link expires in <strong>10 minutes</strong> and can only be used once.</p>
     <p><a href="${esc(input.resetUrl)}" style="display:inline-block;background:#003d82;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;">Reset password</a></p>
     <p style="color:#6b7280;font-size:13px;">If you did not request this, ignore this email. Your password will not change.</p>`)
-  const delivery = await resend.emails.send({ from: sender, to: recipient, subject, html })
+  let fromUsed = sender
+  let delivery = await resend.emails.send({ from: sender, to: recipient, subject, html })
+  const sendError = delivery.error?.message || ''
+  const unverifiedFrom = /not verified|invalid `from`|only send testing emails/i.test(sendError)
+  if (delivery.error && unverifiedFrom && sender !== RESEND_ONBOARDING_FROM) {
+    fromUsed = RESEND_ONBOARDING_FROM
+    delivery = await resend.emails.send({ from: RESEND_ONBOARDING_FROM, to: recipient, subject, html })
+  }
   if (delivery.error) throw new Error(delivery.error.message)
   // An audit failure must not invalidate a link the provider already accepted.
   try {
-    await prisma.emailLog.create({ data: { userId: input.userId, toEmail: recipient, subject, template: 'password_reset', status: 'accepted', meta: { providerMessageId: delivery.data?.id || null, testMode: !production && Boolean(testEmailOverride()), intendedRecipient: input.email } } })
+    await prisma.emailLog.create({ data: { userId: input.userId, toEmail: recipient, subject, template: 'password_reset', status: 'accepted', meta: { providerMessageId: delivery.data?.id || null, testMode: !production && Boolean(testEmailOverride()), intendedRecipient: input.email, from: fromUsed } } })
   } catch (error) {
     logError('auth.password_reset.email_log_failed', error, { userId: input.userId })
   }
