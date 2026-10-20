@@ -16,10 +16,10 @@ export default async function AssignedContactInbox({
     })
   }
 
+  // Every Super Admin sees every enquiry. Filtering by assignee hid messages from all but the
+  // oldest Super Admin account, which every new enquiry is assigned to.
   const messages = await prisma.contactSubmission.findMany({
-    where: isSuperAdmin
-      ? { OR: [{ assignedToId: adminId }, { assignedToId: null }] }
-      : { assignedToId: adminId },
+    where: isSuperAdmin ? {} : { assignedToId: adminId },
     orderBy: { createdAt: 'desc' },
     take: 100,
     include: { replies: { orderBy: { sentAt: 'desc' } } },

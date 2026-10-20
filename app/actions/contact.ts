@@ -85,10 +85,13 @@ async function createContactSubmissionAndNotify({
     const saved = await tx.contactSubmission.create({
       data: { name, email, phone: phone || null, category: category || null, message, assignedToId },
     })
-    if (assignedToId) {
-      await tx.userNotification.create({
-        data: {
-          userId: assignedToId,
+    // Every active Super Admin is told, not only the one the enquiry is assigned to.
+    const superAdmins = await tx.user.findMany({ where: { isSuperAdmin: true, status: 'ACTIVE' }, select: { id: true } })
+    const notifyIds = Array.from(new Set([...superAdmins.map((user) => user.id), ...(assignedToId ? [assignedToId] : [])]))
+    if (notifyIds.length) {
+      await tx.userNotification.createMany({
+        data: notifyIds.map((userId) => ({
+          userId,
           title: 'New contact enquiry',
           body: `${name} sent a ${category || 'general'} enquiry.`,
           href: '/admin/announcements',
@@ -96,7 +99,7 @@ async function createContactSubmissionAndNotify({
           entity: 'ContactSubmission',
           entityId: saved.id,
           audienceRoles: ['ADMIN'],
-        },
+        })),
       })
     }
     return saved
@@ -183,7 +186,13 @@ export async function sendContactMessage(formData: FormData): Promise<ContactSub
   })
   if (!parsed.success) return { ok: false, error: 'invalid', message: parsed.error.issues[0]?.message || 'Please check the form fields.' }
 
-  await createContactSubmissionAndNotify(parsed.data)
+  try {
+    await createContactSubmissionAndNotify(parsed.data)
+  } catch (error) {
+    // A thrown server-action error reaches the visitor only as a generic production message.
+    logError('contact.submit.failed', error)
+    return { ok: false, error: 'server', message: 'We could not send your message right now. Please try again in a moment.' }
+  }
   return { ok: true }
 }
 
@@ -191,10 +200,8 @@ async function requireAssignedSuperAdmin(id: string) {
   const actor = await requireAdmin()
   if (!actor.isSuperAdmin) throw new Error('Only the Super Admin can manage the contact inbox.')
   const submission = await prisma.contactSubmission.findUniqueOrThrow({ where: { id } })
-  if (submission.assignedToId && submission.assignedToId !== actor.id) {
-    throw new Error('This enquiry is not assigned to you.')
-  }
-  if (!submission.assignedToId) {
+  // Any Super Admin may handle any enquiry; whoever acts on it becomes its assignee.
+  if (submission.assignedToId !== actor.id) {
     await prisma.contactSubmission.update({
       where: { id },
       data: { assignedToId: actor.id },
@@ -253,10 +260,7 @@ export async function deleteSelectedContactMessages(
     if (!ids.length) return { ok: false, error: 'Select at least one enquiry.' }
 
     const allowed = await prisma.contactSubmission.findMany({
-      where: {
-        id: { in: ids },
-        OR: [{ assignedToId: actor.id }, { assignedToId: null }],
-      },
+      where: { id: { in: ids } },
       select: { id: true },
     })
     if (!allowed.length) return { ok: false, error: 'No matching enquiries to delete.' }

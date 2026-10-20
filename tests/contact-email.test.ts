@@ -4,7 +4,7 @@ vi.mock('resend', () => ({ Resend: class { emails = { send: m.send } } }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }))
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
 vi.mock('@/lib/prisma', () => {
-  const prisma = { appSetting: { findUnique: m.findSetting, upsert: m.upsert }, user: { findFirst: m.assignee, findMany: m.users }, contactSubmission: { create: m.create, update: m.update }, userNotification: { create: m.notify }, $transaction: async (fn: (tx: unknown) => unknown) => fn(prisma) }
+  const prisma = { appSetting: { findUnique: m.findSetting, upsert: m.upsert }, user: { findFirst: m.assignee, findMany: m.users }, contactSubmission: { create: m.create, update: m.update }, userNotification: { createMany: m.notify }, $transaction: async (fn: (tx: unknown) => unknown) => fn(prisma) }
   return { prisma }
 })
 vi.mock('@/lib/auth/session', () => ({ requireAdmin: vi.fn() }))
@@ -41,7 +41,7 @@ describe('contact enquiry forwarding and notifications', () => {
     expect(await sendContactMessage(form())).toEqual({ ok: true })
     expect(m.send).toHaveBeenCalledTimes(1)
     expect(m.send).toHaveBeenCalledWith(expect.objectContaining({ from: DEFAULT_FROM_EMAIL, to: ['infoalubonets@gmail.com'], replyTo: 'visitor@example.com', html: expect.stringContaining('Please tell me about joining.') }))
-    expect(m.notify).toHaveBeenCalledWith({ data: expect.objectContaining({ userId: 'admin-1', entityId: 'enquiry-1', type: 'contact_enquiry', audienceRoles: ['ADMIN'] }) })
+    expect(m.notify).toHaveBeenCalledWith({ data: [expect.objectContaining({ userId: 'admin-1', entityId: 'enquiry-1', type: 'contact_enquiry', audienceRoles: ['ADMIN'] })] })
     expect(m.update).toHaveBeenCalledWith({ where: { id: 'enquiry-1' }, data: { emailStatus: 'sent' } })
   })
   it('isolates rejected and throwing copy recipients from the primary delivery', async () => {
@@ -76,6 +76,18 @@ describe('contact enquiry forwarding and notifications', () => {
     data.set('message', 'hehe')
     expect(await sendContactMessage(data)).toEqual({ ok: true })
     expect(m.create).toHaveBeenCalledWith({ data: expect.objectContaining({ message: 'hehe' }) })
+  })
+  it('notifies every active Super Admin, not only the assignee', async () => {
+    m.users.mockImplementation(async (args: { where?: { isSuperAdmin?: boolean } }) =>
+      args?.where?.isSuperAdmin ? [{ id: 'admin-1' }, { id: 'super-2' }] : [],
+    )
+    expect(await sendContactMessage(form())).toEqual({ ok: true })
+    const rows = m.notify.mock.calls[0][0].data as Array<{ userId: string }>
+    expect(rows.map((row) => row.userId).sort()).toEqual(['admin-1', 'super-2'])
+  })
+  it('tells the visitor plainly when the message cannot be saved', async () => {
+    m.create.mockRejectedValue(new Error("Can't reach database server"))
+    expect(await sendContactMessage(form())).toEqual({ ok: false, error: 'server', message: expect.stringContaining('could not send your message') })
   })
   it('explains a whitespace-only message and does not save or email it', async () => {
     const data = form()
