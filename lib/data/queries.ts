@@ -1,6 +1,7 @@
 import { unstable_cache, revalidateTag } from 'next/cache'
 import { appDayRange } from '@/lib/dates'
 import { prisma } from '@/lib/prisma'
+import { REVIEWABLE_APPLICANTS } from '@/lib/applicants'
 import { announcementAudienceWhere } from '@/lib/notification-audience'
 import { formatMonthKeys, formatPaymentMethod, monthKeyFromDate } from '@/lib/chart-labels'
 import type { PaymentMethod, ProjectStatus, Role, WelfareStatus } from '@prisma/client'
@@ -28,8 +29,8 @@ export const getAdminDashboardData = unstable_cache(
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { status: 'ACTIVE' } }),
-      prisma.user.count({ where: { status: 'PENDING' } }),
-      prisma.user.findMany({ where: { status: 'PENDING' }, orderBy: { createdAt: 'desc' }, take: 20 }),
+      prisma.user.count({ where: REVIEWABLE_APPLICANTS }),
+      prisma.user.findMany({ where: REVIEWABLE_APPLICANTS, orderBy: { createdAt: 'desc' }, take: 20 }),
       prisma.contribution.aggregate({ where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.welfareRequest.count({ where: { status: 'PENDING' } }),
       prisma.auditLog.findMany({
@@ -65,7 +66,7 @@ export const getExecutiveDashboardData = unstable_cache(
       principals,
     ] = await Promise.all([
       prisma.user.count({ where: { status: 'ACTIVE' } }),
-      prisma.user.count({ where: { status: 'PENDING' } }),
+      prisma.user.count({ where: REVIEWABLE_APPLICANTS }),
       prisma.contribution.aggregate({ where: { status: { in: ['CONFIRMED','RECONCILED'] } }, _sum: { amount: true }, _count: true }),
       prisma.project.findMany({ orderBy: { updatedAt: 'desc' }, take: 10 }),
       prisma.event.count({ where: { startsAt: { gte: new Date() } } }),

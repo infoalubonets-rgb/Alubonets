@@ -1,6 +1,7 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
+import { REVIEWABLE_APPLICANTS } from '@/lib/applicants'
 import ApprovalsTable, { type ApprovalApplicant } from '@/components/admin/ApprovalsTable'
 import { requireAdmin } from '@/lib/auth/session'
 import { assignableRoles, getDisabledRoles } from '@/lib/disabled-roles'
@@ -13,12 +14,7 @@ export default async function AdminApprovalsPage() {
     .filter((role) => role !== 'ADMIN' || actor.isSuperAdmin)
     .map((role) => ({ value: role, label: ROLE_LABEL[role] }))
   const [pending, principals] = await Promise.all([prisma.user.findMany({
-    where: {
-      status: 'PENDING',
-      rejectedAt: null,
-      // Signed in (e.g. with Google) but never submitted the application: nothing to review yet.
-      NOT: { AND: [{ authUserId: { not: null } }, { consentRecords: { none: {} } }] },
-    },
+    where: REVIEWABLE_APPLICANTS,
     orderBy: { createdAt: 'desc' },
     include: {
       memberProfile: true,

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { REVIEWABLE_APPLICANTS } from '@/lib/applicants'
 import { allowedDashboards, type Role } from '@/lib/auth/types'
 import { FEATURE_FLAGS, isFeatureEnabled } from '@/lib/feature-flags'
 export type RoleAlert = {
@@ -20,7 +21,7 @@ type AlertSpec = Omit<RoleAlert, 'count'> & { count: () => Promise<number> }
 /** Open work items each role is responsible for, linked to the page where it gets done. */
 function alertSpecs(user: AlertUser, flags: { loans: boolean; welfare: boolean }): AlertSpec[] {
   return [
-    { key: 'admin-approvals', role: 'ADMIN', icon: 'pending_actions', title: 'Membership applications', description: 'Applicants waiting for approval', href: '/admin/approvals', count: () => prisma.user.count({ where: { status: 'PENDING', rejectedAt: null } }) },
+    { key: 'admin-approvals', role: 'ADMIN', icon: 'pending_actions', title: 'Membership applications', description: 'Applicants waiting for approval', href: '/admin/approvals', count: () => prisma.user.count({ where: REVIEWABLE_APPLICANTS }) },
     { key: 'admin-gallery', role: 'ADMIN', icon: 'photo_library', title: 'Gallery queue', description: 'Photos waiting to be published', href: '/admin/gallery-queue', count: () => prisma.galleryPhoto.count({ where: { isPublic: false } }) },
     { key: 'admin-resolutions', role: 'ADMIN', icon: 'gavel', title: 'Resolutions', description: 'Resolutions waiting for a decision', href: '/governance/manage', count: () => prisma.resolution.count({ where: { status: 'PENDING_APPROVAL' } }) },
 

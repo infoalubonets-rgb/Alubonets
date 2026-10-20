@@ -8,6 +8,7 @@ import { navForRole } from '@/lib/dashboard/nav'
 import { getSessionProfile } from '@/lib/auth/session'
 import { getDirectoryMembers } from '@/app/actions/directory'
 import { prisma } from '@/lib/prisma'
+import { REVIEWABLE_APPLICANTS } from '@/lib/applicants'
 import { canViewMemberDirectory } from '@/lib/directory'
 import { type Role } from '@/lib/auth/types'
 
@@ -45,7 +46,7 @@ export default async function DirectoryPage({
     : 'EXECUTIVE'
   const [members, pendingApprovals] = await Promise.all([
     getDirectoryMembers(),
-    isAdmin ? prisma.user.count({ where: { status: 'PENDING', rejectedAt: null } }) : Promise.resolve(0),
+    isAdmin ? prisma.user.count({ where: REVIEWABLE_APPLICANTS }) : Promise.resolve(0),
   ])
 
   return (
