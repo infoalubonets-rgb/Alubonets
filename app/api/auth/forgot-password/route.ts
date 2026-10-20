@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { createPasswordResetToken, PASSWORD_RESET_TTL_MINUTES } from '@/lib/password-reset'
-import { deliverPasswordResetLink, sendSupabaseRecoveryEmail } from '@/lib/email/password-reset-delivery'
+import { deliverPasswordResetLink } from '@/lib/email/password-reset-delivery'
 import { logError } from '@/lib/logger'
 import { requestIp } from '@/lib/membership'
 import { appBaseUrl } from '@/lib/app-url'
@@ -12,9 +12,9 @@ import { appBaseUrl } from '@/lib/app-url'
 const bodySchema = z.object({ email: z.string().trim().toLowerCase().email().max(254) })
 
 /**
- * Looks the email up and, only if it belongs to an account, creates a link and emails it
- * (branded Resend mail, falling back to Supabase's recovery mail). Runs after the response, so
- * it never slows the form down and never reveals whether the account exists or a send failed.
+ * Looks the email up and, only if it belongs to an account, creates a link and emails it through
+ * Resend. Runs after the response, so it never slows the form down and never reveals whether the
+ * account exists or a send failed; failures are logged (and kept in email_logs with the reason).
  */
 async function sendResetIfAccountExists(email: string, requestUrl: string) {
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true, email: true, fullName: true, authUserId: true } })
@@ -37,19 +37,14 @@ async function sendResetIfAccountExists(email: string, requestUrl: string) {
   try {
     const record = await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } })
     try {
-      const { channel } = await deliverPasswordResetLink({ userId: user.id, fullName: user.fullName, email: user.email, resetUrl, requestUrl })
-      // Supabase's recovery mail carries its own link; the unused custom token is removed.
-      if (channel === 'supabase') await prisma.passwordResetToken.delete({ where: { id: record.id } })
+      await deliverPasswordResetLink({ userId: user.id, fullName: user.fullName, email: user.email, resetUrl, requestUrl })
     } catch (error) {
+      // An unsent link must not stay valid in the database.
       await prisma.passwordResetToken.delete({ where: { id: record.id } }).catch(() => undefined)
       throw error
     }
   } catch (error) {
-    // Last resort when the database or both mail paths failed above.
-    logError('auth.password_reset.primary_failed', error, { userId: user.id })
-    await sendSupabaseRecoveryEmail(user.email, requestUrl).catch((fallbackError) =>
-      logError('auth.password_reset.request_failed', fallbackError, { userId: user.id }),
-    )
+    logError('auth.password_reset.request_failed', error, { userId: user.id })
   }
 }
 

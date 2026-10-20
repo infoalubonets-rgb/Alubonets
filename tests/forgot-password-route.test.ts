@@ -60,15 +60,15 @@ describe('forgot password', () => {
     expect(m.deliver).toHaveBeenCalledWith(expect.objectContaining({ email: 'member@example.com', resetUrl: expect.stringContaining('/reset-password?token=') }))
   })
 
-  it('never shows an error when sending fails; it falls back to Supabase and logs', async () => {
+  it('never shows an error when sending fails; it discards the unsent link and logs, with no other provider', async () => {
     m.findUser.mockResolvedValue({ id: 'u1', email: 'member@example.com', fullName: 'Member', authUserId: 'auth-1' })
     m.deliver.mockRejectedValue(new Error('Resend rejected'))
     const res = await POST(request('member@example.com'))
     expect(res.status).toBe(200)
     await runBackground()
     expect(m.deleteToken).toHaveBeenCalled()
-    expect(m.supabase).toHaveBeenCalledWith('member@example.com', expect.any(String))
-    expect(m.log).toHaveBeenCalledWith('auth.password_reset.primary_failed', expect.any(Error), { userId: 'u1' })
+    expect(m.supabase).not.toHaveBeenCalled()
+    expect(m.log).toHaveBeenCalledWith('auth.password_reset.request_failed', expect.any(Error), { userId: 'u1' })
   })
 
   it('still rejects an invalid email address', async () => {

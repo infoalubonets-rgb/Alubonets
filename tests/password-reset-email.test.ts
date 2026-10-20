@@ -4,7 +4,7 @@ vi.mock('resend', () => ({ Resend: class { emails = { send: mocks.send } } }))
 vi.mock('@/lib/prisma', () => ({ prisma: { emailLog: { create: mocks.log } } }))
 vi.mock('@/lib/pdf/receipt', () => ({ buildReceiptPdf: vi.fn() }))
 vi.mock('@/lib/logger', () => ({ logError: mocks.logError }))
-import { sendPasswordResetEmail, RESEND_ONBOARDING_FROM } from '@/lib/email/resend'
+import { sendPasswordResetEmail } from '@/lib/email/resend'
 import { DEFAULT_FROM_EMAIL } from '@/lib/constants'
 
 const input = { userId: 'member-1', fullName: 'Test Member', email: 'member@example.com', resetUrl: 'https://alubonets.com/reset-password?token=test-token' }
@@ -40,19 +40,27 @@ describe('password reset email delivery', () => {
     await expect(sendPasswordResetEmail(input)).resolves.toBeUndefined()
     expect(mocks.logError).toHaveBeenCalledWith('auth.password_reset.email_log_failed', expect.any(Error), { userId: input.userId })
   })
-  it('reports provider rejection so the request can discard the unsent token', async () => {
+  it('reports provider rejection, keeping the reason in the email log, so the unsent token is discarded', async () => {
     mocks.send.mockResolvedValue({ data: null, error: { message: 'Sender not verified' } })
     await expect(sendPasswordResetEmail(input)).rejects.toThrow('Sender not verified')
-    expect(mocks.log).not.toHaveBeenCalled()
+    expect(mocks.log).toHaveBeenCalledWith({ data: expect.objectContaining({ status: 'failed', meta: expect.objectContaining({ error: 'Sender not verified' }) }) })
   })
-  it('retries with Resend onboarding sender when the group domain is rejected', async () => {
+  it('never sends live mail from an unverified domain in FROM_EMAIL', async () => {
     vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('FROM_EMAIL', 'Alubonets <noreply@alubonets.com>')
+    await sendPasswordResetEmail(input)
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ from: DEFAULT_FROM_EMAIL, to: input.email }))
+  })
+  it('retries from the verified sender when a configured sender is refused', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('FROM_EMAIL', 'Alubonets <noreply@info.alubonets.com>')
     mocks.send
-      .mockResolvedValueOnce({ data: null, error: { message: 'The info.alubonets.com domain is not verified' } })
+      .mockResolvedValueOnce({ data: null, error: { message: 'Invalid `from` field' } })
       .mockResolvedValueOnce({ data: { id: 'email-2' }, error: null })
     await sendPasswordResetEmail(input)
-    expect(mocks.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ from: DEFAULT_FROM_EMAIL, to: input.email }))
-    expect(mocks.send).toHaveBeenNthCalledWith(2, expect.objectContaining({ from: RESEND_ONBOARDING_FROM, to: input.email }))
-    expect(mocks.log).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ meta: expect.objectContaining({ from: RESEND_ONBOARDING_FROM }) }) }))
+    expect(mocks.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ from: 'Alubonets <noreply@info.alubonets.com>' }))
+    expect(mocks.send).toHaveBeenNthCalledWith(2, expect.objectContaining({ from: DEFAULT_FROM_EMAIL, to: input.email }))
+    expect(mocks.log).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'accepted', meta: expect.objectContaining({ from: DEFAULT_FROM_EMAIL }) }) }))
   })
 })

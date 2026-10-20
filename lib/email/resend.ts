@@ -12,10 +12,17 @@ function getResend() {
   return new Resend(key)
 }
 
+const domainOf = (address: string) => address.match(/@([^\s>]+)>?\s*$/)?.[1]?.toLowerCase() ?? ''
+const VERIFIED_SENDER_DOMAIN = domainOf(DEFAULT_FROM_EMAIL) // info.alubonets.com, verified in Resend
+
 export const emailFrom = () => {
   const configured = process.env.FROM_EMAIL?.trim()
-  // Live mail must use the real sender even if onboarding settings remain.
-  if (process.env.NODE_ENV === 'production' && configured?.includes('onboarding@resend.dev')) return DEFAULT_FROM_EMAIL
+  // Live mail may only use the domain verified in Resend. A FROM_EMAIL on any other domain (the
+  // onboarding sender, plain alubonets.com, a typo) is refused by Resend for every recipient, so
+  // production falls back to the verified sender instead of failing every email.
+  if (process.env.NODE_ENV === 'production' && (!configured || domainOf(configured) !== VERIFIED_SENDER_DOMAIN)) {
+    return DEFAULT_FROM_EMAIL
+  }
   return configured || DEFAULT_FROM_EMAIL
 }
 const from = emailFrom
@@ -94,9 +101,6 @@ export async function sendSupportMessageEmail(input: { memberName: string; membe
   return { skipped: false as const, accepted: accepted > 0 }
 }
 
-/** Fallback sender if a custom from-address is rejected. Live mail uses info.alubonets.com. */
-export const RESEND_ONBOARDING_FROM = 'Alubonets <onboarding@resend.dev>'
-
 export async function sendPasswordResetEmail(input: { userId: string; fullName: string; email: string; resetUrl: string }) {
   const resend = getResend()
   if (!resend) throw new Error('Password-reset email is not configured.')
@@ -114,12 +118,21 @@ export async function sendPasswordResetEmail(input: { userId: string; fullName: 
   let fromUsed = sender
   let delivery = await resend.emails.send({ from: sender, to: recipient, subject, html })
   const sendError = delivery.error?.message || ''
-  const unverifiedFrom = /not verified|invalid `from`|only send testing emails/i.test(sendError)
-  if (delivery.error && unverifiedFrom && sender !== RESEND_ONBOARDING_FROM) {
-    fromUsed = RESEND_ONBOARDING_FROM
-    delivery = await resend.emails.send({ from: RESEND_ONBOARDING_FROM, to: recipient, subject, html })
+  // A FROM_EMAIL on a domain Resend has not verified (e.g. plain alubonets.com) is refused; retry
+  // from the verified info.alubonets.com sender, which can reach any member.
+  const senderRefused = /domain|not verified|invalid `from`|testing emails/i.test(sendError)
+  if (delivery.error && senderRefused && sender !== DEFAULT_FROM_EMAIL) {
+    logError('auth.password_reset.sender_refused', delivery.error, { userId: input.userId, from: sender })
+    fromUsed = DEFAULT_FROM_EMAIL
+    delivery = await resend.emails.send({ from: DEFAULT_FROM_EMAIL, to: recipient, subject, html })
   }
-  if (delivery.error) throw new Error(delivery.error.message)
+  if (delivery.error) {
+    // Kept in email_logs so the exact Resend reason can be looked up (Supabase → email_logs).
+    await prisma.emailLog
+      .create({ data: { userId: input.userId, toEmail: recipient, subject, template: 'password_reset', status: 'failed', meta: { error: delivery.error.message, from: fromUsed } } })
+      .catch(() => undefined)
+    throw new Error(delivery.error.message)
+  }
   // An audit failure must not invalidate a link the provider already accepted.
   try {
     await prisma.emailLog.create({ data: { userId: input.userId, toEmail: recipient, subject, template: 'password_reset', status: 'accepted', meta: { providerMessageId: delivery.data?.id || null, testMode: !production && Boolean(testEmailOverride()), intendedRecipient: input.email, from: fromUsed } } })
