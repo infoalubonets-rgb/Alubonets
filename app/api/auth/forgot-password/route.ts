@@ -61,10 +61,19 @@ export async function POST(request: Request) {
 
   const email = parsed.data.email
   const requestUrl = request.url
+  // Tell the person plainly when there is no account for this email (a quick indexed lookup);
+  // the IP limit above keeps anyone from checking many addresses.
+  const account = await prisma.user.findUnique({ where: { email }, select: { authUserId: true } })
+  if (!account?.authUserId) {
+    return NextResponse.json(
+      { error: 'No account exists with this email address. Check the spelling, or register first.' },
+      { status: 404 },
+    )
+  }
+  // Sending happens after the reply, so the form answers straight away.
   after(() =>
     sendResetIfAccountExists(email, requestUrl).catch((error) => logError('auth.password_reset.background_failed', error)),
   )
-  // The same answer, straight away, whether or not the email has an account.
   return NextResponse.json({
     message: `A password-reset link has been sent to ${email}. It expires in ${PASSWORD_RESET_TTL_MINUTES} minutes. Check your spam folder too.`,
   })

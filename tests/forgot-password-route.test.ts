@@ -41,11 +41,11 @@ describe('forgot password', () => {
     m.supabase.mockResolvedValue(undefined)
   })
 
-  it('answers the same way for an unknown email and sends nothing', async () => {
+  it('tells the person when no account exists for the email, and sends nothing', async () => {
     m.findUser.mockResolvedValue(null)
     const res = await POST(request('nobody@example.com'))
-    expect(res.status).toBe(200)
-    expect((await res.json()).message).toBe('A password-reset link has been sent to nobody@example.com. It expires in 10 minutes. Check your spam folder too.')
+    expect(res.status).toBe(404)
+    expect((await res.json()).error).toContain('No account exists with this email address')
     await runBackground()
     expect(m.deliver).not.toHaveBeenCalled()
     expect(m.supabase).not.toHaveBeenCalled()
@@ -55,6 +55,7 @@ describe('forgot password', () => {
     m.findUser.mockResolvedValue({ id: 'u1', email: 'member@example.com', fullName: 'Member', authUserId: 'auth-1' })
     const res = await POST(request('member@example.com'))
     expect(res.status).toBe(200)
+    expect((await res.json()).message).toBe('A password-reset link has been sent to member@example.com. It expires in 10 minutes. Check your spam folder too.')
     expect(m.deliver).not.toHaveBeenCalled()
     await runBackground()
     expect(m.deliver).toHaveBeenCalledWith(expect.objectContaining({ email: 'member@example.com', resetUrl: expect.stringContaining('/reset-password?token=') }))
