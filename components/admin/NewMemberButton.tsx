@@ -77,7 +77,16 @@ function temporaryPassword() {
   return chars.join('')
 }
 
-type Done = { name: string; minor: boolean; emailed: boolean; setupUrl: string | null; password: string }
+type Done = {
+  name: string
+  minor: boolean
+  emailed: boolean
+  emailedTo: string | null
+  testInbox: boolean
+  emailError: string | null
+  setupUrl: string | null
+  password: string
+}
 
 /**
  * Admin "+ New member".
@@ -165,7 +174,16 @@ export default function NewMemberButton({
           setError(result.error)
           return
         }
-        setDone({ name, minor: result.minor, emailed: result.emailed, setupUrl: result.setupUrl, password })
+        setDone({
+          name,
+          minor: result.minor,
+          emailed: result.emailed,
+          emailedTo: result.emailedTo,
+          testInbox: result.emailRedirectedToTestInbox,
+          emailError: result.emailError,
+          setupUrl: result.setupUrl,
+          password,
+        })
         router.refresh()
       } catch {
         setError('Could not reach the server. Check your connection and try again.')
@@ -204,11 +222,25 @@ export default function NewMemberButton({
             </p>
             {done.setupUrl && (
               <>
+                {done.emailed && !done.testInbox && (
+                  <p className="rounded-lg bg-green-50 p-2 text-green-800 dark:bg-green-900/20 dark:text-green-300">
+                    Welcome email with the setup link and temporary password sent to <b>{done.emailedTo}</b>.
+                  </p>
+                )}
+                {done.emailed && done.testInbox && (
+                  <p className="rounded-lg bg-amber-50 p-2 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+                    The email went to the test inbox <b>{done.emailedTo}</b>, not to the member, because test mode is on
+                    (RESEND_TEST_EMAIL is set in Vercel). Remove it there and redeploy so members get their own emails.
+                    Until then, share the link below yourself.
+                  </p>
+                )}
+                {!done.emailed && (
+                  <p className="rounded-lg bg-error-container p-2 text-error">
+                    The email was not sent{done.emailError ? `: ${done.emailError}` : '.'} Copy the link below and share it with them yourself.
+                  </p>
+                )}
                 <p className="text-on-surface-variant">
-                  {done.emailed
-                    ? 'A setup link was emailed to them. You can also copy it and share it yourself.'
-                    : 'The email could not be sent, so copy this link and share it with them.'}{' '}
-                  It works once, for 14 days. Opening it lets them choose their own password, then they complete their profile.
+                  The link works once, for 14 days. Opening it lets them choose their own password, then they complete their profile.
                 </p>
                 <div className="flex items-stretch gap-2">
                   <span className="min-w-0 flex-1 break-all rounded-lg bg-surface-container-low p-2 font-mono text-xs">{done.setupUrl}</span>

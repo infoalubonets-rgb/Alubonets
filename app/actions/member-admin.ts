@@ -14,6 +14,7 @@ import { nextMembershipNumber } from '@/lib/membership'
 import { branchHistoryData, validateFamilyAttachment } from '@/lib/family-rules'
 import { notifyUsers } from '@/lib/notifications'
 import { sendDirectEmails } from '@/lib/email/resend'
+import { sendMemberSetupEmail } from '@/lib/email/member-setup'
 import { ALL_ROLES, ROLE_LABEL } from '@/lib/auth/types'
 import { createServerClient as createServiceClient } from '@/lib/supabase-server'
 import { ADMIN_CREATED_NOTE } from '@/lib/profile-completion'
@@ -277,20 +278,19 @@ async function createMember(input: z.input<typeof createMemberSchema>) {
   }
 
   const setupUrl = data.isMinor ? null : setupUrlFor(token)
+  // Includes the temporary password and the setup link; never throws, and reports what happened.
   const mail = setupUrl
-    ? await sendDirectEmails({
-        emails: [email],
-        subject: 'Your Alubonets account is ready',
-        title: 'Welcome to Alubonets',
-        body: `<p>An administrator added you as a <strong>${escapeHtml(ROLE_LABEL[role])}</strong>${
-          principal ? ` in <strong>${escapeHtml(principal.fullName)}</strong>’s family branch` : ''
-        }. Open the link to choose your password, then sign in and complete your profile. The link works for 14 days.</p>`,
-        ctaLabel: 'Set my password',
-        ctaUrl: setupUrl,
+    ? await sendMemberSetupEmail({
+        userId: created.id,
         actorId: actor.id,
-        template: 'admin_member_invite',
+        to: email,
+        fullName: data.fullName,
+        roleLabel: ROLE_LABEL[role],
+        principalName: principal?.fullName ?? null,
+        setupUrl,
+        temporaryPassword: data.password!,
       })
-    : { sent: 0 }
+    : null
   if (principal) {
     await notifyUsers({
       userIds: [principal.id],
@@ -302,6 +302,7 @@ async function createMember(input: z.input<typeof createMemberSchema>) {
       entityId: created.id,
     })
     if (!principal.email.endsWith('@alubonets.local')) {
+      // The member already exists; a mail outage here must not turn into a failed "Add member".
       await sendDirectEmails({
         emails: [principal.email],
         subject: 'New member in your family branch',
@@ -311,7 +312,7 @@ async function createMember(input: z.input<typeof createMemberSchema>) {
         ctaUrl: `${appUrl()}/dashboard/member/family`,
         actorId: actor.id,
         template: 'family_assigned_principal',
-      })
+      }).catch((cause) => logError('member_admin.principal_email_failed', cause, { memberId: created.id }))
     }
   }
 
@@ -336,7 +337,11 @@ async function createMember(input: z.input<typeof createMemberSchema>) {
     id: created.id,
     membershipNumber: created.membershipNumber,
     minor: data.isMinor,
-    emailed: mail.sent > 0,
+    emailed: Boolean(mail?.sent),
+    /** Where the email actually went (the test inbox when RESEND_TEST_EMAIL is set). */
+    emailedTo: mail?.sent ? mail.deliveredTo : null,
+    emailRedirectedToTestInbox: mail?.sent ? mail.redirectedToTestInbox : false,
+    emailError: mail && !mail.sent ? mail.error : null,
     /** Always returned for adults so the admin can copy and share it. */
     setupUrl,
   }
