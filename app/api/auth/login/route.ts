@@ -90,6 +90,11 @@ export async function POST(req: Request) {
       )
     }
 
+    // Needed after sign-in; fetched while Supabase checks the password instead of afterwards.
+    const disabledRolesPromise = getDisabledRoles().catch((cause) => {
+      logError('auth.login.disabled_roles', cause)
+      return []
+    })
     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -236,7 +241,7 @@ export async function POST(req: Request) {
       )
     }
 
-    if (isLockedOutByRole(profile, await getDisabledRoles())) {
+    if (isLockedOutByRole(profile, await disabledRolesPromise)) {
       await supabase.auth.signOut()
       return NextResponse.json(
         { error: roleInactiveMessage(profile.role), code: 'ROLE_INACTIVE' },

@@ -66,6 +66,18 @@ export default function AuthModal() {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
+  // Coming back with the browser's Back button restores this page from cache mid-redirect.
+  useEffect(() => {
+    const reset = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setLoading(false)
+        setRedirecting(false)
+      }
+    }
+    window.addEventListener('pageshow', reset)
+    return () => window.removeEventListener('pageshow', reset)
+  }, [])
   const [devOpen, setDevOpen] = useState(false)
   const [registrationName, setRegistrationName] = useState('')
 
@@ -102,7 +114,9 @@ export default function AuthModal() {
     setLoading(true)
     try {
       const { user, redirectTo, status, requiresVerification } = await loginRequest(email, password)
-      setOpen(false)
+      // Keep the form open and busy until the next page replaces it: the dashboard takes a few
+      // seconds to load, and closing early looked like sign-in had silently done nothing.
+      setRedirecting(true)
       if (status === 'PENDING') {
         window.location.assign('/pending')
       } else if (requiresVerification || redirectTo === '/verify-login') {
@@ -112,7 +126,6 @@ export default function AuthModal() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid credentials')
-    } finally {
       setLoading(false)
     }
   }
@@ -219,7 +232,7 @@ export default function AuthModal() {
               </div>
               {error && <p className="text-error text-[12px] text-center">{error}</p>}
               <button type="submit" className="auth-primary-btn" disabled={loading}>
-                {loading ? 'Signing in…' : 'Sign In'}
+                {redirecting ? 'Opening your dashboard…' : loading ? 'Signing in…' : 'Sign In'}
               </button>
               <div className="flex items-center gap-2 my-1">
                 <div className="flex-1 h-px bg-outline-variant/50" />

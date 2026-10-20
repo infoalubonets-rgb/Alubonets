@@ -32,6 +32,18 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
   const [error, setError] = useState('')
   const friendly = error ? friendlyError(error, 'We could not sign you in. Please try again.') : null
   const [loading, setLoading] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
+  // Coming back with the browser's Back button restores this page from cache mid-redirect.
+  useEffect(() => {
+    const reset = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setLoading(false)
+        setRedirecting(false)
+      }
+    }
+    window.addEventListener('pageshow', reset)
+    return () => window.removeEventListener('pageshow', reset)
+  }, [])
   const [devOpen, setDevOpen] = useState(false)
 
   useEffect(() => {
@@ -78,6 +90,7 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
     try {
       if (mode === 'register') {
         const { redirectTo } = await registerRequest({ email, password, fullName, phone })
+        setRedirecting(true)
         router.push(redirectTo || '/pending')
         router.refresh()
         return
@@ -86,12 +99,16 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
         email,
         password,
       )
+      if (status === 'PENDING' && admin) {
+        await logoutRequest()
+        setError('Your account is still waiting for approval by an administrator.')
+        setLoading(false)
+        return
+      }
+      // Stay busy until the next page replaces this one: it takes a few seconds to load, and
+      // resetting the button meanwhile looked like sign-in had silently done nothing.
+      setRedirecting(true)
       if (status === 'PENDING') {
-        if (admin) {
-          await logoutRequest()
-          setError('Your account is still waiting for approval by an administrator.')
-          return
-        }
         window.location.assign('/pending')
         return
       }
@@ -99,15 +116,9 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
         window.location.assign('/verify-login')
         return
       }
-      const next = safeRedirectPath(searchParams.get('next'))
-      if (next) {
-        window.location.assign(next)
-      } else {
-        window.location.assign(redirectTo || homeForAccount(user))
-      }
+      window.location.assign(safeRedirectPath(searchParams.get('next')) ?? (redirectTo || homeForAccount(user)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
-    } finally {
       setLoading(false)
     }
   }
@@ -247,7 +258,9 @@ export default function LoginForm({ title = 'Member Login', allowRegister = true
                   className="bg-secondary-container text-on-secondary font-label-bold text-label-bold py-[11px] px-xl rounded-full hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-sm min-h-[44px] shadow-md disabled:opacity-60"
                 >
                   <UnlockIcon />
-                  {loading
+                  {redirecting
+                    ? 'Opening your dashboard…'
+                    : loading
                     ? mode === 'register'
                       ? 'Creating…'
                       : 'Signing in…'
