@@ -28,6 +28,10 @@ export type DirectoryMember = {
   relationship: string | null
   principalName: string | null
   isPrincipal: boolean
+  /** PJW for a Principal, PJW01 for an attached member, null when not in a family. */
+  familyTag: string | null
+  /** The family's code (PJW) for both the Principal and attached members, for search. */
+  familyCode: string | null
   role: string | null
   profession: string | null
   skills: string | null

@@ -64,8 +64,10 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
       (member) =>
         matchesDirectoryFilters(member, filters) &&
         (!q ||
-          [member.fullName, member.profession, member.skills, member.location, member.principalName, member.details?.membershipNumber]
-            .some((field) => field?.toLowerCase().includes(q))),
+          [member.fullName, member.profession, member.skills, member.location, member.principalName, member.details?.membershipNumber, member.familyTag]
+            .some((field) => field?.toLowerCase().includes(q)) ||
+          // Typing a family code (e.g. PJW) lists the Principal and everyone attached to them.
+          member.familyCode?.toLowerCase() === q),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members, query, filters.type, filters.role, filters.status])
@@ -94,7 +96,7 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search name, profession, location…"
+          placeholder="Search name, member ID, family code (e.g. PJW), profession…"
           className="h-10 w-full rounded-xl border bg-surface py-2 pl-9 pr-3 text-sm"
         />
       </label>
@@ -124,7 +126,14 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
                       className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`}
                     >
                       <td className="px-4 py-3">
-                        <p className="font-medium text-on-surface">{member.fullName}</p>
+                        <p className="flex items-center gap-1.5 font-medium text-on-surface">
+                          {member.fullName}
+                          {member.familyTag && (
+                            <span className="rounded-md bg-secondary-container/15 px-1.5 py-0.5 font-mono text-[11px] font-bold text-secondary" title="Family tag">
+                              {member.familyTag}
+                            </span>
+                          )}
+                        </p>
                         {member.details?.membershipNumber && (
                           <p className="text-xs text-on-surface-variant">{member.details.membershipNumber}</p>
                         )}
@@ -184,7 +193,8 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
             <DetailRow label="Role" value={roleLabel(selected)} />
             <DetailRow label="Member type" value={memberType(selected)} />
             <DetailRow label="Account status" value={selected.account && title(selected.account.status)} />
-            <DetailRow label="Membership number" value={selected.details?.membershipNumber} />
+            <DetailRow label="Member ID" value={selected.details?.membershipNumber} />
+            <DetailRow label="Family tag" value={selected.familyTag} />
             <DetailRow label="Standing" value={selected.details && title(selected.details.standing)} />
             <DetailRow label="Joined" value={selected.details && new Date(selected.details.joinedAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })} />
             <DetailRow label="Principal member" value={selected.principalName} />

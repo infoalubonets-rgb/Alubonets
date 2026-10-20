@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { appTodayInputValue } from '@/lib/dates'
 
 export const POLICY_VERSION = '2026-10-20-v2'
 // Shown on /privacy and /terms; update together with POLICY_VERSION.
@@ -81,12 +82,20 @@ export async function nextMembershipNumber(
       }) => Promise<{ lastValue: number }>
     }
   },
-  year = new Date().getFullYear()
+  now = new Date()
 ) {
+  const [year, month] = appTodayInputValue(now).split('-').map(Number)
+  // One counter per approval month, keyed YYYYMM (e.g. 202608) in membership_sequences.year.
+  const period = year * 100 + month
   const sequence = await tx.membershipSequence.upsert({
-    where: { year },
-    create: { year, lastValue: 1 },
+    where: { year: period },
+    create: { year: period, lastValue: 1 },
     update: { lastValue: { increment: 1 } },
   })
-  return `ALU-${year}-${String(sequence.lastValue).padStart(3, '0')}`
+  return formatMemberId(year, month, sequence.lastValue)
+}
+
+/** Permanent member ID: AL + YYMM of approval + 3-digit monthly counter, e.g. AL2608-001. */
+export function formatMemberId(year: number, month: number, counter: number) {
+  return `AL${String(year % 100).padStart(2, '0')}${String(month).padStart(2, '0')}-${String(counter).padStart(3, '0')}`
 }

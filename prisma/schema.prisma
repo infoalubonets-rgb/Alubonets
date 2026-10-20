@@ -322,7 +322,14 @@ model User {
   superAdminGrantedById      String?
   dashboardAccess            Role[]                     @default([])
   avatarUrl                  String?
+  /// Permanent member ID, e.g. AL2608-001 (approval year+month, then a monthly counter).
   membershipNumber           String?                    @unique
+  /// The number this member had before member IDs moved to the AL2608-001 format.
+  legacyMembershipNumber     String?
+  /// Principal's family code, e.g. PJW (set by the users_assign_family_tags trigger; never changes).
+  familyCode                 String?                    @unique
+  /// Order of joining within the Principal's family: 1 → PJW01 (set by the same trigger).
+  familyMemberNumber         Int?
   approvalNotes              String?
   rejectionReason            String?
   approvedAt                 DateTime?
@@ -433,6 +440,7 @@ model User {
 
   @@index([principalMemberId])
   @@index([isPrincipal])
+  @@unique([principalMemberId, familyMemberNumber])
   @@map("users")
 }
 

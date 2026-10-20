@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { requireActiveRole } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { ageOn } from '@/lib/profile-privacy'
+import { familyTag } from '@/lib/family-tags'
 import {
   DIRECTORY_SAFE_FIELDS,
   canViewMemberDirectory,
@@ -65,6 +66,8 @@ export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
       isPrincipal: true,
       principalMemberId: true,
       familyRelationship: true,
+      familyCode: true,
+      familyMemberNumber: true,
       memberProfile: {
         select: {
           profession: true,
@@ -79,7 +82,7 @@ export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
         },
       },
       profileVisibility: true,
-      principal: { select: { id: true, fullName: true } },
+      principal: { select: { id: true, fullName: true, familyCode: true } },
       _count: { select: { attachedMembers: true } },
     },
   })
@@ -92,6 +95,8 @@ export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
       relationship: row.familyRelationship,
       principalName: row.principal?.fullName || null,
       isPrincipal: row.isPrincipal,
+      familyTag: familyTag(row),
+      familyCode: row.isPrincipal ? row.familyCode : row.principal?.familyCode ?? null,
       role: row.role,
       profession: row.memberProfile?.profession || null,
       skills: row.memberProfile?.skills || null,
