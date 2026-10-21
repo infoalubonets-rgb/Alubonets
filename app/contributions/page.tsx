@@ -129,6 +129,7 @@ export default async function ContributionsPage({ searchParams }: { searchParams
             period={{ key: period.key, from: period.from, to: period.to, label: period.label }}
             canEditAmounts={canRecordPayments(profile)}
             canSetPlan={canRecordPayments(profile) || profile.role === 'ADMIN' || Boolean(profile.isSuperAdmin)}
+            canDelete={Boolean(account && canRecordContributions(account))}
           />
         </div>
       </DashboardShell>

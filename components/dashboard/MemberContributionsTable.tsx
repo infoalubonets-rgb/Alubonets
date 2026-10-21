@@ -6,7 +6,7 @@ import FullScreenModal from '@/components/ui/FullScreenModal'
 import MonthlyContributionsGrid from '@/components/dashboard/MonthlyContributionsGrid'
 import TimeRangeFilter from '@/components/finance/TimeRangeFilter'
 import { MemberPurposeSettingsButton } from '@/components/finance/PurposeSettingsEditor'
-import { editContributionAmount, setContributionPlan } from '@/app/actions/finance'
+import { deleteContributions, editContributionAmount, setContributionPlan } from '@/app/actions/finance'
 
 export type MemberContributionRow = {
   id: string
@@ -131,24 +131,98 @@ function EditAmountForm({ payment, onDone, onCancel }: { payment: PaymentView; o
   )
 }
 
-function PaymentsList({ payments, canEdit = false, onChanged }: { payments: PaymentView[]; canEdit?: boolean; onChanged?: () => void }) {
+/** Reason prompt shown before payments are deleted; nothing is removed until it is confirmed. */
+function DeleteConfirm({ ids, onDone, onCancel }: { ids: string[]; onDone: () => void; onCancel: () => void }) {
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const [pending, startTransition] = useTransition()
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    startTransition(async () => {
+      const result = await deleteContributions({ ids, reason })
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
+      onDone()
+    })
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-2 rounded-xl border border-error/40 bg-error-container/30 p-3">
+      <p className="text-sm font-semibold text-error">Delete {ids.length === 1 ? 'this payment' : `${ids.length} payments`}?</p>
+      <p className="text-xs text-on-surface-variant">It is removed from the member&apos;s record and totals and reversed in the ledger. The reason is saved in the audit log.</p>
+      <label className="block text-xs font-semibold text-on-surface-variant">
+        Reason
+        <input
+          required
+          minLength={3}
+          maxLength={500}
+          autoFocus
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g. Recorded twice by mistake"
+          className="mt-1 block h-9 w-full rounded-lg border px-2 text-sm font-normal text-on-surface"
+        />
+      </label>
+      {error && <p className="text-xs text-error">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} disabled={pending} className="h-8 rounded-full border border-outline-variant px-3 text-xs font-semibold">Cancel</button>
+        <button type="submit" disabled={pending} className="h-8 rounded-full bg-error px-3 text-xs font-semibold text-on-error disabled:opacity-60">
+          {pending ? 'Deleting…' : ids.length === 1 ? 'Delete payment' : `Delete ${ids.length} payments`}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+type Selection = { selected: Set<string>; toggle: (ids: string[], on: boolean) => void; onDelete: (ids: string[]) => void }
+
+function PaymentsList({ payments, canEdit = false, onChanged, selection }: { payments: PaymentView[]; canEdit?: boolean; onChanged?: () => void; selection?: Selection }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   if (payments.length === 0) {
     return <p className="rounded-xl border border-dashed border-outline-variant px-4 py-6 text-center text-sm text-on-surface-variant">No contributions recorded.</p>
   }
+  const allIds = payments.map((p) => p.id)
+  const allSelected = selection ? allIds.every((id) => selection.selected.has(id)) : false
   return (
     <ul className="divide-y divide-outline-variant/60 rounded-xl border border-outline-variant">
+      {selection && (
+        <li className="flex items-center gap-2 bg-surface-container-low px-3 py-1.5 text-xs text-on-surface-variant">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={(e) => selection.toggle(allIds, e.target.checked)}
+            aria-label="Select all payments in this list"
+            className="h-4 w-4 accent-primary"
+          />
+          Select all
+        </li>
+      )}
       {payments.map((p) => {
         const editable = canEdit && p.status !== 'REJECTED' && p.status !== 'REVERSED'
         return (
           <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-sm">
-            <div className="min-w-0">
-              <p className="font-medium text-on-surface">{p.purpose}</p>
-              <p className="text-xs text-on-surface-variant">
-                {dateLabel(p.paidAt)}
-                {p.method ? ` · ${p.method}` : ''}
-                {p.reference ? ` · ${p.reference}` : ''}
-              </p>
+            <div className="flex min-w-0 items-center gap-2">
+              {selection && (
+                <input
+                  type="checkbox"
+                  checked={selection.selected.has(p.id)}
+                  onChange={(e) => selection.toggle([p.id], e.target.checked)}
+                  aria-label={`Select ${p.purpose} payment of ${dateLabel(p.paidAt)}`}
+                  className="h-4 w-4 shrink-0 accent-primary"
+                />
+              )}
+              <div className="min-w-0">
+                <p className="font-medium text-on-surface">{p.purpose}</p>
+                <p className="text-xs text-on-surface-variant">
+                  {dateLabel(p.paidAt)}
+                  {p.method ? ` · ${p.method}` : ''}
+                  {p.reference ? ` · ${p.reference}` : ''}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLE[p.status] ?? 'bg-surface-container text-on-surface-variant'}`}>
@@ -164,6 +238,17 @@ function PaymentsList({ payments, canEdit = false, onChanged }: { payments: Paym
                   className="flex h-7 w-7 items-center justify-center rounded-full text-primary transition hover:bg-primary/10"
                 >
                   <span className="material-symbols-outlined text-[17px]">edit</span>
+                </button>
+              )}
+              {selection && (
+                <button
+                  type="button"
+                  onClick={() => selection.onDelete([p.id])}
+                  title="Delete payment"
+                  aria-label={`Delete ${p.purpose} payment of ${dateLabel(p.paidAt)}`}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-error transition hover:bg-error/10"
+                >
+                  <span className="material-symbols-outlined text-[17px]">delete</span>
                 </button>
               )}
             </div>
@@ -245,12 +330,34 @@ function PlanSwitch({ memberId, plan, canEdit, onChanged }: { memberId: string; 
   )
 }
 
-function MemberContributionsModal({ row, onClose, canEditAmounts = false, canSetPlan = false }: { row: MemberContributionRow | null; onClose: () => void; canEditAmounts?: boolean; canSetPlan?: boolean }) {
+function MemberContributionsModal({ row, onClose, canEditAmounts = false, canSetPlan = false, canDelete = false }: { row: MemberContributionRow | null; onClose: () => void; canEditAmounts?: boolean; canSetPlan?: boolean; canDelete?: boolean }) {
   const router = useRouter()
   // After an edit, reload this member's payments and the table totals behind the pop-up.
   const [state, setState] = useState<{ id: string; data?: MemberDetail; error?: string } | null>(null)
   const [attempt, setAttempt] = useState(0)
   const rowId = row?.id
+  // Payments ticked for deletion (own and attached members), and the ones awaiting a reason.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirming, setConfirming] = useState<string[] | null>(null)
+  useEffect(() => {
+    setSelected(new Set())
+    setConfirming(null)
+  }, [rowId])
+  const selection: Selection | undefined = canDelete
+    ? {
+        selected,
+        toggle: (ids, on) =>
+          setSelected((current) => {
+            const next = new Set(current)
+            for (const id of ids) {
+              if (on) next.add(id)
+              else next.delete(id)
+            }
+            return next
+          }),
+        onDelete: (ids) => setConfirming(ids),
+      }
+    : undefined
   const refresh = () => {
     if (rowId) loadedDetails.delete(rowId)
     setAttempt((n) => n + 1)
@@ -316,12 +423,36 @@ function MemberContributionsModal({ row, onClose, canEditAmounts = false, canSet
                 ))}
               </div>
 
-              <PaymentsList payments={data.contributions} canEdit={canEditAmounts} onChanged={refresh} />
+              {canDelete && selected.size > 0 && !confirming && (
+                <div className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-outline-variant bg-surface px-3 py-2 shadow-sm">
+                  <p className="text-sm font-semibold text-on-surface">{selected.size} selected</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setSelected(new Set())} className="h-8 rounded-full border border-outline-variant px-3 text-xs font-semibold">Clear</button>
+                    <button type="button" onClick={() => setConfirming([...selected])} className="inline-flex h-8 items-center gap-1 rounded-full bg-error px-3 text-xs font-semibold text-on-error">
+                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      Delete selected
+                    </button>
+                  </div>
+                </div>
+              )}
+              {confirming && (
+                <DeleteConfirm
+                  ids={confirming}
+                  onCancel={() => setConfirming(null)}
+                  onDone={() => {
+                    setConfirming(null)
+                    setSelected(new Set())
+                    refresh()
+                  }}
+                />
+              )}
+
+              <PaymentsList payments={data.contributions} canEdit={canEditAmounts} onChanged={refresh} selection={selection} />
 
               {data.family.map((member) => (
                 <div key={member.id} className="space-y-2">
                   <p className="text-[11px] font-bold uppercase tracking-wide text-on-surface-variant">Attached: {member.fullName}</p>
-                  <PaymentsList payments={member.contributions} canEdit={canEditAmounts} onChanged={refresh} />
+                  <PaymentsList payments={member.contributions} canEdit={canEditAmounts} onChanged={refresh} selection={selection} />
                 </div>
               ))}
             </>
@@ -333,7 +464,7 @@ function MemberContributionsModal({ row, onClose, canEditAmounts = false, canSet
 }
 
 /** Every member's contribution totals; the eye opens that member's payments in a pop-up. */
-export default function MemberContributionsTable({ rows, period = { key: 'all', from: '', to: '', label: 'All time' }, canEditAmounts = false, canSetPlan = false }: { rows: MemberContributionRow[]; period?: { key: string; from: string; to: string; label: string }; canEditAmounts?: boolean; canSetPlan?: boolean }) {
+export default function MemberContributionsTable({ rows, period = { key: 'all', from: '', to: '', label: 'All time' }, canEditAmounts = false, canSetPlan = false, canDelete = false }: { rows: MemberContributionRow[]; period?: { key: string; from: string; to: string; label: string }; canEditAmounts?: boolean; canSetPlan?: boolean; canDelete?: boolean }) {
   // The time filter lives in the URL so totals come from the server for that period.
   const filtered = period.key !== 'all'
   const monthLabel = filtered ? period.label : null
@@ -445,7 +576,7 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
         </div>
       </div>
       <p className="text-xs text-on-surface-variant">Totals count confirmed and reconciled payments. Pending payments are still waiting for a second check.</p>
-      <MemberContributionsModal row={viewing} onClose={() => setViewing(null)} canEditAmounts={canEditAmounts} canSetPlan={canSetPlan} />
+      <MemberContributionsModal row={viewing} onClose={() => setViewing(null)} canEditAmounts={canEditAmounts} canSetPlan={canSetPlan} canDelete={canDelete} />
     </div>
   )
 }

@@ -10,6 +10,7 @@ export const ACTION_LABELS: Record<string, string> = {
   CONTRIBUTION_RECONCILE: 'Reconciled a payment',
   CONTRIBUTION_MEMBER_REASSIGN: 'Changed the member linked to a payment',
   CONTRIBUTION_AMOUNT_EDIT: 'Changed a payment amount',
+  CONTRIBUTION_DELETE: 'Deleted a payment',
   FINANCIAL_TRANSACTION_UNAPPROVE: 'Sent a transaction back to pending',
   MEMBER_CONTRIBUTION_PLAN: 'Set a member’s contribution plan',
   CONTRIBUTION_CSV_IMPORT: 'Imported contributions (CSV)',
