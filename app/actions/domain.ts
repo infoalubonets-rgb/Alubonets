@@ -267,6 +267,7 @@ export async function actionCreateEvent(formData: FormData) {
   revalidatePath('/dashboard/organizer')
   revalidatePath('/dashboard/organizer/events')
   revalidatePath('/dashboard/member')
+  revalidatePath('/dashboard/member/events')
   revalidatePath('/events')
   revalidateTag(TAGS.events)
 }
@@ -275,6 +276,7 @@ const EVENT_PATHS = [
   '/dashboard/organizer',
   '/dashboard/organizer/events',
   '/dashboard/member',
+  '/dashboard/member/events',
   '/events',
 ]
 

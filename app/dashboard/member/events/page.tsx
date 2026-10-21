@@ -1,5 +1,7 @@
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import MemberEventsClient from '@/components/dashboard/MemberEventsClient'
+import AddEventButton from '@/components/dashboard/AddEventButton'
+import { getActiveMembers } from '@/lib/data/queries'
 import { requireActiveRole } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
@@ -45,6 +47,7 @@ export default async function MemberEventsPage() {
   const canDeleteAnyEvent = actor.isSuperAdmin || actor.role === 'ADMIN'
   const isOrganizer = actor.role === 'ORGANIZER' || actor.role === 'SECRETARY'
     || actor.dashboardAccess.includes('ORGANIZER') || actor.dashboardAccess.includes('SECRETARY')
+  const canCreateEvents = actor.isSuperAdmin || actor.role === 'ADMIN' || isOrganizer
   const now = new Date()
   const toCard = (event: (typeof events)[number]) => ({
     id: event.id, title: event.title, description: event.description, location: event.location, mapsUrl: event.mapsUrl,
@@ -69,8 +72,15 @@ export default async function MemberEventsPage() {
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())
     .map(toCard)
 
+  const members = canCreateEvents ? await getActiveMembers() : []
+
   return (
-    <DashboardShell role={actor.role} title="Events" nav={navForRole(actor.role)}>
+    <DashboardShell
+      role={actor.role}
+      title="Events"
+      nav={navForRole(actor.role)}
+      pageAction={canCreateEvents ? <AddEventButton members={members} /> : undefined}
+    >
       <div className="space-y-4 p-4 md:p-6">
         {!paidUp && <MemberGate variant="renew" what="Upcoming events" reason={reason} />}
         <MemberEventsClient upcoming={upcoming} past={past} />
