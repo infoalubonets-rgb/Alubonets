@@ -3,6 +3,7 @@ import { getSessionProfile } from '@/lib/auth/session'
 import { canViewAllFinances } from '@/lib/finance-access'
 import { prisma } from '@/lib/prisma'
 import { APP_TIMEZONE, appDayRange } from '@/lib/dates'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
 
   const [members, contributions, firstPayment] = await Promise.all([
     prisma.user.findMany({
-      where: { status: { not: 'PENDING' } },
+      where: { status: { not: 'PENDING' }, ...NOT_DELETED_MEMBER },
       select: { id: true, fullName: true, membershipNumber: true, contributionPlan: true },
       orderBy: { fullName: 'asc' },
     }),

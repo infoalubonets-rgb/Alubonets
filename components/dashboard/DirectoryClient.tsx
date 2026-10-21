@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { deleteMembers } from '@/app/actions/members'
 import FullScreenModal from '@/components/ui/FullScreenModal'
 import MemberAccountActions from '@/components/admin/MemberAccountActions'
 import MemberFamilyActions from '@/components/admin/MemberFamilyActions'
@@ -72,6 +73,39 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [members, query, filters.type, filters.role, filters.status])
 
+  // Admin bulk delete: ticked members, the confirm step and the outcome.
+  const router = useRouter()
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [confirming, setConfirming] = useState(false)
+  const [understood, setUnderstood] = useState(false)
+  const [deleting, startDeleting] = useTransition()
+  const [deleteResult, setDeleteResult] = useState<{ deleted: number; failed: string[] } | { error: string } | null>(null)
+  const deletable = (member: DirectoryMember) => Boolean(member.account) && !member.isSuperAdmin
+  const pickableRows = rows.filter(deletable)
+  const allPicked = pickableRows.length > 0 && pickableRows.every((member) => picked.has(member.id))
+  const pick = (ids: string[], on: boolean) =>
+    setPicked((current) => {
+      const next = new Set(current)
+      for (const id of ids) {
+        if (on) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
+  const runBulkDelete = () =>
+    startDeleting(async () => {
+      const result = await deleteMembers({ userIds: [...picked] })
+      setConfirming(false)
+      setUnderstood(false)
+      if (!result.ok) {
+        setDeleteResult({ error: result.error })
+        return
+      }
+      setDeleteResult({ deleted: result.deleted, failed: result.failed })
+      setPicked(new Set())
+      router.refresh()
+    })
+
   const stats = [
     { label: 'Members', value: members.length },
     { label: 'Principal', value: members.filter((m) => m.isPrincipal).length },
@@ -101,11 +135,73 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
         />
       </label>
 
+      {isAdmin && picked.size > 0 && !confirming && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-outline-variant bg-surface px-4 py-2.5">
+          <p className="text-sm font-semibold text-on-surface">{picked.size} member{picked.size === 1 ? '' : 's'} selected</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setPicked(new Set())} className="h-9 rounded-full border border-outline-variant px-4 text-xs font-semibold">Clear</button>
+            <button
+              type="button"
+              onClick={() => { setDeleteResult(null); setConfirming(true) }}
+              className="inline-flex h-9 items-center gap-1 rounded-full bg-error px-4 text-xs font-semibold text-on-error"
+            >
+              <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+              Delete selected members
+            </button>
+          </div>
+        </div>
+      )}
+      {confirming && (
+        <div role="alertdialog" aria-label="Confirm deleting members" className="space-y-2 rounded-xl border border-error/50 bg-error-container/30 p-4">
+          <p className="text-sm font-semibold text-error">Are you sure? Delete {picked.size} member{picked.size === 1 ? '' : 's'} permanently?</p>
+          <p className="text-xs text-on-surface-variant">
+            Each member and all their contributions (reversed in the ledger) and details — profile, family links, messages and sign-in — are deleted.
+            <strong> This cannot be undone.</strong> The audit log keeps a record of each deletion.
+          </p>
+          <label className="flex items-center gap-2 text-xs font-semibold text-on-surface">
+            <input type="checkbox" checked={understood} onChange={(e) => setUnderstood(e.target.checked)} className="h-4 w-4 accent-error" />
+            I understand this permanently deletes these members and their contributions
+          </label>
+          <div className="flex justify-end gap-2">
+            <button type="button" disabled={deleting} onClick={() => { setConfirming(false); setUnderstood(false) }} className="h-8 rounded-full border border-outline-variant px-3 text-xs font-semibold">Cancel</button>
+            <button type="button" disabled={deleting || !understood} onClick={runBulkDelete} className="h-8 rounded-full bg-error px-3 text-xs font-semibold text-on-error disabled:opacity-50">
+              {deleting ? 'Deleting…' : 'Yes, delete permanently'}
+            </button>
+          </div>
+        </div>
+      )}
+      {deleteResult && (
+        'error' in deleteResult ? (
+          <p className="rounded-xl bg-error-container/40 px-3 py-2 text-sm text-error">{deleteResult.error}</p>
+        ) : (
+          <div className="rounded-xl bg-primary-fixed/50 px-3 py-2 text-sm text-primary">
+            <p>{deleteResult.deleted} member{deleteResult.deleted === 1 ? '' : 's'} deleted.</p>
+            {deleteResult.failed.length > 0 && (
+              <ul className="mt-1 list-disc pl-5 text-xs text-error">
+                {deleteResult.failed.map((reason) => <li key={reason}>{reason}</li>)}
+              </ul>
+            )}
+          </div>
+        )
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-outline-variant bg-surface-container-low text-left">
+                {isAdmin && (
+                  <th className="w-10 py-3 pl-4">
+                    <input
+                      type="checkbox"
+                      checked={allPicked}
+                      disabled={pickableRows.length === 0}
+                      onChange={(e) => pick(pickableRows.map((member) => member.id), e.target.checked)}
+                      aria-label="Select all listed members"
+                      className="h-4 w-4 accent-primary"
+                    />
+                  </th>
+                )}
                 {['Name', 'Role', 'Type', 'Branch / Principal', 'Profession', 'Location', ...(isAdmin ? ['Status'] : [])].map((heading) => (
                   <th key={heading} className="px-4 py-3 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">{heading}</th>
                 ))}
@@ -115,7 +211,7 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={isAdmin ? 8 : 7} className="py-10 text-center text-on-surface-variant">No members match this filter.</td>
+                  <td colSpan={isAdmin ? 9 : 7} className="py-10 text-center text-on-surface-variant">No members match this filter.</td>
                 </tr>
               ) : (
                 rows.map((member, i) => {
@@ -125,6 +221,18 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
                       key={member.id}
                       className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`}
                     >
+                      {isAdmin && (
+                        <td className="py-3 pl-4">
+                          <input
+                            type="checkbox"
+                            checked={picked.has(member.id)}
+                            disabled={!deletable(member)}
+                            onChange={(e) => pick([member.id], e.target.checked)}
+                            aria-label={`Select ${member.fullName}`}
+                            className="h-4 w-4 accent-primary disabled:opacity-30"
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <p className="font-medium text-on-surface">{member.fullName}</p>
                       </td>

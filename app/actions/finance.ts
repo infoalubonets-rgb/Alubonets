@@ -27,6 +27,7 @@ import { getStandingSettings, saveStandingSettings } from '@/lib/membership-stan
 import { syncMembershipStanding } from '@/lib/membership-standing-sync'
 import { ANNUAL_DUE_DATE_PATTERN } from '@/lib/membership-standing'
 import { writeAudit } from '@/lib/audit'
+import { reverseContributions } from '@/lib/contribution-deletion'
 import { TAGS } from '@/lib/data/queries'
 import { createSignedUpload } from '@/lib/upload-signed'
 import { requireWelfareEnabled } from '@/lib/feature-flags'
@@ -34,6 +35,7 @@ import { assertNotFuture } from '@/lib/dates'
 import { amountKes, amountKesOrZero } from '@/lib/money-limits'
 import { notifyUsers } from '@/lib/notifications'
 import { otherCategoryDescriptionSchema, paymentDescription, resolvePaymentCategory, uniqueCategoryCode } from '@/lib/payment-categories'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 const refreshFinance = () => {
   for (const path of ['/dashboard/treasurer/finance','/dashboard/treasurer/ledger','/dashboard/treasurer/reports','/contributions','/admin/finance']) revalidatePath(path)
@@ -632,7 +634,7 @@ export async function reconcilePaymentEvent(formData: FormData) {
 export async function getReconciliationMembers() {
   const actor = await requireActiveRole(['TREASURER', 'ADMIN'])
   return prisma.user.findMany({
-    where: { ...(canRecordContributionFor(actor, actor.id) ? {} : { id: { not: actor.id } }) },
+    where: { ...NOT_DELETED_MEMBER, ...(canRecordContributionFor(actor, actor.id) ? {} : { id: { not: actor.id } }) },
     select: { id: true, fullName: true, email: true },
     orderBy: { fullName: 'asc' },
   })
@@ -1138,75 +1140,17 @@ const deleteContributionsSchema = z.object({
 })
 
 /**
- * Treasurer / Super Admin: deletes recorded payments, one or many. Ledger rows are locked once
- * posted, so a posted payment gets a confirmed reversal entry and a pending one is rejected; the
- * payment itself is marked Reversed, which drops it from every list, total and standing check.
- * Each deletion is audited with the reason. Already-reversed payments are skipped.
+ * Treasurer / Super Admin: deletes recorded payments, one or many. Posted payments are reversed in
+ * the ledger, pending ones rejected, and each deletion is audited (see lib/contribution-deletion).
  */
 export async function deleteContributions(input: z.input<typeof deleteContributionsSchema>): Promise<{ ok: true; deleted: number; skipped: number } | { ok: false; error: string }> {
   try {
     const actor = await requireContributionRecorder()
     const data = deleteContributionsSchema.parse(input)
     const ids = [...new Set(data.ids)]
-    const contributions = await prisma.contribution.findMany({
-      where: { id: { in: ids }, status: { not: 'REVERSED' } },
-      include: { user: { select: { fullName: true } } },
-    })
-    const note = `Deleted: ${data.reason}`
-
-    for (const contribution of contributions) {
-      const original = contribution.financialTransactionId
-        ? await prisma.financialTransaction.findUnique({ where: { id: contribution.financialTransactionId }, include: { entries: true } })
-        : null
-      const posted = original && (original.status === 'CONFIRMED' || original.status === 'RECONCILED')
-      const period = posted ? await getPeriodForDate(original.occurredAt) : null
-      await prisma.$transaction(async (tx) => {
-        if (original && posted && period) {
-          await tx.financialTransaction.create({
-            data: {
-              transactionNumber: transactionNumber(),
-              type: 'REVERSAL',
-              status: 'CONFIRMED',
-              amount: original.amount,
-              description: `Reversal of ${original.transactionNumber} (payment deleted)`,
-              occurredAt: original.occurredAt,
-              correctionReason: note,
-              ...periodFields(period),
-              createdById: actor.id,
-              approvedById: actor.id,
-              confirmedAt: new Date(),
-              originalTransactionId: original.id,
-              entries: { create: original.entries.map((entry) => ({ accountId: entry.accountId, debit: entry.credit, credit: entry.debit, memo: note })) },
-            },
-          })
-          await tx.financialTransaction.update({ where: { id: original.id }, data: { status: 'REVERSED', reversedAt: new Date(), correctionReason: note } })
-          await markEditedAfterClose(original.id, tx)
-        } else if (original?.status === 'PENDING') {
-          await tx.financialTransaction.update({ where: { id: original.id }, data: { status: 'REJECTED', correctionReason: note } })
-        }
-        await tx.contribution.update({ where: { id: contribution.id }, data: { status: 'REVERSED', correctionReason: note } })
-        if (contribution.campaignId) await refreshObligation(contribution.campaignId, contribution.userId, tx)
-      })
-      await writeAudit({
-        userId: actor.id,
-        action: 'CONTRIBUTION_DELETE',
-        entity: 'Contribution',
-        entityId: contribution.id,
-        reason: data.reason,
-        oldValue: { amount: Number(contribution.amount), status: contribution.status, paidAt: contribution.paidAt.toISOString() },
-        newValue: { status: 'REVERSED' },
-        meta: { memberName: contribution.user.fullName, category: contribution.category },
-      })
-    }
-
-    for (const userId of new Set(contributions.map((c) => c.userId))) await recomputeStandingSafely(userId, actor.id)
-    const projectIds = [...new Set(contributions.map((c) => c.projectId).filter((id): id is string => Boolean(id)))]
-    if (projectIds.length) {
-      const { syncProjectFinancials } = await import('@/lib/project-status')
-      for (const projectId of projectIds) await syncProjectFinancials(projectId).catch(() => {})
-    }
+    const deleted = await reverseContributions(actor.id, ids, data.reason)
     refreshFinance()
-    return { ok: true, deleted: contributions.length, skipped: ids.length - contributions.length }
+    return { ok: true, deleted, skipped: ids.length - deleted }
   } catch (error) {
     if (error instanceof z.ZodError) return { ok: false, error: error.issues[0]?.message || 'Check the selection and reason.' }
     return { ok: false, error: error instanceof Error ? error.message : 'Could not delete the payments.' }

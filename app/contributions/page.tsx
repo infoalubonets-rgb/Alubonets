@@ -13,6 +13,7 @@ import AddContributionButton from '@/components/finance/AddContributionButton'
 import ImportContributionsButton from '@/components/finance/ImportContributionsButton'
 import ContributionTabs from '@/components/dashboard/ContributionTabs'
 import MemberContributionsTable, { type MemberContributionRow } from '@/components/dashboard/MemberContributionsTable'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 export const dynamic = 'force-dynamic'
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
@@ -59,7 +60,7 @@ async function getMemberContributionRows(range: ResolvedTimeRange): Promise<Memb
   const paidAt = rangeFilter(range)
   const [members, paid, pending] = await Promise.all([
     prisma.user.findMany({
-      where: { status: { not: 'PENDING' } },
+      where: { status: { not: 'PENDING' }, ...NOT_DELETED_MEMBER },
       select: { id: true, fullName: true, membershipNumber: true, status: true, standing: true, contributionPlan: true },
       orderBy: { fullName: 'asc' },
     }),

@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { APP_TIMEZONE, appDayRange, appTodayInputValue } from '@/lib/dates'
 import { formatPaymentMethod } from '@/lib/chart-labels'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 /** The reports on the Financial reports page; each can be viewed, filtered and downloaded. */
 export const REPORT_KINDS = [
@@ -56,7 +57,7 @@ export async function buildReport(filters: ReportFilters): Promise<Report> {
 
 async function monthlyReport({ year }: ReportFilters): Promise<Report> {
   const [members, contributions] = await Promise.all([
-    prisma.user.findMany({ where: { status: { not: 'PENDING' } }, select: { id: true, fullName: true, membershipNumber: true }, orderBy: { fullName: 'asc' } }),
+    prisma.user.findMany({ where: { status: { not: 'PENDING' }, ...NOT_DELETED_MEMBER }, select: { id: true, fullName: true, membershipNumber: true }, orderBy: { fullName: 'asc' } }),
     prisma.contribution.findMany({
       where: { status: { in: ['CONFIRMED', 'RECONCILED'] }, paidAt: { gte: appDayRange(`${year}-01-01`).start, lte: appDayRange(`${year}-12-31`).end } },
       select: { userId: true, amount: true, paidAt: true },

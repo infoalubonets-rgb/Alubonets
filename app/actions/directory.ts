@@ -13,6 +13,7 @@ import {
   isExecutive,
   type DirectoryMember,
 } from '@/lib/directory'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 const visibilitySchema = z.object({
   userId: z.string().min(1),
@@ -39,7 +40,7 @@ export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
 
   const rows = await prisma.user.findMany({
     // Admins manage every account here, so they also see pending, suspended and former members.
-    where: isAdmin ? {} : { status: 'ACTIVE' },
+    where: isAdmin ? NOT_DELETED_MEMBER : { status: 'ACTIVE' },
     orderBy: { fullName: 'asc' },
     select: {
       id: true,

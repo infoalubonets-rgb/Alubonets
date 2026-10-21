@@ -9,10 +9,11 @@ import { assertNotFuture } from '@/lib/dates'
 import { recordLedgerContribution } from '@/app/actions/finance'
 import Papa from 'papaparse'
 import { CONTRIBUTION_CSV_HEADERS } from '@/lib/contribution-csv'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 export async function getContributionResolveMembers() {
   const actor = await requireContributionRecorder()
-  const members = await prisma.user.findMany({ orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, email: true } })
+  const members = await prisma.user.findMany({ where: NOT_DELETED_MEMBER, orderBy: { fullName: 'asc' }, select: { id: true, fullName: true, email: true } })
   return members.filter((member) => canRecordContributionFor(actor, member.id))
 }
 

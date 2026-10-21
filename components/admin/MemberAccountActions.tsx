@@ -163,8 +163,8 @@ export default function MemberAccountActions({ member }: { member: MemberAccount
             <div role="alertdialog" aria-label="Confirm member deletion" className="space-y-2 rounded-xl border border-error/50 bg-error-container/30 p-3">
               <p className="text-sm font-semibold text-error">Are you sure?</p>
               <p className="text-xs text-on-surface-variant">
-                This permanently deletes {member.fullName ? <strong>{member.fullName}</strong> : 'this member'} and all their details: profile, payments, family links,
-                messages and sign-in. <strong>This cannot be undone.</strong>
+                This permanently deletes {member.fullName ? <strong>{member.fullName}</strong> : 'this member'}, all their contributions (reversed in the
+                ledger) and all their details: profile, family links, messages and sign-in. <strong>This cannot be undone.</strong> The audit log keeps a record of the deletion.
               </p>
               <div className="flex justify-end gap-2">
                 <button type="button" disabled={pending} onClick={() => setConfirmDelete(false)} className="h-8 rounded-full border border-outline-variant px-3 text-xs font-semibold">
