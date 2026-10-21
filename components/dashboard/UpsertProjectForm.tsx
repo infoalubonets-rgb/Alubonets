@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { actionUpsertProject } from '@/app/actions/domain'
 import { createClient } from '@/utils/supabase/client'
 
@@ -207,6 +208,24 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-3">
+
+      {!existingId && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-blue-950">
+            <p className="text-[12px] leading-relaxed">
+              This form creates a <strong>project</strong> and sends a “New project” email. For one-time gatherings,
+              dinners, services, or meetings, create an event instead.
+            </p>
+            <Link href="/dashboard/organizer/events" className="shrink-0 text-[12px] font-semibold underline underline-offset-2">
+              Go to Events
+            </Link>
+          </div>
+          <label className="flex items-start gap-2 text-[12px] text-on-surface-variant">
+            <input type="checkbox" required className="mt-0.5 accent-primary" />
+            <span>I confirm this is a project, not a one-time event.</span>
+          </label>
+        </>
+      )}
 
       {/* Title + Status */}
       <div className="grid gap-3 md:grid-cols-2">

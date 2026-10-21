@@ -261,6 +261,13 @@ ${ctaBlock}`)
 
   const sent = results.filter((r) => r.ok).length
   const failed = results.length - sent
+  const failureReasons = [...new Set(
+    results
+      .filter((result) => !result.ok)
+      .map((result) => (result.error || 'Email provider rejected the send.')
+        .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[email redacted]')
+        .slice(0, 240)),
+  )].slice(0, 3)
 
   await prisma.emailLog.create({
     data: {
@@ -269,7 +276,12 @@ ${ctaBlock}`)
       subject,
       template,
       status: failed === 0 ? 'sent' : sent === 0 ? 'failed' : 'partial',
-      meta: { sent, failed, hadAttachments: Boolean(attachments?.length) },
+      meta: {
+        sent,
+        failed,
+        hadAttachments: Boolean(attachments?.length),
+        ...(failureReasons.length ? { failureReasons } : {}),
+      },
     },
   })
   return { sent, failed, results }
