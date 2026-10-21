@@ -64,8 +64,6 @@ export async function deleteOneMember(actor: DeleteActor, userId: string, option
       await tx.profileVisibility.deleteMany({ where: { userId } })
       await tx.familyInvite.deleteMany({ where: { userId } })
       await tx.supportConversation.deleteMany({ where: { userId } })
-      await tx.familyAccountTransition.deleteMany({ where: { memberId: userId } })
-      await tx.familyBranchHistory.deleteMany({ where: { memberId: userId } })
       await tx.loginEvent.updateMany({ where: { userId }, data: { userId: null } })
       await tx.user.update({
         where: { id: userId },
@@ -101,7 +99,7 @@ export async function deleteOneMember(actor: DeleteActor, userId: string, option
           aboutTitle: null,
         },
       })
-    })
+    }, { timeout: 20_000 })
   }
 
   await writeAudit({
