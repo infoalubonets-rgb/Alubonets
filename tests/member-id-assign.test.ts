@@ -23,7 +23,8 @@ describe('member ID assignment', () => {
 
   it('gives an approved account without an ID the next one, only where none is set', async () => {
     const id = await ensureMembershipNumber({ id: 'u', membershipNumber: null, status: 'ACTIVE' }, )
-    expect(id).toMatch(/^AL\d{4}-008$/)
+    expect(id).toMatch(/^AL\d{6}-008$/)
+    expect(mocks.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { year: 0 } }))
     expect(mocks.updateMany).toHaveBeenCalledWith({ where: { id: 'u', membershipNumber: null }, data: { membershipNumber: id } })
   })
 

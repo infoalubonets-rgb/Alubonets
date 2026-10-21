@@ -38,7 +38,7 @@ export type AuthUser = {
   dashboardAccess?: Role[]
   status?: string
   isPrincipal?: boolean
-  /** Permanent member ID, e.g. AL2608-001 (null until approved). */
+  /** Permanent member ID, e.g. AL261003-006 (null until approved). */
   memberId?: string | null
   /** PJW for a Principal, PJW01 for an attached member, null when not in a family. */
   familyTag?: string | null

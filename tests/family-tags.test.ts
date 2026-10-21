@@ -3,12 +3,12 @@ import { familyTag } from '@/lib/family-tags'
 import { formatMemberId } from '@/lib/membership'
 
 describe('member IDs', () => {
-  it('use AL + approval YYMM + a 3-digit counter', () => {
-    expect(formatMemberId(2026, 8, 1)).toBe('AL2608-001')
-    expect(formatMemberId(2027, 1, 42)).toBe('AL2701-042')
+  it('use AL + approval YYMMDD + the system-wide member number', () => {
+    expect(formatMemberId(2026, 10, 3, 6)).toBe('AL261003-006')
+    expect(formatMemberId(2027, 1, 21, 42)).toBe('AL270121-042')
   })
   it('keep counting past 999 instead of breaking', () => {
-    expect(formatMemberId(2026, 12, 1000)).toBe('AL2612-1000')
+    expect(formatMemberId(2026, 12, 31, 1000)).toBe('AL261231-1000')
   })
 })
 

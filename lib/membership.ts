@@ -74,6 +74,9 @@ export function requestIp(req: Request) {
   )
 }
 
+/** membership_sequences row holding the single system-wide member counter. */
+export const MEMBER_ID_SEQUENCE_KEY = 0
+
 export async function nextMembershipNumber(
   tx: {
     membershipSequence: {
@@ -86,18 +89,21 @@ export async function nextMembershipNumber(
   },
   now = new Date()
 ) {
-  const [year, month] = appTodayInputValue(now).split('-').map(Number)
-  // One counter per approval month, keyed YYYYMM (e.g. 202608) in membership_sequences.year.
-  const period = year * 100 + month
+  const [year, month, day] = appTodayInputValue(now).split('-').map(Number)
+  // One counter for the whole system, so the number says how many members have joined (006 = 6th).
   const sequence = await tx.membershipSequence.upsert({
-    where: { year: period },
-    create: { year: period, lastValue: 1 },
+    where: { year: MEMBER_ID_SEQUENCE_KEY },
+    create: { year: MEMBER_ID_SEQUENCE_KEY, lastValue: 1 },
     update: { lastValue: { increment: 1 } },
   })
-  return formatMemberId(year, month, sequence.lastValue)
+  return formatMemberId(year, month, day, sequence.lastValue)
 }
 
-/** Permanent member ID: AL + YYMM of approval + 3-digit monthly counter, e.g. AL2608-001. */
-export function formatMemberId(year: number, month: number, counter: number) {
-  return `AL${String(year % 100).padStart(2, '0')}${String(month).padStart(2, '0')}-${String(counter).padStart(3, '0')}`
+/**
+ * Permanent member ID: AL + YYMMDD of approval + system-wide member number, e.g. AL261003-006
+ * for the 6th member, approved on 3 October 2026.
+ */
+export function formatMemberId(year: number, month: number, day: number, counter: number) {
+  const two = (value: number) => String(value).padStart(2, '0')
+  return `AL${two(year % 100)}${two(month)}${two(day)}-${String(counter).padStart(3, '0')}`
 }

@@ -43,7 +43,7 @@ export type ProfileViewData = {
   status: string
   isSuperAdmin: boolean
   initials: string
-  /** Permanent member ID, e.g. AL2608-001. */
+  /** Permanent member ID, e.g. AL261003-006. */
   memberId: string | null
   /** PJW / PJW01; null when not in a family. */
   familyTag: string | null
