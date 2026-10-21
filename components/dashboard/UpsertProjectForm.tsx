@@ -197,6 +197,7 @@ export default function UpsertProjectForm({ members = [], initial, onSuccess }: 
     fd.set('isPublic', isPublic ? 'on' : 'off')
     if (uploadedUrl) fd.set('imageUrl', uploadedUrl)
     fd.set('sendEmail', sendEmail && !existingId ? 'on' : 'off')
+    if (sendEmail && !existingId) window.dispatchEvent(new Event('email-send-started'))
     fd.set('emailAudience', emailAudience)
     if (emailAudience === 'SELECTED') {
       selectedMembers.forEach((id) => fd.append('emailMemberId', id))

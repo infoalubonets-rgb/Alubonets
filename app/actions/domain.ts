@@ -22,6 +22,7 @@ import {
 } from '@/lib/data/queries'
 import { prisma } from '@/lib/prisma'
 import { sendBroadcastEmail, sendContributionReceiptEmail } from '@/lib/email/resend'
+import { finishAnnouncementEmailProgress, recordAnnouncementEmailProgress } from '@/lib/email-sends'
 import { writeAudit } from '@/lib/audit'
 import { assertNotPast } from '@/lib/dates'
 
@@ -105,7 +106,9 @@ export async function actionSendAnnouncement(formData: FormData) {
     imageUrl,
     broadcast,
     memberIds,
+    includeSelf: broadcast && sendEmail,
     expiresAt,
+    trackEmail: broadcast && sendEmail,
   })
   await writeAudit({
     userId: actor.id,
@@ -130,15 +133,18 @@ export async function actionSendAnnouncement(formData: FormData) {
           ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/announcements`,
           template: 'announcement_broadcast',
           actorId,
+          onProgress: (recipient) => recordAnnouncementEmailProgress(announcementId, recipient),
         })
+        await finishAnnouncementEmailProgress(announcementId, result.sent)
         if ('sent' in result && result.sent > 0) {
-          await prisma.announcement.update({
-            where: { id: announcementId },
-            data: { emailSentAt: new Date() },
-          })
           revalidateTag(TAGS.announcements)
         }
       } catch (e) {
+        await finishAnnouncementEmailProgress(
+          announcementId,
+          0,
+          e instanceof Error ? e.message : 'Email delivery failed.',
+        ).catch(console.error)
         console.error(e)
       }
     })
@@ -223,46 +229,62 @@ export async function actionCreateEvent(formData: FormData) {
   if (description) lines.push(description)
   if (!isPublic) lines.push('(Members only — not listed on the public website)')
 
-  after(() => sendAnnouncement({
-    authorId: actorId,
-    title: `New event: ${title}`,
-    content: lines.join('\n'),
-    broadcast: true,
-    includeSelf: true,
-  }).catch(console.error))
+  const memberIds = emailAudience === 'SELECTED' && emailMemberIds.length ? emailMemberIds : undefined
+  after(async () => {
+    let announcementId: string | undefined
+    try {
+      const announcement = await sendAnnouncement({
+        authorId: actorId,
+        title: `New event: ${title}`,
+        content: lines.join('\n'),
+        broadcast: true,
+        includeSelf: true,
+        trackEmail: sendEmail,
+        emailMemberIds: memberIds,
+      })
+      announcementId = announcement.id
+      if (!sendEmail) return
 
-  if (sendEmail) {
-    const memberIds = emailAudience === 'SELECTED' && emailMemberIds.length ? emailMemberIds : undefined
     const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
     const paragraphs = lines.map((l) => `<p style="margin:0 0 6px;">${l}</p>`).join('')
-    after(async () => {
-      try {
-        const result = await sendBroadcastEmail({
-          subject: `New event: ${title}`,
-          title: `Upcoming event — ${title}`,
-          body: paragraphs,
-          imageUrl: imageUrl || undefined,
-          ctaLabel: 'View Event',
-          ctaUrl: `${appBaseUrl}/events/${event.id}`,
-          template: 'event_notification',
-          actorId,
-          memberIds,
+      const result = await sendBroadcastEmail({
+        subject: `New event: ${title}`,
+        title: `Upcoming event — ${title}`,
+        body: paragraphs,
+        imageUrl: imageUrl || undefined,
+        ctaLabel: 'View Event',
+        ctaUrl: `${appBaseUrl}/events/${event.id}`,
+        template: 'event_notification',
+        actorId,
+        memberIds,
+        onProgress: (recipient) => recordAnnouncementEmailProgress(announcement.id, recipient),
+      })
+      await finishAnnouncementEmailProgress(
+        announcement.id,
+        result.sent,
+        'results' in result ? undefined : 'Email provider is not configured.',
+      )
+      if (result.sent > 0) {
+        await sendAnnouncement({
+          authorId: actorId,
+          title: `Email sent: ${title}`,
+          content: `Your email notification for "${title}" was successfully sent to ${result.sent} member${result.sent !== 1 ? 's' : ''}.`,
+          broadcast: false,
+          memberIds: [actorId],
         })
-        if ('sent' in result && result.sent > 0) {
-          await sendAnnouncement({
-            authorId: actorId,
-            title: `Email sent: ${title}`,
-            content: `Your email notification for "${title}" was successfully sent to ${result.sent} member${result.sent !== 1 ? 's' : ''}.`,
-            broadcast: false,
-            memberIds: [actorId],
-          })
-          revalidateTag(TAGS.announcements)
-        }
-      } catch (e) {
-        console.error(e)
+        revalidateTag(TAGS.announcements)
       }
-    })
-  }
+    } catch (e) {
+      if (announcementId && sendEmail) {
+        await finishAnnouncementEmailProgress(
+          announcementId,
+          0,
+          e instanceof Error ? e.message : 'Email delivery failed.',
+        ).catch(console.error)
+      }
+      console.error(e)
+    }
+  })
 
   revalidatePath('/dashboard/organizer')
   revalidatePath('/dashboard/organizer/events')
@@ -442,6 +464,7 @@ export async function actionUpsertProject(formData: FormData) {
 
     // Single after() — create announcement, then optionally send email and mark emailSentAt
     after(async () => {
+      let announcementId: string | undefined
       try {
         const ann = await sendAnnouncement({
           authorId: actorId,
@@ -449,7 +472,10 @@ export async function actionUpsertProject(formData: FormData) {
           content: description,
           broadcast: true,
           includeSelf: true,
+          trackEmail: sendEmail,
+          emailMemberIds: memberIds,
         })
+        announcementId = ann.id
 
         if (sendEmail) {
           const result = await sendBroadcastEmail({
@@ -462,18 +488,30 @@ export async function actionUpsertProject(formData: FormData) {
             template: 'project_notification',
             actorId,
             memberIds,
+            onProgress: (recipient) => recordAnnouncementEmailProgress(ann.id, recipient),
           })
+          await finishAnnouncementEmailProgress(
+            ann.id,
+            result.sent,
+            'results' in result ? undefined : 'Email provider is not configured.',
+          )
           if ('sent' in result && result.sent > 0) {
-            await prisma.announcement.update({
-              where: { id: ann.id },
-              data: { emailSentAt: new Date() },
-            })
+            revalidateTag(TAGS.announcements)
           }
         }
 
         revalidatePath('/announcements')
         revalidateTag(TAGS.announcements)
-      } catch (e) { console.error(e) }
+      } catch (e) {
+        if (announcementId && sendEmail) {
+          await finishAnnouncementEmailProgress(
+            announcementId,
+            0,
+            e instanceof Error ? e.message : 'Email delivery failed.',
+          ).catch(console.error)
+        }
+        console.error(e)
+      }
     })
   }
 

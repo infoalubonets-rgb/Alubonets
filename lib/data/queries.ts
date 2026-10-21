@@ -825,6 +825,10 @@ export async function sendAnnouncement(input: {
   expiresAt?: Date
   /** Workspaces this announcement belongs to; empty = shown in every workspace. */
   audienceRoles?: Role[]
+  /** Track recipient email delivery in the progress banner for this announcement. */
+  trackEmail?: boolean
+  /** When set, only these recipients are included in the email progress count. */
+  emailMemberIds?: string[]
 }) {
   const recipientIds = input.broadcast
     ? (
@@ -847,7 +851,15 @@ export async function sendAnnouncement(input: {
       broadcast: input.broadcast,
       expiresAt: input.expiresAt ?? null,
       audienceRoles: input.audienceRoles ?? [],
-      receipts: { create: recipientIds.map((userId) => ({ userId })) },
+      status: input.trackEmail ? 'SENDING' : 'SENT',
+      receipts: {
+        create: recipientIds.map((userId) => ({
+          userId,
+          emailStatus: input.trackEmail && (!input.emailMemberIds || input.emailMemberIds.includes(userId))
+            ? 'PENDING'
+            : 'SKIPPED',
+        })),
+      },
     },
   })
 }

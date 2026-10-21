@@ -275,6 +275,7 @@ export default function CreateEventForm({
     clearDraft()
 
     fd.set('sendEmail', sendEmail ? 'on' : 'off')
+    if (sendEmail) window.dispatchEvent(new Event('email-send-started'))
     fd.set('emailAudience', emailAudience)
     if (emailAudience === 'SELECTED') {
       selectedEmailMembers.forEach((id) => fd.append('emailMemberId', id))
