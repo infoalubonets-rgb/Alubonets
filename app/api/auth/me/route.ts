@@ -77,6 +77,14 @@ export async function GET() {
       },
     })
   } catch (cause) {
+    if (
+      typeof cause === 'object' &&
+      cause !== null &&
+      'digest' in cause &&
+      String((cause as { digest?: unknown }).digest).startsWith('NEXT_REDIRECT')
+    ) {
+      throw cause
+    }
     logError('auth.me.failed', cause)
     return NextResponse.json({ error: 'Account details are temporarily unavailable' }, { status: 503 })
   }

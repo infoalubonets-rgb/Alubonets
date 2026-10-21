@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-const m = vi.hoisted(() => ({ send: vi.fn(), log: vi.fn(), override: vi.fn() }))
+const m = vi.hoisted(() => ({ send: vi.fn(), log: vi.fn(), override: vi.fn(), from: vi.fn() }))
 vi.mock('resend', () => ({ Resend: class { emails = { send: m.send } } }))
 vi.mock('@/lib/prisma', () => ({ prisma: { emailLog: { create: m.log } } }))
 vi.mock('@/lib/email/resend', () => ({
   baseHtml: (body: string) => `<html>${body}</html>`,
-  emailFrom: () => 'Alubonets <support@info.alubonets.com>',
+  emailFrom: () => m.from(),
   testEmailOverride: m.override,
 }))
 import { sendMemberSetupEmail } from '@/lib/email/member-setup'
@@ -24,6 +24,7 @@ describe('new member setup email', () => {
     vi.resetAllMocks()
     vi.stubEnv('RESEND_API_KEY', 're_live-key')
     m.override.mockReturnValue(null)
+    m.from.mockReturnValue('Alubonets <support@info.alubonets.com>')
     m.log.mockResolvedValue({})
     m.send.mockResolvedValue({ data: { id: 'email-1' }, error: null })
   })
@@ -53,5 +54,10 @@ describe('new member setup email', () => {
   it('escapes member-typed values in the email', async () => {
     await sendMemberSetupEmail({ ...input, fullName: '<b>Evil</b> Name' })
     expect(m.send.mock.calls[0][0].html).toContain('&lt;b&gt;Evil&lt;/b&gt;')
+  })
+  it('always sends from the verified sender, not FROM_EMAIL', async () => {
+    m.from.mockReturnValue('Alubonets <onboarding@resend.dev>')
+    expect(await sendMemberSetupEmail(input)).toEqual({ sent: true, deliveredTo: 'new.member@example.com', redirectedToTestInbox: false })
+    expect(m.send).toHaveBeenCalledWith(expect.objectContaining({ from: 'Alubonets <support@info.alubonets.com>' }))
   })
 })

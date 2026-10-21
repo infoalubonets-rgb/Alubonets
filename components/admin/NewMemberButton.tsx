@@ -218,7 +218,7 @@ export default function NewMemberButton({
           <div className="space-y-3 text-sm">
             <p className="flex items-center gap-2 font-semibold text-green-700">
               <span className="material-symbols-outlined">check_circle</span>
-              {done.name} was added{done.minor ? ' as a minor (record only, no login).' : ' and approved.'}
+              {done.name}&apos;s account is ready{done.minor ? ' (minor record only, no login).' : '.'}
             </p>
             {done.setupUrl && (
               <>
@@ -236,7 +236,7 @@ export default function NewMemberButton({
                 )}
                 {!done.emailed && (
                   <p className="rounded-lg bg-error-container p-2 text-error">
-                    The email was not sent{done.emailError ? `: ${done.emailError}` : '.'} Copy the link below and share it with them yourself.
+                    The account was saved. The welcome email did not go out{done.emailError ? `: ${done.emailError}` : '.'} Copy the link below and share it with them yourself.
                   </p>
                 )}
                 <p className="text-on-surface-variant">

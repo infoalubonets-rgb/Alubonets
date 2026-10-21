@@ -5,6 +5,9 @@ import { appBaseUrl } from '@/lib/app-url'
 import type { Contribution, User } from '@prisma/client'
 import { buildReceiptPdf } from '@/lib/pdf/receipt'
 import { SITE_LOGO, CONTACT_EMAIL, DEFAULT_FROM_EMAIL } from '@/lib/constants'
+import { emailFrom } from '@/lib/email/from'
+
+export { emailFrom, normalizeFromAddress } from '@/lib/email/from'
 
 function getResend() {
   const key = process.env.RESEND_API_KEY
@@ -12,19 +15,6 @@ function getResend() {
   return new Resend(key)
 }
 
-const domainOf = (address: string) => address.match(/@([^\s>]+)>?\s*$/)?.[1]?.toLowerCase() ?? ''
-const VERIFIED_SENDER_DOMAIN = domainOf(DEFAULT_FROM_EMAIL) // info.alubonets.com, verified in Resend
-
-export const emailFrom = () => {
-  const configured = process.env.FROM_EMAIL?.trim()
-  // Live mail may only use the domain verified in Resend. A FROM_EMAIL on any other domain (the
-  // onboarding sender, plain alubonets.com, a typo) is refused by Resend for every recipient, so
-  // production falls back to the verified sender instead of failing every email.
-  if (process.env.NODE_ENV === 'production' && (!configured || domainOf(configured) !== VERIFIED_SENDER_DOMAIN)) {
-    return DEFAULT_FROM_EMAIL
-  }
-  return configured || DEFAULT_FROM_EMAIL
-}
 const from = emailFrom
 const appUrl = appBaseUrl
 /** Escapes text before it goes into email HTML; names and notes are typed by members. */
@@ -120,7 +110,7 @@ export async function sendPasswordResetEmail(input: { userId: string; fullName: 
   const sendError = delivery.error?.message || ''
   // A FROM_EMAIL on a domain Resend has not verified (e.g. plain alubonets.com) is refused; retry
   // from the verified info.alubonets.com sender, which can reach any member.
-  const senderRefused = /domain|not verified|invalid `from`|testing emails/i.test(sendError)
+  const senderRefused = /domain|not verified|invalid ['\`]from['\`]|testing emails/i.test(sendError)
   if (delivery.error && senderRefused && sender !== DEFAULT_FROM_EMAIL) {
     logError('auth.password_reset.sender_refused', delivery.error, { userId: input.userId, from: sender })
     fromUsed = DEFAULT_FROM_EMAIL

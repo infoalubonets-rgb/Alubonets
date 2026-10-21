@@ -52,15 +52,11 @@ describe('password reset email delivery', () => {
     expect(mocks.send).toHaveBeenCalledTimes(1)
     expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ from: DEFAULT_FROM_EMAIL, to: input.email }))
   })
-  it('retries from the verified sender when a configured sender is refused', async () => {
+  it('sends production mail from the hardcoded verified sender even if FROM_EMAIL is another address on the same domain', async () => {
     vi.stubEnv('NODE_ENV', 'production')
     vi.stubEnv('FROM_EMAIL', 'Alubonets <noreply@info.alubonets.com>')
-    mocks.send
-      .mockResolvedValueOnce({ data: null, error: { message: 'Invalid `from` field' } })
-      .mockResolvedValueOnce({ data: { id: 'email-2' }, error: null })
     await sendPasswordResetEmail(input)
-    expect(mocks.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ from: 'Alubonets <noreply@info.alubonets.com>' }))
-    expect(mocks.send).toHaveBeenNthCalledWith(2, expect.objectContaining({ from: DEFAULT_FROM_EMAIL, to: input.email }))
-    expect(mocks.log).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'accepted', meta: expect.objectContaining({ from: DEFAULT_FROM_EMAIL }) }) }))
+    expect(mocks.send).toHaveBeenCalledTimes(1)
+    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ from: DEFAULT_FROM_EMAIL, to: input.email }))
   })
 })

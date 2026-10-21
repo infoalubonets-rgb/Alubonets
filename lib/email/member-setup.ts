@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { prisma } from '@/lib/prisma'
-import { baseHtml, emailFrom, testEmailOverride } from '@/lib/email/resend'
+import { DEFAULT_FROM_EMAIL } from '@/lib/constants'
+import { baseHtml, testEmailOverride } from '@/lib/email/resend'
 
 const esc = (value: string) =>
   value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
@@ -56,12 +57,13 @@ export async function sendMemberSetupEmail(input: {
   `)
 
   try {
-    const { data, error } = await new Resend(key).emails.send({ from: emailFrom(), to: deliveredTo, subject, html })
+    const fromAddress = DEFAULT_FROM_EMAIL
+    const { data, error } = await new Resend(key).emails.send({ from: fromAddress, to: deliveredTo, subject, html })
     if (error) {
-      await log('failed', { error: error.message, deliveredTo })
+      await log('failed', { error: error.message, deliveredTo, from: fromAddress })
       return { sent: false, error: `The email provider rejected it: ${error.message}` }
     }
-    await log('sent', { providerMessageId: data?.id ?? null, deliveredTo, testMode: Boolean(override) })
+    await log('sent', { providerMessageId: data?.id ?? null, deliveredTo, testMode: Boolean(override), from: fromAddress })
     return { sent: true, deliveredTo, redirectedToTestInbox: Boolean(override) }
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : 'unknown error'
