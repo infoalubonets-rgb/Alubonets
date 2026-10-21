@@ -205,6 +205,7 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
             <MemberAccountActions
               member={{
                 id: selected.id,
+                fullName: selected.fullName,
                 isSuperAdmin: selected.isSuperAdmin,
                 isMinor: selected.isMinor,
                 standing: selected.details.standing,

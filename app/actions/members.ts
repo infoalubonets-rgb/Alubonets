@@ -337,6 +337,70 @@ export async function setMemberStatus(input: z.infer<typeof statusSchema>) {
   return updated
 }
 
+/**
+ * Admin: permanently deletes a member and their personal records (profile, payments, family
+ * history, messages, sign-in data). Audit entries stay but lose the link to the member. Members
+ * with attached family members, or who recorded or approved ledger entries, cannot be deleted
+ * because those records are locked; give them a status such as Resigned instead.
+ */
+export async function deleteMember(input: { userId: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const actor = await requireAdmin()
+    const userId = z.string().min(1).parse(input.userId)
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, fullName: true, email: true, role: true, status: true, isSuperAdmin: true, authUserId: true, membershipNumber: true,
+        _count: { select: { attachedMembers: true, createdFinancialTransactions: true, approvedFinancialTransactions: true } },
+      },
+    })
+    if (!target) return { ok: false, error: 'This member no longer exists.' }
+    if (target.id === actor.id) return { ok: false, error: 'You cannot delete your own account.' }
+    if (target.isSuperAdmin) return { ok: false, error: 'A Super Admin cannot be deleted. Remove their Super Admin rights first.' }
+    if (target.role === 'ADMIN' && !actor.isSuperAdmin) return { ok: false, error: 'Only a Super Admin can delete an Admin.' }
+    if (target._count.attachedMembers > 0) {
+      return { ok: false, error: `${target.fullName} has ${target._count.attachedMembers} attached member(s). Move them to another Principal first.` }
+    }
+    if (target._count.createdFinancialTransactions + target._count.approvedFinancialTransactions > 0) {
+      return { ok: false, error: `${target.fullName} is linked to ledger entries (for example M-Pesa payments or approvals), which can never be deleted. Set their status to Resigned or Inactive instead.` }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Children that block the delete (ON DELETE RESTRICT) but belong only to this member.
+      await tx.supportingDocument.deleteMany({ where: { OR: [{ uploadedById: userId }, { contribution: { userId } }] } })
+      await tx.supportMessage.deleteMany({ where: { senderId: userId } })
+      await tx.familyAccountTransition.deleteMany({ where: { memberId: userId } })
+      await tx.familyBranchHistory.deleteMany({ where: { memberId: userId } })
+      await tx.user.delete({ where: { id: userId } })
+    })
+
+    await writeAudit({
+      userId: actor.id,
+      action: 'MEMBER_DELETE',
+      entity: 'User',
+      entityId: userId,
+      reason: `Member ${target.fullName} permanently deleted`,
+      oldValue: { fullName: target.fullName, email: target.email, membershipNumber: target.membershipNumber, status: target.status, role: target.role },
+      meta: { deletedMember: target.fullName, deletedEmail: target.email },
+    })
+    if (target.authUserId) {
+      const { error } = await createServerClient().auth.admin.deleteUser(target.authUserId)
+      if (error) console.error('Could not delete Supabase user of deleted member', error)
+    }
+    revalidateAdmin()
+    revalidatePath('/contributions')
+    return { ok: true }
+  } catch (error) {
+    // A record the system must keep (meeting minutes, documents, ledger rows…) still points at the member.
+    const code = (error as { code?: string })?.code
+    const message = error instanceof Error ? error.message : ''
+    if (code === 'P2003' || code === 'P2014' || /foreign key|immutable|cannot be deleted|append-only/i.test(message)) {
+      return { ok: false, error: 'This member is linked to records that must be kept (such as meetings, documents or finance records), so they cannot be deleted. Set their status to Resigned or Inactive instead.' }
+    }
+    return { ok: false, error: message || 'Could not delete the member.' }
+  }
+}
+
 const standingSchema = z.object({
   userId: z.string().min(1),
   mode: z.enum(['AUTO', 'PAID_UP', 'LAPSED']),

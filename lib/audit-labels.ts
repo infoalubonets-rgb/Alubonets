@@ -4,6 +4,7 @@ export const ACTION_LABELS: Record<string, string> = {
   MEMBER_DASHBOARD_ACCESS: 'Updated dashboard access',
   MEMBER_SUSPEND: 'Suspended a member',
   MEMBER_STATUS_CHANGE: 'Restored a member',
+  MEMBER_DELETE: 'Deleted a member',
   SUPER_ADMIN_FLAG: 'Updated Super Admin access',
   PROFILE_UPDATE: 'Updated their profile',
   CONTRIBUTION_CREATE: 'Recorded a contribution',

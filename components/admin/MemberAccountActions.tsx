@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { setContributionRights, setMemberStanding, setMemberStatus } from '@/app/actions/members'
+import { deleteMember, setContributionRights, setMemberStanding, setMemberStatus } from '@/app/actions/members'
 
 export type MemberAccount = {
   id: string
+  fullName?: string
   status: string
   isSuperAdmin: boolean
   isMinor: boolean
@@ -17,6 +18,16 @@ export type MemberAccount = {
 }
 
 type Status = 'ACTIVE' | 'SUSPENDED' | 'DECEASED' | 'RESIGNED' | 'DISQUALIFIED' | 'INACTIVE'
+
+const STATUSES: Status[] = ['ACTIVE', 'SUSPENDED', 'INACTIVE', 'RESIGNED', 'DECEASED', 'DISQUALIFIED']
+const STATUS_LABEL: Record<Status, string> = {
+  ACTIVE: 'Active',
+  SUSPENDED: 'Suspended',
+  INACTIVE: 'Inactive',
+  RESIGNED: 'Resigned',
+  DECEASED: 'Deceased',
+  DISQUALIFIED: 'Disqualified',
+}
 
 /** Admin-only controls for one member: standing, contribution rights and account status. */
 export default function MemberAccountActions({ member }: { member: MemberAccount }) {
@@ -48,7 +59,23 @@ export default function MemberAccountActions({ member }: { member: MemberAccount
     )
 
   const setStatus = (status: Status) =>
-    run(() => setMemberStatus({ userId: member.id, status }), status === 'ACTIVE' ? 'Member restored' : 'Member status updated', 'Could not update status')
+    run(() => setMemberStatus({ userId: member.id, status }), status === 'ACTIVE' ? 'Member restored' : `Status changed to ${STATUS_LABEL[status]}`, 'Could not update status')
+
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const removeMember = () => {
+    setError('')
+    setOk('')
+    startTransition(async () => {
+      const result = await deleteMember({ userId: member.id })
+      if (!result.ok) {
+        setError(result.error)
+        setConfirmDelete(false)
+        return
+      }
+      setOk('Member deleted')
+      router.refresh()
+    })
+  }
 
   return (
     <div className="mt-4 space-y-4">
@@ -87,28 +114,75 @@ export default function MemberAccountActions({ member }: { member: MemberAccount
 
       <section className="border-t border-outline-variant pt-3">
         <p className="mb-2 font-label-bold text-[12px] uppercase tracking-wide text-secondary">Account actions</p>
-        {member.status === 'SUSPENDED' || member.status === 'INACTIVE' ? (
-          <button type="button" disabled={pending} onClick={() => setStatus('ACTIVE')} className="h-11 w-full rounded-full border-2 border-primary text-sm font-label-bold text-primary hover:bg-primary/5 disabled:opacity-50">
-            Restore member
-          </button>
-        ) : member.status === 'ACTIVE' ? (
-          <div className="space-y-2">
-            <button type="button" disabled={pending || member.isSuperAdmin} onClick={() => setStatus('SUSPENDED')} className="h-11 w-full rounded-full border border-error/40 text-sm font-label-bold text-error hover:bg-error-container/40 disabled:opacity-40">
-              Suspend member
-            </button>
-            <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
-              {(['RESIGNED', 'DECEASED', 'DISQUALIFIED'] as const).map((status) => (
-                <button key={status} type="button" disabled={pending || member.isSuperAdmin} onClick={() => setStatus(status)} className="h-9 rounded-lg border border-outline-variant text-[11px] font-semibold text-on-surface-variant hover:border-primary/40 disabled:opacity-40">
-                  {status === 'RESIGNED' ? 'Resigned' : status === 'DECEASED' ? 'Deceased' : 'Disqualified'}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-on-surface-variant">Status actions apply to ACTIVE / SUSPENDED / INACTIVE members.</p>
-        )}
+        {/* Every status is always offered, so an admin can move a member to any other status later. */}
+        <p className="mb-2 text-xs text-on-surface-variant">
+          Current status: <span className="font-semibold text-on-surface">{STATUS_LABEL[member.status as Status] ?? member.status}</span>
+        </p>
+        <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-3">
+          {STATUSES.map((status) => {
+            const current = member.status === status
+            return (
+              <button
+                key={status}
+                type="button"
+                aria-pressed={current}
+                disabled={pending || current || (member.isSuperAdmin && status !== 'ACTIVE')}
+                onClick={() => setStatus(status)}
+                className={`h-9 rounded-lg border text-[11px] font-semibold transition disabled:cursor-not-allowed ${
+                  current
+                    ? 'border-primary bg-primary text-on-primary'
+                    : status === 'ACTIVE'
+                      ? 'border-primary/50 text-primary hover:bg-primary/5 disabled:opacity-40'
+                      : status === 'SUSPENDED'
+                        ? 'border-error/40 text-error hover:bg-error-container/40 disabled:opacity-40'
+                        : 'border-outline-variant text-on-surface-variant hover:border-primary/40 disabled:opacity-40'
+                }`}
+              >
+                {status === 'ACTIVE' && member.status !== 'ACTIVE' ? 'Restore (Active)' : STATUS_LABEL[status]}
+              </button>
+            )
+          })}
+        </div>
         <p className="mt-2 text-[11px] text-on-surface-variant">Role and dashboard access are managed on the Roles page.</p>
       </section>
+
+      {!member.isSuperAdmin && (
+        <section className="border-t border-outline-variant pt-3">
+          <p className="mb-2 font-label-bold text-[12px] uppercase tracking-wide text-error">Delete member</p>
+          {!confirmDelete ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => { setError(''); setOk(''); setConfirmDelete(true) }}
+              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-full border border-error text-sm font-label-bold text-error hover:bg-error-container/40 disabled:opacity-40"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+              Delete member permanently
+            </button>
+          ) : (
+            <div role="alertdialog" aria-label="Confirm member deletion" className="space-y-2 rounded-xl border border-error/50 bg-error-container/30 p-3">
+              <p className="text-sm font-semibold text-error">Are you sure?</p>
+              <p className="text-xs text-on-surface-variant">
+                This permanently deletes {member.fullName ? <strong>{member.fullName}</strong> : 'this member'} and all their details: profile, payments, family links,
+                messages and sign-in. <strong>This cannot be undone.</strong>
+              </p>
+              <div className="flex justify-end gap-2">
+                <button type="button" disabled={pending} onClick={() => setConfirmDelete(false)} className="h-8 rounded-full border border-outline-variant px-3 text-xs font-semibold">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={removeMember}
+                  className="h-8 rounded-full bg-error px-3 text-xs font-semibold text-on-error disabled:opacity-60"
+                >
+                  {pending ? 'Deleting…' : 'Yes, delete permanently'}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {error && <p className="rounded-xl bg-error-container/40 px-3 py-2 text-center text-sm text-error">{error}</p>}
       {ok && !error && <p className="rounded-xl bg-primary-fixed/50 px-3 py-2 text-center text-sm text-primary">{ok}</p>}
