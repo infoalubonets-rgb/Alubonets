@@ -14,6 +14,7 @@ import {
   type DirectoryMember,
 } from '@/lib/directory'
 import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
+import { assignMissingMembershipNumbers } from '@/lib/member-id-assign'
 
 const visibilitySchema = z.object({
   userId: z.string().min(1),
@@ -37,6 +38,8 @@ export async function getDirectoryMembers(): Promise<DirectoryMember[]> {
     throw new Error('Only Admin, Super Admin, Auditor and executives can open the member list.')
   }
   const isAdmin = viewer.role === 'ADMIN' || viewer.isSuperAdmin
+  // Accounts created without approval (bootstrap admins, seeded officers) get their missing member ID.
+  if (isAdmin) await assignMissingMembershipNumbers()
 
   const rows = await prisma.user.findMany({
     // Admins manage every account here, so they also see pending, suspended and former members.

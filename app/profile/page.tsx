@@ -4,6 +4,7 @@ import { getSessionProfile } from '@/lib/auth/session'
 import { prisma } from '@/lib/prisma'
 import { initialsFromName } from '@/lib/auth/helpers'
 import { familyTag } from '@/lib/family-tags'
+import { ensureMembershipNumber } from '@/lib/member-id-assign'
 import ProfileView from '@/components/profile/ProfileView'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 import { navForRole } from '@/lib/dashboard/nav'
@@ -79,7 +80,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
           status: user.status,
           isSuperAdmin: user.isSuperAdmin,
           initials: initialsFromName(user.fullName),
-          memberId: user.membershipNumber,
+          memberId: await ensureMembershipNumber(user),
           familyTag: familyTag(user),
           contributionCount: agg._count,
           contributionTotal: agg._sum.amount ?? 0,

@@ -5,6 +5,7 @@ import { REVIEWABLE_APPLICANTS } from '@/lib/applicants'
 import { announcementAudienceWhere } from '@/lib/notification-audience'
 import { formatMonthKeys, formatPaymentMethod, monthKeyFromDate } from '@/lib/chart-labels'
 import type { PaymentMethod, ProjectStatus, Role, WelfareStatus } from '@prisma/client'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 // ─── Cache tags ────────────────────────────────────────────────────────────────
 export const TAGS = {
@@ -27,7 +28,7 @@ export const getAdminDashboardData = unstable_cache(
       totalMembers, activeMembers, pendingMembers, pendingList,
       contributionAgg, openWelfare, recentAudit, galleryQueue, allUsers,
     ] = await Promise.all([
-      prisma.user.count(),
+      prisma.user.count({ where: NOT_DELETED_MEMBER }),
       prisma.user.count({ where: { status: 'ACTIVE' } }),
       prisma.user.count({ where: REVIEWABLE_APPLICANTS }),
       prisma.user.findMany({ where: REVIEWABLE_APPLICANTS, orderBy: { createdAt: 'desc' }, take: 20 }),
@@ -397,6 +398,7 @@ export const getContributionChartSeries = unstable_cache(
 export const getMemberGrowthSeries = unstable_cache(
   async () => {
     const users = await prisma.user.findMany({
+      where: NOT_DELETED_MEMBER,
       select: { createdAt: true },
       orderBy: { createdAt: 'asc' },
     })

@@ -531,7 +531,7 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { label: monthLabel ? `Collected · ${monthLabel}` : 'Total collected', value: kes.format(totals.collected) },
-          { label: 'Members', value: rows.length },
+          { label: 'Contributing members', value: rows.length },
           { label: monthLabel ? 'Paid in this period' : 'Contributing', value: totals.contributing },
           { label: 'Pending checks', value: totals.pending },
         ].map((stat) => (
@@ -547,11 +547,14 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[17px] text-on-surface-variant">search</span>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search member or membership number…" className="h-10 w-full rounded-xl border bg-surface py-2 pl-9 pr-3 text-sm" />
         </label>
-        <select value={show} onChange={(e) => setShow(e.target.value as typeof show)} aria-label="Filter members by payments" className="h-10 rounded-xl border bg-surface px-3 text-sm">
-          <option value="all">{filtered ? 'All members (incl. not paid)' : 'All members'}</option>
-          <option value="paid">{filtered ? 'Paid in this period' : 'Have paid'}</option>
-          <option value="none">{filtered ? 'Not paid in this period' : 'Not yet paid'}</option>
-        </select>
+        {/* Only members who have paid are listed, so the paid / not-paid split matters only for a period. */}
+        {filtered && (
+          <select value={show} onChange={(e) => setShow(e.target.value as typeof show)} aria-label="Filter members by payments" className="h-10 rounded-xl border bg-surface px-3 text-sm">
+            <option value="all">All contributing members</option>
+            <option value="paid">Paid in this period</option>
+            <option value="none">Not paid in this period</option>
+          </select>
+        )}
         <TimeRangeFilter key={`${period.key}|${period.from}|${period.to}`} range={period.key} from={period.from} to={period.to} />
         <MonthlyContributionsGrid />
       </div>
@@ -617,7 +620,7 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
             </thead>
             <tbody>
               {visible.length === 0 ? (
-                <tr><td colSpan={canDelete ? 7 : 6} className="py-10 text-center text-on-surface-variant">{filtered && show === 'paid' && !query.trim() ? `Nobody paid in this period (${period.label.toLowerCase()}).` : 'No members match.'}</td></tr>
+                <tr><td colSpan={canDelete ? 7 : 6} className="py-10 text-center text-on-surface-variant">{filtered && show === 'paid' && !query.trim() ? `Nobody paid in this period (${period.label.toLowerCase()}).` : rows.length === 0 ? 'No member has made a payment yet. Members appear here after their first payment.' : 'No members match.'}</td></tr>
               ) : (
                 visible.map((row, i) => (
                   <tr key={row.id} className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`}>

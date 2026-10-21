@@ -183,20 +183,15 @@ export default function ProfileView({ data }: { data: ProfileViewData }) {
               {data.email}
               {data.phone ? ` · ${data.phone}` : ''}
             </p>
-            {(data.memberId || data.familyTag) && (
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
-                {data.memberId && (
-                  <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-[12px] text-primary">
-                    Member ID <b className="font-mono">{data.memberId}</b>
-                  </span>
-                )}
-                {data.familyTag && (
-                  <span className="rounded-lg bg-secondary-container/15 px-2.5 py-1 text-[12px] text-secondary">
-                    Family tag <b className="font-mono">{data.familyTag}</b>
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Always shown, so members can see both IDs (or that one is not assigned yet). */}
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <span className="rounded-lg bg-primary/10 px-2.5 py-1 text-[12px] text-primary">
+                Alubonets ID <b className="font-mono">{data.memberId ?? 'Not assigned yet'}</b>
+              </span>
+              <span className="rounded-lg bg-secondary-container/15 px-2.5 py-1 text-[12px] text-secondary">
+                Family ID <b className="font-mono">{data.familyTag ?? 'Not in a family'}</b>
+              </span>
+            </div>
           </div>
 
           {!editing && error && (

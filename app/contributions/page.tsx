@@ -58,7 +58,7 @@ function getAttachedMembers(principalId: string) {
 /** One row per member: confirmed totals, pending checks and last payment — all time or a period. */
 async function getMemberContributionRows(range: ResolvedTimeRange): Promise<MemberContributionRow[]> {
   const paidAt = rangeFilter(range)
-  const [members, paid, pending] = await Promise.all([
+  const [members, paid, pending, everPaid] = await Promise.all([
     prisma.user.findMany({
       where: { status: { not: 'PENDING' }, ...NOT_DELETED_MEMBER },
       select: { id: true, fullName: true, membershipNumber: true, status: true, standing: true, contributionPlan: true },
@@ -72,10 +72,13 @@ async function getMemberContributionRows(range: ResolvedTimeRange): Promise<Memb
       _max: { paidAt: true },
     }),
     prisma.contribution.groupBy({ by: ['userId'], where: { status: 'PENDING', ...(paidAt ? { paidAt } : {}) }, _count: true }),
+    // Members appear only once they have made a payment (any time); until then they are not listed.
+    prisma.contribution.groupBy({ by: ['userId'], where: { status: { in: ['CONFIRMED', 'RECONCILED', 'PENDING'] } } }),
   ])
   const paidBy = new Map(paid.map((row) => [row.userId, row]))
   const pendingBy = new Map(pending.map((row) => [row.userId, row._count]))
-  return members.map((member) => {
+  const hasPaid = new Set(everPaid.map((row) => row.userId))
+  return members.filter((member) => hasPaid.has(member.id)).map((member) => {
     const totals = paidBy.get(member.id)
     return {
       id: member.id,

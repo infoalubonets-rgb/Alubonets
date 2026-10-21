@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { formatAuditAction } from '@/lib/audit-labels'
 import { requireAdmin } from '@/lib/auth/session'
 import ActivityDetailsButton from '@/components/admin/ActivityDetailsButton'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 export default async function AdminPage() {
   await requireAdmin()
@@ -23,7 +24,7 @@ export default async function AdminPage() {
     getMemberGrowthSeries(),
     getFamilyBranchDistribution(),
   ])
-  const statusCounts = await prisma.user.groupBy({ by: ['status'], _count: true })
+  const statusCounts = await prisma.user.groupBy({ by: ['status'], where: NOT_DELETED_MEMBER, _count: true })
   const statusMap = Object.fromEntries(statusCounts.map((s) => [s.status, s._count]))
   const nav = await navWithLoans('ADMIN')
 
