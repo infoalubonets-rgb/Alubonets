@@ -49,7 +49,7 @@ vi.mock('@/lib/feature-flags', () => ({ requireWelfareEnabled: vi.fn() }))
 vi.mock('@/lib/notifications', () => ({ notifyUsers: vi.fn() }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }))
 
-import { deleteContributions } from '@/app/actions/finance'
+import { deleteContributions, deleteMembersContributions } from '@/app/actions/finance'
 
 const payment = (id: string, status: string, financialTransactionId: string | null, extra = {}) => ({
   id, status, financialTransactionId, userId: 'member', amount: 500, paidAt: new Date('2026-10-01'),
@@ -98,6 +98,21 @@ describe('deleting contributions', () => {
     expect(await deleteContributions({ ids: ['c1'], reason: ' ' })).toMatchObject({ ok: false })
     expect(await deleteContributions({ ids: [], reason: 'Test data' })).toMatchObject({ ok: false })
     expect(mocks.contributionFindMany).not.toHaveBeenCalled()
+  })
+
+  it('deletes every payment of the selected members', async () => {
+    mocks.contributionFindMany
+      .mockResolvedValueOnce([{ id: 'c1' }, { id: 'c2' }])
+      .mockResolvedValueOnce([payment('c1', 'REJECTED', null), payment('c2', 'REJECTED', null)])
+    const result = await deleteMembersContributions({ memberIds: ['member'], reason: 'Test data' })
+    expect(result).toEqual({ ok: true, deleted: 2, skipped: 0 })
+    expect(mocks.contributionFindMany.mock.calls[0][0]).toMatchObject({ where: { userId: { in: ['member'] }, status: { not: 'REVERSED' } } })
+    expect(mocks.writeAudit).toHaveBeenCalledTimes(2)
+  })
+
+  it('says so when the selected members have no payments', async () => {
+    mocks.contributionFindMany.mockResolvedValueOnce([])
+    expect(await deleteMembersContributions({ memberIds: ['member'], reason: 'Test data' })).toMatchObject({ ok: false })
   })
 
   it('refuses accounts that cannot record contributions', async () => {

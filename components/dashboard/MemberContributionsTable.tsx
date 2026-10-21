@@ -6,7 +6,7 @@ import FullScreenModal from '@/components/ui/FullScreenModal'
 import MonthlyContributionsGrid from '@/components/dashboard/MonthlyContributionsGrid'
 import TimeRangeFilter from '@/components/finance/TimeRangeFilter'
 import { MemberPurposeSettingsButton } from '@/components/finance/PurposeSettingsEditor'
-import { deleteContributions, editContributionAmount, setContributionPlan } from '@/app/actions/finance'
+import { deleteContributions, deleteMembersContributions, editContributionAmount, setContributionPlan } from '@/app/actions/finance'
 
 export type MemberContributionRow = {
   id: string
@@ -132,7 +132,17 @@ function EditAmountForm({ payment, onDone, onCancel }: { payment: PaymentView; o
 }
 
 /** Reason prompt shown before payments are deleted; nothing is removed until it is confirmed. */
-function DeleteConfirm({ ids, onDone, onCancel }: { ids: string[]; onDone: () => void; onCancel: () => void }) {
+type DeleteResult = { ok: true } | { ok: false; error: string }
+
+function DeleteConfirm({ ids, onDone, onCancel, title, confirmLabel, onConfirm }: {
+  ids: string[]
+  onDone: () => void
+  onCancel: () => void
+  title?: string
+  confirmLabel?: string
+  /** Defaults to deleting the given payment ids. */
+  onConfirm?: (reason: string) => Promise<DeleteResult>
+}) {
   const [reason, setReason] = useState('')
   const [error, setError] = useState('')
   const [pending, startTransition] = useTransition()
@@ -141,7 +151,7 @@ function DeleteConfirm({ ids, onDone, onCancel }: { ids: string[]; onDone: () =>
     event.preventDefault()
     setError('')
     startTransition(async () => {
-      const result = await deleteContributions({ ids, reason })
+      const result = await (onConfirm ? onConfirm(reason) : deleteContributions({ ids, reason }))
       if (!result.ok) {
         setError(result.error)
         return
@@ -152,7 +162,7 @@ function DeleteConfirm({ ids, onDone, onCancel }: { ids: string[]; onDone: () =>
 
   return (
     <form onSubmit={submit} className="space-y-2 rounded-xl border border-error/40 bg-error-container/30 p-3">
-      <p className="text-sm font-semibold text-error">Delete {ids.length === 1 ? 'this payment' : `${ids.length} payments`}?</p>
+      <p className="text-sm font-semibold text-error">{title ?? `Delete ${ids.length === 1 ? 'this payment' : `${ids.length} payments`}?`}</p>
       <p className="text-xs text-on-surface-variant">It is removed from the member&apos;s record and totals and reversed in the ledger. The reason is saved in the audit log.</p>
       <label className="block text-xs font-semibold text-on-surface-variant">
         Reason
@@ -171,7 +181,7 @@ function DeleteConfirm({ ids, onDone, onCancel }: { ids: string[]; onDone: () =>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onCancel} disabled={pending} className="h-8 rounded-full border border-outline-variant px-3 text-xs font-semibold">Cancel</button>
         <button type="submit" disabled={pending} className="h-8 rounded-full bg-error px-3 text-xs font-semibold text-on-error disabled:opacity-60">
-          {pending ? 'Deleting…' : ids.length === 1 ? 'Delete payment' : `Delete ${ids.length} payments`}
+          {pending ? 'Deleting…' : confirmLabel ?? (ids.length === 1 ? 'Delete payment' : `Delete ${ids.length} payments`)}
         </button>
       </div>
     </form>
@@ -489,6 +499,27 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
     })
   }, [rows, query, show])
 
+  const router = useRouter()
+  // Members ticked for deleting all their payments, and the ones awaiting a reason.
+  const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [confirmingMembers, setConfirmingMembers] = useState<MemberContributionRow[] | null>(null)
+  const hasPayments = (row: MemberContributionRow) => row.payments > 0 || row.pending > 0
+  const pickable = visible.filter(hasPayments)
+  const allPicked = pickable.length > 0 && pickable.every((row) => picked.has(row.id))
+  const pick = (ids: string[], on: boolean) =>
+    setPicked((current) => {
+      const next = new Set(current)
+      for (const id of ids) {
+        if (on) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
+  useEffect(() => {
+    // Drop picks for members that no longer have payments after a refresh.
+    setPicked((current) => new Set([...current].filter((id) => rows.some((row) => row.id === id && hasPayments(row)))))
+  }, [rows])
+
   const totals = {
     collected: rows.reduce((sum, row) => sum + row.totalPaid, 0),
     contributing: rows.filter((row) => row.payments > 0).length,
@@ -525,23 +556,83 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
         <MonthlyContributionsGrid />
       </div>
 
+      {canDelete && picked.size > 0 && !confirmingMembers && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-outline-variant bg-surface px-4 py-2.5">
+          <p className="text-sm font-semibold text-on-surface">{picked.size} member{picked.size === 1 ? '' : 's'} selected</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setPicked(new Set())} className="h-9 rounded-full border border-outline-variant px-4 text-xs font-semibold">Clear</button>
+            <button
+              type="button"
+              onClick={() => setConfirmingMembers(rows.filter((row) => picked.has(row.id)))}
+              className="inline-flex h-9 items-center gap-1 rounded-full bg-error px-4 text-xs font-semibold text-on-error"
+            >
+              <span className="material-symbols-outlined text-[16px]">delete</span>
+              Delete their contributions
+            </button>
+          </div>
+        </div>
+      )}
+      {confirmingMembers && (
+        <DeleteConfirm
+          ids={[]}
+          title={
+            confirmingMembers.length === 1
+              ? `Delete all contributions of ${confirmingMembers[0].fullName}?`
+              : `Delete all contributions of ${confirmingMembers.length} members?`
+          }
+          confirmLabel={confirmingMembers.length === 1 ? 'Delete their contributions' : `Delete contributions of ${confirmingMembers.length} members`}
+          onConfirm={(reason) => deleteMembersContributions({ memberIds: confirmingMembers.map((row) => row.id), reason })}
+          onCancel={() => setConfirmingMembers(null)}
+          onDone={() => {
+            setConfirmingMembers(null)
+            setPicked(new Set())
+            loadedDetails.clear()
+            router.refresh()
+          }}
+        />
+      )}
+
       <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest shadow-[0_4px_12px_rgba(20,32,51,0.04)]">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="border-b border-outline-variant bg-surface-container-low text-left">
+                {canDelete && (
+                  <th className="w-10 py-3 pl-4">
+                    <input
+                      type="checkbox"
+                      checked={allPicked}
+                      disabled={pickable.length === 0}
+                      onChange={(e) => pick(pickable.map((row) => row.id), e.target.checked)}
+                      aria-label="Select all members with payments"
+                      className="h-4 w-4 accent-primary"
+                    />
+                  </th>
+                )}
                 {['Member', 'Payments', 'Total paid', 'Last payment', 'Standing'].map((heading) => (
                   <th key={heading} className="px-4 py-3 font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">{heading}</th>
                 ))}
-                <th className="w-16 px-4 py-3 text-right font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">View</th>
+                <th className="w-16 px-4 py-3 text-right font-label-bold text-[11px] uppercase tracking-wide text-on-surface-variant">{canDelete ? 'Actions' : 'View'}</th>
               </tr>
             </thead>
             <tbody>
               {visible.length === 0 ? (
-                <tr><td colSpan={6} className="py-10 text-center text-on-surface-variant">{filtered && show === 'paid' && !query.trim() ? `Nobody paid in this period (${period.label.toLowerCase()}).` : 'No members match.'}</td></tr>
+                <tr><td colSpan={canDelete ? 7 : 6} className="py-10 text-center text-on-surface-variant">{filtered && show === 'paid' && !query.trim() ? `Nobody paid in this period (${period.label.toLowerCase()}).` : 'No members match.'}</td></tr>
               ) : (
                 visible.map((row, i) => (
                   <tr key={row.id} className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`}>
+                    {canDelete && (
+                      <td className="py-3 pl-4">
+                        <input
+                          type="checkbox"
+                          checked={picked.has(row.id)}
+                          disabled={!hasPayments(row)}
+                          onChange={(e) => pick([row.id], e.target.checked)}
+                          aria-label={`Select ${row.fullName}`}
+                          className="h-4 w-4 accent-primary disabled:opacity-30"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <button type="button" onClick={() => setViewing(row)} onPointerEnter={() => prefetchDetail(row.id)} onFocus={() => prefetchDetail(row.id)} className="text-left font-medium text-on-surface hover:text-primary hover:underline">{row.fullName}</button>
                       <p className="text-xs text-on-surface-variant">
@@ -567,6 +658,11 @@ export default function MemberContributionsTable({ rows, period = { key: 'all', 
                       <button type="button" onClick={() => setViewing(row)} onPointerEnter={() => prefetchDetail(row.id)} onFocus={() => prefetchDetail(row.id)} title="View contributions" aria-label={`View contributions for ${row.fullName}`} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition hover:bg-primary/10">
                         <span className="material-symbols-outlined text-[19px]">visibility</span>
                       </button>
+                      {canDelete && hasPayments(row) && (
+                        <button type="button" onClick={() => setConfirmingMembers([row])} title="Delete this member's contributions" aria-label={`Delete contributions of ${row.fullName}`} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-error transition hover:bg-error/10">
+                          <span className="material-symbols-outlined text-[19px]">delete</span>
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

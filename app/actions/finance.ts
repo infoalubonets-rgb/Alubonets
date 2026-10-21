@@ -1133,7 +1133,7 @@ export async function editContributionAmount(formData: FormData): Promise<{ ok: 
 }
 
 const deleteContributionsSchema = z.object({
-  ids: z.array(z.string().min(1)).min(1, 'Pick at least one payment.').max(200, 'Delete at most 200 payments at a time.'),
+  ids: z.array(z.string().min(1)).min(1, 'Pick at least one payment.').max(5000, 'Delete at most 5,000 payments at a time.'),
   reason: z.string().trim().min(3, 'Give a short reason (at least 3 characters).').max(500),
 })
 
@@ -1209,6 +1209,20 @@ export async function deleteContributions(input: z.input<typeof deleteContributi
     return { ok: true, deleted: contributions.length, skipped: ids.length - contributions.length }
   } catch (error) {
     if (error instanceof z.ZodError) return { ok: false, error: error.issues[0]?.message || 'Check the selection and reason.' }
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not delete the payments.' }
+  }
+}
+
+/** Treasurer / Super Admin: deletes every recorded payment of the chosen members (same rules as above). */
+export async function deleteMembersContributions(input: { memberIds: string[]; reason: string }): Promise<{ ok: true; deleted: number; skipped: number } | { ok: false; error: string }> {
+  try {
+    await requireContributionRecorder()
+    const memberIds = z.array(z.string().min(1)).min(1, 'Pick at least one member.').max(500).parse(input.memberIds)
+    const rows = await prisma.contribution.findMany({ where: { userId: { in: memberIds }, status: { not: 'REVERSED' } }, select: { id: true } })
+    if (rows.length === 0) return { ok: false, error: 'The selected members have no payments to delete.' }
+    return await deleteContributions({ ids: rows.map((row) => row.id), reason: input.reason })
+  } catch (error) {
+    if (error instanceof z.ZodError) return { ok: false, error: error.issues[0]?.message || 'Check the selection.' }
     return { ok: false, error: error instanceof Error ? error.message : 'Could not delete the payments.' }
   }
 }
