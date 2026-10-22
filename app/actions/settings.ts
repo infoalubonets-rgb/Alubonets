@@ -81,7 +81,7 @@ export async function updateContactFinanceSettings(input: {
           .refine((v) => v === '' || /^[+0-9()\-\s]{7,40}$/.test(v), {
             message: 'Enter a valid phone number, or leave it blank.',
           }),
-        enquiryEmail: z.string().trim().email('Enter a valid enquiry forwarding email.'),
+        enquiryEmail: z.string().trim().min(1),
         approvalThreshold: z
           .string()
           .trim()
@@ -102,8 +102,8 @@ export async function updateContactFinanceSettings(input: {
       }),
       prisma.appSetting.upsert({
         where: { key: SETTING_KEYS.contactDestinationEmail },
-        create: { key: SETTING_KEYS.contactDestinationEmail, value: data.enquiryEmail, updatedBy: actor.id },
-        update: { value: data.enquiryEmail, updatedBy: actor.id },
+        create: { key: SETTING_KEYS.contactDestinationEmail, value: validateSettingValue(SETTING_KEYS.contactDestinationEmail, data.enquiryEmail), updatedBy: actor.id },
+        update: { value: validateSettingValue(SETTING_KEYS.contactDestinationEmail, data.enquiryEmail), updatedBy: actor.id },
       }),
       prisma.appSetting.upsert({
         where: { key: SETTING_KEYS.contactRecipients },

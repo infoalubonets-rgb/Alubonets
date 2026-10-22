@@ -10,7 +10,10 @@ vi.mock('@/lib/prisma', () => {
 vi.mock('@/lib/auth/session', () => ({ requireAdmin: vi.fn() }))
 vi.mock('@/lib/audit', () => ({ writeAudit: vi.fn() }))
 vi.mock('@/lib/rate-limit', () => ({ enforceRateLimit: vi.fn() }))
-vi.mock('@/lib/settings', () => ({ getPublicContact: m.contact }))
+vi.mock('@/lib/settings', () => ({
+  getPublicContact: m.contact,
+  parseEmailList: (value: string) => Array.from(new Set(value.split(/[,;\n]/).map((email) => email.trim().toLowerCase()).filter(Boolean))),
+}))
 vi.mock('@/lib/logger', () => ({ logError: m.log }))
 vi.mock('@/lib/pdf/receipt', () => ({ buildReceiptPdf: vi.fn() }))
 import { sendContactMessage } from '@/app/actions/contact'
@@ -53,13 +56,31 @@ describe('contact enquiry forwarding and notifications', () => {
     expect(m.update).toHaveBeenCalledTimes(1)
     expect(m.update).toHaveBeenCalledWith({ where: { id: 'enquiry-1' }, data: { emailStatus: 'sent' } })
   })
+  it('delivers to every configured destination and deduplicates copy recipients', async () => {
+    m.findSetting.mockResolvedValue({ value: 'InfoAlubonets@gmail.com, secretary@example.com\ntreasurer@example.com' })
+    m.contact.mockResolvedValue({ recipients: ['secretary@example.com', 'copy@example.com'] })
+    expect(await sendContactMessage(form())).toEqual({ ok: true })
+    expect(m.send).toHaveBeenCalledTimes(4)
+    expect(m.send).toHaveBeenNthCalledWith(1, expect.objectContaining({ to: ['infoalubonets@gmail.com'] }))
+    expect(m.send).toHaveBeenNthCalledWith(2, expect.objectContaining({ to: ['secretary@example.com'] }))
+    expect(m.send).toHaveBeenNthCalledWith(3, expect.objectContaining({ to: ['treasurer@example.com'] }))
+    expect(m.send).toHaveBeenNthCalledWith(4, expect.objectContaining({ to: 'copy@example.com' }))
+    expect(m.update).toHaveBeenCalledWith({ where: { id: 'enquiry-1' }, data: { emailStatus: 'sent' } })
+  })
+  it('tries the remaining destinations when one email fails', async () => {
+    m.findSetting.mockResolvedValue({ value: 'first@example.com, second@example.com' })
+    m.send.mockRejectedValueOnce(new Error('Temporary failure')).mockResolvedValueOnce({ error: null })
+    expect(await sendContactMessage(form())).toEqual({ ok: true })
+    expect(m.send).toHaveBeenCalledTimes(2)
+    expect(m.update).toHaveBeenCalledWith({ where: { id: 'enquiry-1' }, data: { emailStatus: 'failed' } })
+  })
   it('retains the enquiry and system notification when primary email is rejected', async () => {
     m.send.mockResolvedValue({ error: { message: 'Sender not verified' } })
     expect(await sendContactMessage(form())).toEqual({ ok: true })
     expect(m.create).toHaveBeenCalledTimes(1)
     expect(m.notify).toHaveBeenCalledTimes(1)
     expect(m.update).toHaveBeenCalledWith({ where: { id: 'enquiry-1' }, data: { emailStatus: 'failed' } })
-    expect(m.log).toHaveBeenCalledWith('contact.email.rejected', expect.anything(), { submissionId: 'enquiry-1' })
+    expect(m.log).toHaveBeenCalledWith('contact.email.rejected', expect.anything(), { submissionId: 'enquiry-1', destination: 'infoalubonets@gmail.com' })
   })
   it('retains enquiries and notifications when email is not configured', async () => {
     vi.stubEnv('RESEND_API_KEY', '')

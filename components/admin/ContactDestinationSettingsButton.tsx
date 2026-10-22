@@ -15,10 +15,12 @@ export default function ContactDestinationSettingsButton({ destinationEmail, upd
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState('')
   const [saved, setSaved] = useState('')
+  const [emails, setEmails] = useState(() => destinationEmail.split(/[,;\n]/).map((email) => email.trim()).filter(Boolean))
 
   const openModal = () => {
     setError('')
     setSaved('')
+    setEmails(destinationEmail.split(/[,;\n]/).map((email) => email.trim()).filter(Boolean))
     setOpen(true)
   }
 
@@ -27,8 +29,10 @@ export default function ContactDestinationSettingsButton({ destinationEmail, upd
     setSaved('')
     startTransition(async () => {
       try {
+        const destinations = formData.getAll('email').map(String).map((email) => email.trim()).filter(Boolean)
+        formData.set('email', destinations.join(', '))
         await updateAction(formData)
-        setSaved(`Saved — Contact Us messages now go to ${String(formData.get('email') ?? '')}`)
+        setSaved(`Saved — Contact Us messages now go to ${destinations.length} inbox${destinations.length === 1 ? '' : 'es'}.`)
         router.refresh()
         setTimeout(() => setOpen(false), 1400)
       } catch (e) {
@@ -54,21 +58,29 @@ export default function ContactDestinationSettingsButton({ destinationEmail, upd
           <div className="rounded-2xl bg-primary/5 p-4">
             <h3 className="font-h3 text-lg text-primary">Public enquiry inbox</h3>
             <p className="mt-2 text-sm text-on-surface-variant">
-              Contact Us form submissions are emailed to this address.
+              Contact Us form submissions are emailed to every address listed here.
             </p>
           </div>
 
           <form action={save} className="space-y-4">
-            <label className="block text-sm font-semibold text-on-surface">
-              Destination email
-              <input
-                name="email"
-                type="email"
-                required
-                defaultValue={destinationEmail}
-                className="mt-1.5 block w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-3 font-normal outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-              />
-            </label>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-on-surface">Destination emails</p>
+              {emails.map((email, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <label className="min-w-0 flex-1">
+                    <span className="sr-only">Destination email {index + 1}</span>
+                    <input name="email" type="email" required value={email}
+                      onChange={(event) => setEmails((current) => current.map((value, i) => i === index ? event.target.value : value))}
+                      className="block w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-3 font-normal outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                  </label>
+                  {emails.length > 1 && <button type="button" onClick={() => setEmails((current) => current.filter((_, i) => i !== index))}
+                    className="rounded-lg border border-outline-variant px-3 py-2 text-sm text-error" aria-label={`Remove email ${index + 1}`}>Remove</button>}
+                </div>
+              ))}
+              <button type="button" disabled={emails.length >= 20} onClick={() => setEmails((current) => [...current, ''])}
+                className="rounded-lg border border-outline-variant px-3 py-2 text-sm font-semibold text-primary disabled:opacity-50">+ Add another email</button>
+              <p className="text-xs text-on-surface-variant">Up to 20 addresses. Each will receive the enquiry.</p>
+            </div>
             {error && (
               <p role="alert" className="flex items-start gap-2 rounded-xl bg-error-container/40 px-3 py-2 text-sm text-error">
                 <span className="material-symbols-outlined text-[18px]">error</span>

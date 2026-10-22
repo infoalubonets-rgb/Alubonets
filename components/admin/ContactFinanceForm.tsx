@@ -47,8 +47,9 @@ export default function ContactFinanceForm({
       setError('Enter a valid phone number, or leave it blank.')
       return
     }
-    if (!trimmedForward || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedForward)) {
-      setError('Enter a valid enquiry forwarding email.')
+    const destinations = trimmedForward.split(/[,;\n]/).map((v) => v.trim()).filter(Boolean)
+    if (destinations.length < 1 || destinations.length > 20 || destinations.some((v) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))) {
+      setError('Enter 1 to 20 valid enquiry emails, separated by commas or new lines.')
       return
     }
     const extra = alsoTo.split(/[,;\n]/).map((v) => v.trim()).filter(Boolean)
@@ -66,7 +67,7 @@ export default function ContactFinanceForm({
       const result = await updateContactFinanceSettings({
         publicEmail: trimmedEmail,
         publicPhone: trimmedPhone,
-        enquiryEmail: trimmedForward,
+        enquiryEmail: destinations.join(', '),
         recipients: extra.join(', '),
         approvalThreshold: trimmedThreshold,
       })
@@ -118,19 +119,20 @@ export default function ContactFinanceForm({
         <div>
           <h3 className="text-sm font-semibold text-primary">Enquiry forwarding</h3>
           <p className="mt-1 text-xs text-on-surface-variant">
-            Contact Us form messages are emailed to this address.
+            Contact Us form messages are emailed to every address listed here.
           </p>
         </div>
         <label className="block text-sm">
           Forward enquiries to
-          <input
-            type="email"
+          <textarea
             value={forwardTo}
             onChange={(e) => setForwardTo(e.target.value)}
             required
+            rows={2}
             className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-            placeholder="enquiries@example.com"
+            placeholder="enquiries@example.com, secretary@example.com"
           />
+          <span className="mt-1 block text-xs text-on-surface-variant">Separate up to 20 addresses with commas or new lines.</span>
         </label>
         <label className="block text-sm">
           Also send to (comma-separated)

@@ -7,7 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth/session'
 import { writeAudit } from '@/lib/audit'
 import { CONTACT_EMAIL } from '@/lib/constants'
-import { getPublicContact } from '@/lib/settings'
+import { getPublicContact, parseEmailList, validateSettingValue, SETTING_KEYS } from '@/lib/settings'
 import { logError } from '@/lib/logger'
 import { renderEmailTemplate } from '@/lib/email/templates'
 import { emailFrom } from '@/lib/email/resend'
@@ -106,7 +106,7 @@ async function createContactSubmissionAndNotify({
   })
   const { enquiryEmail, recipients } = await getPublicContact()
   // Prefer the Communications / Settings destination; fall back to CONTACT_EMAIL.
-  const destination = destinationEmail || enquiryEmail || CONTACT_EMAIL
+  const destinations = parseEmailList(destinationEmail || enquiryEmail || CONTACT_EMAIL)
   const copies = recipients.length ? recipients : await defaultContactRecipients()
 
   const key = process.env.RESEND_API_KEY
@@ -114,8 +114,7 @@ async function createContactSubmissionAndNotify({
     try {
       const resend = new Resend(key)
       const from = emailFrom()
-      // Send the main inbox independently: a failed copy must not block it.
-      const to = [destination]
+      // Deliver to each configured inbox independently so one rejection does not block the others.
       const rendered = renderEmailTemplate('contact_enquiry', {
         name,
         email,
@@ -123,21 +122,26 @@ async function createContactSubmissionAndNotify({
         category: category || 'General',
         message,
       })
-      const { error } = await resend.emails.send({
-        from,
-        to,
-        replyTo: email,
-        subject: rendered.subject,
-        html: rendered.html,
-      })
+      let failed = false
+      for (const destination of destinations) {
+        try {
+          const { error } = await resend.emails.send({ from, to: [destination], replyTo: email, subject: rendered.subject, html: rendered.html })
+          if (error) {
+            failed = true
+            logError('contact.email.rejected', error, { submissionId: submission.id, destination })
+          }
+        } catch (deliveryError) {
+          failed = true
+          logError('contact.email.failed', deliveryError, { submissionId: submission.id, destination })
+        }
+      }
       await prisma.contactSubmission.update({
         where: { id: submission.id },
-        data: { emailStatus: error ? 'failed' : 'sent' },
+        data: { emailStatus: failed ? 'failed' : 'sent' },
       })
-      if (error) logError('contact.email.rejected', error, { submissionId: submission.id })
       const testCopy = process.env.NODE_ENV !== 'production' ? process.env.RESEND_TEST_EMAIL?.trim() : undefined
       const extra = Array.from(new Set([...copies, ...(testCopy ? [testCopy] : [])].map(address => address.trim().toLowerCase())))
-        .filter(address => address && address !== destination.toLowerCase())
+        .filter(address => address && !destinations.includes(address))
       for (const address of extra) {
         try {
           const copy = await resend.emails.send({ from, to: address, replyTo: email, subject: rendered.subject, html: rendered.html })
@@ -387,7 +391,7 @@ export async function replyToContact(
 export async function updateContactDestination(formData: FormData) {
   const actor = await requireAdmin()
   if (!actor.isSuperAdmin) throw new Error('Only the Super Admin can change the contact destination.')
-  const value = z.string().email().parse(formData.get('email'))
+  const value = validateSettingValue(SETTING_KEYS.contactDestinationEmail, String(formData.get('email') ?? ''))
   await prisma.appSetting.upsert({ where: { key: 'contact_destination_email' }, create: { key: 'contact_destination_email', value, updatedBy: actor.id }, update: { value, updatedBy: actor.id } })
   await writeAudit({ userId: actor.id, action: 'CONTACT_DESTINATION_UPDATE', entity: 'AppSetting', entityId: 'contact_destination_email' })
   revalidateTag('app-settings')

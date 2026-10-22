@@ -26,7 +26,12 @@ export const SETTING_KEYS = {
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS]
 
 const validators: Record<SettingKey, z.ZodType<string>> = {
-  [SETTING_KEYS.contactDestinationEmail]: z.string().email().or(z.literal('')),
+  [SETTING_KEYS.contactDestinationEmail]: z.string().max(2000)
+    .refine((value) => {
+      const emails = parseEmailList(value)
+      return emails.length >= 1 && emails.length <= 20 && emails.every((email) => z.string().email().safeParse(email).success)
+    }, { message: 'Enter 1 to 20 valid email addresses, separated by commas or new lines.' })
+    .transform((value) => parseEmailList(value).join(', ')),
   [SETTING_KEYS.contactRecipients]: z
     .string()
     .max(2000)

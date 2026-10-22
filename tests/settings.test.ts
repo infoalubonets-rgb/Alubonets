@@ -17,4 +17,10 @@ describe('validateSettingValue', () => {
   it('accepts loan max amount', () => {
     expect(validateSettingValue(SETTING_KEYS.loanMaxAmountKes, '50000')).toBe('50000')
   })
+  it('normalizes and validates multiple contact destinations', () => {
+    expect(validateSettingValue(SETTING_KEYS.contactDestinationEmail, ' Info@example.com; team@example.com\nINFO@example.com '))
+      .toBe('info@example.com, team@example.com')
+    expect(() => validateSettingValue(SETTING_KEYS.contactDestinationEmail, 'info@example.com, invalid'))
+      .toThrow('Enter 1 to 20 valid email addresses')
+  })
 })
