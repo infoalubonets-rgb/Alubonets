@@ -4,6 +4,7 @@ import FamilyAdministrationClient, { FamilyAdministrationActions, FamilyAdminist
 import { requireAdmin } from '@/lib/auth/session'
 import { navForRole } from '@/lib/dashboard/nav'
 import { prisma } from '@/lib/prisma'
+import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
 
 const relationshipLabel: Record<string, string> = {
   SPOUSE: 'Spouse', SON: 'Son', DAUGHTER: 'Daughter', CHILD: 'Child', DEPENDENT: 'Dependent', OTHER: 'Other',
@@ -13,7 +14,7 @@ export default async function AdminFamilyPage({ searchParams }: { searchParams: 
   await requireAdmin()
   if ((await searchParams).view === 'mine') return <MyFamilyPage adminWorkspace />
   const members = await prisma.user.findMany({
-    where: { status: { in: ['ACTIVE', 'PENDING', 'INACTIVE'] } },
+    where: { AND: [NOT_DELETED_MEMBER, { status: { in: ['ACTIVE', 'PENDING', 'INACTIVE'] } }] },
     orderBy: { fullName: 'asc' }, take: 500,
     select: { id: true, fullName: true, email: true, phone: true, status: true, isPrincipal: true, principalMemberId: true, familyRelationship: true, principal: { select: { fullName: true } } },
   })

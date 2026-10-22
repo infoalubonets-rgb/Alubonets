@@ -17,6 +17,52 @@ import { sanitizePublicProfileFields } from '@/lib/public-profile'
 import { isExecutive } from '@/lib/directory'
 import { canRemoveSuperAdmin, grantMap } from '@/lib/super-admin'
 import { deleteOneMember } from '@/lib/member-deletion'
+import { REVIEWABLE_APPLICANTS } from '@/lib/applicants'
+import { EDUCATION_LEVELS, GENDERS } from '@/lib/membership'
+
+const applicantEditSchema = z.object({
+  userId: z.string().min(1),
+  fullName: z.string().trim().min(2).max(120),
+  phone: z.string().trim().max(40),
+  location: z.string().trim().max(250),
+  gender: z.enum(GENDERS).nullable(),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  address: z.string().trim().max(250),
+  familyBranch: z.string().trim().max(120),
+  memberCategory: z.enum(['ORDINARY', 'COMMITTEE_MEMBER', 'ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER']).nullable(),
+  nextOfKinName: z.string().trim().max(120),
+  nextOfKinPhone: z.string().trim().max(40),
+  nextOfKinRelationship: z.string().trim().max(80),
+  emergencyContactName: z.string().trim().max(120),
+  emergencyContactPhone: z.string().trim().max(40),
+  profession: z.string().trim().max(120),
+  educationLevel: z.enum(EDUCATION_LEVELS).nullable(),
+  skills: z.string().trim().max(1000),
+  achievements: z.string().trim().max(2000),
+  mentorshipArea: z.string().trim().max(500),
+  interests: z.string().trim().max(1000),
+}).strict()
+
+export async function updatePendingApplicant(input: z.input<typeof applicantEditSchema>) {
+  const actor = await requireAdmin()
+  const { userId, fullName, phone, location, dateOfBirth, ...profile } = applicantEditSchema.parse(input)
+  const birthDate = dateOfBirth ? new Date(`${dateOfBirth}T00:00:00.000Z`) : null
+  if (dateOfBirth && (Number.isNaN(birthDate?.getTime()) || birthDate?.toISOString().slice(0, 10) !== dateOfBirth || birthDate >= new Date())) {
+    throw new Error('Enter a valid past date of birth.')
+  }
+  const nullableProfile = Object.fromEntries(Object.entries(profile).map(([key, value]) => [key, typeof value === 'string' ? value || null : value])) as typeof profile
+  const updated = await prisma.$transaction(async (tx) => {
+    const before = await tx.user.findFirst({ where: { id: userId, ...REVIEWABLE_APPLICANTS }, include: { memberProfile: true } })
+    if (!before) throw new Error('This application is no longer pending.')
+    const user = await tx.user.update({ where: { id: userId }, data: { fullName, phone: phone || null, location: location || null } })
+    await tx.memberProfile.upsert({ where: { userId }, create: { userId, ...nullableProfile, dateOfBirth: birthDate }, update: { ...nullableProfile, dateOfBirth: birthDate } })
+    await tx.auditLog.create({ data: { userId: actor.id, actorRole: actor.role, actorSecondaryRoles: actor.dashboardAccess, action: 'APPLICANT_DETAILS_UPDATE', entity: 'User', entityId: userId, meta: { changedFields: Object.keys(input).filter((key) => key !== 'userId') } } })
+    return user
+  })
+  await syncUserMetadata(updated)
+  revalidatePath('/admin/approvals')
+  revalidatePath('/directory')
+}
 
 const approveSchema = z.object({
   userId: z.string().min(1),

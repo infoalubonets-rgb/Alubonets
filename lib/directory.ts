@@ -65,5 +65,15 @@ export type DirectoryMember = {
     standingOverrideUntil: string | null
     contributionExempt: boolean
     about: { show: boolean; title: string | null; order: number; fields: string[] }
+    privateProfile: {
+      dateOfBirth: string | null
+      address: string | null
+      nextOfKinName: string | null
+      nextOfKinPhone: string | null
+      nextOfKinRelationship: string | null
+      emergencyContactName: string | null
+      emergencyContactPhone: string | null
+      achievements: string | null
+    }
   } | null
 }

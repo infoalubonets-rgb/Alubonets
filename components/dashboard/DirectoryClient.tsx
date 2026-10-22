@@ -55,6 +55,7 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
   const [query, setQuery] = useState(initialQuery)
   // Keep the id, not the row, so the pop-up shows fresh data after an admin action refreshes the page.
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [modalView, setModalView] = useState<'actions' | 'details'>('actions')
   const selected = members.find((member) => member.id === selectedId) ?? null
   const showDetails = members.some((member) => member.details)
   const isAdmin = members.some((member) => member.account)
@@ -259,7 +260,7 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() => setSelectedId(member.id)}
+                          onClick={() => { setSelectedId(member.id); setModalView(isAdmin ? 'actions' : 'details') }}
                           aria-label={`View ${member.fullName}`}
                           title="View details"
                           className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition hover:bg-primary/10"
@@ -287,7 +288,18 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
       <FullScreenModal open={Boolean(selected)} title={selected?.fullName ?? 'Member'} onClose={() => setSelectedId(null)} size="compact">
         {selected && (
           <>
+          <div className="mb-4 flex gap-2 border-b border-outline-variant pb-3">
+            {(selected.account ? ['actions', 'details'] as const : ['details'] as const).map((view) => (
+              <button key={view} type="button" onClick={() => setModalView(view)}
+                aria-pressed={modalView === view}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold ${modalView === view ? 'bg-primary text-on-primary' : 'border border-outline-variant text-primary'}`}>
+                {view === 'actions' ? 'Manage' : 'Details'}
+              </button>
+            ))}
+          </div>
+          {modalView === 'details' ? (
           <dl>
+            <DetailRow label="Membership number" value={selected.details?.membershipNumber} />
             <DetailRow label="Role" value={roleLabel(selected)} />
             <DetailRow label="Member type" value={memberType(selected)} />
             <DetailRow label="Account status" value={selected.account && title(selected.account.status)} />
@@ -308,7 +320,19 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
             <DetailRow label="Location" value={selected.location} />
             <DetailRow label="Email" value={selected.contact?.email} />
             <DetailRow label="Phone" value={selected.contact?.phone} />
+            {selected.account && <>
+              <DetailRow label="Date of birth" value={selected.account.privateProfile.dateOfBirth} />
+              <DetailRow label="Address" value={selected.account.privateProfile.address} />
+              <DetailRow label="Next of kin" value={selected.account.privateProfile.nextOfKinName} />
+              <DetailRow label="Next-of-kin phone" value={selected.account.privateProfile.nextOfKinPhone} />
+              <DetailRow label="Next-of-kin relationship" value={selected.account.privateProfile.nextOfKinRelationship} />
+              <DetailRow label="Emergency contact" value={selected.account.privateProfile.emergencyContactName} />
+              <DetailRow label="Emergency phone" value={selected.account.privateProfile.emergencyContactPhone} />
+              <DetailRow label="Achievements" value={selected.account.privateProfile.achievements} />
+            </>}
           </dl>
+          ) : <>
+          <p className="mb-3 text-sm text-on-surface-variant">{roleLabel(selected)} · {memberType(selected)}{selected.account ? ` · ${title(selected.account.status)}` : ''}</p>
           {selected.account && selected.details && (
             <MemberAccountActions
               member={{
@@ -340,6 +364,7 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
           {selected.account && (selected.isExecutive || selected.account.about.show) && (
             <ExecutiveAboutSettings key={selected.id} userId={selected.id} about={selected.account.about} />
           )}
+          </>}
           </>
         )}
       </FullScreenModal>

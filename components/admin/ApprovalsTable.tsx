@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { setMemberApproval } from '@/app/actions/members'
+import { setMemberApproval, updatePendingApplicant } from '@/app/actions/members'
 import type { Role } from '@/lib/auth/types'
 
 export type ApprovalApplicant = {
@@ -15,7 +15,32 @@ export type ApprovalApplicant = {
   consentSummary: string | null
   hasPrincipalLink: boolean
   fields: [string, string | null | undefined][]
+  editable: ApplicantEditValues
 }
+
+export type ApplicantEditValues = {
+  fullName: string; phone: string; location: string; gender: 'MALE' | 'FEMALE' | 'OTHER' | 'PREFER_NOT_TO_SAY' | null
+  dateOfBirth: string | null; address: string; familyBranch: string
+  memberCategory: 'ORDINARY' | 'COMMITTEE_MEMBER' | 'ADMIN' | 'EXECUTIVE' | 'TREASURER' | 'SECRETARY' | 'ORGANIZER' | 'MEMBER' | null
+  nextOfKinName: string; nextOfKinPhone: string; nextOfKinRelationship: string
+  emergencyContactName: string; emergencyContactPhone: string; profession: string
+  educationLevel: 'PRIMARY' | 'SECONDARY' | 'CERTIFICATE' | 'DIPLOMA' | 'BACHELORS' | 'MASTERS' | 'DOCTORATE' | 'OTHER' | null
+  skills: string; achievements: string; mentorshipArea: string; interests: string
+}
+
+const editFields: { key: keyof ApplicantEditValues; label: string; options?: string[] }[] = [
+  { key: 'fullName', label: 'Full name' }, { key: 'phone', label: 'Phone' }, { key: 'location', label: 'Location' },
+  { key: 'gender', label: 'Gender', options: ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'] },
+  { key: 'dateOfBirth', label: 'Date of birth' }, { key: 'address', label: 'Address' }, { key: 'familyBranch', label: 'Family branch' },
+  { key: 'memberCategory', label: 'Member category', options: ['ORDINARY', 'COMMITTEE_MEMBER', 'ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] },
+  { key: 'nextOfKinName', label: 'Next of kin' }, { key: 'nextOfKinPhone', label: 'Next-of-kin phone' },
+  { key: 'nextOfKinRelationship', label: 'Next-of-kin relationship' },
+  { key: 'emergencyContactName', label: 'Emergency contact' }, { key: 'emergencyContactPhone', label: 'Emergency phone' },
+  { key: 'profession', label: 'Profession' },
+  { key: 'educationLevel', label: 'Education', options: ['PRIMARY', 'SECONDARY', 'CERTIFICATE', 'DIPLOMA', 'BACHELORS', 'MASTERS', 'DOCTORATE', 'OTHER'] },
+  { key: 'skills', label: 'Skills' }, { key: 'achievements', label: 'Achievements' },
+  { key: 'mentorshipArea', label: 'Mentorship area' }, { key: 'interests', label: 'Interests' },
+]
 
 type PrincipalOption = { id: string; fullName: string; membershipNumber: string | null }
 type RoleOption = { value: Role; label: string }
@@ -32,6 +57,9 @@ export default function ApprovalsTable({
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [editValues, setEditValues] = useState<ApplicantEditValues | null>(null)
+  const [saved, setSaved] = useState(false)
   const [confirmingReject, setConfirmingReject] = useState(false)
   const [linkingPrincipal, setLinkingPrincipal] = useState(false)
   const [principalId, setPrincipalId] = useState('')
@@ -57,6 +85,9 @@ export default function ApprovalsTable({
 
   const open = (id: string) => {
     setSelectedId(id)
+    setEditing(false)
+    setSaved(false)
+    setEditValues(applicants.find((applicant) => applicant.id === id)?.editable ?? null)
     setConfirmingReject(false)
     setLinkingPrincipal(false)
     setPrincipalId('')
@@ -66,10 +97,27 @@ export default function ApprovalsTable({
 
   const close = () => {
     setSelectedId(null)
+    setEditing(false)
     setConfirmingReject(false)
     setLinkingPrincipal(false)
     setPrincipalId('')
     setError('')
+  }
+
+  const saveEdits = () => {
+    if (!selected || !editValues) return
+    setError('')
+    setSaved(false)
+    startTransition(async () => {
+      try {
+        await updatePendingApplicant({ userId: selected.id, ...editValues })
+        setEditing(false)
+        setSaved(true)
+        router.refresh()
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Could not save applicant details')
+      }
+    })
   }
 
   const decide = (approve: boolean, link?: { principalMemberId: string; familyRelationship: typeof relationship }) => {
@@ -240,6 +288,36 @@ export default function ApprovalsTable({
                   {selected.consentSummary || 'No consent record'}
                 </p>
 
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" disabled={pending} onClick={() => { setEditing(!editing); setError(''); setSaved(false); setEditValues(selected.editable) }}
+                    className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-primary">
+                    {editing ? 'Cancel editing' : 'Edit details'}
+                  </button>
+                  {saved && <span className="text-sm text-primary">Details saved</span>}
+                </div>
+
+                {error && <p className="rounded-xl bg-error-container/40 px-3 py-2 text-sm text-error">{error}</p>}
+
+                {editing && editValues ? (
+                  <div className="space-y-3">
+                    <p className="text-xs text-on-surface-variant">Email is the login identifier and cannot be changed here.</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {editFields.map(({ key, label, options }) => (
+                        <label key={key} className="block text-xs font-semibold text-on-surface-variant">{label}
+                          {options ? <select value={editValues[key] ?? ''} onChange={(event) => setEditValues({ ...editValues, [key]: event.target.value || null })}
+                            className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-normal text-on-surface">
+                            <option value="">Not provided</option>
+                            {options.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
+                          </select> : <input type={key === 'dateOfBirth' ? 'date' : 'text'} value={editValues[key] ?? ''}
+                            onChange={(event) => setEditValues({ ...editValues, [key]: event.target.value || (key === 'dateOfBirth' ? null : '') })}
+                            className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-normal text-on-surface" />}
+                        </label>
+                      ))}
+                    </div>
+                    <button type="button" disabled={pending} onClick={saveEdits} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50">{pending ? 'Saving…' : 'Save details'}</button>
+                  </div>
+                ) : <>
+
                 {selected.fields.length > 0 && (
                   <dl className="grid gap-3 text-sm sm:grid-cols-2">
                     {selected.fields.map(([title, value]) => (
@@ -255,7 +333,9 @@ export default function ApprovalsTable({
                   </dl>
                 )}
 
-                <section className="pt-1 border-t border-outline-variant space-y-3">
+                </>}
+
+                {!editing && <section className="pt-1 border-t border-outline-variant space-y-3">
                   {error && (
                     <p className="text-sm text-error text-center bg-error-container/40 rounded-xl py-2 px-3">
                       {error}
@@ -282,7 +362,7 @@ export default function ApprovalsTable({
                   {confirmingReject ? (
                     <div className="rounded-xl border border-error/40 bg-error-container/30 p-3 space-y-2">
                       <p className="text-sm text-error font-medium">
-                        This permanently deletes the application, profile, and login account. Continue?
+                        Reject this application and remove its login access? A minimal record is retained for audit and family history.
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -291,7 +371,7 @@ export default function ApprovalsTable({
                           onClick={() => decide(false)}
                           className="rounded-lg bg-error px-4 py-2 text-sm text-on-error disabled:opacity-50"
                         >
-                          {pending ? 'Deleting…' : 'Yes, reject and delete'}
+                          {pending ? 'Rejecting…' : 'Yes, reject application'}
                         </button>
                         <button
                           type="button"
@@ -343,7 +423,7 @@ export default function ApprovalsTable({
                       </button>
                     </div>
                   )}
-                </section>
+                </section>}
               </div>
             </div>
           </div>,
