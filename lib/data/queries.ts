@@ -213,7 +213,8 @@ export const getOrganizerEvents = unstable_cache(
       orderBy: { startsAt: 'asc' },
       select: {
         id: true, title: true, startsAt: true, location: true, mapsUrl: true,
-        description: true, imageUrl: true, isPublic: true,
+        description: true, imageUrl: true, isPublic: true, capacity: true,
+        reminderOffsetsHours: true,
       },
     })
     const now = new Date()
@@ -225,6 +226,8 @@ export const getOrganizerEvents = unstable_cache(
       description: e.description ?? null,
       imageUrl: e.imageUrl ?? null,
       isPublic: e.isPublic ?? true,
+      capacity: e.capacity,
+      reminderOffsetsHours: e.reminderOffsetsHours,
       startsAt: e.startsAt.toISOString(),
     }))
     return {

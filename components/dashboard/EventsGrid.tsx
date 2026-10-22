@@ -11,6 +11,8 @@ export type EventRow = {
   startsAt: string
   imageUrl?: string | null
   isPublic?: boolean
+  capacity?: number | null
+  reminderOffsetsHours?: number[]
 }
 
 type Props = {
@@ -22,6 +24,7 @@ type Props = {
   onToggleSelect?: (id: string) => void
   onDelete?: (id: string) => void
   onViewDetails?: (event: EventRow) => void
+  onEdit?: (event: EventRow) => void
   manageHref?: (id: string) => string
 }
 
@@ -34,6 +37,7 @@ export default function EventsGrid({
   onToggleSelect,
   onDelete,
   onViewDetails,
+  onEdit,
   manageHref,
 }: Props) {
   if (events.length === 0) {
@@ -53,6 +57,7 @@ export default function EventsGrid({
           onDelete={onDelete ? () => onDelete(e.id) : undefined}
           manageHref={manageHref?.(e.id)}
           onViewDetails={onViewDetails ? () => onViewDetails(e) : undefined}
+          onEdit={onEdit ? () => onEdit(e) : undefined}
         />
       ))}
     </div>
@@ -67,6 +72,7 @@ function EventCard({
   onToggleSelect,
   onDelete,
   onViewDetails,
+  onEdit,
   manageHref,
 }: {
   event: EventRow
@@ -76,6 +82,7 @@ function EventCard({
   onToggleSelect?: () => void
   onDelete?: () => void
   onViewDetails?: () => void
+  onEdit?: () => void
   manageHref?: string
 }) {
   const [showPopover, setShowPopover] = useState(false)
@@ -224,6 +231,16 @@ function EventCard({
           >
             View details
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+          </button>
+        )}
+        {onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-primary hover:gap-2 transition-all"
+          >
+            Edit event
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
           </button>
         )}
         {manageHref && (

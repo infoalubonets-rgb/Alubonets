@@ -70,8 +70,11 @@ export async function upsertEventDetails(formData: FormData) {
   // An event may not be scheduled in the past. An event that has already happened
   // stays editable, so only a *changed* date has to clear the bound.
   const existing = data.id ? await prisma.event.findUnique({ where: { id: data.id }, select: { startsAt: true, rsvpDeadlineAt: true } }) : null
-  if (data.startsAt.getTime() !== existing?.startsAt.getTime()) assertNotPast(data.startsAt, 'Event date')
-  if (data.rsvpDeadlineAt && data.rsvpDeadlineAt.getTime() !== existing?.rsvpDeadlineAt?.getTime()) assertNotPast(data.rsvpDeadlineAt, 'RSVP deadline')
+  const sameMinute = (left: Date, right: Date) => left.toISOString().slice(0, 16) === right.toISOString().slice(0, 16)
+  const unchangedStart = !!existing && sameMinute(data.startsAt, existing.startsAt)
+  const unchangedDeadline = !!data.rsvpDeadlineAt && !!existing?.rsvpDeadlineAt && sameMinute(data.rsvpDeadlineAt, existing.rsvpDeadlineAt)
+  if (!unchangedStart) assertNotPast(data.startsAt, 'Event date')
+  if (data.rsvpDeadlineAt && !unchangedDeadline) assertNotPast(data.rsvpDeadlineAt, 'RSVP deadline')
   if (data.audienceType === 'BRANCH_MEMBERS' && !data.audiencePrincipalId) {
     throw new Error('Select a Principal Member for branch audience events.')
   }
@@ -85,7 +88,7 @@ export async function upsertEventDetails(formData: FormData) {
     description: data.description ?? null,
     location: data.location ?? null,
     mapsUrl: data.mapsUrl ?? null,
-    startsAt: data.startsAt,
+    startsAt: unchangedStart ? existing!.startsAt : data.startsAt,
     endsAt: data.endsAt ?? null,
     imageUrl: data.imageUrl ?? null,
     isPublic: data.audienceType === 'PUBLIC' || data.isPublic !== 'off',
@@ -93,7 +96,7 @@ export async function upsertEventDetails(formData: FormData) {
     audiencePrincipalId: data.audienceType === 'BRANCH_MEMBERS' ? data.audiencePrincipalId ?? null : null,
     audienceRoles,
     capacity: data.capacity ?? null,
-    rsvpDeadlineAt: data.rsvpDeadlineAt ?? null,
+    rsvpDeadlineAt: unchangedDeadline ? existing!.rsvpDeadlineAt : data.rsvpDeadlineAt ?? null,
     budgetKes: data.budgetKes ?? 0,
     actualCostKes: data.actualCostKes ?? 0,
     reminderOffsetsHours: offsets,

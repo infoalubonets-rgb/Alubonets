@@ -101,6 +101,7 @@ function clearDraft() {
 type OptimisticEvent = {
   id: string; title: string; description?: string | null
   location?: string | null; mapsUrl?: string | null; startsAt: string; imageUrl?: string | null; isPublic?: boolean
+  capacity?: number | null; reminderOffsetsHours?: number[]
 }
 
 export default function CreateEventForm({
@@ -122,8 +123,8 @@ export default function CreateEventForm({
   const [description, setDescription] = useState(initial?.description ?? '')
   const [isPublic, setIsPublic]       = useState(initial?.isPublic !== false)
   const [sendEmail, setSendEmail]     = useState(true)
-  const [capacity, setCapacity]       = useState('')
-  const [reminders, setReminders]     = useState('24,2')
+  const [capacity, setCapacity]       = useState(initial?.capacity?.toString() ?? '')
+  const [reminders, setReminders]     = useState(initial?.reminderOffsetsHours?.join(',') || '24,2')
   const [emailAudience, setEmailAudience] = useState<'ALL' | 'SELECTED'>('ALL')
   const [selectedEmailMembers, setSelectedEmailMembers] = useState<Set<string>>(new Set())
   const [memberModalOpen, setMemberModalOpen] = useState(false)
@@ -236,7 +237,8 @@ export default function CreateEventForm({
 
     const fd = new FormData()
     fd.set('title', title)
-    fd.set('startsAt', startsAt)
+    const unchangedStart = isEditing && initial?.startsAt && startsAt === toDateTimeLocal(initial.startsAt)
+    fd.set('startsAt', unchangedStart ? initial.startsAt : startsAt)
     fd.set('location', location)
     fd.set('mapsUrl', mapsUrl)
     fd.set('description', description)
@@ -253,9 +255,11 @@ export default function CreateEventForm({
         description: description || null,
         location: location || null,
         mapsUrl: mapsUrl || null,
-        startsAt: new Date(startsAt).toISOString(),
+        startsAt: unchangedStart ? initial!.startsAt : new Date(startsAt).toISOString(),
         imageUrl: effectiveUrl || null,
         isPublic,
+        capacity: capacity.trim() ? Number(capacity) : null,
+        reminderOffsetsHours: reminders.split(',').map((value) => Number(value.trim())).filter((value) => Number.isFinite(value) && value > 0),
       })
       actionUpdateEvent(initial!.id, fd).catch(console.error)
       return

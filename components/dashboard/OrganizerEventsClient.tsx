@@ -200,6 +200,7 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
           onToggleSelect={toggleSelect}
           onDelete={handleDelete}
           onViewDetails={setDetail}
+          onEdit={(event) => setEditing(event)}
           manageHref={(id) => `/dashboard/organizer/events/${id}`}
         />
       </section>
@@ -231,6 +232,7 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
             onToggleSelect={toggleSelect}
             onDelete={handleDelete}
             onViewDetails={setDetail}
+            onEdit={(event) => setEditing(event)}
             manageHref={(id) => `/dashboard/organizer/events/${id}`}
           />
         </section>
