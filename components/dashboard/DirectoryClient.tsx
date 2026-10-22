@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { deleteMembers } from '@/app/actions/members'
+import { deleteMembers, updateMemberDetails } from '@/app/actions/members'
 import FullScreenModal from '@/components/ui/FullScreenModal'
 import MemberAccountActions from '@/components/admin/MemberAccountActions'
 import MemberFamilyActions from '@/components/admin/MemberFamilyActions'
@@ -10,6 +10,7 @@ import ExecutiveAboutSettings from '@/components/admin/ExecutiveAboutSettings'
 import { ROLE_LABEL, type Role } from '@/lib/auth/types'
 import type { DirectoryMember } from '@/lib/directory'
 import { matchesDirectoryFilters, memberType, type DirectoryFilterValues } from '@/lib/directory-filters'
+import { memberEditFields, type MemberEditValues } from '@/lib/member-edit-fields'
 
 const title = (value: string) => value.charAt(0) + value.slice(1).toLowerCase().replaceAll('_', ' ')
 
@@ -44,6 +45,23 @@ function DetailRow({ label, value }: { label: string; value: string | number | n
   )
 }
 
+function memberEditValues(member: DirectoryMember): MemberEditValues {
+  const privateProfile = member.account?.privateProfile
+  return {
+    fullName: member.fullName, phone: member.contact?.phone ?? '', location: member.location ?? '',
+    gender: (member.details?.gender ?? null) as MemberEditValues['gender'],
+    dateOfBirth: privateProfile?.dateOfBirth ?? null, address: privateProfile?.address ?? '',
+    familyBranch: member.details?.familyBranch ?? '',
+    memberCategory: (member.details?.memberCategory ?? null) as MemberEditValues['memberCategory'],
+    nextOfKinName: privateProfile?.nextOfKinName ?? '', nextOfKinPhone: privateProfile?.nextOfKinPhone ?? '',
+    nextOfKinRelationship: privateProfile?.nextOfKinRelationship ?? '',
+    emergencyContactName: privateProfile?.emergencyContactName ?? '', emergencyContactPhone: privateProfile?.emergencyContactPhone ?? '',
+    profession: member.profession ?? '', educationLevel: (member.details?.educationLevel ?? null) as MemberEditValues['educationLevel'],
+    skills: member.skills ?? '', achievements: privateProfile?.achievements ?? '',
+    mentorshipArea: member.details?.mentorshipArea ?? '', interests: member.details?.interests ?? '',
+  }
+}
+
 type Props = {
   members: DirectoryMember[]
   initialQuery?: string
@@ -56,6 +74,11 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
   // Keep the id, not the row, so the pop-up shows fresh data after an admin action refreshes the page.
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [modalView, setModalView] = useState<'actions' | 'details'>('actions')
+  const [editingDetails, setEditingDetails] = useState(false)
+  const [editValues, setEditValues] = useState<MemberEditValues | null>(null)
+  const [editError, setEditError] = useState('')
+  const [editSaved, setEditSaved] = useState(false)
+  const [savingDetails, startSavingDetails] = useTransition()
   const selected = members.find((member) => member.id === selectedId) ?? null
   const showDetails = members.some((member) => member.details)
   const isAdmin = members.some((member) => member.account)
@@ -106,6 +129,21 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
       setPicked(new Set())
       router.refresh()
     })
+
+  const saveDetails = () => {
+    if (!selected || !editValues) return
+    setEditError('')
+    startSavingDetails(async () => {
+      try {
+        await updateMemberDetails({ userId: selected.id, ...editValues })
+        setEditingDetails(false)
+        setEditSaved(true)
+        router.refresh()
+      } catch (error) {
+        setEditError(error instanceof Error ? error.message : 'Could not save member details')
+      }
+    })
+  }
 
   const stats = [
     { label: 'Members', value: members.length },
@@ -260,7 +298,7 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
                       <td className="px-4 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() => { setSelectedId(member.id); setModalView(isAdmin ? 'actions' : 'details') }}
+                          onClick={() => { setSelectedId(member.id); setModalView(isAdmin ? 'actions' : 'details'); setEditingDetails(false); setEditValues(null); setEditError(''); setEditSaved(false) }}
                           aria-label={`View ${member.fullName}`}
                           title="View details"
                           className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition hover:bg-primary/10"
@@ -290,14 +328,41 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
           <>
           <div className="mb-4 flex gap-2 border-b border-outline-variant pb-3">
             {(selected.account ? ['actions', 'details'] as const : ['details'] as const).map((view) => (
-              <button key={view} type="button" onClick={() => setModalView(view)}
+              <button key={view} type="button" onClick={() => { setModalView(view); setEditingDetails(false); setEditError('') }}
                 aria-pressed={modalView === view}
                 className={`rounded-lg px-4 py-2 text-sm font-semibold ${modalView === view ? 'bg-primary text-on-primary' : 'border border-outline-variant text-primary'}`}>
                 {view === 'actions' ? 'Manage' : 'Details'}
               </button>
             ))}
           </div>
-          {modalView === 'details' ? (
+          {modalView === 'details' ? <>
+          {selected.account && <div className="mb-4 flex items-center gap-2">
+            <button type="button" disabled={savingDetails} onClick={() => { setEditingDetails(!editingDetails); setEditValues(memberEditValues(selected)); setEditError(''); setEditSaved(false) }}
+              className="rounded-lg border border-outline-variant px-4 py-2 text-sm font-semibold text-primary">
+              {editingDetails ? 'Cancel editing' : 'Edit member details'}
+            </button>
+            {editSaved && <span className="text-sm text-primary">Details saved</span>}
+          </div>}
+          {editError && <p className="mb-3 rounded-lg bg-error-container/40 px-3 py-2 text-sm text-error">{editError}</p>}
+          {editingDetails && editValues ? <div className="space-y-4">
+            <p className="text-xs text-on-surface-variant">Email, membership number, role, status, and family links are managed separately.</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {memberEditFields.map(({ key, label, options }) => (
+                <label key={key} className="block text-xs font-semibold text-on-surface-variant">{label}
+                  {options ? <select value={editValues[key] ?? ''} onChange={(event) => setEditValues({ ...editValues, [key]: event.target.value || null })}
+                    className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-normal text-on-surface">
+                    <option value="">Not provided</option>
+                    {options.map((option) => <option key={option} value={option}>{option.replaceAll('_', ' ')}</option>)}
+                  </select> : <input type={key === 'dateOfBirth' ? 'date' : 'text'} value={editValues[key] ?? ''}
+                    onChange={(event) => setEditValues({ ...editValues, [key]: event.target.value || (key === 'dateOfBirth' ? null : '') })}
+                    className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-normal text-on-surface" />}
+                </label>
+              ))}
+            </div>
+            <button type="button" disabled={savingDetails} onClick={saveDetails} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary disabled:opacity-50">
+              {savingDetails ? 'Saving…' : 'Save changes'}
+            </button>
+          </div> :
           <dl>
             <DetailRow label="Membership number" value={selected.details?.membershipNumber} />
             <DetailRow label="Role" value={roleLabel(selected)} />
@@ -330,8 +395,8 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
               <DetailRow label="Emergency phone" value={selected.account.privateProfile.emergencyContactPhone} />
               <DetailRow label="Achievements" value={selected.account.privateProfile.achievements} />
             </>}
-          </dl>
-          ) : <>
+          </dl>}
+          </> : <>
           <p className="mb-3 text-sm text-on-surface-variant">{roleLabel(selected)} · {memberType(selected)}{selected.account ? ` · ${title(selected.account.status)}` : ''}</p>
           {selected.account && selected.details && (
             <MemberAccountActions

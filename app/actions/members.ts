@@ -19,6 +19,7 @@ import { canRemoveSuperAdmin, grantMap } from '@/lib/super-admin'
 import { deleteOneMember } from '@/lib/member-deletion'
 import { REVIEWABLE_APPLICANTS } from '@/lib/applicants'
 import { EDUCATION_LEVELS, GENDERS } from '@/lib/membership'
+import { isDeletedMemberEmail } from '@/lib/deleted-member'
 
 const applicantEditSchema = z.object({
   userId: z.string().min(1),
@@ -62,6 +63,28 @@ export async function updatePendingApplicant(input: z.input<typeof applicantEdit
   await syncUserMetadata(updated)
   revalidatePath('/admin/approvals')
   revalidatePath('/directory')
+}
+
+export async function updateMemberDetails(input: z.input<typeof applicantEditSchema>) {
+  const actor = await requireAdmin()
+  const { userId, fullName, phone, location, dateOfBirth, ...profile } = applicantEditSchema.parse(input)
+  const birthDate = dateOfBirth ? new Date(`${dateOfBirth}T00:00:00.000Z`) : null
+  if (dateOfBirth && (Number.isNaN(birthDate?.getTime()) || birthDate?.toISOString().slice(0, 10) !== dateOfBirth || birthDate >= new Date())) {
+    throw new Error('Enter a valid past date of birth.')
+  }
+  const nullableProfile = Object.fromEntries(Object.entries(profile).map(([key, value]) => [key, typeof value === 'string' ? value || null : value])) as typeof profile
+  const updated = await prisma.$transaction(async (tx) => {
+    const before = await tx.user.findUnique({ where: { id: userId } })
+    if (!before || isDeletedMemberEmail(before.email)) throw new Error('Member not found.')
+    const user = await tx.user.update({ where: { id: userId }, data: { fullName, phone: phone || null, location: location || null } })
+    await tx.memberProfile.upsert({ where: { userId }, create: { userId, ...nullableProfile, dateOfBirth: birthDate }, update: { ...nullableProfile, dateOfBirth: birthDate } })
+    await tx.auditLog.create({ data: { userId: actor.id, actorRole: actor.role, actorSecondaryRoles: actor.dashboardAccess, action: 'MEMBER_DETAILS_ADMIN_UPDATE', entity: 'User', entityId: userId, meta: { changedFields: Object.keys(input).filter((key) => key !== 'userId') } } })
+    return user
+  })
+  await syncUserMetadata(updated)
+  revalidatePath('/directory')
+  revalidatePath('/profile')
+  revalidatePath('/admin/approvals')
 }
 
 const approveSchema = z.object({

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { setMemberApproval, updatePendingApplicant } from '@/app/actions/members'
 import type { Role } from '@/lib/auth/types'
+import { memberEditFields, type MemberEditValues } from '@/lib/member-edit-fields'
 
 export type ApprovalApplicant = {
   id: string
@@ -15,32 +16,8 @@ export type ApprovalApplicant = {
   consentSummary: string | null
   hasPrincipalLink: boolean
   fields: [string, string | null | undefined][]
-  editable: ApplicantEditValues
+  editable: MemberEditValues
 }
-
-export type ApplicantEditValues = {
-  fullName: string; phone: string; location: string; gender: 'MALE' | 'FEMALE' | 'OTHER' | 'PREFER_NOT_TO_SAY' | null
-  dateOfBirth: string | null; address: string; familyBranch: string
-  memberCategory: 'ORDINARY' | 'COMMITTEE_MEMBER' | 'ADMIN' | 'EXECUTIVE' | 'TREASURER' | 'SECRETARY' | 'ORGANIZER' | 'MEMBER' | null
-  nextOfKinName: string; nextOfKinPhone: string; nextOfKinRelationship: string
-  emergencyContactName: string; emergencyContactPhone: string; profession: string
-  educationLevel: 'PRIMARY' | 'SECONDARY' | 'CERTIFICATE' | 'DIPLOMA' | 'BACHELORS' | 'MASTERS' | 'DOCTORATE' | 'OTHER' | null
-  skills: string; achievements: string; mentorshipArea: string; interests: string
-}
-
-const editFields: { key: keyof ApplicantEditValues; label: string; options?: string[] }[] = [
-  { key: 'fullName', label: 'Full name' }, { key: 'phone', label: 'Phone' }, { key: 'location', label: 'Location' },
-  { key: 'gender', label: 'Gender', options: ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'] },
-  { key: 'dateOfBirth', label: 'Date of birth' }, { key: 'address', label: 'Address' }, { key: 'familyBranch', label: 'Family branch' },
-  { key: 'memberCategory', label: 'Member category', options: ['ORDINARY', 'COMMITTEE_MEMBER', 'ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] },
-  { key: 'nextOfKinName', label: 'Next of kin' }, { key: 'nextOfKinPhone', label: 'Next-of-kin phone' },
-  { key: 'nextOfKinRelationship', label: 'Next-of-kin relationship' },
-  { key: 'emergencyContactName', label: 'Emergency contact' }, { key: 'emergencyContactPhone', label: 'Emergency phone' },
-  { key: 'profession', label: 'Profession' },
-  { key: 'educationLevel', label: 'Education', options: ['PRIMARY', 'SECONDARY', 'CERTIFICATE', 'DIPLOMA', 'BACHELORS', 'MASTERS', 'DOCTORATE', 'OTHER'] },
-  { key: 'skills', label: 'Skills' }, { key: 'achievements', label: 'Achievements' },
-  { key: 'mentorshipArea', label: 'Mentorship area' }, { key: 'interests', label: 'Interests' },
-]
 
 type PrincipalOption = { id: string; fullName: string; membershipNumber: string | null }
 type RoleOption = { value: Role; label: string }
@@ -58,7 +35,7 @@ export default function ApprovalsTable({
   const [mounted, setMounted] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  const [editValues, setEditValues] = useState<ApplicantEditValues | null>(null)
+  const [editValues, setEditValues] = useState<MemberEditValues | null>(null)
   const [saved, setSaved] = useState(false)
   const [confirmingReject, setConfirmingReject] = useState(false)
   const [linkingPrincipal, setLinkingPrincipal] = useState(false)
@@ -302,7 +279,7 @@ export default function ApprovalsTable({
                   <div className="space-y-3">
                     <p className="text-xs text-on-surface-variant">Email is the login identifier and cannot be changed here.</p>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {editFields.map(({ key, label, options }) => (
+                      {memberEditFields.map(({ key, label, options }) => (
                         <label key={key} className="block text-xs font-semibold text-on-surface-variant">{label}
                           {options ? <select value={editValues[key] ?? ''} onChange={(event) => setEditValues({ ...editValues, [key]: event.target.value || null })}
                             className="mt-1 w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-normal text-on-surface">
