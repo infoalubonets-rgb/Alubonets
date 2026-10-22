@@ -324,6 +324,9 @@ export default function DirectoryClient({ members, initialQuery = '' }: Props) {
           {selected.account && (
             <MemberFamilyActions
               key={`family-${selected.id}`}
+              principals={members
+                .filter((member) => member.isPrincipal && member.account?.status === 'ACTIVE')
+                .map((member) => ({ id: member.id, fullName: member.fullName }))}
               member={{
                 id: selected.id,
                 fullName: selected.fullName,
