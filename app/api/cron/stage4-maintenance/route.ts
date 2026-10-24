@@ -9,6 +9,7 @@ import { syncMembershipStanding } from '@/lib/membership-standing-sync'
 import { syncProjectStatuses } from '@/lib/project-status'
 import { revalidateTag } from 'next/cache'
 import { TAGS } from '@/lib/data/queries'
+import { withDatabaseRetry } from '@/lib/database-retry'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,20 +35,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const [expiredDocuments, overdueActionPoints, eventReminders, scheduledAnnouncements, emailRetries, membershipStanding, projectStatuses] =
-    await Promise.all([
-      syncExpiredDocuments(),
-      syncOverdueActionPoints(),
-      processEventReminders(),
-      processScheduledAnnouncements(),
-      retryFailedAnnouncementEmailsBatch(),
-      syncMembershipStanding().catch((error) => ({ error: String(error) })),
-      syncProjectStatuses().catch((error) => ({ error: String(error) })),
-    ])
+  // The production function has a small Prisma pool. Launching seven database-heavy
+  // sweeps together can exhaust it; run them in order and retry transient pool errors.
+  const failures: string[] = []
+  async function runTask<T>(name: string, task: () => Promise<T>, retry = false): Promise<T | { error: string }> {
+    try {
+      // Retry only sweeps whose writes are idempotent. Email jobs can have sent
+      // a message before a later database failure and must not be replayed here.
+      return retry ? await withDatabaseRetry(task, { attempts: 3, delaysMs: [250, 1000] }) : await task()
+    } catch (error) {
+      console.error(`Cron task ${name} failed`, error)
+      failures.push(name)
+      return { error: 'Task failed' }
+    }
+  }
+
+  const expiredDocuments = await runTask('expiredDocuments', syncExpiredDocuments, true)
+  const overdueActionPoints = await runTask('overdueActionPoints', syncOverdueActionPoints, true)
+  const eventReminders = await runTask('eventReminders', processEventReminders)
+  const scheduledAnnouncements = await runTask('scheduledAnnouncements', processScheduledAnnouncements)
+  const emailRetries = await runTask('emailRetries', retryFailedAnnouncementEmailsBatch)
+  const membershipStanding = await runTask('membershipStanding', syncMembershipStanding, true)
+  const projectStatuses = await runTask('projectStatuses', syncProjectStatuses, true)
   if (!('error' in projectStatuses) && projectStatuses.updated > 0) revalidateTag(TAGS.projects)
 
   return NextResponse.json({
-    ok: true,
+    ok: failures.length === 0,
+    failures,
     expiredDocuments,
     overdueActionPoints,
     eventReminders,
@@ -56,5 +70,5 @@ export async function GET(req: NextRequest) {
     membershipStanding,
     projectStatuses,
     at: new Date().toISOString(),
-  })
+  }, { status: failures.length ? 500 : 200 })
 }

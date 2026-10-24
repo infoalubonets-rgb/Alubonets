@@ -4,6 +4,7 @@ import { isTransientDatabaseError, withDatabaseRetry } from '@/lib/database-retr
 describe('database retry', () => {
   it('recognizes transient Prisma connection failures', () => {
     expect(isTransientDatabaseError(Object.assign(new Error("Can't reach database server"), { code: 'P1001' }))).toBe(true)
+    expect(isTransientDatabaseError(Object.assign(new Error('Timed out fetching a new connection from the connection pool'), { code: 'P2024' }))).toBe(true)
     expect(isTransientDatabaseError(Object.assign(new Error('Bad query'), { code: 'P2002' }))).toBe(false)
   })
 

@@ -1,11 +1,11 @@
-const TRANSIENT_DATABASE_CODES = new Set(['P1001', 'P1002', 'P1017'])
+const TRANSIENT_DATABASE_CODES = new Set(['P1001', 'P1002', 'P1017', 'P2024'])
 
 export function isTransientDatabaseError(error: unknown) {
   if (!error || typeof error !== 'object') return false
   const code = 'code' in error ? String(error.code) : ''
   if (TRANSIENT_DATABASE_CODES.has(code)) return true
   const message = error instanceof Error ? error.message : String(error)
-  return /can(?:not|'t) reach database server|server has closed the connection|connection (?:timed out|terminated)/i.test(message)
+  return /can(?:not|'t) reach database server|server has closed the connection|connection (?:timed out|terminated)|timed out fetching a new connection/i.test(message)
 }
 
 export async function withDatabaseRetry<T>(
