@@ -188,7 +188,7 @@ ${ctaBlock}`)
   if (!resend) {
     await prisma.emailLog.create({
       data: {
-        userId: actorId ?? '',
+        userId: actorId ?? null,
         toEmail: 'BROADCAST',
         subject,
         template,
@@ -271,7 +271,7 @@ ${ctaBlock}`)
 
   await prisma.emailLog.create({
     data: {
-      userId: actorId ?? '',
+      userId: actorId ?? null,
       toEmail: 'BROADCAST',
       subject,
       template,
@@ -315,7 +315,7 @@ export async function sendDirectEmails({
   if (!resend) {
     await prisma.emailLog.create({
       data: {
-        userId: actorId ?? '',
+        userId: actorId ?? null,
         toEmail: 'DIRECT',
         subject,
         template,
@@ -354,7 +354,7 @@ ${ctaBlock}`)
 
   await prisma.emailLog.create({
     data: {
-      userId: actorId ?? '',
+      userId: actorId ?? null,
       toEmail: 'DIRECT',
       subject,
       template,
