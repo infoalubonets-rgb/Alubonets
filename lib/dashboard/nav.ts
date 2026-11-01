@@ -48,7 +48,7 @@ export const ADMIN_NAV: NavItem[] = [
   finance('/admin/finance', [{ ...CONTRIBUTIONS_NAV, label: 'Contributions' }]),
   projectsAndEvents('/dashboard/executive/projects', [
     EVENTS_VIEW_NAV,
-    { icon: 'photo_library', label: 'Gallery queue', href: '/admin/gallery-queue' },
+    { icon: 'photo_library', label: 'Gallery', href: '/admin/gallery-queue' },
   ]),
   meetings(),
   communications('/admin/announcements'),

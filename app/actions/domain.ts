@@ -25,6 +25,7 @@ import { sendBroadcastEmail, sendContributionReceiptEmail } from '@/lib/email/re
 import { finishAnnouncementEmailProgress, recordAnnouncementEmailProgress } from '@/lib/email-sends'
 import { writeAudit } from '@/lib/audit'
 import { assertNotPast } from '@/lib/dates'
+import { eventDeleteSnapshot } from '@/lib/events-list'
 
 export async function actionCreateContribution(formData: FormData) {
   void formData
@@ -303,16 +304,36 @@ const EVENT_PATHS = [
 ]
 
 export async function actionDeleteEvent(id: string) {
-  await requireActiveRole(['ORGANIZER', 'ADMIN', 'SECRETARY'])
+  const actor = await requireActiveRole(['ORGANIZER', 'ADMIN', 'SECRETARY'])
+  const existing = await prisma.event.findUnique({ where: { id } })
   await deleteEvent(id)
+  if (existing) {
+    await writeAudit({
+      userId: actor.id,
+      action: 'EVENT_DELETE',
+      entity: 'Event',
+      entityId: id,
+      oldValue: eventDeleteSnapshot(existing),
+    })
+  }
   EVENT_PATHS.forEach((p) => revalidatePath(p))
   revalidateTag(TAGS.events)
 }
 
 export async function actionDeleteEvents(ids: string[]) {
-  await requireActiveRole(['ORGANIZER', 'ADMIN', 'SECRETARY'])
+  const actor = await requireActiveRole(['ORGANIZER', 'ADMIN', 'SECRETARY'])
   if (!ids.length) return
+  const existing = await prisma.event.findMany({ where: { id: { in: ids } } })
   await deleteEvents(ids)
+  for (const event of existing) {
+    await writeAudit({
+      userId: actor.id,
+      action: 'EVENT_DELETE',
+      entity: 'Event',
+      entityId: event.id,
+      oldValue: eventDeleteSnapshot(event),
+    })
+  }
   EVENT_PATHS.forEach((p) => revalidatePath(p))
   revalidateTag(TAGS.events)
 }
@@ -380,6 +401,7 @@ export async function actionCreateGallery(formData: FormData) {
   revalidatePath('/dashboard/organizer')
   revalidatePath('/dashboard/organizer/gallery')
   revalidatePath('/admin')
+  revalidatePath('/admin/gallery-queue')
   revalidatePath('/gallery')
   revalidateTag(TAGS.gallery)
 }

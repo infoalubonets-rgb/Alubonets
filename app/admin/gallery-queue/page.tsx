@@ -3,26 +3,28 @@ import { ADMIN_NAV } from '@/lib/dashboard/nav'
 import { actionApproveGallery } from '@/app/actions/domain'
 import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth/session'
+import { getOrganizerGalleryPhotos } from '@/lib/data/queries'
+import AddGalleryPhotoButton from '@/components/dashboard/AddGalleryPhotoButton'
+import OrganizerGalleryClient from '@/components/dashboard/OrganizerGalleryClient'
 
-export default async function AdminGalleryQueuePage() {
+export default async function AdminGalleryPage() {
   await requireAdmin()
-  const queue = await prisma.galleryPhoto.findMany({
-    where: { isPublic: false },
-    orderBy: { uploadedAt: 'desc' },
-    include: { uploader: { select: { fullName: true, email: true } } },
-  })
+  const [queue, photos] = await Promise.all([
+    prisma.galleryPhoto.findMany({
+      where: { isPublic: false },
+      orderBy: { uploadedAt: 'desc' },
+      include: { uploader: { select: { fullName: true, email: true } } },
+    }),
+    getOrganizerGalleryPhotos(),
+  ])
 
   return (
-    <DashboardShell role="ADMIN" title="Gallery queue" nav={ADMIN_NAV}>
-      <div className="space-y-4 p-4 md:p-6">
+    <DashboardShell role="ADMIN" title="Gallery" nav={ADMIN_NAV} pageAction={<AddGalleryPhotoButton />}>
+      {queue.length > 0 && (
+      <div className="space-y-4 p-4 pb-0 md:p-6 md:pb-0">
         <p className="text-sm text-on-surface-variant">
-          Approve photos to publish them on the public gallery.
+          {queue.length} photo{queue.length !== 1 ? 's' : ''} waiting — publish them to show on the public gallery.
         </p>
-        {queue.length === 0 && (
-          <p className="text-sm text-on-surface-variant rounded-xl border p-4 bg-surface">
-            No pending photos.
-          </p>
-        )}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {queue.map((g) => (
             <figure key={g.id} className="border rounded-xl overflow-hidden bg-surface">
@@ -44,6 +46,8 @@ export default async function AdminGalleryQueuePage() {
           ))}
         </div>
       </div>
+      )}
+      <OrganizerGalleryClient photos={photos} showAddButton={false} />
     </DashboardShell>
   )
 }

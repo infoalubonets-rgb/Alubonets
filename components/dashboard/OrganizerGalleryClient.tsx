@@ -4,15 +4,18 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { actionDeleteGalleryPhoto, actionDeleteGalleryPhotos, actionUpdateGalleryPhoto } from '@/app/actions/domain'
 import GalleryGrid, { GalleryPhotoRow } from './GalleryGrid'
-import CreateGalleryForm from './CreateGalleryForm'
+import AddGalleryPhotoButton, { GALLERY_PHOTO_ADDED } from './AddGalleryPhotoButton'
 import { GALLERY_FULL_SIZES, gallerySrcSet } from '@/lib/gallery-image'
 
-type Props = { photos: GalleryPhotoRow[] }
+type Props = {
+  photos: GalleryPhotoRow[]
+  /** Off when the page already shows an Add photo button in its header. */
+  showAddButton?: boolean
+}
 
-export default function OrganizerGalleryClient({ photos }: Props) {
+export default function OrganizerGalleryClient({ photos, showAddButton = true }: Props) {
   const [localPhotos, setLocalPhotos] = useState(photos)
   const [selected, setSelected]       = useState<Set<string>>(new Set())
-  const [open, setOpen]               = useState(false)
   const [detail, setDetail]           = useState<GalleryPhotoRow | null>(null)
   const [editMode, setEditMode]         = useState(false)
   const [editCaption, setEditCaption]   = useState('')
@@ -42,11 +45,15 @@ export default function OrganizerGalleryClient({ photos }: Props) {
     actionDeleteGalleryPhotos(ids).catch(console.error)
   }
 
-  /* ── optimistic add ── */
-  function handleOptimisticAdd(photo: GalleryPhotoRow) {
-    setLocalPhotos((prev) => [photo, ...prev])
-    setOpen(false)
-  }
+  /* ── optimistic add (from any Add photo button on the page) ── */
+  useEffect(() => {
+    const onAdded = (e: Event) => {
+      const photo = (e as CustomEvent<GalleryPhotoRow>).detail
+      setLocalPhotos((prev) => [photo, ...prev])
+    }
+    window.addEventListener(GALLERY_PHOTO_ADDED, onAdded)
+    return () => window.removeEventListener(GALLERY_PHOTO_ADDED, onAdded)
+  }, [])
 
   /* ── open detail with edit state reset ── */
   function handleViewDetail(photo: GalleryPhotoRow) {
@@ -101,13 +108,7 @@ export default function OrganizerGalleryClient({ photos }: Props) {
               </button>
             </>
           )}
-          <button
-            onClick={() => setOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-primary text-on-primary px-4 py-2 text-[13px] font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm"
-          >
-            <span className="material-symbols-outlined icon-fill" style={{ fontSize: 17 }}>add_photo_alternate</span>
-            Add photo
-          </button>
+          {showAddButton && <AddGalleryPhotoButton />}
         </div>
       </div>
 
@@ -130,47 +131,13 @@ export default function OrganizerGalleryClient({ photos }: Props) {
       {/* Grid */}
       <GalleryGrid
         photos={localPhotos}
-        emptyMessage="No photos yet. Add your first photo with the button above."
+        emptyMessage="No photos yet. Add your first photo with the Add photo button."
         selectable
         selected={selected}
         onToggleSelect={toggleSelect}
         onDelete={handleDelete}
         onViewDetails={handleViewDetail}
       />
-
-      {/* Add photo modal */}
-      {open && createPortal(
-        <div
-          className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="relative w-full max-w-md rounded-2xl border border-outline-variant dark:border-[#1a2d4f] bg-surface dark:bg-[#0d1729] p-5 shadow-2xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/20">
-                  <span className="material-symbols-outlined icon-fill text-primary" style={{ fontSize: 18 }}>add_photo_alternate</span>
-                </div>
-                <div>
-                  <h2 className="font-semibold text-[14px] text-on-surface dark:text-blue-50">Add photo</h2>
-                  <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50">Upload or paste an image URL</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="rounded-full p-1.5 hover:bg-surface-container dark:hover:bg-[#111f36] text-on-surface-variant transition-colors"
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
-              </button>
-            </div>
-            <CreateGalleryForm onOptimisticAdd={handleOptimisticAdd} />
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* View details modal */}
       {detail && createPortal(

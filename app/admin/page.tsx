@@ -39,7 +39,7 @@ export default async function AdminPage() {
     { label: 'Members', description: 'Every member and account, with role filters', icon: 'manage_accounts', href: '/directory' },
     { label: 'Activities', description: 'What is happening today and this week', icon: 'today', href: '/today' },
     { label: 'Approvals', description: `${data.pendingMembers} pending registration${data.pendingMembers === 1 ? '' : 's'}`, icon: 'pending_actions', href: '/admin/approvals', badge: data.pendingMembers > 0 ? data.pendingMembers : null },
-    { label: 'Gallery queue', description: `${data.galleryQueue.length} awaiting publish`, icon: 'photo_library', href: '/admin/gallery-queue', badge: data.galleryQueue.length > 0 ? data.galleryQueue.length : null },
+    { label: 'Gallery', description: `${data.galleryQueue.length} awaiting publish`, icon: 'photo_library', href: '/admin/gallery-queue', badge: data.galleryQueue.length > 0 ? data.galleryQueue.length : null },
     { label: 'Roles & access', description: 'Assign primary role and dashboards', icon: 'admin_panel_settings', href: '/admin/roles' },
     { label: 'Communications', description: 'Send notifications to members', icon: 'campaign', href: '/admin/announcements' },
     { label: 'Activity logs', description: 'Full audit trail', icon: 'history', href: '/admin/audit-logs' },
