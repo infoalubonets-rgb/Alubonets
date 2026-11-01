@@ -30,10 +30,6 @@ export default function MemberEventsClient({ upcoming, past }: { upcoming: Membe
   const [deleting, startDelete] = useTransition()
   const visibleUpcoming = upcoming.filter((event) => !deletedIds.has(event.id))
   const visiblePast = past.filter((event) => !deletedIds.has(event.id))
-  const events = [
-    ...visibleUpcoming.map((event) => ({ event, past: false })),
-    ...visiblePast.map((event) => ({ event, past: true })),
-  ].sort((a, b) => Math.abs(new Date(a.event.startsAt).getTime() - Date.now()) - Math.abs(new Date(b.event.startsAt).getTime() - Date.now()))
 
   function requestDelete(event: MemberEventCard) {
     setPendingDelete(event)
@@ -51,13 +47,33 @@ export default function MemberEventsClient({ upcoming, past }: { upcoming: Membe
   }
 
   return (
-    <div>
-      {events.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {events.map(({ event, past: isPast }) => (
-            <EventCard key={event.id} event={event} past={isPast} onView={() => setDetail(event)} onDelete={() => requestDelete(event)} deleting={deleting} />
-          ))}
-        </div>
+    <div className="space-y-8">
+      {visibleUpcoming.length > 0 && (
+        <section>
+          <h2 className="mb-4 text-[13px] font-semibold uppercase tracking-wider text-on-surface dark:text-blue-50">
+            Upcoming ({visibleUpcoming.length})
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {visibleUpcoming.map((event) => (
+              <EventCard key={event.id} event={event} past={false} onView={() => setDetail(event)} onDelete={() => requestDelete(event)} deleting={deleting} />
+            ))}
+          </div>
+        </section>
+      )}
+      {visiblePast.length > 0 && (
+        <section>
+          <h2 className="mb-4 text-[13px] font-semibold uppercase tracking-wider text-on-surface-variant">
+            Past ({visiblePast.length})
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {visiblePast.map((event) => (
+              <EventCard key={event.id} event={event} past onView={() => setDetail(event)} onDelete={() => requestDelete(event)} deleting={deleting} />
+            ))}
+          </div>
+        </section>
+      )}
+      {visibleUpcoming.length === 0 && visiblePast.length === 0 && (
+        <p className="py-6 text-[13px] text-on-surface-variant">No events to show.</p>
       )}
 
       {detail && <EventDetailsModal event={detail} onClose={() => setDetail(null)} onDelete={requestDelete} deleting={deleting} />}
@@ -89,17 +105,16 @@ function EventCard({ event, past, onView, onDelete, deleting }: {
 }) {
   const startsAt = new Date(event.startsAt)
   return (
-    <article className={`group relative flex min-h-[230px] flex-col overflow-hidden rounded-2xl border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${past ? 'border-outline-variant bg-surface opacity-60 dark:bg-[#0a1628]' : 'border-outline-variant bg-surface hover:border-primary/35 dark:bg-[#0a1628]'}`}>
-      {!event.isPublic && (
+    <article className="group relative flex min-h-[230px] flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md dark:bg-[#0a1628]">
+      {past && (
         <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
-          <span className="material-symbols-outlined text-[12px]">lock</span>
-          Members only
+          Past
         </span>
       )}
       {event.imageUrl ? (
-        <div className="relative overflow-hidden"><img src={event.imageUrl} alt="" className={`h-36 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03] ${past ? 'grayscale' : ''}`} /><div className="absolute inset-0 bg-gradient-to-t from-primary/70 to-transparent" /></div>
+        <div className="relative overflow-hidden"><img src={event.imageUrl} alt="" className="h-36 w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" /><div className="absolute inset-0 bg-gradient-to-t from-primary/70 to-transparent" /></div>
       ) : (
-        <div className={`relative h-28 overflow-hidden bg-gradient-to-br from-primary to-[#001435] ${past ? 'opacity-80' : ''}`}>
+        <div className="relative h-28 overflow-hidden bg-gradient-to-br from-primary to-[#001435]">
           <span className="absolute right-4 top-1/2 -translate-y-1/2 select-none text-[88px] font-black leading-none text-white/[0.06]">{startsAt.getDate()}</span>
           <div className="absolute inset-0 flex items-center gap-3 px-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-center"><span className="text-[9px] font-bold uppercase tracking-widest text-white/70">{startsAt.toLocaleDateString('en-KE', { month: 'short' })}</span><span className="-mt-3 text-[25px] font-black text-white">{startsAt.getDate()}</span></div><p className="line-clamp-2 text-[15px] font-bold text-white">{event.title}</p></div>
         </div>

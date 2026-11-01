@@ -12,6 +12,7 @@ import { sendBroadcastEmail } from '@/lib/email/resend'
 import { sendAnnouncement } from '@/lib/data/queries'
 import { assertNotPast } from '@/lib/dates'
 import { amountKes, amountKesOrZero } from '@/lib/money-limits'
+import { eventDeleteSnapshot } from '@/lib/events-list'
 
 function refreshEvents(eventId?: string) {
   revalidatePath('/events')
@@ -247,8 +248,15 @@ export async function deleteEventFromMemberView(eventId: string) {
     })
     if (!creationLog) throw new Error('You can only delete events you created.')
   }
+  const existing = await prisma.event.findUnique({ where: { id: eventId } })
   await prisma.event.delete({ where: { id: eventId } })
-  await writeAudit({ userId: actor.id, action: 'EVENT_DELETE', entity: 'Event', entityId: eventId })
+  await writeAudit({
+    userId: actor.id,
+    action: 'EVENT_DELETE',
+    entity: 'Event',
+    entityId: eventId,
+    oldValue: existing ? eventDeleteSnapshot(existing) : { id: eventId },
+  })
   refreshEvents(eventId)
 }
 

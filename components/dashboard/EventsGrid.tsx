@@ -105,8 +105,6 @@ function EventCard({
 
   return (
     <div className={`group rounded-2xl border overflow-hidden flex flex-col bg-surface dark:bg-[#0a1628] transition-all duration-200 shadow-sm hover:shadow-md relative ${
-      dimPast ? 'opacity-55' : ''
-    } ${
       isSelected
         ? 'border-primary ring-2 ring-primary/20'
         : 'border-outline-variant dark:border-[#1a2d4f] hover:border-primary/40'
@@ -151,12 +149,16 @@ function EventCard({
               {daysLabel}
             </span>
           )}
-          {event.isPublic === false && (
+          {dimPast ? (
+            <span className="absolute bottom-2.5 left-2.5 bg-black/50 backdrop-blur-sm text-white text-[9px] font-semibold px-2 py-0.5 rounded-full pointer-events-none">
+              Past
+            </span>
+          ) : event.isPublic === false ? (
             <span className="absolute bottom-2.5 left-2.5 bg-black/50 backdrop-blur-sm text-white text-[9px] font-semibold px-2 py-0.5 rounded-full pointer-events-none flex items-center gap-1">
               <span className="material-symbols-outlined" style={{ fontSize: 10 }}>lock</span>
               Members only
             </span>
-          )}
+          ) : null}
         </div>
       ) : (
         /* No-image gradient header */
@@ -188,12 +190,16 @@ function EventCard({
               )}
             </div>
           </div>
-          {event.isPublic === false && (
+          {dimPast ? (
+            <span className="absolute top-2 right-2 bg-black/40 text-white text-[9px] font-semibold px-2 py-0.5 rounded-full">
+              Past
+            </span>
+          ) : event.isPublic === false ? (
             <span className="absolute top-2 right-2 bg-black/40 text-white text-[9px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
               <span className="material-symbols-outlined" style={{ fontSize: 10 }}>lock</span>
               Members only
             </span>
-          )}
+          ) : null}
         </div>
       )}
 

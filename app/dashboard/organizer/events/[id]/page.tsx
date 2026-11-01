@@ -14,6 +14,7 @@ import {
 } from '@/app/actions/events'
 import { moneyNumber } from '@/lib/projects'
 import { lowerBoundFor } from '@/lib/dates'
+import EventCoverUpload from '@/components/dashboard/EventCoverUpload'
 
 const ROLES = ['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'] as const
 
@@ -107,6 +108,9 @@ export default async function OrganizerEventManagePage({
             <input name="location" defaultValue={event.location || ''} placeholder="Location" className="rounded-lg border px-3 py-2" />
             <input name="mapsUrl" type="url" defaultValue={event.mapsUrl || ''} placeholder="Maps directions link (optional)" className="rounded-lg border px-3 py-2" />
             <textarea name="description" defaultValue={event.description || ''} className="rounded-lg border px-3 py-2 md:col-span-3" />
+            <div className="md:col-span-3">
+              <EventCoverUpload name="imageUrl" initialUrl={event.imageUrl} />
+            </div>
             <select name="audienceType" defaultValue={event.audienceType} className="rounded-lg border px-3 py-2">
               <option value="PUBLIC">Public</option>
               <option value="ALL_MEMBERS">All members</option>

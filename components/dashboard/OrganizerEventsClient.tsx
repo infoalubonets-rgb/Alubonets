@@ -73,40 +73,10 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
     if (realIds.length > 0) startTransition(() => { actionDeleteEvents(realIds) })
   }
 
-  function handleDeleteAllPast() {
-    const ids = localPast.map((e) => e.id)
-    setLocalPast([])
-    clearSelection()
-    startTransition(() => { actionDeleteEvents(ids) })
-  }
-
   const anySelected = selected.size > 0
 
   return (
     <div className="space-y-5 p-4 md:p-6 max-w-4xl mx-auto">
-
-      {/* Past events cleanup banner */}
-      {localPast.length > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="material-symbols-outlined text-amber-500 dark:text-amber-400 flex-shrink-0" style={{ fontSize: 18 }}>
-              schedule
-            </span>
-            <p className="text-[12px] text-amber-800 dark:text-amber-300 truncate">
-              {localPast.length} past event{localPast.length > 1 ? 's' : ''} — consider cleaning up old records
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={isPending}
-            onClick={handleDeleteAllPast}
-            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-50"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete_sweep</span>
-            Delete all past
-          </button>
-        </div>
-      )}
 
       {/* Header row */}
       <div className="flex items-center justify-between gap-3">
@@ -224,7 +194,7 @@ export default function OrganizerEventsClient({ upcoming, past, members }: Props
             </button>
           </div>
           <EventsGrid
-            events={localPast.slice(0, 12)}
+            events={localPast}
             emptyMessage=""
             dimPast
             selectable

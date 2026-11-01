@@ -2,7 +2,7 @@ import { getFeatureFlags } from '@/lib/feature-flags'
 import { enabledRequestNoticesWhere } from '@/lib/notification-audience'
 import { NextResponse } from 'next/server'
 import { getSessionProfile } from '@/lib/auth/session'
-import { getRecentItems, getOldAnnouncementsCount, getPastEventsCount, getOldGalleryCount } from '@/lib/data/queries'
+import { getRecentItems, getOldAnnouncementsCount, getOldGalleryCount } from '@/lib/data/queries'
 import { prisma } from '@/lib/prisma'
 import { noticeAudienceWhere } from '@/lib/notification-audience'
 import type { Role } from '@/lib/auth/types'
@@ -28,11 +28,10 @@ export async function GET() {
 
     const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
-    const [{ events, projects, photos }, announcementCount, pastEventsCount, oldGalleryCount, recentPayments, persisted] =
+    const [{ events, projects, photos }, announcementCount, oldGalleryCount, recentPayments, persisted] =
       await Promise.all([
         getRecentItems(windowHours),
         isManager ? getOldAnnouncementsCount() : Promise.resolve(0),
-        isManager ? getPastEventsCount() : Promise.resolve(0),
         isManager ? getOldGalleryCount() : Promise.resolve(0),
         isPaymentRole
           ? prisma.auditLog.findMany({
@@ -108,7 +107,7 @@ export async function GET() {
 
     const unreadCount = persisted.filter((n) => !n.readAt).length
 
-    return NextResponse.json({ items, announcementCount, pastEventsCount, oldGalleryCount, unreadCount })
+    return NextResponse.json({ items, announcementCount, pastEventsCount: 0, oldGalleryCount, unreadCount })
   } catch (err) {
     console.error('[/api/notifications]', err)
     return NextResponse.json(EMPTY)

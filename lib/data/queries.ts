@@ -6,6 +6,7 @@ import { announcementAudienceWhere } from '@/lib/notification-audience'
 import { formatMonthKeys, formatPaymentMethod, monthKeyFromDate } from '@/lib/chart-labels'
 import type { PaymentMethod, ProjectStatus, Role, WelfareStatus } from '@prisma/client'
 import { NOT_DELETED_MEMBER } from '@/lib/deleted-member'
+import { partitionEventsByStart } from '@/lib/events-list'
 
 // ─── Cache tags ────────────────────────────────────────────────────────────────
 export const TAGS = {
@@ -181,7 +182,7 @@ export const getSecretaryDashboardData = unstable_cache(
   { tags: [TAGS.documents, TAGS.meetings, TAGS.announcements, TAGS.events], revalidate: 60 },
 )
 
-export const getOrganizerDashboardData = unstable_cache(
+const getOrganizerDashboardRows = unstable_cache(
   async () => {
     const [events, galleryCount, projectCount] = await Promise.all([
       prisma.event.findMany({
@@ -191,13 +192,8 @@ export const getOrganizerDashboardData = unstable_cache(
       prisma.galleryPhoto.count(),
       prisma.project.count(),
     ])
-    const now = new Date()
-    const upcoming = events
-      .filter((e) => e.startsAt >= now)
-      .map((e) => ({ ...e, startsAt: e.startsAt.toISOString() }))
     return {
       events: events.map((e) => ({ ...e, startsAt: e.startsAt.toISOString() })),
-      upcoming,
       galleryCount,
       projectCount,
     }
@@ -206,8 +202,12 @@ export const getOrganizerDashboardData = unstable_cache(
   { tags: [TAGS.events, TAGS.gallery, TAGS.projects], revalidate: 60 },
 )
 
-// Returns events split into upcoming/past with ISO string dates — for client components
-export const getOrganizerEvents = unstable_cache(
+export async function getOrganizerDashboardData() {
+  const data = await getOrganizerDashboardRows()
+  return { ...data, upcoming: partitionEventsByStart(data.events).upcoming }
+}
+
+const getOrganizerEventRows = unstable_cache(
   async () => {
     const events = await prisma.event.findMany({
       orderBy: { startsAt: 'asc' },
@@ -217,8 +217,7 @@ export const getOrganizerEvents = unstable_cache(
         reminderOffsetsHours: true,
       },
     })
-    const now = new Date()
-    const rows = events.map((e) => ({
+    return events.map((e) => ({
       id: e.id,
       title: e.title,
       location: e.location ?? null,
@@ -230,14 +229,14 @@ export const getOrganizerEvents = unstable_cache(
       reminderOffsetsHours: e.reminderOffsetsHours,
       startsAt: e.startsAt.toISOString(),
     }))
-    return {
-      upcoming: rows.filter((e) => new Date(e.startsAt) >= now),
-      past: rows.filter((e) => new Date(e.startsAt) < now).reverse(),
-    }
   },
   ['organizer-events'],
   { tags: [TAGS.events], revalidate: 60 },
 )
+
+export async function getOrganizerEvents() {
+  return partitionEventsByStart(await getOrganizerEventRows())
+}
 
 // Returns gallery photos with ISO string dates — for client components
 export const getOrganizerGalleryPhotos = unstable_cache(
@@ -348,7 +347,7 @@ export const getMemberProjects = unstable_cache(
 )
 
 /** Events for the members' events page; the page decides who may see upcoming vs past. */
-export const getPublicEvents = unstable_cache(
+const getPublicEventRows = unstable_cache(
   async () => {
     const events = await prisma.event.findMany({
       where: { OR: [{ isPublic: true }, { audienceType: { in: ['PUBLIC', 'ALL_MEMBERS'] } }] },
@@ -358,8 +357,7 @@ export const getPublicEvents = unstable_cache(
         startsAt: true, imageUrl: true,
       },
     })
-    const now = new Date()
-    const rows = events.map((e) => ({
+    return events.map((e) => ({
       id: e.id,
       title: e.title,
       description: e.description ?? null,
@@ -368,14 +366,14 @@ export const getPublicEvents = unstable_cache(
       imageUrl: e.imageUrl ?? null,
       startsAt: e.startsAt.toISOString(),
     }))
-    return {
-      upcoming: rows.filter((e) => new Date(e.startsAt) >= now),
-      past: rows.filter((e) => new Date(e.startsAt) < now).reverse().slice(0, 24),
-    }
   },
   ['member-events'],
   { tags: [TAGS.events], revalidate: 300 },
 )
+
+export async function getPublicEvents() {
+  return partitionEventsByStart(await getPublicEventRows())
+}
 
 export async function getContributionChartSeriesFresh() {
     const rows = await prisma.contribution.findMany({

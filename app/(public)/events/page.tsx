@@ -32,14 +32,14 @@ function EventCard({ event, past = false }: { event: EventRow; past?: boolean })
 
   return (
     <Link href={`/events/${event.id}`} className="block group">
-      <article className={`rounded-2xl border border-outline-variant bg-surface overflow-hidden flex flex-col shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 h-full ${past ? 'opacity-60' : ''}`}>
+      <article className="rounded-2xl border border-outline-variant bg-surface overflow-hidden flex flex-col shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 h-full">
 
         {event.imageUrl ? (
           <div className="relative overflow-hidden">
             <img
               src={event.imageUrl}
               alt={event.title}
-              className={`w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105 ${past ? 'grayscale' : ''}`}
+              className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
             <div className="absolute bottom-3 left-3">
@@ -72,7 +72,7 @@ function EventCard({ event, past = false }: { event: EventRow; past?: boolean })
 
         <div className="p-4 flex flex-col gap-2 flex-1">
           {event.imageUrl && (
-            <h3 className={`font-bold text-[15px] leading-snug line-clamp-2 ${past ? 'text-on-surface-variant' : 'text-on-surface'}`}>
+            <h3 className="font-bold text-[15px] leading-snug line-clamp-2 text-on-surface">
               {event.title}
             </h3>
           )}
@@ -177,7 +177,7 @@ export default async function PublicEventsPage() {
                 <span className="material-symbols-outlined text-outline" style={{ fontSize: 20 }}>history</span>
               </div>
               <div>
-                <h2 className="font-h3 text-[18px] leading-none text-on-surface-variant">Recent past events</h2>
+                <h2 className="font-h3 text-[18px] leading-none text-on-surface-variant">Past events</h2>
                 <p className="mt-0.5 text-[12px] text-outline">{past.length} past event{past.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
