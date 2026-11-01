@@ -6,6 +6,7 @@ import { navForRole } from '@/lib/dashboard/nav'
 import { requireActiveRole } from '@/lib/auth/session'
 import {
   listUpcomingActivities,
+  listPastActivities,
   createDailyActivity,
   deleteDailyActivity,
   prepareActivityImageUpload,
@@ -19,7 +20,8 @@ export default async function TodayPage() {
   const actor = await requireActiveRole(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'])
   if (actor.status !== 'ACTIVE') redirect('/login?error=inactive')
 
-  const activities = await listUpcomingActivities()
+  const [upcoming, past] = await Promise.all([listUpcomingActivities(), listPastActivities()])
+  const activities = [...upcoming, ...past]
 
   const canCreate = ['ADMIN', 'SECRETARY', 'ORGANIZER', 'EXECUTIVE'].includes(actor.role) || actor.isSuperAdmin
 

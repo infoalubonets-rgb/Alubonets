@@ -12,6 +12,7 @@ type Activity = {
   body: string | null
   imageUrl: string | null
   startsAt: string
+  endsAt: string | null
   venue: string | null
   emailed: boolean
   canDelete: boolean
@@ -38,7 +39,9 @@ export default function TodayActivitiesClient({
   const [error, setError] = useState('')
   const viewing = activities.find((activity) => activity.id === viewingId) ?? null
   const todayKey = todayInputValue()
-  const isToday = (activity: Activity) => new Date(activity.startsAt).toLocaleDateString('en-CA') <= todayKey
+  const dayKey = (iso: string) => new Date(iso).toLocaleDateString('en-CA')
+  const isPassed = (activity: Activity) => dayKey(activity.endsAt ?? activity.startsAt) < todayKey
+  const isToday = (activity: Activity) => !isPassed(activity) && dayKey(activity.startsAt) <= todayKey
 
   async function confirmDelete() {
     if (!deleting || pending) return
@@ -73,14 +76,15 @@ export default function TodayActivitiesClient({
             <tbody>
               {activities.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-10 text-center text-on-surface-variant">No activities today or coming up.</td>
+                  <td colSpan={4} className="py-10 text-center text-on-surface-variant">No activities yet.</td>
                 </tr>
               ) : (
                 activities.map((activity, i) => (
-                  <tr key={activity.id} className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''}`}>
+                  <tr key={activity.id} className={`border-t border-outline-variant/50 transition-colors hover:bg-primary/[0.03] ${i % 2 === 1 ? 'bg-surface-container-low/40' : ''} ${isPassed(activity) ? 'opacity-60' : ''}`}>
                     <td className="whitespace-nowrap px-4 py-3 text-on-surface-variant">
                       {dayLabel(activity.startsAt)}
                       {isToday(activity) && <span className="ml-2 rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold text-on-primary">Today</span>}
+                      {isPassed(activity) && <span className="ml-2 rounded-full bg-surface-container-high px-2 py-0.5 text-[10px] font-bold text-on-surface-variant">Passed</span>}
                     </td>
                     <td className="px-4 py-3">
                       <p className="flex items-center gap-1.5 font-medium text-on-surface">
@@ -117,7 +121,7 @@ export default function TodayActivitiesClient({
             {viewing.imageUrl && (
               <img src={viewing.imageUrl} alt="" className="max-h-72 w-full rounded-xl object-cover" />
             )}
-            <p className="text-sm font-semibold text-secondary">{dayLabel(viewing.startsAt, 'long')}{viewing.venue ? ` · ${viewing.venue}` : ''}</p>
+            <p className="text-sm font-semibold text-secondary">{dayLabel(viewing.startsAt, 'long')}{isPassed(viewing) ? ' · Passed' : ''}{viewing.venue ? ` · ${viewing.venue}` : ''}</p>
             {viewing.subtitle && <p className="font-medium text-on-surface">{viewing.subtitle}</p>}
             {viewing.body ? (
               <p className="whitespace-pre-line text-sm text-on-surface-variant">{viewing.body}</p>

@@ -61,7 +61,11 @@ function toActivityView(
 }
 
 /** Activities the viewer may see, from the start of today onward. */
-async function listActivities(windowFilter: (start: Date, end: Date) => Prisma.DailyActivityWhereInput, take: number) {
+async function listActivities(
+  windowFilter: (start: Date, end: Date) => Prisma.DailyActivityWhereInput,
+  take: number,
+  order: Prisma.SortOrder = 'asc',
+) {
   // Identity comes from the session — a caller must not be able to claim a role or branch.
   const viewer = await requireActiveRole(['ADMIN', 'EXECUTIVE', 'TREASURER', 'SECRETARY', 'ORGANIZER', 'MEMBER'])
   const { start, end } = todayRange()
@@ -81,7 +85,7 @@ async function listActivities(windowFilter: (start: Date, end: Date) => Prisma.D
 
   const rows = await prisma.dailyActivity.findMany({
     where: { published: true, AND: [audienceFilter, windowFilter(start, end)] },
-    orderBy: { startsAt: 'asc' },
+    orderBy: { startsAt: order },
     take,
     include: { createdBy: { select: { fullName: true } } },
   })
@@ -109,6 +113,20 @@ export async function listUpcomingActivities() {
       OR: [{ startsAt: { gte: start } }, { endsAt: { gte: start } }],
     }),
     100,
+  )
+}
+
+/** Activities that finished before today, newest first — kept on the page and shown as passed. */
+export async function listPastActivities() {
+  return listActivities(
+    (start) => ({
+      OR: [
+        { endsAt: null, startsAt: { lt: start } },
+        { endsAt: { lt: start } },
+      ],
+    }),
+    100,
+    'desc',
   )
 }
 

@@ -10,6 +10,14 @@ type Status = { oldMonth: { key: string; label: string } | null; currentLabel?: 
 /** Event fired after an admin opens or closes a month, so the pill updates without a reload. */
 export const ACCOUNTING_PERIOD_CHANGED = 'accounting-period-changed'
 
+const DISMISS_KEY = 'old-month-pill-dismissed-until'
+
+/** The calendar month the browser is in, e.g. "2026-11" — a dismissal lasts until this changes. */
+function thisMonthKey() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 /** Floating reminder, on every admin page, that an old month is open — with a one-click way back. */
 export default function OldMonthPill() {
   const router = useRouter()
@@ -17,6 +25,13 @@ export default function OldMonthPill() {
   const [status, setStatus] = useState<Status | null>(null)
   const [switching, setSwitching] = useState(false)
   const [error, setError] = useState('')
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    try {
+      setDismissed(localStorage.getItem(DISMISS_KEY) === thisMonthKey())
+    } catch {}
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -33,7 +48,14 @@ export default function OldMonthPill() {
     }
   }, [pathname])
 
-  if (!status?.oldMonth) return null
+  if (!status?.oldMonth || dismissed) return null
+
+  function dismiss() {
+    setDismissed(true)
+    try {
+      localStorage.setItem(DISMISS_KEY, thisMonthKey())
+    } catch {}
+  }
 
   async function switchBack() {
     if (switching) return
@@ -72,6 +94,15 @@ export default function OldMonthPill() {
       >
         {switching && <span className="material-symbols-outlined animate-spin text-[14px]">progress_activity</span>}
         {switching ? 'Switching…' : `Back to ${status.currentLabel?.split(' ')[0] ?? 'current month'}`}
+      </button>
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="Dismiss until next month"
+        title="Dismiss until next month"
+        className="-mr-1 inline-flex shrink-0 items-center rounded-full p-1 text-amber-800 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-500/10"
+      >
+        <span className="material-symbols-outlined text-[18px]">close</span>
       </button>
     </div>
   )
