@@ -572,7 +572,7 @@ export async function actionUpdateEvent(id: string, formData: FormData) {
     description,
     location,
     mapsUrl,
-    imageUrl: imageUrl ?? undefined,
+    imageUrl,
     startsAt: new Date(startsAt),
     isPublic,
     capacity: capacity && Number.isFinite(capacity) ? capacity : null,

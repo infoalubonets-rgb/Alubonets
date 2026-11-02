@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
+import CreateEventForm from './CreateEventForm'
 import { deleteEventFromMemberView, submitEventRsvp } from '@/app/actions/events'
 
 type Rsvp = { status: string } | undefined
@@ -23,13 +25,36 @@ export type MemberEventCard = {
   canDelete?: boolean
 }
 
-export default function MemberEventsClient({ upcoming, past }: { upcoming: MemberEventCard[]; past: MemberEventCard[] }) {
+type MemberOption = { id: string; fullName: string; email: string }
+
+export default function MemberEventsClient({
+  upcoming,
+  past,
+  members = [],
+}: {
+  upcoming: MemberEventCard[]
+  past: MemberEventCard[]
+  members?: MemberOption[]
+}) {
   const [detail, setDetail] = useState<MemberEventCard | null>(null)
+  const [editing, setEditing] = useState<MemberEventCard | null>(null)
+  const [edits, setEdits] = useState<Record<string, Partial<MemberEventCard>>>({})
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
   const [pendingDelete, setPendingDelete] = useState<MemberEventCard | null>(null)
   const [deleting, startDelete] = useTransition()
-  const visibleUpcoming = upcoming.filter((event) => !deletedIds.has(event.id))
-  const visiblePast = past.filter((event) => !deletedIds.has(event.id))
+  const withEdits = (event: MemberEventCard) => ({ ...event, ...edits[event.id] })
+  const visibleUpcoming = upcoming.filter((event) => !deletedIds.has(event.id)).map(withEdits)
+  const visiblePast = past.filter((event) => !deletedIds.has(event.id)).map(withEdits)
+
+  function openEdit(event: MemberEventCard) {
+    setDetail(null)
+    setEditing(event)
+  }
+
+  function saveEdit(updated: Partial<MemberEventCard> & { id: string }) {
+    setEdits((current) => ({ ...current, [updated.id]: { ...current[updated.id], ...updated } }))
+    setEditing(null)
+  }
 
   function requestDelete(event: MemberEventCard) {
     setPendingDelete(event)
@@ -55,7 +80,7 @@ export default function MemberEventsClient({ upcoming, past }: { upcoming: Membe
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {visibleUpcoming.map((event) => (
-              <EventCard key={event.id} event={event} past={false} onView={() => setDetail(event)} onDelete={() => requestDelete(event)} deleting={deleting} />
+              <EventCard key={event.id} event={event} past={false} onView={() => setDetail(event)} onEdit={() => openEdit(event)} onDelete={() => requestDelete(event)} deleting={deleting} />
             ))}
           </div>
         </section>
@@ -67,7 +92,7 @@ export default function MemberEventsClient({ upcoming, past }: { upcoming: Membe
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {visiblePast.map((event) => (
-              <EventCard key={event.id} event={event} past onView={() => setDetail(event)} onDelete={() => requestDelete(event)} deleting={deleting} />
+              <EventCard key={event.id} event={event} past onView={() => setDetail(event)} onEdit={() => openEdit(event)} onDelete={() => requestDelete(event)} deleting={deleting} />
             ))}
           </div>
         </section>
@@ -76,7 +101,36 @@ export default function MemberEventsClient({ upcoming, past }: { upcoming: Membe
         <p className="py-6 text-[13px] text-on-surface-variant">No events to show.</p>
       )}
 
-      {detail && <EventDetailsModal event={detail} onClose={() => setDetail(null)} onDelete={requestDelete} deleting={deleting} />}
+      {detail && <EventDetailsModal event={withEdits(detail)} onClose={() => setDetail(null)} onEdit={() => openEdit(withEdits(detail))} onDelete={requestDelete} deleting={deleting} />}
+
+      {editing && createPortal(
+        <div
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          onClick={() => setEditing(null)}
+        >
+          <div
+            className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-outline-variant bg-surface p-5 shadow-2xl dark:border-[#1a2d4f] dark:bg-[#0d1729]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-[14px] font-semibold text-on-surface dark:text-blue-50">Edit event</h2>
+                <p className="text-[11px] text-on-surface-variant dark:text-blue-200/50">Add or change the cover photo, then save.</p>
+              </div>
+              <button type="button" onClick={() => setEditing(null)} className="rounded-full p-1.5 text-on-surface-variant hover:bg-surface-container" aria-label="Close">
+                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
+              </button>
+            </div>
+            <CreateEventForm
+              key={editing.id}
+              initial={editing}
+              members={members}
+              onSuccess={(updated) => saveEdit(updated)}
+            />
+          </div>
+        </div>,
+        document.body,
+      )}
 
       <ConfirmDeleteModal
         open={Boolean(pendingDelete)}
@@ -96,10 +150,11 @@ export default function MemberEventsClient({ upcoming, past }: { upcoming: Membe
   )
 }
 
-function EventCard({ event, past, onView, onDelete, deleting }: {
+function EventCard({ event, past, onView, onEdit, onDelete, deleting }: {
   event: MemberEventCard
   past: boolean
   onView: () => void
+  onEdit: () => void
   onDelete: () => void
   deleting: boolean
 }) {
@@ -125,9 +180,16 @@ function EventCard({ event, past, onView, onDelete, deleting }: {
             <p className="text-[11px] font-bold uppercase tracking-wide text-secondary-container">{startsAt.toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
             <h3 className="mt-1 line-clamp-2 text-[15px] font-bold leading-snug text-on-surface dark:text-blue-50">{event.title}</h3>
           </div>
-          <button type="button" onClick={onView} aria-label={`View details for ${event.title}`} title="View details" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary transition hover:bg-primary hover:text-on-primary">
-            <span className="material-symbols-outlined text-[19px]">visibility</span>
-          </button>
+          <div className="flex shrink-0 gap-1">
+            <button type="button" onClick={onView} aria-label={`View details for ${event.title}`} title="View details" className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary transition hover:bg-primary hover:text-on-primary">
+              <span className="material-symbols-outlined text-[19px]">visibility</span>
+            </button>
+            {event.canDelete && (
+              <button type="button" onClick={onEdit} aria-label={`Edit ${event.title}`} title="Edit event" className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary transition hover:bg-primary hover:text-on-primary">
+                <span className="material-symbols-outlined text-[19px]">edit</span>
+              </button>
+            )}
+          </div>
         </div>
         <div className="mt-3 space-y-1.5 text-[12px] text-on-surface-variant">
           <p className="flex items-center gap-1.5"><span className="material-symbols-outlined text-[15px] text-primary">schedule</span>{startsAt.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}</p>
@@ -173,7 +235,7 @@ function RsvpForm({ event }: { event: MemberEventCard }) {
   )
 }
 
-function EventDetailsModal({ event, onClose, onDelete, deleting }: { event: MemberEventCard; onClose: () => void; onDelete: (event: MemberEventCard) => void; deleting: boolean }) {
+function EventDetailsModal({ event, onClose, onEdit, onDelete, deleting }: { event: MemberEventCard; onClose: () => void; onEdit: () => void; onDelete: (event: MemberEventCard) => void; deleting: boolean }) {
   const startsAt = new Date(event.startsAt)
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="event-detail-title" onMouseDown={(e) => e.target === e.currentTarget && onClose()} className="fixed inset-0 z-[100] grid place-items-center bg-[#001f50]/55 p-3 backdrop-blur-sm">
@@ -193,7 +255,15 @@ function EventDetailsModal({ event, onClose, onDelete, deleting }: { event: Memb
           <div className="mt-3"><h3 className="text-[13px] font-bold text-on-surface">About this event</h3><p className="mt-1 whitespace-pre-wrap text-[12px] leading-5 text-on-surface-variant">{event.description || 'No additional description was provided.'}</p></div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-outline-variant pt-3">
             {startsAt >= new Date() ? <RsvpForm event={event} /> : <span className="text-[12px] text-on-surface-variant">This event has ended.</span>}
-            {event.canDelete && <button type="button" disabled={deleting} onClick={() => onDelete(event)} className="inline-flex items-center gap-1.5 rounded-full border border-red-200 px-3 py-1.5 text-[12px] font-bold text-red-600 hover:bg-red-50 disabled:opacity-40"><span className="material-symbols-outlined text-[16px]">delete</span>Delete event</button>}
+            <div className="flex flex-wrap gap-2">
+              {event.canDelete && (
+                <button type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[12px] font-bold text-on-primary">
+                  <span className="material-symbols-outlined text-[16px]">add_photo_alternate</span>
+                  {event.imageUrl ? 'Edit event' : 'Add photo'}
+                </button>
+              )}
+              {event.canDelete && <button type="button" disabled={deleting} onClick={() => onDelete(event)} className="inline-flex items-center gap-1.5 rounded-full border border-red-200 px-3 py-1.5 text-[12px] font-bold text-red-600 hover:bg-red-50 disabled:opacity-40"><span className="material-symbols-outlined text-[16px]">delete</span>Delete event</button>}
+            </div>
           </div>
         </div>
       </div>

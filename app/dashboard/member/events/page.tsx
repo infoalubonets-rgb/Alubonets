@@ -83,7 +83,7 @@ export default async function MemberEventsPage() {
     >
       <div className="space-y-4 p-4 md:p-6">
         {!paidUp && <MemberGate variant="renew" what="Upcoming events" reason={reason} />}
-        <MemberEventsClient upcoming={upcoming} past={past} />
+        <MemberEventsClient upcoming={upcoming} past={past} members={members} />
       </div>
     </DashboardShell>
   )
