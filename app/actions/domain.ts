@@ -7,7 +7,7 @@ import {
   TAGS,
   approveGalleryPhoto,
   createEvent,
-  createGalleryPhoto,
+  createGalleryPhotos,
   deleteAnnouncement,
   deleteEvent,
   deleteEvents,
@@ -26,6 +26,8 @@ import { finishAnnouncementEmailProgress, recordAnnouncementEmailProgress } from
 import { writeAudit } from '@/lib/audit'
 import { assertNotPast } from '@/lib/dates'
 import { eventDeleteSnapshot } from '@/lib/events-list'
+import { removeGalleryFiles } from '@/lib/gallery-storage'
+import { GALLERY_MAX_BATCH } from '@/lib/gallery-upload'
 
 export async function actionCreateContribution(formData: FormData) {
   void formData
@@ -373,27 +375,34 @@ export async function actionDeleteDocument(id: string) {
   revalidateTag(TAGS.documents)
 }
 
-export async function actionCreateGallery(formData: FormData) {
+/**
+ * Saves a batch of already-uploaded photos in one insert and sends a single "N new photos"
+ * notice instead of one per photo. Captions are optional and can be added later.
+ */
+export async function actionCreateGalleryPhotos(
+  items: { url: string; caption?: string | null; category?: string | null }[],
+) {
   const actor = await requireActiveRole(['ORGANIZER', 'ADMIN', 'MEMBER'])
-  const url = String(formData.get('url') || '')
-  if (!url) throw new Error('Image URL required')
-  const caption = String(formData.get('caption') || '') || undefined
-  const category = String(formData.get('category') || '') || undefined
-  await createGalleryPhoto({
-    url,
-    caption,
-    category,
-    uploadedBy: actor.id,
-    isPublic: true,
-  })
-  // In-app announcement for all members (visible in notification toasts)
+  const photos = items
+    .map((item) => ({
+      url: String(item.url || '').trim(),
+      caption: String(item.caption || '').trim().slice(0, 300) || undefined,
+      category: String(item.category || '').trim().slice(0, 60) || undefined,
+    }))
+    .filter((item) => /^https?:\/\//i.test(item.url))
+  if (!photos.length) throw new Error('No photos to add')
+  if (photos.length > GALLERY_MAX_BATCH) throw new Error(`Add up to ${GALLERY_MAX_BATCH} photos at a time`)
+
+  const created = await createGalleryPhotos(photos, actor.id)
+
   const authorId = actor.id
-  const lines = ['A new photo has been added to the gallery.']
-  if (caption) lines.push(`"${caption}"`)
-  if (category) lines.push(`Category: ${category}`)
+  const categories = [...new Set(photos.map((p) => p.category).filter(Boolean))]
+  const lines = [created.length === 1 ? 'A new photo has been added to the gallery.' : `${created.length} new photos have been added to the gallery.`]
+  if (created.length === 1 && photos[0].caption) lines.push(`"${photos[0].caption}"`)
+  if (categories.length) lines.push(`Category: ${categories.join(', ')}`)
   after(() => sendAnnouncement({
     authorId,
-    title: 'New photo added to gallery',
+    title: created.length === 1 ? 'New photo added to gallery' : `${created.length} new photos added to gallery`,
     content: lines.join('\n'),
     broadcast: true,
     includeSelf: true,
@@ -404,24 +413,30 @@ export async function actionCreateGallery(formData: FormData) {
   revalidatePath('/admin/gallery-queue')
   revalidatePath('/gallery')
   revalidateTag(TAGS.gallery)
+
+  return created.map((photo) => ({ ...photo, uploadedAt: photo.uploadedAt.toISOString() }))
 }
 
 export async function actionDeleteGalleryPhoto(id: string) {
   await requireActiveRole(['ORGANIZER', 'ADMIN'])
-  await deleteGalleryPhoto(id)
+  const { url } = await deleteGalleryPhoto(id)
+  after(() => removeGalleryFiles([url]))
   revalidatePath('/dashboard/organizer/gallery')
   revalidatePath('/gallery')
   revalidatePath('/admin')
+  revalidatePath('/admin/gallery-queue')
   revalidateTag(TAGS.gallery)
 }
 
 export async function actionDeleteGalleryPhotos(ids: string[]) {
   await requireActiveRole(['ORGANIZER', 'ADMIN'])
   if (!ids.length) return
-  await deleteGalleryPhotos(ids)
+  const urls = await deleteGalleryPhotos(ids)
+  after(() => removeGalleryFiles(urls))
   revalidatePath('/dashboard/organizer/gallery')
   revalidatePath('/gallery')
   revalidatePath('/admin')
+  revalidatePath('/admin/gallery-queue')
   revalidateTag(TAGS.gallery)
 }
 

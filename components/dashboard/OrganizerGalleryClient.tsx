@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { actionDeleteGalleryPhoto, actionDeleteGalleryPhotos, actionUpdateGalleryPhoto } from '@/app/actions/domain'
 import GalleryGrid, { GalleryPhotoRow } from './GalleryGrid'
 import AddGalleryPhotoButton, { GALLERY_PHOTO_ADDED } from './AddGalleryPhotoButton'
+import { GALLERY_CATEGORIES } from './CreateGalleryForm'
 import { GALLERY_FULL_SIZES, gallerySrcSet } from '@/lib/gallery-image'
 
 type Props = {
@@ -20,15 +21,17 @@ export default function OrganizerGalleryClient({ photos, showAddButton = true }:
   const [editMode, setEditMode]         = useState(false)
   const [editCaption, setEditCaption]   = useState('')
   const [editCategory, setEditCategory] = useState('')
+  const [confirmBulk, setConfirmBulk]   = useState(false)
 
   useEffect(() => { setLocalPhotos(photos) }, [photos])
 
   /* ── selection ── */
   function toggleSelect(id: string) {
+    setConfirmBulk(false)
     setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
-  function selectAll() { setSelected(new Set(localPhotos.map((p) => p.id))) }
-  function clearSelection() { setSelected(new Set()) }
+  function selectAll() { setSelected(new Set(localPhotos.map((p) => p.id))); setConfirmBulk(false) }
+  function clearSelection() { setSelected(new Set()); setConfirmBulk(false) }
   const anySelected = selected.size > 0
 
   /* ── delete ── */
@@ -48,8 +51,8 @@ export default function OrganizerGalleryClient({ photos, showAddButton = true }:
   /* ── optimistic add (from any Add photo button on the page) ── */
   useEffect(() => {
     const onAdded = (e: Event) => {
-      const photo = (e as CustomEvent<GalleryPhotoRow>).detail
-      setLocalPhotos((prev) => [photo, ...prev])
+      const added = (e as CustomEvent<GalleryPhotoRow[]>).detail
+      setLocalPhotos((prev) => [...added, ...prev])
     }
     window.addEventListener(GALLERY_PHOTO_ADDED, onAdded)
     return () => window.removeEventListener(GALLERY_PHOTO_ADDED, onAdded)
@@ -96,11 +99,15 @@ export default function OrganizerGalleryClient({ photos, showAddButton = true }:
               <span className="text-[12px] text-on-surface-variant dark:text-blue-200/50">{selected.size} selected</span>
               <button
                 type="button"
-                onClick={handleBulkDelete}
-                className="flex items-center gap-1.5 rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 px-3 py-2 text-[12px] font-semibold hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                onClick={confirmBulk ? handleBulkDelete : () => setConfirmBulk(true)}
+                className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-semibold transition-colors ${
+                  confirmBulk
+                    ? 'border-red-600 bg-red-600 text-white hover:bg-red-700'
+                    : 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40'
+                }`}
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 15 }}>delete</span>
-                Delete ({selected.size})
+                {confirmBulk ? `Yes, delete ${selected.size} for good` : `Delete (${selected.size})`}
               </button>
               <button type="button" onClick={clearSelection}
                 className="text-[12px] text-on-surface-variant dark:text-blue-200/40 hover:text-on-surface transition-colors">
@@ -131,7 +138,7 @@ export default function OrganizerGalleryClient({ photos, showAddButton = true }:
       {/* Grid */}
       <GalleryGrid
         photos={localPhotos}
-        emptyMessage="No photos yet. Add your first photo with the Add photo button."
+        emptyMessage="No photos yet. Add your first photos with the Add photos button."
         selectable
         selected={selected}
         onToggleSelect={toggleSelect}
@@ -185,7 +192,7 @@ export default function OrganizerGalleryClient({ photos, showAddButton = true }:
                           className="w-full appearance-none bg-transparent outline-none text-[13px] text-on-surface dark:text-blue-50 px-3 py-2.5 pr-8 cursor-pointer"
                         >
                           <option value="">No category</option>
-                          {['Events','Meetings','Projects','Celebrations','Community Work','Fundraising','Training','Field Visit','Members','Other'].map((c) => (
+                          {GALLERY_CATEGORIES.map((c) => (
                             <option key={c} value={c}>{c}</option>
                           ))}
                         </select>

@@ -952,8 +952,11 @@ export async function deleteGalleryPhoto(id: string) {
   return prisma.galleryPhoto.delete({ where: { id } })
 }
 
+/** Deletes the rows and returns their URLs so the stored image files can be removed too. */
 export async function deleteGalleryPhotos(ids: string[]) {
-  return prisma.galleryPhoto.deleteMany({ where: { id: { in: ids } } })
+  const rows = await prisma.galleryPhoto.findMany({ where: { id: { in: ids } }, select: { url: true } })
+  await prisma.galleryPhoto.deleteMany({ where: { id: { in: ids } } })
+  return rows.map((row) => row.url)
 }
 
 export async function createMeeting(data: {
@@ -1017,6 +1020,18 @@ export async function createGalleryPhoto(data: {
 }) {
   return prisma.galleryPhoto.create({
     data: { ...data, approvedAt: data.isPublic ? new Date() : null },
+  })
+}
+
+/** Saves a whole upload batch in one insert. */
+export async function createGalleryPhotos(
+  photos: { url: string; caption?: string; category?: string }[],
+  uploadedBy: string,
+) {
+  const approvedAt = new Date()
+  return prisma.galleryPhoto.createManyAndReturn({
+    data: photos.map((photo) => ({ ...photo, uploadedBy, isPublic: true, approvedAt })),
+    select: { id: true, url: true, caption: true, category: true, isPublic: true, uploadedAt: true },
   })
 }
 
